@@ -8,20 +8,24 @@
   },
   "scripts": {
     "dev": "next dev",
+    "deploy:dollar:local": "node scripts/deploy-local-dollar.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "sdk:sync": "node scripts/vendor-statics-sdk.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:integration:local": "node test/integration/local-dollar.mjs",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@privy-io/react-auth": "3.35.1",
     "@privy-io/wagmi": "4.0.14",
+    "@statics-protocol/sdk": "file:vendor/statics-sdk",
     "@tanstack/react-query": "5.101.4",
     "next": "16.2.11",
     "react": "19.2.8",
@@ -32,6 +36,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "1.61.1",
+    "@scure/bip39": "1.6.0",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",

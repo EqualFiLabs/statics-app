@@ -20,6 +20,7 @@ test-results/
 *.sqlite3
 cache/
 .cache/
+.local/
 
 # Editors and operating systems
 .DS_Store
