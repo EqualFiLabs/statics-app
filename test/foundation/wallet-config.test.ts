@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getAddressExplorerUrl, readWalletEnvironment } from "@/lib/wallet-config";
+import {
+  getAddressExplorerUrl,
+  getTransactionExplorerUrl,
+  readWalletEnvironment,
+} from "@/lib/wallet-config";
 
 describe("wallet environment", () => {
   it("uses Robinhood Testnet and its public RPC only for local development fallback", () => {
@@ -50,5 +54,12 @@ describe("wallet environment", () => {
     expect(getAddressExplorerUrl(environment.defaultChain, "0x1234")).toBe(
       "https://explorer.testnet.chain.robinhood.com/address/0x1234"
     );
+  });
+
+  it("creates transaction links only for chains with a configured explorer", () => {
+    expect(getTransactionExplorerUrl(46_630, "0x1234")).toBe(
+      "https://explorer.testnet.chain.robinhood.com/tx/0x1234"
+    );
+    expect(getTransactionExplorerUrl(31_337, "0x1234")).toBeNull();
   });
 });

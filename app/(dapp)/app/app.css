@@ -700,6 +700,15 @@
   line-height: 1.6;
 }
 
+.dollar-action-reason {
+  margin: 1rem 0 0;
+  padding: 0.9rem;
+  border: 1px solid var(--line-bright);
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.6;
+}
+
 .dollar-submit {
   width: 100%;
   margin-top: 1rem;
@@ -806,15 +815,30 @@
   color: var(--green);
 }
 
-.activity-status.is-reverted {
+.activity-status.is-rejected,
+.activity-status.is-reverted,
+.activity-status.is-failed,
+.activity-status.is-replaced {
   color: #e5a79d;
 }
 
+.activity-status.is-simulating,
+.activity-status.is-signing,
+.activity-status.is-submitted {
+  color: #d1b46e;
+}
+
 .activity-panel code,
+.activity-hash,
 .activity-panel li p {
   grid-column: 1 / -1;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.activity-hash {
+  font-family: monospace;
+  font-size: 0.62rem;
 }
 
 @media (max-width: 900px) {

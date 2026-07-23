@@ -132,3 +132,8 @@ export function getAddressExplorerUrl(chain: Chain, address: string): string | n
   const explorer = chain.blockExplorers?.default.url;
   return explorer ? `${explorer}/address/${address}` : null;
 }
+
+export function getTransactionExplorerUrl(chainId: number, hash: string): string | null {
+  if (chainId !== robinhoodTestnet.id) return null;
+  return `${robinhoodTestnet.blockExplorers.default.url}/tx/${hash}`;
+}

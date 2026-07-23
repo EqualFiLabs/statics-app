@@ -1,11 +1,14 @@
-import { encodeErrorResult } from "viem";
+import { encodeErrorResult, encodeFunctionResult } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { staticsDollarErrorAbi } from "@statics-protocol/sdk";
+import { staticsAbi, staticsDollarErrorAbi } from "@statics-protocol/sdk";
 import {
   describeDollarError,
+  isOnchainRevert,
+  isWalletRejection,
   maximumWithTolerance,
   minimumWithTolerance,
+  validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 
 describe("Dollar transaction bounds", () => {
@@ -29,5 +32,25 @@ describe("Dollar transaction bounds", () => {
     expect(describeDollarError(new Error("User rejected the request."))).toBe(
       "The wallet request was rejected."
     );
+    expect(isWalletRejection(new Error("User denied transaction signature"))).toBe(true);
+    expect(isOnchainRevert(new Error("The transaction reverted onchain."))).toBe(true);
+  });
+
+  it("refuses a successful no-op recombination simulation", () => {
+    const unavailable = encodeFunctionResult({
+      abi: staticsAbi,
+      functionName: "recombineToWETH",
+      result: [2, 0n],
+    });
+    expect(() => validateRecombinationSimulation("recombineToWETH", unavailable)).toThrow(
+      "CollateralExitUnavailable"
+    );
+
+    const available = encodeFunctionResult({
+      abi: staticsAbi,
+      functionName: "recombineToWETH",
+      result: [0, 100n],
+    });
+    expect(validateRecombinationSimulation("recombineToWETH", available)).toBe(100n);
   });
 });

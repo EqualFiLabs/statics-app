@@ -2,7 +2,16 @@
 
 import type { Address, Hex } from "viem";
 
-export type DollarActivityStatus = "signing" | "submitted" | "confirmed" | "reverted" | "replaced";
+export type DollarActivityStatus =
+  | "simulating"
+  | "signing"
+  | "submitted"
+  | "confirmed"
+  | "rejected"
+  | "reverted"
+  | "replaced"
+  | "failed";
+export type DollarReplacementReason = "repriced" | "replaced" | "cancelled";
 export type DollarActivityKind =
   | "approve-weth"
   | "approve-dollar"
@@ -24,11 +33,23 @@ export type DollarActivity = Readonly<{
   createdAt: number;
   hash?: Hex;
   replacementHash?: Hex;
+  confirmedHash?: Hex;
+  replacementReason?: DollarReplacementReason;
   error?: string;
 }>;
 
 const activityEvent = "statics-dollar-activity";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
+const activityStatuses = new Set<DollarActivityStatus>([
+  "simulating",
+  "signing",
+  "submitted",
+  "confirmed",
+  "rejected",
+  "reverted",
+  "replaced",
+  "failed",
+]);
 
 function storageKey(wallet: Address, chainId: number): string {
   return `statics:dollar:activity:${chainId}:${wallet.toLowerCase()}`;
@@ -41,7 +62,22 @@ export function readDollarActivity(wallet: Address, chainId: number): DollarActi
   const cached = activityCache.get(key);
   if (cached?.raw === raw) return cached.value;
   try {
-    const value = JSON.parse(raw) as DollarActivity[];
+    const parsed: unknown = JSON.parse(raw);
+    const value = Array.isArray(parsed)
+      ? parsed.filter(
+          (item): item is DollarActivity =>
+            typeof item === "object" &&
+            item !== null &&
+            typeof (item as DollarActivity).id === "string" &&
+            typeof (item as DollarActivity).wallet === "string" &&
+            Number.isInteger((item as DollarActivity).chainId) &&
+            typeof (item as DollarActivity).kind === "string" &&
+            typeof (item as DollarActivity).label === "string" &&
+            typeof (item as DollarActivity).amount === "string" &&
+            activityStatuses.has((item as DollarActivity).status) &&
+            Number.isFinite((item as DollarActivity).createdAt)
+        )
+      : [];
     activityCache.set(key, { raw, value });
     return value;
   } catch {

@@ -45,3 +45,5 @@ The local integration command separately deploys real contracts to ephemeral Anv
 and WETH Dollar lifecycles with real approvals and confirmed receipts.
 
 See `STATICS-DAPP-BUILD-PLAN.md` for the product roadmap, security boundaries, phase gates, and progress record.
+Use `WALLET-DOLLAR-REHEARSAL.md` for the local Privy identity, embedded-wallet Dollar, and
+external-wallet acceptance checklist.

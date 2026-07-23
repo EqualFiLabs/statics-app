@@ -1,7 +1,7 @@
 # Statics Site and DApp Build Plan
 
 - Last updated: 2026-07-22
-- Status: Phase 3 local Dollar flows implemented and locally verified; interactive Privy and public deployment proofs pending
+- Status: Wallet and Dollar safety hardening locally verified; interactive Privy and public deployment proofs pending
 - Primary workspace: `statics-site`
 - Protocol source: `../statics`
 - Reference wallet implementation: `../market-ui/eves-market-ui`
@@ -117,7 +117,9 @@ Proposed routes may change during UX design, but the product capabilities should
 - [-] Support configured pegged-profile mint and redemption; outside the first local WETH profile scope.
 - [x] Keep Risk Share ERC-1155 operator approval separate, explain its all-series scope, and expose revocation.
 - [x] Refresh authoritative previews before simulation and refresh balances after confirmed receipts.
-- [~] Disable actions from profile health, debt ceiling, pause, and exit state; contract simulation fails closed, while proactive per-condition button messaging remains future UX work.
+- [x] Disable actions proactively from the operation-specific profile, series, oracle, health, debt, pause, balance, quote, and exit requirements (`lib/dollar/action-state.ts`).
+- [x] Preserve prior previews during refresh without allowing stale input or series data to submit.
+- [x] Distinguish simulation, signature, rejection, submission, replacement, confirmation, reversion, and local failure in browser-scoped activity.
 
 ### Basket release
 
@@ -235,6 +237,26 @@ Evidence (2026-07-22): `npm run test:integration:local` generated an ephemeral A
 
 The final site gate passed lint, formatting, TypeScript, 31 Vitest tests, the Next.js production build, and 24 Playwright checks across desktop, tablet, and mobile. The canonical protocol SDK separately passed 24 tests and its TypeScript build before commit `be81deec2424dd6ad18ab9cbd192632ed39c4921`.
 
+### Wallet and Dollar release rehearsal
+
+- [x] Add deterministic operation-specific eligibility and one-next-action sequencing.
+- [x] Decode recombination simulation results and refuse unavailable or zero-output exits before requesting a wallet signature.
+- [x] Preserve current/previous preview identity and block submission while the current input refreshes.
+- [x] Add accurate activity states, replacement metadata, and verified-chain-only explorer links.
+- [x] Document a credential-safe embedded and external wallet rehearsal (`WALLET-DOLLAR-REHEARSAL.md`).
+- [!] Prove the same Privy identity resolves to the exact same embedded address in Statics and Eves; requires dashboard origin approval and interactive authentication.
+- [!] Complete the embedded-wallet UI Dollar lifecycle and external-wallet smoke test; requires interactive wallet access.
+
+Gate: automated safety checks and the real local CLI lifecycle pass, then a human completes every
+identity, embedded-wallet, and external-wallet outcome in the rehearsal checklist. Automated proof
+does not close the interactive items.
+
+Evidence (2026-07-22): `npm run verify` passed lint, formatting, TypeScript, 51 Vitest tests, the
+Next.js production build, and 24 Playwright checks across desktop, tablet, and mobile.
+`npm run test:integration:local` deployed current contracts to ephemeral Anvil and confirmed ETH and
+WETH deposit/recombination lifecycles with available, nonzero decoded exit results. No Privy
+identity, browser-wallet, public-network, or production proof is claimed.
+
 ### Broader protocol DApp
 
 - [ ] Basket discovery, details, mint, and redemption.
@@ -301,7 +323,7 @@ These decisions do not block documenting or scaffolding the application, but the
 - [ ] Add the Statics origin to the existing Eves Privy App ID and validate normal independent sign-in.
 - [x] Select Robinhood Chain Testnet (chain ID 46630) as the wallet foundation target; select a dedicated staging/production RPC before deployment.
 - [ ] Produce or select the verified Statics deployment manifest; none is currently recorded.
-- [ ] Decide how the versioned Statics SDK and ABI artifacts enter this repository without production imports from `../statics`.
+- [x] Vendor the versioned canonical Statics SDK with protocol commit and SHA-256 provenance; production imports remain independent from `../statics`.
 - [ ] Confirm which pegged profiles are part of the first Dollar release.
 - [ ] Confirm final Eves Market URL and desired handoff behavior.
 
@@ -309,13 +331,14 @@ These decisions do not block documenting or scaffolding the application, but the
 
 Add dated entries with concrete evidence. Keep plans and completed work distinct.
 
-| Date       | Area                    | Status                  | Evidence / note                                                                                                                                                                                 |
-| ---------- | ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-22 | Landing prototype       | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                             |
-| 2026-07-22 | Phase 1 foundation      | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                        |
-| 2026-07-22 | Eves Privy/Wagmi review | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                     |
-| 2026-07-22 | Statics DApp plan       | Documented              | This file created as the implementation and release tracker.                                                                                                                                    |
-| 2026-07-22 | Wallet foundation       | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending. |
+| Date       | Area                    | Status                  | Evidence / note                                                                                                                                                                                                                                             |
+| ---------- | ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-22 | Landing prototype       | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                                                                                         |
+| 2026-07-22 | Phase 1 foundation      | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                                                                                    |
+| 2026-07-22 | Eves Privy/Wagmi review | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                                                                                 |
+| 2026-07-22 | Statics DApp plan       | Documented              | This file created as the implementation and release tracker.                                                                                                                                                                                                |
+| 2026-07-22 | Wallet foundation       | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending.                                                             |
+| 2026-07-22 | Dollar safety rehearsal | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked. |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 

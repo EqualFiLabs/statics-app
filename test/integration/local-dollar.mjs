@@ -8,6 +8,7 @@ import {
   buildDepositWETHCall,
   buildRecombineToETHCall,
   buildRecombineToWETHCall,
+  staticsAbi,
   staticsDollarCoreAbi,
   staticsDollarRiskTokenAbi,
   staticsDollarTokenAbi,
@@ -16,6 +17,7 @@ import {
 import {
   createPublicClient,
   createWalletClient,
+  decodeFunctionResult,
   encodeFunctionData,
   http,
   parseEther,
@@ -97,11 +99,25 @@ try {
   const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
 
   const send = async (to, data, value = 0n) => {
-    await publicClient.call({ account: account.address, to, data, value });
+    const simulation = await publicClient.call({ account: account.address, to, data, value });
     const hash = await walletClient.sendTransaction({ to, data, value });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error(`Local transaction ${hash} reverted.`);
-    return receipt;
+    return { receipt, simulationData: simulation.data };
+  };
+
+  const assertAvailableRecombination = (functionName, simulationData) => {
+    if (!simulationData) throw new Error(`${functionName} simulation returned no result.`);
+    const [status, collateralOut] = decodeFunctionResult({
+      abi: staticsAbi,
+      functionName,
+      data: simulationData,
+    });
+    if (status !== 0 || collateralOut === 0n) {
+      throw new Error(
+        `${functionName} simulation did not prove an available, nonzero collateral exit.`
+      );
+    }
   };
 
   const profile = await publicClient.readContract({
@@ -165,7 +181,7 @@ try {
     functionName: "previewRecombine",
     args: [profile.activeSeriesId, firstDollarBalance],
   });
-  await send(
+  const ethRecombination = await send(
     deployment.contracts.gateway,
     buildRecombineToETHCall(
       profile.activeSeriesId,
@@ -175,6 +191,7 @@ try {
       minimum(ethRecombinePreview.collateralOut)
     )
   );
+  assertAvailableRecombination("recombineToETH", ethRecombination.simulationData);
 
   await send(
     deployment.contracts.weth,
@@ -226,7 +243,7 @@ try {
     functionName: "previewRecombine",
     args: [profile.activeSeriesId, secondDollarBalance],
   });
-  await send(
+  const wethRecombination = await send(
     deployment.contracts.gateway,
     buildRecombineToWETHCall(
       profile.activeSeriesId,
@@ -236,6 +253,7 @@ try {
       minimum(wethRecombinePreview.collateralOut)
     )
   );
+  assertAvailableRecombination("recombineToWETH", wethRecombination.simulationData);
 
   const endingDollar = await publicClient.readContract({
     address: deployment.contracts.dollar,

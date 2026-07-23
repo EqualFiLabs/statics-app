@@ -8,13 +8,21 @@ import {
   subscribeDollarActivity,
   type DollarActivity,
 } from "@/lib/dollar/activity";
+import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function statusLabel(activity: DollarActivity): string {
+  if (activity.status === "simulating") return "Simulating";
   if (activity.status === "signing") return "Awaiting signature";
   if (activity.status === "submitted") return "Confirming";
-  if (activity.status === "confirmed") return "Confirmed";
-  if (activity.status === "replaced") return "Replaced";
+  if (activity.status === "confirmed") {
+    return activity.replacementReason === "repriced" ? "Confirmed · repriced" : "Confirmed";
+  }
+  if (activity.status === "rejected") return "Rejected";
+  if (activity.status === "reverted") return "Reverted";
+  if (activity.status === "replaced") {
+    return activity.replacementReason === "cancelled" ? "Cancelled" : "Replaced";
+  }
   return "Failed";
 }
 
@@ -52,27 +60,51 @@ export function ActivityPage() {
       ) : (
         <ol>
           {activity.map((item) => (
-            <li key={item.id}>
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.amount}</span>
-              </div>
-              <div>
-                <strong className={`activity-status is-${item.status}`}>{statusLabel(item)}</strong>
-                <time dateTime={new Date(item.createdAt).toISOString()}>
-                  {new Date(item.createdAt).toLocaleString()}
-                </time>
-              </div>
-              {item.hash && (
-                <code title={item.hash}>
-                  {item.hash.slice(0, 10)}…{item.hash.slice(-8)}
-                </code>
-              )}
-              {item.error && <p>{item.error}</p>}
-            </li>
+            <ActivityItem key={item.id} activity={item} />
           ))}
         </ol>
       )}
     </section>
+  );
+}
+
+function ActivityItem({ activity }: { activity: DollarActivity }) {
+  const displayHash = activity.confirmedHash ?? activity.replacementHash ?? activity.hash;
+  const explorerUrl = displayHash ? getTransactionExplorerUrl(activity.chainId, displayHash) : null;
+  const hashLabel = displayHash ? `${displayHash.slice(0, 10)}…${displayHash.slice(-8)}` : null;
+
+  return (
+    <li>
+      <div>
+        <strong>{activity.label}</strong>
+        <span>{activity.amount}</span>
+      </div>
+      <div>
+        <strong className={`activity-status is-${activity.status}`}>{statusLabel(activity)}</strong>
+        <time dateTime={new Date(activity.createdAt).toISOString()}>
+          {new Date(activity.createdAt).toLocaleString()}
+        </time>
+      </div>
+      {displayHash &&
+        (explorerUrl ? (
+          <a
+            className="activity-hash"
+            href={explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={displayHash}
+          >
+            {hashLabel} ↗
+          </a>
+        ) : (
+          <code title={displayHash}>{hashLabel}</code>
+        ))}
+      {activity.replacementHash && activity.hash && (
+        <p>
+          Original transaction {activity.hash.slice(0, 10)}…{activity.hash.slice(-8)}
+        </p>
+      )}
+      {activity.error && <p>{activity.error}</p>}
+    </li>
   );
 }
