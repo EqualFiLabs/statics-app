@@ -7,17 +7,27 @@ import {
   encodeFunctionData,
   formatUnits,
   getAddress,
+  parseEventLogs,
   parseUnits,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 
-import { basketTokenAbi, buildCreateAndStakeCall, staticsAbi } from "@statics-protocol/sdk";
+import {
+  basketTokenAbi,
+  buildClaimRewardsCall,
+  buildCreateAndStakeCall,
+  staticsAbi,
+} from "@statics-protocol/sdk";
 
 import { RewardsPreview } from "@/components/preview/DappPreview";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
-import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
+import {
+  claimablePositionRewards,
+  describePositionError,
+  loadPositionCatalog,
+} from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -65,6 +75,10 @@ function RewardsRuntime() {
   const [amountInput, setAmountInput] = useState("");
   const [selectedAssets, setSelectedAssets] = useState<readonly `0x${string}`[]>([]);
   const [pending, setPending] = useState(false);
+  const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
+  const [claimSelections, setClaimSelections] = useState<Record<string, readonly `0x${string}`[]>>(
+    {}
+  );
   const [actionError, setActionError] = useState<string | null>(null);
   const catalog = useQuery({
     queryKey: [
@@ -173,6 +187,128 @@ function RewardsRuntime() {
       setActionError(describePositionError(error));
     } finally {
       setPending(false);
+    }
+  };
+
+  const claimPositionRewards = async (positionId: bigint) => {
+    if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
+      return;
+    }
+    setClaimingPositionId(positionId);
+    setActionError(null);
+    try {
+      const refreshed = await catalog.refetch();
+      const position = refreshed.data?.positions.find((item) => item.positionId === positionId);
+      if (!position) throw new Error("The selected PositionNFT is no longer owned by this wallet.");
+      const key = positionId.toString();
+      const defaultAssets = claimablePositionRewards(position.rewards).map(
+        (reward) => reward.token.address
+      );
+      const requested = claimSelections[key] ?? defaultAssets;
+      const rewards = claimablePositionRewards(position.rewards, requested);
+      if (!rewards.length) throw new Error("Select at least one nonzero reward.");
+      const assets = rewards.map((reward) => reward.token.address);
+      const minimums = rewards.map((reward) => reward.pending);
+      const balancesBefore = await Promise.all(
+        rewards.map((reward) =>
+          publicClient.readContract({
+            address: reward.token.address,
+            abi: basketTokenAbi,
+            functionName: "balanceOf",
+            args: [wallet],
+          })
+        )
+      );
+      await executeProtocolTransaction({
+        publicClient,
+        wallet,
+        chainId: deploymentState.deployment.chainId,
+        kind: "claim-rewards",
+        label: `Claim rewards from Position #${key}`,
+        amount: rewards
+          .map(
+            (reward) =>
+              `${displayAmount(reward.pending, reward.token.decimals)} ${reward.token.symbol}`
+          )
+          .join(" + "),
+        to: deploymentState.deployment.contracts.diamond,
+        data: buildClaimRewardsCall(positionId, assets, wallet, minimums),
+        sendTransaction: ({ to, data, value }) =>
+          walletClient.data!.sendTransaction({
+            account: wallet,
+            chain: walletClient.data!.chain,
+            to,
+            data,
+            value,
+          }),
+        describeError: describePositionError,
+        validateSimulation: (result) => {
+          if (!result) throw new Error("The reward claim simulation returned no amounts.");
+          const amounts = decodeFunctionResult({
+            abi: staticsAbi,
+            functionName: "claimRewards",
+            data: result,
+          });
+          if (amounts.some((amount, index) => amount < (minimums[index] ?? 0n))) {
+            throw new Error("The reward claim simulation fell below the reviewed minimum.");
+          }
+        },
+        verifyConfirmation: async (receipt) => {
+          const events = parseEventLogs({
+            abi: staticsAbi,
+            eventName: "RewardClaimed",
+            logs: receipt.logs,
+            strict: true,
+          }).filter((event) => event.args.positionId === positionId);
+          if (
+            assets.some(
+              (asset) =>
+                !events.some(
+                  (event) =>
+                    getAddress(event.args.asset) === asset &&
+                    getAddress(event.args.receiver) === wallet
+                )
+            )
+          ) {
+            throw new Error("The receipt did not contain every reviewed reward claim.");
+          }
+          const [pendingAfter, balancesAfter] = await Promise.all([
+            publicClient.readContract({
+              account: wallet,
+              address: deploymentState.deployment.contracts.diamond,
+              abi: staticsAbi,
+              functionName: "pendingRewards",
+              args: [positionId, assets],
+            }),
+            Promise.all(
+              rewards.map((reward) =>
+                publicClient.readContract({
+                  address: reward.token.address,
+                  abi: basketTokenAbi,
+                  functionName: "balanceOf",
+                  args: [wallet],
+                })
+              )
+            ),
+          ]);
+          if (pendingAfter.some((amount) => amount !== 0n)) {
+            throw new Error("Claimed rewards remain pending after confirmation.");
+          }
+          if (
+            balancesAfter.some(
+              (balance, index) => balance - (balancesBefore[index] ?? 0n) < (minimums[index] ?? 0n)
+            )
+          ) {
+            throw new Error("The wallet did not receive every reviewed reward amount.");
+          }
+        },
+      });
+      setClaimSelections((current) => ({ ...current, [key]: [] }));
+      await catalog.refetch();
+    } catch (error) {
+      setActionError(describePositionError(error));
+    } finally {
+      setClaimingPositionId(null);
     }
   };
 
@@ -299,7 +435,7 @@ function RewardsRuntime() {
             <p className="dapp-section-label">Wallet-owned positions</p>
             <h2>Selected rewards</h2>
           </div>
-          <span>Claims planned</span>
+          <span>Multi-asset claims</span>
         </div>
         {catalog.isPending && wallet ? (
           <p className="dollar-loading">Loading selected reward state…</p>
@@ -309,34 +445,69 @@ function RewardsRuntime() {
           </p>
         ) : catalog.data?.positions.length ? (
           <div className="reward-position-list">
-            {catalog.data.positions.map((position) => (
-              <article key={position.positionId.toString()}>
-                <div>
-                  <h3>Position #{position.positionId.toString()}</h3>
-                  <span>
-                    {displayAmount(position.stakedBalance, catalog.data.stakingToken.decimals)}{" "}
-                    {catalog.data.stakingToken.symbol} staked
-                  </span>
-                </div>
-                {position.rewards.length ? (
-                  <ul>
-                    {position.rewards.map((reward) => (
-                      <li key={reward.token.address}>
-                        <span>{reward.token.symbol}</span>
-                        <strong>
-                          {displayAmount(reward.pending, reward.token.decimals)} pending
-                        </strong>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No reward assets selected.</p>
-                )}
-                <Link href={`/app/positions/${position.positionId.toString()}`}>
-                  Manage selections and stake →
-                </Link>
-              </article>
-            ))}
+            {catalog.data.positions.map((position) => {
+              const key = position.positionId.toString();
+              const defaults = claimablePositionRewards(position.rewards).map(
+                (reward) => reward.token.address
+              );
+              const selected = claimSelections[key] ?? defaults;
+              return (
+                <article key={key}>
+                  <div>
+                    <h3>Position #{position.positionId.toString()}</h3>
+                    <span>
+                      {displayAmount(position.stakedBalance, catalog.data.stakingToken.decimals)}{" "}
+                      {catalog.data.stakingToken.symbol} staked
+                    </span>
+                  </div>
+                  {position.rewards.length ? (
+                    <ul>
+                      {position.rewards.map((reward) => (
+                        <li key={reward.token.address}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(reward.token.address)}
+                              disabled={reward.pending === 0n || claimingPositionId !== null}
+                              onChange={() =>
+                                setClaimSelections((current) => ({
+                                  ...current,
+                                  [key]: selected.includes(reward.token.address)
+                                    ? selected.filter((asset) => asset !== reward.token.address)
+                                    : [...selected, reward.token.address],
+                                }))
+                              }
+                            />
+                            <span>{reward.token.symbol}</span>
+                          </label>
+                          <strong>
+                            {displayAmount(reward.pending, reward.token.decimals)} pending
+                          </strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No reward assets selected.</p>
+                  )}
+                  <Link href={`/app/positions/${position.positionId.toString()}`}>
+                    Manage selections and stake →
+                  </Link>
+                  <button
+                    className="dollar-submit"
+                    type="button"
+                    disabled={
+                      claimingPositionId !== null ||
+                      claimablePositionRewards(position.rewards, selected).length === 0
+                    }
+                    onClick={() => void claimPositionRewards(position.positionId)}
+                  >
+                    {claimingPositionId === position.positionId
+                      ? "Claiming selected rewards…"
+                      : "Claim selected rewards"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="position-empty">
@@ -344,9 +515,6 @@ function RewardsRuntime() {
             <p>Create and stake above to begin.</p>
           </div>
         )}
-        <button className="dollar-submit" type="button" disabled>
-          Claim selected rewards · Planned
-        </button>
       </section>
     </div>
   );

@@ -53,6 +53,16 @@ export type PositionRecord = Readonly<{
   rewards: readonly PositionReward[];
 }>;
 
+export function claimablePositionRewards(
+  rewards: PositionRecord["rewards"],
+  selectedAssets?: readonly Address[]
+): PositionRecord["rewards"] {
+  const selected =
+    selectedAssets ??
+    rewards.filter((reward) => reward.pending > 0n).map((reward) => reward.token.address);
+  return rewards.filter((reward) => reward.pending > 0n && selected.includes(reward.token.address));
+}
+
 export type RewardCandidate = Readonly<{
   token: TokenMetadata;
   sources: readonly string[];

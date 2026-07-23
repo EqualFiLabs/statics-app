@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   canClosePosition,
+  claimablePositionRewards,
   describePositionError,
   isUnstakeAvailable,
   unlockedCollateral,
@@ -39,6 +40,47 @@ function metadataClient(
 }
 
 describe("position action guards", () => {
+  it("defaults claims to every nonzero reward and honors a selected subset", () => {
+    const second = "0x0000000000000000000000000000000000000022" as Address;
+    const rewards = [
+      {
+        token: {
+          address: rewardAsset,
+          name: "Reward",
+          symbol: "RWD",
+          decimals: 18,
+          metadataAvailable: true,
+        },
+        pending: 5n,
+      },
+      {
+        token: {
+          address: second,
+          name: "Second",
+          symbol: "TWO",
+          decimals: 6,
+          metadataAvailable: true,
+        },
+        pending: 7n,
+      },
+      {
+        token: {
+          address: "0x0000000000000000000000000000000000000033" as Address,
+          name: "Empty",
+          symbol: "ZERO",
+          decimals: 18,
+          metadataAvailable: true,
+        },
+        pending: 0n,
+      },
+    ];
+    expect(claimablePositionRewards(rewards).map((reward) => reward.token.address)).toEqual([
+      rewardAsset,
+      second,
+    ]);
+    expect(claimablePositionRewards(rewards, [second])).toEqual([rewards[1]]);
+  });
+
   it("computes unlocked collateral and blocks close while any leg is active", () => {
     const collateral = {
       depositedShares: 15n,
