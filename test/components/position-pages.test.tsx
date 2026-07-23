@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
@@ -29,6 +29,13 @@ describe("position and reward routes without wallet configuration", () => {
       screen.getByRole("button", { name: "deposit collateral · Preview only" })
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Claim selected rewards · Planned" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "withdraw" }));
+    fireEvent.click(screen.getByRole("button", { name: "unstake" }));
+    expect(
+      screen.getByRole("button", { name: "withdraw collateral · Preview only" })
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "unstake WETH · Preview only" })).toBeDisabled();
   });
 
   it("shows sample staking and selected rewards while keeping actions disabled", () => {

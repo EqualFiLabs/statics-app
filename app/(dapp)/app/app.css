@@ -186,6 +186,19 @@
   background: rgba(7, 8, 7, 0.68);
 }
 
+.dapp-nav-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.dapp-mobile-navigation,
+.dapp-nav-panel-heading,
+.dapp-mobile-site-link {
+  display: none;
+}
+
 .dapp-nav-label,
 .dapp-section-label,
 .dapp-eyebrow {
@@ -239,6 +252,12 @@
 .dapp-nav-item:not(.active)[href]:hover {
   border-color: var(--line-bright);
   color: var(--text);
+}
+
+.dapp-nav-toggle:focus-visible,
+.dapp-nav-panel-heading button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
 }
 
 .dapp-sidebar-note {
@@ -942,28 +961,146 @@
   }
 
   .dapp-sidebar {
+    position: relative;
+    z-index: 40;
     min-width: 0;
-    overflow: hidden;
-    padding: 0.75rem 1rem;
+    overflow: visible;
+    padding: 0;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    background: rgba(5, 6, 5, 0.96);
   }
 
-  .dapp-nav-label,
-  .dapp-sidebar-note {
+  .dapp-nav-label {
     display: none;
   }
 
-  .dapp-sidebar nav {
+  .dapp-mobile-navigation {
+    display: block;
+    padding: 0.65rem 1rem;
+  }
+
+  .dapp-nav-toggle {
+    display: grid;
+    width: 100%;
+    min-height: 48px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--line);
+    background: rgba(8, 10, 8, 0.92);
+    color: var(--muted);
+    font: inherit;
+    text-align: left;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .dapp-nav-toggle span {
+    font-size: 0.52rem;
+    letter-spacing: 0.08em;
+  }
+
+  .dapp-nav-toggle strong {
+    color: var(--text);
+    font-size: 0.68rem;
+    font-weight: 500;
+  }
+
+  .dapp-nav-toggle span:last-child {
+    color: var(--green);
+    text-align: right;
+  }
+
+  .dapp-nav-panel {
+    position: fixed;
+    z-index: 50;
+    inset: 88px 0 0;
+    display: none;
+    padding: 1rem;
+    overflow-y: auto;
+    border-top: 1px solid var(--line);
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px), #050605;
+    background-size: 48px 48px;
+  }
+
+  .dapp-sidebar.is-open .dapp-nav-panel {
     display: flex;
-    gap: 0.5rem;
-    margin: 0;
-    overflow-x: auto;
-    max-width: 100%;
+  }
+
+  .dapp-nav-panel-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.5rem 0 1rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dapp-nav-panel-heading > div {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .dapp-nav-panel-heading span {
+    color: var(--green);
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .dapp-nav-panel-heading strong {
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .dapp-nav-panel-heading button {
+    min-height: 40px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .dapp-sidebar nav {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 1rem;
+    overflow: visible;
   }
 
   .dapp-nav-item {
-    min-width: max-content;
+    min-height: 50px;
+    padding: 0.75rem 1rem;
+    border-color: var(--line);
+    background: rgba(8, 10, 8, 0.78);
+  }
+
+  .dapp-sidebar-note {
+    margin-top: 1.5rem;
+  }
+
+  .dapp-mobile-site-link {
+    display: inline-flex;
+    min-height: 44px;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--line-bright);
+    color: var(--text);
+    font-size: 0.62rem;
+    text-transform: uppercase;
   }
 
   .dapp-status-grid {
@@ -995,12 +1132,14 @@
 
 @media (max-width: 560px) {
   .dapp-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
     min-height: 74px;
     padding: 12px 18px;
   }
 
   .dapp-brand img {
-    width: 150px;
+    width: min(142px, 100%);
   }
 
   .dapp-return {
@@ -1017,25 +1156,47 @@
   }
 
   .dapp-wallet-button {
-    max-width: 145px;
+    max-width: 160px;
     min-height: 38px;
     padding: 0.55rem 0.7rem;
-    overflow: hidden;
     font-size: 0.55rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .dapp-nav-panel {
+    inset: 74px 0 0;
   }
 
   .dapp-content {
-    padding: 2.5rem 1rem;
+    padding: 1.75rem 1rem 2.5rem;
   }
 
   .dapp-intro h1 {
-    font-size: 2.15rem;
+    margin: 0.8rem 0 1rem;
+    font-size: 1.9rem;
+    line-height: 1.08;
+  }
+
+  .dapp-intro > p:last-child {
+    font-size: 0.76rem;
+    line-height: 1.6;
   }
 
   .dapp-status-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 1.5rem;
+  }
+
+  .dapp-status-card {
+    min-height: 86px;
+    padding: 0.85rem;
+  }
+
+  .dapp-status-card strong {
+    margin-top: 0.85rem;
+    font-size: 0.66rem;
   }
 
   .dapp-wallet-details {
@@ -1049,6 +1210,11 @@
 
   .dollar-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .preview-banner {
+    gap: 0.65rem;
+    padding: 0.85rem;
   }
 
   .activity-panel li {

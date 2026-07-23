@@ -1,5 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function navigateDapp(page: Page, href: string) {
+  const toggle = page.locator(".dapp-nav-toggle");
+  if (await toggle.isVisible()) {
+    await toggle.click();
+  }
+  await page.locator(`.dapp-nav-item[href="${href}"]`).click();
+}
 
 test.describe("landing foundation", () => {
   test.beforeEach(async ({ page }) => {
@@ -43,7 +51,7 @@ test.describe("landing foundation", () => {
       .click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(
-      page.getByRole("heading", { name: "Issue and redeem Statics Dollar." })
+      page.getByRole("heading", { name: "Track your Statics portfolio." })
     ).toBeVisible();
   });
 
@@ -97,6 +105,11 @@ test.describe("Dollar DApp foundation", () => {
     await expect(page.getByRole("button", { name: "Wallet not configured" })).toBeDisabled();
     await expect(page.getByText("12,480.52 Dollar")).toBeVisible();
 
+    if (testInfo.project.name === "mobile") {
+      const overview = await page.locator(".dollar-overview-card").boundingBox();
+      expect(overview?.y).toBeLessThan(844);
+    }
+
     await expect(page).toHaveScreenshot(`app-${testInfo.project.name}.png`, {
       fullPage: true,
       animations: "disabled",
@@ -107,38 +120,80 @@ test.describe("Dollar DApp foundation", () => {
 
   test("provides Dollar, baskets, positions, rewards, activity, and settings", async ({ page }) => {
     await page.goto("/app");
-    await page.locator('.dapp-nav-item[href="/app/dollar"]').click();
+    await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
     await expect(page.getByText("Sample Dollar data")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Preview only · connect local deployment" })
     ).toBeDisabled();
 
-    await page.locator('.dapp-nav-item[href="/app/baskets"]').click();
+    await navigateDapp(page, "/app/baskets");
     await expect(page).toHaveURL(/\/app\/baskets$/);
     await expect(page.getByRole("heading", { name: "Statics baskets" })).toBeVisible();
 
-    await page.locator('.dapp-nav-item[href="/app/positions"]').click();
+    await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
     await expect(page.getByRole("heading", { name: "Your PositionNFTs" })).toBeVisible();
 
-    await page.locator('.dapp-nav-item[href="/app/rewards"]').click();
+    await navigateDapp(page, "/app/rewards");
     await expect(page).toHaveURL(/\/app\/rewards$/);
     await expect(page.getByRole("heading", { name: "Create and stake" })).toBeVisible();
 
-    await page.locator('.dapp-nav-item[href="/app/activity"]').click();
+    await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
-    await expect(page.getByRole("heading", { name: "Protocol activity" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Review protocol activity." })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Protocol activity", exact: true })
+    ).toBeVisible();
 
-    await page.locator('.dapp-nav-item[href="/app/settings"]').click();
+    await navigateDapp(page, "/app/settings");
     await expect(page).toHaveURL(/\/app\/settings$/);
+    await expect(page.getByRole("heading", { name: "Manage your Statics wallet." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
+  });
+
+  test("provides an accessible responsive application menu", async ({ page }, testInfo) => {
+    await page.goto("/app");
+    const toggle = page.locator(".dapp-nav-toggle");
+
+    if (testInfo.project.name === "desktop") {
+      await expect(toggle).toBeHidden();
+      await expect(page.locator('.dapp-nav-item[href="/app/baskets"]')).toBeVisible();
+      return;
+    }
+
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#dapp-navigation-panel")).toBeVisible();
+    await expect(page.locator('.dapp-nav-item[href="/app"]')).toBeFocused();
+    await expect(page).toHaveScreenshot(`app-navigation-${testInfo.project.name}.png`, {
+      animations: "disabled",
+      caret: "hide",
+      maxDiffPixelRatio: 0.005,
+    });
+
+    await page.keyboard.press("Escape");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toBeFocused();
+
+    await toggle.click();
+    await page.locator('.dapp-nav-item[href="/app/baskets"]').click();
+    await expect(page).toHaveURL(/\/app\/baskets$/);
+    await expect(page.locator(".dapp-nav-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator(".dapp-nav-toggle")).toHaveAttribute(
+      "aria-label",
+      "Application menu. Current route: Baskets"
+    );
   });
 
   test("captures every populated DApp preview surface", async ({ page }, testInfo) => {
     const surfaces = [
       ["dollar", "/app/dollar"],
+      ["basket-catalog", "/app/baskets"],
       ["basket-detail", "/app/baskets/0"],
+      ["position-catalog", "/app/positions"],
       ["position-detail", "/app/positions/1042"],
       ["rewards", "/app/rewards"],
       ["activity", "/app/activity"],
@@ -162,7 +217,7 @@ test.describe("Dollar DApp foundation", () => {
     await expect(
       page.getByRole("heading", { name: "Inspect, mint, and redeem static baskets." })
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: /baskets/i })).toHaveAttribute(
+    await expect(page.locator('.dapp-nav-item[href="/app/baskets"]')).toHaveAttribute(
       "aria-current",
       "page"
     );

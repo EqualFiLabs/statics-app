@@ -22,7 +22,7 @@ describe("DApp wallet shell", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Issue and redeem Statics Dollar." })
+      screen.getByRole("heading", { name: "Track your Statics portfolio." })
     ).toBeInTheDocument();
     expect(screen.getByText("Design preview")).toBeInTheDocument();
     expect(screen.getByText("Sample interface", { selector: "strong" })).toBeInTheDocument();
@@ -41,6 +41,27 @@ describe("DApp wallet shell", () => {
       "/app/settings"
     );
     expect(screen.queryByText(/0x[0-9a-f]{8}/i)).not.toBeInTheDocument();
+  });
+
+  it("opens and closes the responsive navigation with focus restoration", () => {
+    renderWithWallet(<AppShell>Overview</AppShell>);
+    const toggle = screen.getByRole("button", {
+      name: "Application menu. Current route: Overview",
+    });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("DApp navigation")).toHaveClass("is-open");
+    expect(screen.getByRole("link", { name: /overview/i })).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
+
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "Close ×" }));
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
   });
 
   it("offers independent Privy sign-in and external wallet connection", () => {

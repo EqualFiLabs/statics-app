@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { BasketDetailPage } from "@/components/baskets/BasketDetailPage";
@@ -28,6 +28,12 @@ describe("basket routes without wallet configuration", () => {
     );
     expect(screen.getByText("Sample basket detail data")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Dollar Reserve" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Preview only · transaction disabled" })
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Redeem" }));
+    expect(screen.getByText("4 constituent outputs")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Preview only · transaction disabled" })
     ).toBeDisabled();

@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
-import { appNavigation, protocolStatus } from "@/lib/site-config";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { getDappRoutePresentation } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
+import { appNavigation, protocolStatus } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -104,39 +106,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const dollarDeployment = readClientDollarDeployment();
+  const [openNavigationPath, setOpenNavigationPath] = useState<string | null>(null);
+  const navigationToggleRef = useRef<HTMLButtonElement>(null);
+  const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
+  const navigationOpen = openNavigationPath === currentPath;
   const designPreview =
     dappPreviewEnabled &&
     (dollarDeployment.status === "unavailable" || wallet.status === "unconfigured");
-  const basketRoute = currentPath.startsWith("/app/baskets");
-  const positionRoute = currentPath.startsWith("/app/positions");
-  const rewardsRoute = currentPath.startsWith("/app/rewards");
-  const routeCopy = basketRoute
-    ? {
-        status: "Basket flows",
-        title: "Inspect, mint, and redeem static baskets.",
-        description:
-          "Discover basket creation events, reconcile current protocol state, and enforce bounded constituent flows before signing.",
-      }
-    : positionRoute
-      ? {
-          status: "Position flows",
-          title: "Manage each wallet-owned PositionNFT.",
-          description:
-            "Reconcile ownership from current onchain state, then manage collateral, staking, and reward selections with bounded transactions.",
-        }
-      : rewardsRoute
-        ? {
-            status: "Reward flows",
-            title: "Create stake positions with selected rewards.",
-            description:
-              "Choose fee assets per PositionNFT, inspect pending amounts, and respect the onchain unstaking cooldown.",
-          }
-        : {
-            status: "Dollar flows",
-            title: "Issue and redeem Statics Dollar.",
-            description:
-              "Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk shares. Every quote comes from current protocol state before signing.",
-          };
+  const routeCopy = getDappRoutePresentation(currentPath);
+
+  const closeNavigation = (restoreFocus = true) => {
+    setOpenNavigationPath(null);
+    if (restoreFocus) {
+      navigationToggleRef.current?.focus();
+    }
+  };
+
+  const openNavigation = () => {
+    setOpenNavigationPath(currentPath);
+  };
+
+  useEffect(() => {
+    if (!navigationOpen) return;
+    const priorOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    firstNavigationLinkRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpenNavigationPath(null);
+      navigationToggleRef.current?.focus();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = priorOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [navigationOpen]);
+
   const statusCards = [
     {
       label: "DApp",
@@ -194,37 +201,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="dapp-layout">
-        <aside className="dapp-sidebar" aria-label="DApp navigation">
-          <p className="dapp-nav-label">Navigation</p>
-          <nav>
-            {appNavigation.map((item, index) => {
-              const active =
-                item.href === currentPath ||
-                (item.href !== "/app" &&
-                  Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
-              return item.enabled && item.href ? (
-                <Link
-                  key={item.label}
-                  className={`dapp-nav-item${active ? " active" : ""}`}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  {item.label}
-                </Link>
-              ) : (
-                <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  {item.label}
-                  <small>Planned</small>
-                </span>
-              );
-            })}
-          </nav>
-          <div className="dapp-sidebar-note">
-            <span aria-hidden="true">{"///"}</span>
-            Statics and Eves use separate sign-ins. Using the same Privy account preserves the same
-            embedded wallet address.
+        <aside
+          className={`dapp-sidebar${navigationOpen ? " is-open" : ""}`}
+          aria-label="DApp navigation"
+        >
+          <div className="dapp-mobile-navigation">
+            <button
+              ref={navigationToggleRef}
+              className="dapp-nav-toggle"
+              type="button"
+              aria-label={`Application menu. Current route: ${routeCopy.label}`}
+              aria-expanded={navigationOpen}
+              aria-controls="dapp-navigation-panel"
+              onClick={navigationOpen ? () => closeNavigation() : openNavigation}
+            >
+              <span>Current route</span>
+              <strong>{routeCopy.label}</strong>
+              <span aria-hidden="true">{navigationOpen ? "Close ×" : "Menu +"}</span>
+            </button>
+          </div>
+
+          <div className="dapp-nav-panel" id="dapp-navigation-panel">
+            <div className="dapp-nav-panel-heading">
+              <div>
+                <span>{"// Statics DApp"}</span>
+                <strong>Application navigation</strong>
+              </div>
+              <button type="button" onClick={() => closeNavigation()}>
+                Close ×
+              </button>
+            </div>
+            <p className="dapp-nav-label">Navigation</p>
+            <nav aria-label="Application routes">
+              {appNavigation.map((item, index) => {
+                const active =
+                  item.href === currentPath ||
+                  (item.href !== "/app" &&
+                    Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
+                return item.enabled && item.href ? (
+                  <Link
+                    ref={index === 0 ? firstNavigationLinkRef : undefined}
+                    key={item.label}
+                    className={`dapp-nav-item${active ? " active" : ""}`}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => closeNavigation()}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    {item.label}
+                    <small>Planned</small>
+                  </span>
+                );
+              })}
+            </nav>
+            <div className="dapp-sidebar-note">
+              <span aria-hidden="true">{"///"}</span>
+              Statics and Eves use separate sign-ins. Using the same Privy account preserves the
+              same embedded wallet address.
+            </div>
+            <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
+              Return to site <span aria-hidden="true">↗</span>
+            </Link>
           </div>
         </aside>
 
