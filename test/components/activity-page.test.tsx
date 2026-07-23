@@ -117,4 +117,23 @@ describe("Dollar activity page", () => {
     expect(screen.getByTitle(originalHash).tagName).toBe("CODE");
     expect(screen.queryByRole("link", { name: /0x11111111/i })).not.toBeInTheDocument();
   });
+
+  it("shows confirmed transactions whose resulting state still needs verification", () => {
+    writeDollarActivity({
+      id: "confirmed-unverified",
+      wallet,
+      chainId: 31_337,
+      kind: "extend-loan",
+      label: "Extend loan #23",
+      amount: "2 extension fees",
+      status: "confirmed-unverified",
+      confirmedHash: originalHash,
+      error: "Refresh before another action.",
+      createdAt: 1,
+    });
+
+    renderActivity(31_337);
+    expect(screen.getByText("Confirmed · refresh required")).toBeInTheDocument();
+    expect(screen.getByText("Refresh before another action.")).toBeInTheDocument();
+  });
 });

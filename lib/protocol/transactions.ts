@@ -1,6 +1,6 @@
 "use client";
 
-import type { Address, Hex, PublicClient } from "viem";
+import type { Address, Hex, PublicClient, TransactionReceipt } from "viem";
 
 import {
   updateProtocolActivity,
@@ -24,7 +24,15 @@ export type ProtocolTransactionRequest = Readonly<{
   sendTransaction: (request: { to: Address; data: Hex; value?: bigint }) => Promise<Hex>;
   describeError: (error: unknown) => string;
   validateSimulation?: (result: Hex | undefined) => void;
+  verifyConfirmation?: (receipt: TransactionReceipt) => Promise<void>;
 }>;
+
+export class ConfirmationVerificationError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ConfirmationVerificationError";
+  }
+}
 
 export async function executeProtocolTransaction(
   request: ProtocolTransactionRequest
@@ -91,6 +99,24 @@ export async function executeProtocolTransaction(
         error: message,
       });
       throw new Error(message);
+    }
+
+    if (request.verifyConfirmation) {
+      try {
+        await request.verifyConfirmation(receipt);
+      } catch (error) {
+        const verificationError = new ConfirmationVerificationError(
+          "The transaction confirmed, but refreshed protocol state could not be verified. Refresh before another action.",
+          { cause: error }
+        );
+        stage = "finished";
+        updateProtocolActivity(request.wallet, request.chainId, id, {
+          status: "confirmed-unverified",
+          confirmedHash: receipt.transactionHash,
+          error: verificationError.message,
+        });
+        throw verificationError;
+      }
     }
 
     stage = "finished";

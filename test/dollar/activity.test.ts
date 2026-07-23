@@ -98,4 +98,19 @@ describe("Dollar activity storage", () => {
       kind: "opt-in-reward-assets",
     });
   });
+
+  it("retains confirmed-unverified loan activity without treating it as failed", () => {
+    writeDollarActivity(
+      activity({
+        id: "loan-verification",
+        kind: "borrow-loan",
+        label: "Borrow against Position #17",
+        status: "confirmed-unverified",
+      })
+    );
+    expect(readDollarActivity(wallet, 31_337)[0]).toMatchObject({
+      kind: "borrow-loan",
+      status: "confirmed-unverified",
+    });
+  });
 });

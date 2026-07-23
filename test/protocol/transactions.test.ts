@@ -80,4 +80,39 @@ describe("protocol transaction execution", () => {
       error: "Invalid simulated output",
     });
   });
+
+  it("preserves a confirmed receipt when refreshed state cannot be verified", async () => {
+    const verificationFailure = new Error("Loan state remained stale");
+
+    await expect(
+      executeProtocolTransaction({
+        publicClient: {
+          call: vi.fn().mockResolvedValue({ data: "0x" }),
+          waitForTransactionReceipt: vi.fn().mockResolvedValue({
+            status: "success",
+            transactionHash: hash,
+          }),
+        } as unknown as PublicClient,
+        wallet,
+        chainId: 31_337,
+        kind: "repay-loan",
+        label: "Repay loan #23",
+        amount: "2 assets",
+        to: target,
+        data: "0x1234",
+        sendTransaction: vi.fn().mockResolvedValue(hash),
+        describeError: (error) => (error instanceof Error ? error.message : "Unknown error"),
+        verifyConfirmation: async () => {
+          throw verificationFailure;
+        },
+      })
+    ).rejects.toThrow("confirmed, but refreshed protocol state could not be verified");
+
+    expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
+      kind: "repay-loan",
+      status: "confirmed-unverified",
+      confirmedHash: hash,
+      error: expect.stringContaining("Refresh before another action"),
+    });
+  });
 });

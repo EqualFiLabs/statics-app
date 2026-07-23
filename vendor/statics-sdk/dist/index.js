@@ -3,6 +3,7 @@ export { robinhoodChain } from "./generated/robinhoodChain.js";
 export const BPS = 10000n;
 export const SHARE_SCALE = 10n ** 18n;
 export const MAX_LTV_BPS = 9500n;
+export const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
 export const Q96 = 1n << 96n;
 export const Q128 = 1n << 128n;
 export const MAX_UINT256 = (1n << 256n) - 1n;
@@ -336,6 +337,11 @@ export const staticsAbi = parseAbi([
     "function repay(uint256 loanId)",
     "function extend(uint256 loanId,uint256[] grossAmountsIn) returns (uint256[] receivedAmounts)",
     "function recover(uint256 loanId)",
+    "function quoteBorrow(uint256 basketId,uint256 sharesIn) view returns (uint256 feeShares,uint256 collateralShares,address[] assets,uint256[] principals)",
+    "function quoteExtension(uint256 loanId) view returns (address[] assets,uint256[] requiredFees)",
+    "function loan(uint256 loanId) view returns ((uint256 positionId,uint256 basketId,uint256 collateralShares,uint256 feeShares,uint40 maturity,address[] assets,uint256[] principals) result)",
+    "function outstandingPrincipal(uint256 basketId,address asset) view returns (uint256)",
+    "function recoverySurplus(uint256 basketId,address asset) view returns (uint256)",
     "function flashLoan(uint256 basketId,uint256 shares,address receiver,bytes data)",
     "function balanceOf(address owner) view returns (uint256)",
     "function ownerOf(uint256 tokenId) view returns (address)",
@@ -413,6 +419,11 @@ export const staticsAbi = parseAbi([
     "event BasketCollateralDeposited(uint256 indexed positionId,uint256 indexed basketId,address indexed payer,uint256 shares)",
     "event BasketCollateralWithdrawn(uint256 indexed positionId,uint256 indexed basketId,address indexed receiver,uint256 shares)",
     "event BasketCollateralRedeemed(uint256 indexed positionId,uint256 indexed basketId,address indexed receiver,uint256 shares)",
+    "event LoanOriginated(uint256 indexed loanId,uint256 indexed positionId,uint256 indexed basketId,address operator,address receiver,uint256 sharesIn,uint256 feeShares,uint256 collateralShares,uint40 maturity)",
+    "event LoanRepaid(uint256 indexed loanId,uint256 indexed positionId,address indexed payer)",
+    "event LoanExtended(uint256 indexed loanId,uint40 maturity)",
+    "event LoanExtensionFeePaid(uint256 indexed loanId,address indexed asset,uint256 requiredFee,uint256 receivedFee)",
+    "event LoanRecovered(uint256 indexed loanId,uint256 indexed positionId,address indexed caller,uint256 collateralShares)",
     "event StakingPositionCreated(uint256 indexed positionId,address indexed owner,uint256 amount)",
     "event Staked(uint256 indexed positionId,address indexed payer,uint256 amount,uint256 totalPositionStake)",
     "event Unstaked(uint256 indexed positionId,address indexed receiver,uint256 amount,uint256 totalPositionStake)",
@@ -574,6 +585,20 @@ export const staticsCollateralErrorAbi = parseAbi([
     "error PositionSharesLocked(uint256 requested,uint256 unlocked)",
     "error InsufficientLockedShares(uint256 requested,uint256 locked)",
     "error PositionDepositTooRecent(uint256 positionId,uint256 basketId,uint256 withdrawableAfterBlock)",
+]);
+export const staticsLendingErrorAbi = parseAbi([
+    "error BasketNotFound(uint256 basketId)",
+    "error LoanNotFound(uint256 loanId)",
+    "error InvalidReceiver()",
+    "error InvalidShares()",
+    "error ZeroPrincipal()",
+    "error ActionPaused(uint256 action)",
+    "error InsufficientVaultBalance(address asset,uint256 required,uint256 available)",
+    "error LoanExpired(uint256 loanId,uint40 maturity)",
+    "error LoanNotRecoverable(uint256 loanId,uint256 recoverableAt)",
+    "error MaturityOverflow()",
+    "error InsufficientTransferReceived(address asset,uint256 required,uint256 received)",
+    "error InvalidExtensionInputLength(uint256 provided,uint256 required)",
 ]);
 export const staticsRewardsErrorAbi = parseAbi([
     "error InvalidAmount()",

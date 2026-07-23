@@ -7,6 +7,7 @@ export type DollarActivityStatus =
   | "signing"
   | "submitted"
   | "confirmed"
+  | "confirmed-unverified"
   | "rejected"
   | "reverted"
   | "replaced"
@@ -36,7 +37,12 @@ export type DollarActivityKind =
   | "stake-position"
   | "unstake-position"
   | "opt-in-reward-assets"
-  | "opt-out-reward-assets";
+  | "opt-out-reward-assets"
+  | "approve-loan-asset"
+  | "borrow-loan"
+  | "repay-loan"
+  | "extend-loan"
+  | "recover-loan";
 
 export type DollarActivity = Readonly<{
   id: string;
@@ -61,6 +67,7 @@ const activityStatuses = new Set<DollarActivityStatus>([
   "signing",
   "submitted",
   "confirmed",
+  "confirmed-unverified",
   "rejected",
   "reverted",
   "replaced",

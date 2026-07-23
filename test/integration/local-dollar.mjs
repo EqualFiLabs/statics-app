@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   basketTokenAbi,
+  buildBorrowCall,
   buildClosePositionCall,
   buildCreateAndStakeCall,
   buildCreatePositionCall,
@@ -15,6 +16,9 @@ import {
   buildMintBasketCollateralCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
+  buildExtendCall,
+  buildRecoverCall,
+  buildRepayCall,
   buildRedeemCall,
   buildRedeemBasketCollateralCall,
   buildRecombineToETHCall,
@@ -33,6 +37,7 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
   http,
+  parseEventLogs,
   parseEther,
   toHex,
 } from "viem";
@@ -81,6 +86,7 @@ const port = await availablePort();
 const rpcUrl = `http://127.0.0.1:${port}`;
 const mnemonic = generateMnemonic(wordlist);
 const account = mnemonicToAccount(mnemonic);
+const recoveryAccount = mnemonicToAccount(mnemonic, { addressIndex: 1 });
 const derivedPrivateKey = account.getHdKey().privateKey;
 if (!derivedPrivateKey) throw new Error("Could not derive the ephemeral Anvil account.");
 const privateKey = toHex(derivedPrivateKey);
@@ -114,6 +120,10 @@ try {
   });
   const publicClient = createPublicClient({ transport: http(rpcUrl) });
   const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
+  const recoveryWalletClient = createWalletClient({
+    account: recoveryAccount,
+    transport: http(rpcUrl),
+  });
   const fixture = await seedLocalBasket({ deployment, rpcUrl, privateKey });
   if (
     deployment.chainId !== 31_337 ||
@@ -610,6 +620,339 @@ try {
     throw new Error("Closing an empty PositionNFT did not burn its ownership record.");
   }
 
+  const createLoanPosition = await send(
+    deployment.contracts.diamond,
+    buildCreatePositionCall(account.address)
+  );
+  if (!createLoanPosition.simulationData) {
+    throw new Error("Loan PositionNFT creation simulation returned no token ID.");
+  }
+  const loanPositionId = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "createPosition",
+    data: createLoanPosition.simulationData,
+  });
+  const loanDepositShares = parseEther("0.2");
+  const loanDepositQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteMint",
+    args: [fixture.basketId, loanDepositShares],
+  });
+  const loanDepositMaximums = loanDepositQuote.map(maximum);
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, loanDepositMaximums[0]],
+    })
+  );
+  await send(
+    deployment.contracts.diamond,
+    buildMintBasketCollateralCall(
+      loanPositionId,
+      fixture.basketId,
+      loanDepositShares,
+      loanDepositMaximums
+    )
+  );
+
+  const borrowShares = parseEther("0.08");
+  const borrowQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteBorrow",
+    args: [fixture.basketId, borrowShares],
+  });
+  const principalBalanceBefore = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  const firstBorrow = await send(
+    deployment.contracts.diamond,
+    buildBorrowCall(loanPositionId, fixture.basketId, borrowShares, account.address)
+  );
+  if (!firstBorrow.simulationData) {
+    throw new Error("Loan origination simulation returned no loan result.");
+  }
+  const [firstLoanId, simulatedPrincipals] = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "borrow",
+    data: firstBorrow.simulationData,
+  });
+  if (
+    simulatedPrincipals.length !== borrowQuote[3].length ||
+    simulatedPrincipals.some((amount, index) => amount !== borrowQuote[3][index])
+  ) {
+    throw new Error("Loan origination simulation did not match the authoritative borrow quote.");
+  }
+  const originatedEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "LoanOriginated",
+    logs: firstBorrow.receipt.logs,
+    strict: true,
+  });
+  if (
+    !originatedEvents.some(
+      (event) =>
+        event.args.loanId === firstLoanId &&
+        event.args.positionId === loanPositionId &&
+        event.args.basketId === fixture.basketId
+    )
+  ) {
+    throw new Error("Confirmed loan origination did not emit its indexed lifecycle event.");
+  }
+  const [firstLoan, firstBorrowCollateral, principalBalanceAfter] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "loan",
+      args: [firstLoanId],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "basketCollateralPosition",
+      args: [loanPositionId, fixture.basketId],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.dollar,
+      abi: staticsDollarTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+  ]);
+  if (
+    firstLoan.collateralShares !== borrowQuote[1] ||
+    firstBorrowCollateral.lockedShares !== borrowQuote[1] ||
+    principalBalanceAfter !== principalBalanceBefore + borrowQuote[3][0]
+  ) {
+    throw new Error("Confirmed loan state, locked collateral, or principal receipt was incorrect.");
+  }
+
+  const extensionQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteExtension",
+    args: [firstLoanId],
+  });
+  if (extensionQuote[1].length !== 1 || extensionQuote[1][0] === 0n) {
+    throw new Error("Local extension quote did not return one nonzero exact fee.");
+  }
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, extensionQuote[1][0]],
+    })
+  );
+  const extensionAllowance = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "allowance",
+    args: [account.address, deployment.contracts.diamond],
+  });
+  if (extensionAllowance !== extensionQuote[1][0]) {
+    throw new Error("Loan extension did not establish the exact quoted fee allowance.");
+  }
+  const extensionResult = await send(
+    deployment.contracts.diamond,
+    buildExtendCall(firstLoanId, extensionQuote[1])
+  );
+  const extendedEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "LoanExtended",
+    logs: extensionResult.receipt.logs,
+    strict: true,
+  });
+  const extendedLoan = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "loan",
+    args: [firstLoanId],
+  });
+  if (
+    extendedEvents.length !== 1 ||
+    extendedLoan.maturity !== firstLoan.maturity + configuredBasket.loanDuration ||
+    extendedLoan.principals.some((principal, index) => principal !== firstLoan.principals[index])
+  ) {
+    throw new Error("Loan extension did not preserve principals and add one configured duration.");
+  }
+
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, extendedLoan.principals[0]],
+    })
+  );
+  const repayAllowance = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "allowance",
+    args: [account.address, deployment.contracts.diamond],
+  });
+  if (repayAllowance !== extendedLoan.principals[0]) {
+    throw new Error("Loan repayment did not establish the exact principal allowance.");
+  }
+  const repayResult = await send(deployment.contracts.diamond, buildRepayCall(firstLoanId));
+  const repaidEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "LoanRepaid",
+    logs: repayResult.receipt.logs,
+    strict: true,
+  });
+  const repaidLoan = await publicClient
+    .readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "loan",
+      args: [firstLoanId],
+    })
+    .then(() => true)
+    .catch(() => false);
+  const repaidCollateral = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basketCollateralPosition",
+    args: [loanPositionId, fixture.basketId],
+  });
+  if (
+    repaidLoan ||
+    repaidEvents.length !== 1 ||
+    repaidCollateral.lockedShares !== 0n ||
+    repaidCollateral.depositedShares !== loanDepositShares - borrowQuote[0]
+  ) {
+    throw new Error("Confirmed repayment did not delete the loan and unlock its collateral.");
+  }
+
+  const recoveryBorrowQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteBorrow",
+    args: [fixture.basketId, borrowShares],
+  });
+  const secondBorrow = await send(
+    deployment.contracts.diamond,
+    buildBorrowCall(loanPositionId, fixture.basketId, borrowShares, account.address)
+  );
+  if (!secondBorrow.simulationData) {
+    throw new Error("Recovery-loan simulation returned no loan result.");
+  }
+  const [secondLoanId] = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "borrow",
+    data: secondBorrow.simulationData,
+  });
+  const secondLoan = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "loan",
+    args: [secondLoanId],
+  });
+  await publicClient.request({
+    method: "evm_setNextBlockTimestamp",
+    params: [Number(secondLoan.maturity) + 3_601],
+  });
+  await publicClient.request({ method: "evm_mine" });
+  const [callerBalanceBefore, surplusBefore, recoveryCollateralBefore] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.dollar,
+      abi: staticsDollarTokenAbi,
+      functionName: "balanceOf",
+      args: [recoveryAccount.address],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "recoverySurplus",
+      args: [fixture.basketId, deployment.contracts.dollar],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "basketCollateralPosition",
+      args: [loanPositionId, fixture.basketId],
+    }),
+  ]);
+  const recoveryData = buildRecoverCall(secondLoanId);
+  await publicClient.call({
+    account: recoveryAccount.address,
+    to: deployment.contracts.diamond,
+    data: recoveryData,
+  });
+  const recoveryHash = await recoveryWalletClient.sendTransaction({
+    to: deployment.contracts.diamond,
+    data: recoveryData,
+  });
+  const recoveryReceipt = await publicClient.waitForTransactionReceipt({ hash: recoveryHash });
+  if (recoveryReceipt.status !== "success") {
+    throw new Error(`Permissionless local recovery ${recoveryHash} reverted.`);
+  }
+  const recoveredEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "LoanRecovered",
+    logs: recoveryReceipt.logs,
+    strict: true,
+  });
+  const recoveredLoan = await publicClient
+    .readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "loan",
+      args: [secondLoanId],
+    })
+    .then(() => true)
+    .catch(() => false);
+  const [callerBalanceAfter, surplusAfter, recoveryCollateralAfter, outstandingAfter] =
+    await Promise.all([
+      publicClient.readContract({
+        address: deployment.contracts.dollar,
+        abi: staticsDollarTokenAbi,
+        functionName: "balanceOf",
+        args: [recoveryAccount.address],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "recoverySurplus",
+        args: [fixture.basketId, deployment.contracts.dollar],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "basketCollateralPosition",
+        args: [loanPositionId, fixture.basketId],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "outstandingPrincipal",
+        args: [fixture.basketId, deployment.contracts.dollar],
+      }),
+    ]);
+  if (
+    recoveredLoan ||
+    recoveredEvents.length !== 1 ||
+    recoveredEvents[0].args.caller.toLowerCase() !== recoveryAccount.address.toLowerCase() ||
+    callerBalanceAfter !== callerBalanceBefore ||
+    surplusAfter <= surplusBefore ||
+    outstandingAfter !== 0n ||
+    recoveryCollateralAfter.lockedShares !==
+      recoveryCollateralBefore.lockedShares - recoveryBorrowQuote[1] ||
+    recoveryCollateralAfter.depositedShares !==
+      recoveryCollateralBefore.depositedShares - recoveryBorrowQuote[1]
+  ) {
+    throw new Error(
+      "Permissionless recovery did not delete the loan, reclassify surplus, remove collateral, and leave the caller unrewarded."
+    );
+  }
+
   const stakingToken = await publicClient.readContract({
     address: deployment.contracts.diamond,
     abi: staticsAbi,
@@ -806,7 +1149,7 @@ try {
   }
 
   console.log(
-    "Local protocol integration passed: Dollar, basket, PositionNFT collateral, staking, reward opt-in, cooldown, and closure guards confirmed."
+    "Local protocol integration passed: Dollar, basket, PositionNFT collateral, loan borrow/extend/repay/recovery, staking, reward opt-in, cooldown, and closure guards confirmed."
   );
 } finally {
   anvil.kill("SIGTERM");

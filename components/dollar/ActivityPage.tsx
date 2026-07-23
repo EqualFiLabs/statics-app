@@ -20,6 +20,7 @@ function statusLabel(activity: ProtocolActivity): string {
   if (activity.status === "confirmed") {
     return activity.replacementReason === "repriced" ? "Confirmed · repriced" : "Confirmed";
   }
+  if (activity.status === "confirmed-unverified") return "Confirmed · refresh required";
   if (activity.status === "rejected") return "Rejected";
   if (activity.status === "reverted") return "Reverted";
   if (activity.status === "replaced") {
