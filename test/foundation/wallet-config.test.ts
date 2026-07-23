@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getAddressExplorerUrl,
+  getAddressExplorerUrlForChain,
   getTransactionExplorerUrl,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
@@ -61,5 +62,9 @@ describe("wallet environment", () => {
       "https://explorer.testnet.chain.robinhood.com/tx/0x1234"
     );
     expect(getTransactionExplorerUrl(31_337, "0x1234")).toBeNull();
+    expect(getAddressExplorerUrlForChain(46_630, "0x1234")).toBe(
+      "https://explorer.testnet.chain.robinhood.com/address/0x1234"
+    );
+    expect(getAddressExplorerUrlForChain(31_337, "0x1234")).toBeNull();
   });
 });

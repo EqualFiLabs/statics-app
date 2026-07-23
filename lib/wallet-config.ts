@@ -137,3 +137,8 @@ export function getTransactionExplorerUrl(chainId: number, hash: string): string
   if (chainId !== robinhoodTestnet.id) return null;
   return `${robinhoodTestnet.blockExplorers.default.url}/tx/${hash}`;
 }
+
+export function getAddressExplorerUrlForChain(chainId: number, address: string): string | null {
+  if (chainId !== robinhoodTestnet.id) return null;
+  return `${robinhoodTestnet.blockExplorers.default.url}/address/${address}`;
+}

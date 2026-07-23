@@ -84,4 +84,18 @@ describe("Dollar activity storage", () => {
       "legacy",
     ]);
   });
+
+  it("stores position and reward lifecycle kinds in the shared protocol ledger", () => {
+    writeDollarActivity(
+      activity({
+        id: "reward-opt-in",
+        kind: "opt-in-reward-assets",
+        label: "Select reward assets",
+      })
+    );
+    expect(readDollarActivity(wallet, 31_337)[0]).toMatchObject({
+      id: "reward-opt-in",
+      kind: "opt-in-reward-assets",
+    });
+  });
 });

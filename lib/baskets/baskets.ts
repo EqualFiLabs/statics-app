@@ -64,7 +64,7 @@ export type BasketCatalog = Readonly<{
   warning: string | null;
 }>;
 
-async function safeTokenMetadata(
+export async function loadTokenMetadata(
   publicClient: PublicClient,
   address: Address,
   fallback?: Readonly<{ name?: string; symbol?: string }>
@@ -116,7 +116,7 @@ async function loadBasket(
   })) as BasketConfiguration;
   const token = getAddress(configured.token);
   const [tokenMetadata, totalSupply, walletBalance] = await Promise.all([
-    safeTokenMetadata(publicClient, token, eventMetadata),
+    loadTokenMetadata(publicClient, token, eventMetadata),
     publicClient.readContract({
       address: token,
       abi: basketTokenAbi,
@@ -135,7 +135,7 @@ async function loadBasket(
     configured.assets.map(async (asset, index): Promise<BasketConstituent> => {
       const address = getAddress(asset);
       const [metadata, vaultBalance, constituentBalance, allowance] = await Promise.all([
-        safeTokenMetadata(publicClient, address),
+        loadTokenMetadata(publicClient, address),
         publicClient.readContract({
           address: deployment.contracts.diamond,
           abi: staticsAbi,

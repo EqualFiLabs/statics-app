@@ -103,9 +103,7 @@ test.describe("Dollar DApp foundation", () => {
     });
   });
 
-  test("provides Dollar, baskets, activity, and settings while future routes stay inert", async ({
-    page,
-  }) => {
+  test("provides Dollar, baskets, positions, rewards, activity, and settings", async ({ page }) => {
     await page.goto("/app");
     await page.getByRole("link", { name: /dollar/i }).click();
     await expect(page).toHaveURL(/\/app\/dollar$/);
@@ -119,6 +117,18 @@ test.describe("Dollar DApp foundation", () => {
       page.getByRole("heading", { name: "Configure Privy to inspect the local basket deployment." })
     ).toBeVisible();
 
+    await page.getByRole("link", { name: /positions/i }).click();
+    await expect(page).toHaveURL(/\/app\/positions$/);
+    await expect(
+      page.getByRole("heading", { name: "Configure Privy to inspect local PositionNFTs." })
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: /rewards/i }).click();
+    await expect(page).toHaveURL(/\/app\/rewards$/);
+    await expect(
+      page.getByRole("heading", { name: "Configure Privy to inspect local staking and rewards." })
+    ).toBeVisible();
+
     await page.getByRole("link", { name: /activity/i }).click();
     await expect(page).toHaveURL(/\/app\/activity$/);
     await expect(
@@ -128,9 +138,6 @@ test.describe("Dollar DApp foundation", () => {
     await page.getByRole("link", { name: /settings/i }).click();
     await expect(page).toHaveURL(/\/app\/settings$/);
     await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
-    await expect(
-      page.locator(".dapp-nav-item[aria-disabled='true']").filter({ hasText: "Positions" })
-    ).toBeVisible();
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {
@@ -154,6 +161,21 @@ test.describe("Dollar DApp foundation", () => {
       (violation) => violation.impact === "serious" || violation.impact === "critical"
     );
     expect(blocking).toEqual([]);
+  });
+
+  test("keeps position and reward routes responsive and accessible", async ({ page }) => {
+    for (const route of ["/app/positions", "/app/rewards"]) {
+      await page.goto(route);
+      const overflow = await page
+        .locator("html")
+        .evaluate((element) => element.scrollWidth - element.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      const results = await new AxeBuilder({ page }).analyze();
+      const blocking = results.violations.filter(
+        (violation) => violation.impact === "serious" || violation.impact === "critical"
+      );
+      expect(blocking).toEqual([]);
+    }
   });
 
   test("renders the branded not-found state", async ({ page }) => {

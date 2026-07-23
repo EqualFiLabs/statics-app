@@ -1,7 +1,7 @@
 # Statics Site and DApp Build Plan
 
-- Last updated: 2026-07-22
-- Status: Wallet and Dollar safety hardening locally verified; interactive Privy and public deployment proofs pending
+- Last updated: 2026-07-23
+- Status: PositionNFT collateral and global staking locally verified; interactive Privy and public deployment proofs pending
 - Primary workspace: `statics-site`
 - Protocol source: `../statics`
 - Reference wallet implementation: `../market-ui/eves-market-ui`
@@ -32,13 +32,13 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 ## Current state
 
 - The approved landing page is served at `/` by Next.js 16 and React 19, with its copy, responsive visual system, Statics branding, and Robin Hood hero preserved.
-- A branded Dollar DApp is served at `/app`, with route-scoped Privy, Wagmi, Viem, and React Query providers; normal sign-in and connection controls; local Anvil switching; Dollar reads and actions; wallet-scoped activity; and wallet settings/export guidance.
+- A branded DApp is served at `/app`, with route-scoped Privy, Wagmi, Viem, and React Query providers; normal sign-in and connection controls; local Anvil switching; Dollar, basket, PositionNFT collateral, staking, and reward-selection flows; wallet-scoped activity; and wallet settings/export guidance.
 - Final brand assets live in `public/assets/`; `mockup.png` remains the design reference.
 - Vitest component/foundation tests and Playwright desktop, tablet, and mobile checks cover the landing, DApp shell, accessibility, route behavior, security headers, and visual snapshots.
 - There is no delegated authority, API layer, database, or public Statics deployment configuration. Local development can generate code-hash-bound Anvil configuration from the protocol deployment script.
 - The live protocol source is maintained separately in `../statics`.
 - The protocol repository records no public Statics deployment. The DApp must not show a production address, live TVL, or “deployed” status until a verified deployment manifest exists.
-- The canonical SDK is vendored from protocol commit `be81deec2424dd6ad18ab9cbd192632ed39c4921` with SHA-256 provenance for every copied artifact.
+- The canonical SDK is vendored from protocol commit `f82f3a7e4ba4c9bfbf749c3208f68bb18fd4afa1` with SHA-256 provenance for every copied artifact.
 - Eves Market already treats Statics Dollar as its default collateral/trading asset and contains a working Privy/Wagmi and delegated-signing reference implementation.
 
 ## Architecture decisions
@@ -89,20 +89,20 @@ Eves signer IDs, authorization keys, policies, delegation records, or capability
 
 Proposed routes may change during UX design, but the product capabilities should remain grouped as follows:
 
-| Route               | User outcome                                                                                                       | Initial release  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| `/app`              | Portfolio overview, wallet, network, Statics Dollar balance, positions, pending rewards, and protocol status       | Yes              |
-| `/app/dollar`       | Deposit ETH/WETH, obtain Statics Dollar and Risk Shares, recombine to ETH/WETH, and use configured pegged profiles | Yes              |
-| `/app/activity`     | Pending, confirmed, failed, and replaced Statics actions with explorer links                                       | Yes              |
-| `/app/settings`     | Wallet information, embedded-wallet export guidance, and Statics-only logout                                       | Yes              |
-| `/app/baskets`      | Discover and inspect permissionless baskets and their lifecycle/risk metadata                                      | Next release     |
-| `/app/baskets/[id]` | Quote, mint, redeem, and inspect constituent requirements and fees                                                 | Next release     |
-| `/app/create`       | Create a permissionless basket with validated configuration and creation fee                                       | Later release    |
-| `/app/positions`    | Inspect and manage PositionNFT legs, staking, basket collateral, Dollar legs, and transfer consequences            | Later release    |
-| `/app/loans`        | Quote, borrow, repay, extend, and inspect recovery state per independent loan tranche                              | Later release    |
-| `/app/rewards`      | Global staking, activation/cooldown, multi-asset pending rewards, and claims                                       | Later release    |
-| `/app/liquidity`    | Canonical pool state, user v4 positions, staking, activation, claims, and exits                                    | Advanced release |
-| `/app/protocol`     | Read-only health, custody, lifecycle, timelock, and deployed-address information                                   | Yes, read-only   |
+| Route               | User outcome                                                                                                       | Initial release                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| `/app`              | Portfolio overview, wallet, network, Statics Dollar balance, positions, pending rewards, and protocol status       | Yes                                    |
+| `/app/dollar`       | Deposit ETH/WETH, obtain Statics Dollar and Risk Shares, recombine to ETH/WETH, and use configured pegged profiles | Yes                                    |
+| `/app/activity`     | Pending, confirmed, failed, and replaced Statics actions with explorer links                                       | Yes                                    |
+| `/app/settings`     | Wallet information, embedded-wallet export guidance, and Statics-only logout                                       | Yes                                    |
+| `/app/baskets`      | Discover and inspect permissionless baskets and their lifecycle/risk metadata                                      | Next release                           |
+| `/app/baskets/[id]` | Quote, mint, redeem, and inspect constituent requirements and fees                                                 | Next release                           |
+| `/app/create`       | Create a permissionless basket with validated configuration and creation fee                                       | Later release                          |
+| `/app/positions`    | Inspect and manage PositionNFT legs, staking, basket collateral, Dollar legs, and transfer consequences            | Current local release                  |
+| `/app/loans`        | Quote, borrow, repay, extend, and inspect recovery state per independent loan tranche                              | Later release                          |
+| `/app/rewards`      | Global staking, activation/cooldown, multi-asset pending rewards, and claims                                       | Current local release; claims deferred |
+| `/app/liquidity`    | Canonical pool state, user v4 positions, staking, activation, claims, and exits                                    | Advanced release                       |
+| `/app/protocol`     | Read-only health, custody, lifecycle, timelock, and deployed-address information                                   | Yes, read-only                         |
 
 ## User-facing protocol requirements
 
@@ -132,13 +132,14 @@ Proposed routes may change during UX design, but the product capabilities should
 
 ### Positions, lending, and rewards release
 
-- [ ] Create and inspect PositionNFTs.
-- [ ] Explain that transferring a PositionNFT transfers every attached protocol leg and obligation.
-- [ ] Support global staking, cooldown state, pending multi-asset rewards, and claims.
-- [ ] Support basket collateral deposits, direct mint-to-collateral, withdrawals, and redemptions.
+- [x] Create and inspect wallet-owned PositionNFTs from event discovery reconciled against current ownership (`components/positions`, `lib/positions/positions.ts`).
+- [x] Explain that transferring a PositionNFT transfers every attached protocol leg and obligation.
+- [x] Support global staking, authoritative cooldown state, per-position reward opt-in/out, and pending multi-asset reward reads.
+- [-] Support multi-asset reward claims; intentionally deferred while pending rewards and closure guards remain visible.
+- [x] Support basket collateral deposits, direct mint-to-collateral, withdrawals, and redemptions with exact approvals and fresh bounds.
 - [ ] Show each loan as an independent tranche with principal vector, maturity, and recovery time.
 - [ ] Support borrow, repay, and extend using fresh authoritative quotes.
-- [ ] Block position closure while any leg remains live.
+- [x] Block position closure while any leg remains live and allow closure only after current state reports zero active legs.
 
 ### Canonical liquidity release
 
@@ -260,7 +261,7 @@ identity, browser-wallet, public-network, or production proof is claimed.
 ### Broader protocol DApp
 
 - [x] Basket discovery, details, mint, and redemption.
-- [ ] PositionNFT, basket collateral, and global staking.
+- [x] PositionNFT, basket collateral, and global staking.
 - [ ] Loan quote, borrow, repay, extend, maturity, and recovery displays.
 - [ ] Multi-asset reward claims.
 - [ ] Permissionless basket creation.
@@ -279,6 +280,20 @@ deposit flow, established a bounded constituent approval, minted and redeemed Ba
 fresh caller/receiver bounds, and verified receipts, supply, vault backing, and wallet balances.
 This is local proof only; no Privy, browser-wallet, public-network, or production transaction was
 performed.
+
+Position and rewards evidence (2026-07-23): canonical SDK commit
+`f82f3a7e4ba4c9bfbf749c3208f68bb18fd4afa1` added PositionNFT ownership/state, basket
+collateral, global staking, reward selection, pending-reward, event, and error interfaces; its 26
+tests and TypeScript build passed. The vendored artifact records that clean protocol commit plus
+source and generated-artifact checksums. `npm run test:integration:local` deployed the current
+unified stack to ephemeral Anvil and confirmed PositionNFT creation and ownership, exact
+BasketToken approval, next-block collateral withdrawal, bounded direct mint-to-collateral and
+redemption, empty-position closure, exact WETH staking approval, atomic create-and-stake, selected
+Dollar reward accrual, opt-out preservation with no future accrual, opt-in cooldown restart, full
+unstake, selection clearing, and close blocking while earned rewards remain pending. Reward claims
+were not invoked. `npm run verify` passed lint, formatting, TypeScript, 73 Vitest tests, the Next.js
+production build, and 30 Playwright checks across desktop, tablet, and mobile. This is local proof
+only; no Privy, browser-wallet, public-network, or production transaction was performed.
 
 ### Live-network readiness
 
@@ -343,15 +358,16 @@ These decisions do not block documenting or scaffolding the application, but the
 
 Add dated entries with concrete evidence. Keep plans and completed work distinct.
 
-| Date       | Area                    | Status                  | Evidence / note                                                                                                                                                                                                                                                                                                       |
-| ---------- | ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-22 | Landing prototype       | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                                                                                                                                                   |
-| 2026-07-22 | Phase 1 foundation      | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                                                                                                                                              |
-| 2026-07-22 | Eves Privy/Wagmi review | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                                                                                                                                           |
-| 2026-07-22 | Statics DApp plan       | Documented              | This file created as the implementation and release tracker.                                                                                                                                                                                                                                                          |
-| 2026-07-22 | Wallet foundation       | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending.                                                                                                                       |
-| 2026-07-22 | Dollar safety rehearsal | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked.                                                           |
-| 2026-07-23 | Basket use flows        | Locally verified        | Event-backed discovery, chain reconciliation, basket detail, sequential bounded approvals, mint/redeem quotes, protocol activity, and responsive route checks passed focused tests. Real ephemeral-Anvil Dollar funding, basket mint, and redemption passed; interactive wallet and public-network proof remain open. |
+| Date       | Area                       | Status                  | Evidence / note                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | -------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-22 | Landing prototype          | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                                                                                                                                                                                |
+| 2026-07-22 | Phase 1 foundation         | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                                                                                                                                                                           |
+| 2026-07-22 | Eves Privy/Wagmi review    | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                                                                                                                                                                        |
+| 2026-07-22 | Statics DApp plan          | Documented              | This file created as the implementation and release tracker.                                                                                                                                                                                                                                                                                       |
+| 2026-07-22 | Wallet foundation          | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending.                                                                                                                                                    |
+| 2026-07-22 | Dollar safety rehearsal    | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked.                                                                                        |
+| 2026-07-23 | Basket use flows           | Locally verified        | Event-backed discovery, chain reconciliation, basket detail, sequential bounded approvals, mint/redeem quotes, protocol activity, and responsive route checks passed focused tests. Real ephemeral-Anvil Dollar funding, basket mint, and redemption passed; interactive wallet and public-network proof remain open.                              |
+| 2026-07-23 | Position and rewards flows | Locally verified        | Ownership-reconciled PositionNFT discovery, exact/bounded basket collateral actions, WETH staking, per-position reward selection, chain-time cooldowns, pending reads, and closure guards passed focused and full checks. Ephemeral-Anvil receipts proved the lifecycle; reward claims, interactive wallets, and public-network proof remain open. |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 

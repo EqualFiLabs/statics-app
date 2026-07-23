@@ -28,6 +28,11 @@ describe("DApp wallet shell", () => {
     expect(screen.getAllByText("Not configured")).toHaveLength(1);
     expect(screen.getByRole("link", { name: /dollar/i })).toHaveAttribute("href", "/app/dollar");
     expect(screen.getByRole("link", { name: /baskets/i })).toHaveAttribute("href", "/app/baskets");
+    expect(screen.getByRole("link", { name: /positions/i })).toHaveAttribute(
+      "href",
+      "/app/positions"
+    );
+    expect(screen.getByRole("link", { name: /rewards/i })).toHaveAttribute("href", "/app/rewards");
     expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute(
       "href",
       "/app/settings"

@@ -23,7 +23,20 @@ export type DollarActivityKind =
   | "recombine-weth"
   | "approve-basket-asset"
   | "mint-basket"
-  | "redeem-basket";
+  | "redeem-basket"
+  | "create-position"
+  | "close-position"
+  | "approve-basket-token"
+  | "deposit-basket-collateral"
+  | "mint-basket-collateral"
+  | "withdraw-basket-collateral"
+  | "redeem-basket-collateral"
+  | "approve-staking-token"
+  | "create-and-stake"
+  | "stake-position"
+  | "unstake-position"
+  | "opt-in-reward-assets"
+  | "opt-out-reward-assets";
 
 export type DollarActivity = Readonly<{
   id: string;

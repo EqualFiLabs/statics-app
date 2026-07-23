@@ -104,8 +104,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const wallet = useWalletState();
   const dollarDeployment = readClientDollarDeployment();
   const basketRoute = currentPath.startsWith("/app/baskets");
+  const positionRoute = currentPath.startsWith("/app/positions");
+  const rewardsRoute = currentPath.startsWith("/app/rewards");
+  const routeCopy = basketRoute
+    ? {
+        status: "Basket flows",
+        title: "Inspect, mint, and redeem static baskets.",
+        description:
+          "Discover basket creation events, reconcile current protocol state, and enforce bounded constituent flows before signing.",
+      }
+    : positionRoute
+      ? {
+          status: "Position flows",
+          title: "Manage each wallet-owned PositionNFT.",
+          description:
+            "Reconcile ownership from current onchain state, then manage collateral, staking, and reward selections with bounded transactions.",
+        }
+      : rewardsRoute
+        ? {
+            status: "Reward flows",
+            title: "Create stake positions with selected rewards.",
+            description:
+              "Choose fee assets per PositionNFT, inspect pending amounts, and respect the onchain unstaking cooldown.",
+          }
+        : {
+            status: "Dollar flows",
+            title: "Issue and redeem Statics Dollar.",
+            description:
+              "Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk shares. Every quote comes from current protocol state before signing.",
+          };
   const statusCards = [
-    { label: "DApp", value: basketRoute ? "Basket flows" : "Dollar flows", ready: true },
+    { label: "DApp", value: routeCopy.status, ready: true },
     { label: "Wallet", value: walletStatusLabel(wallet.status), ready: wallet.status === "ready" },
     {
       label: "Network",
@@ -189,16 +218,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="dapp-content" className="dapp-content">
           <section className="dapp-intro">
             <p className="dapp-eyebrow">{"// Statics application"}</p>
-            <h1>
-              {basketRoute
-                ? "Inspect, mint, and redeem static baskets."
-                : "Issue and redeem Statics Dollar."}
-            </h1>
-            <p>
-              {basketRoute
-                ? "Discover basket creation events, reconcile current protocol state, and enforce bounded constituent flows before signing."
-                : "Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk shares. Every quote comes from current protocol state before signing."}
-            </p>
+            <h1>{routeCopy.title}</h1>
+            <p>{routeCopy.description}</p>
           </section>
 
           {wallet.error && (
