@@ -2019,3 +2019,671 @@
     text-align: left;
   }
 }
+
+.basket-section-actions {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.basket-section-actions a {
+  color: var(--green);
+}
+
+.basket-section-actions button,
+.creation-assets button,
+.creation-footer > button {
+  min-height: 40px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line-bright);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.basket-section-actions button:disabled,
+.creation-assets button:disabled,
+.creation-footer > button:disabled {
+  color: #5d625d;
+  cursor: not-allowed;
+}
+
+.remaining-hero,
+.remaining-list,
+.remaining-workspace,
+.creation-workspace,
+.pool-catalog,
+.fee-allocation,
+.pol-boundary,
+.position-attached-grid article {
+  border: 1px solid var(--line);
+  background: rgba(8, 10, 8, 0.76);
+}
+
+.remaining-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.remaining-hero h2,
+.remaining-section-heading h3,
+.creation-workspace h3,
+.pool-catalog h3,
+.fee-allocation h3,
+.pol-boundary h3,
+.position-attached-grid h3 {
+  margin: 0.45rem 0 0;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.remaining-hero > div > p:last-child,
+.remaining-section-heading + p,
+.fee-allocation p,
+.pol-boundary p,
+.position-attached-grid p {
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.7;
+}
+
+.remaining-hero dl {
+  display: grid;
+  min-width: min(520px, 48%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--line);
+}
+
+.remaining-hero dl > div,
+.remaining-quote > div,
+.fee-allocation dl > div {
+  min-width: 0;
+  padding: 0.9rem;
+  background: #080a08;
+}
+
+.remaining-hero dt,
+.remaining-quote dt,
+.fee-allocation dt,
+.pool-grid dt {
+  color: var(--muted);
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+
+.remaining-hero dd,
+.remaining-quote dd,
+.fee-allocation dd,
+.pool-grid dd {
+  margin: 0.45rem 0 0;
+  font-size: 0.67rem;
+  overflow-wrap: anywhere;
+}
+
+.remaining-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.remaining-list,
+.remaining-workspace,
+.creation-workspace,
+.pool-catalog,
+.fee-allocation,
+.pol-boundary {
+  padding: clamp(1.2rem, 2.5vw, 1.75rem);
+}
+
+.remaining-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.remaining-section-heading > span,
+.loan-tranche > .loan-time,
+.lp-position > span:last-child {
+  color: var(--muted);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+}
+
+.loan-tranche,
+.lp-position {
+  display: grid;
+  width: 100%;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: #070907;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.loan-tranche:hover,
+.loan-tranche.is-selected,
+.lp-position:hover,
+.lp-position.is-selected {
+  border-color: var(--green);
+  background: rgba(117, 241, 45, 0.045);
+}
+
+.loan-tranche strong,
+.lp-position strong {
+  font-size: 0.69rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.loan-tranche small,
+.lp-position small {
+  color: var(--muted);
+  font-size: 0.55rem;
+}
+
+.remaining-status {
+  width: max-content;
+  padding: 0.32rem 0.48rem;
+  border: 1px solid var(--line-bright);
+  color: var(--muted);
+  font-size: 0.52rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.remaining-status.is-active,
+.remaining-status.is-wallet-owned {
+  border-color: rgba(117, 241, 45, 0.45);
+  color: var(--green);
+}
+
+.remaining-status.is-grace,
+.remaining-status.is-warmup,
+.remaining-status.is-activation-pending {
+  border-color: #9d8141;
+  color: #d1b46e;
+}
+
+.remaining-status.is-recoverable,
+.remaining-status.is-exit-only {
+  border-color: #8f493f;
+  color: #e5a79d;
+}
+
+.remaining-workspace .dollar-tabs {
+  margin: 1.4rem 0;
+}
+
+.remaining-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.remaining-form-grid,
+.creation-economics,
+.creation-review {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.remaining-form-grid .basket-field {
+  margin-top: 0;
+}
+
+.basket-field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #050605;
+  color: var(--text);
+  font: inherit;
+}
+
+.remaining-quote {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 1rem 0;
+  background: var(--line);
+}
+
+.loan-detail-meta {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.loan-detail-meta p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.principal-vector {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+}
+
+.principal-vector > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.principal-vector ul {
+  padding: 0;
+  margin: 0.8rem 0 0;
+  list-style: none;
+}
+
+.principal-vector li {
+  display: grid;
+  grid-template-columns: minmax(75px, 0.5fr) minmax(90px, 0.75fr) minmax(120px, 1fr);
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.64rem;
+}
+
+.principal-vector li small {
+  color: var(--muted);
+  text-align: right;
+}
+
+.creation-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 0;
+  margin: 10px 0 0;
+  background: var(--line);
+  list-style: none;
+}
+
+.creation-steps button {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border: 0;
+  background: #080a08;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.creation-steps button span {
+  color: #7a807a;
+}
+
+.creation-steps .is-current button {
+  background: rgba(117, 241, 45, 0.07);
+  color: var(--text);
+}
+
+.creation-steps .is-current button span {
+  color: var(--green);
+}
+
+.creation-assets {
+  margin-top: 1.5rem;
+}
+
+.creation-assets article {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(180px, 0.45fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.creation-assets article > span,
+.creation-assets code {
+  color: var(--muted);
+  font-size: 0.56rem;
+}
+
+.creation-assets article > div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.creation-assets article label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+
+.creation-assets article input {
+  min-height: 42px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--line);
+  background: #050605;
+  color: var(--text);
+  font: inherit;
+}
+
+.creation-economics > section,
+.creation-review > section {
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+}
+
+.creation-tier-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.creation-tier-grid article {
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+}
+
+.creation-tier-grid article > strong,
+.creation-tier-grid p {
+  font-size: 0.6rem;
+}
+
+.creation-tier-grid p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+}
+
+.creation-review ul {
+  padding-left: 1rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.8;
+}
+
+.creation-review section > p:not(.dapp-section-label) {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.7;
+}
+
+.creation-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.creation-footer .creation-next {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.pool-catalog,
+.fee-allocation,
+.pol-boundary {
+  margin-top: 10px;
+}
+
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 1.25rem;
+}
+
+.pool-grid article {
+  padding: 1rem;
+  border: 1px solid var(--line);
+}
+
+.pool-grid article > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pool-grid code {
+  color: var(--muted);
+  font-size: 0.54rem;
+}
+
+.pool-grid h4 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.pool-grid article > p {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.pool-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 1rem 0 0;
+  background: var(--line);
+}
+
+.pool-grid dl > div {
+  padding: 0.75rem;
+  background: #080a08;
+}
+
+.fee-allocation {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1.4fr);
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.fee-allocation dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--line);
+}
+
+.liquidity-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.pol-boundary {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.3fr);
+  gap: 2rem;
+  align-items: center;
+}
+
+.position-attached-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.position-attached-grid article {
+  padding: 1.25rem;
+}
+
+.position-attached-grid a {
+  color: var(--green);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+
+.claim-selector {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+}
+
+.claim-selector legend {
+  padding: 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+}
+
+.claim-selector label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.85rem;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.claim-selector label:first-of-type {
+  border-top: 0;
+}
+
+.claim-selector label > span {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.56rem;
+}
+
+.claim-selector label > span strong {
+  color: var(--text);
+}
+
+.claim-selector label > small {
+  color: var(--muted);
+  font-size: 0.52rem;
+}
+
+@media (max-width: 1100px) {
+  .remaining-hero {
+    display: grid;
+  }
+
+  .remaining-hero dl {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .fee-allocation {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .remaining-layout,
+  .creation-economics,
+  .creation-review,
+  .pool-grid,
+  .pol-boundary,
+  .position-attached-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fee-allocation dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .basket-section-actions {
+    justify-items: start;
+  }
+
+  .remaining-hero {
+    gap: 1rem;
+  }
+
+  .remaining-hero dl,
+  .remaining-form-grid,
+  .remaining-quote,
+  .pool-grid dl {
+    grid-template-columns: 1fr;
+  }
+
+  .remaining-tabs,
+  .liquidity-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .creation-steps button {
+    display: grid;
+    min-height: 62px;
+    justify-items: center;
+    padding: 0.65rem 0.35rem;
+    font-size: 0.52rem;
+  }
+
+  .creation-assets article {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .creation-assets article label {
+    grid-column: 2;
+  }
+
+  .creation-footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .creation-footer > button,
+  .creation-footer .dollar-submit {
+    width: 100%;
+  }
+
+  .principal-vector li {
+    grid-template-columns: 0.6fr 1fr;
+  }
+
+  .principal-vector li small {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .claim-selector label {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .claim-selector label > small {
+    grid-column: 2;
+  }
+}

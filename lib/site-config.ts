@@ -72,7 +72,9 @@ export const appNavigation = [
   { label: "Dollar", enabled: true, href: "/app/dollar" },
   { label: "Baskets", enabled: true, href: "/app/baskets" },
   { label: "Positions", enabled: true, href: "/app/positions" },
+  { label: "Loans", enabled: true, href: "/app/loans" },
   { label: "Rewards", enabled: true, href: "/app/rewards" },
+  { label: "Liquidity", enabled: true, href: "/app/liquidity" },
   { label: "Activity", enabled: true, href: "/app/activity" },
   { label: "Settings", enabled: true, href: "/app/settings" },
 ] as const;

@@ -18,6 +18,10 @@ describe("basket routes without wallet configuration", () => {
       "href",
       "/app/baskets/0"
     );
+    expect(screen.getByRole("link", { name: /create sample basket/i })).toHaveAttribute(
+      "href",
+      "/app/create"
+    );
   });
 
   it("shows sample basket detail while keeping transactions disabled", () => {

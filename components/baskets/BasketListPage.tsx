@@ -87,7 +87,12 @@ function BasketListRuntime() {
           <p className="dapp-section-label">Event-discovered · chain-reconciled</p>
           <h2 id="basket-catalog-title">Statics baskets</h2>
         </div>
-        <span>{catalog.data.baskets.length} discovered</span>
+        <div className="basket-section-actions">
+          <span>{catalog.data.baskets.length} discovered</span>
+          <button type="button" disabled>
+            Basket creation · Planned
+          </button>
+        </div>
       </div>
       {catalog.data.warning && (
         <p className="dollar-warning" role="status">

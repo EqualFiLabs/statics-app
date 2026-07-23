@@ -5,7 +5,7 @@ import { useState } from "react";
 
 const sampleWallet = "0xA11cE00000000000000000000000000000001042";
 
-function PreviewBanner({ surface }: { surface: string }) {
+export function PreviewBanner({ surface }: { surface: string }) {
   return (
     <aside className="preview-banner" role="status" data-dapp-preview>
       <div>
@@ -20,7 +20,7 @@ function PreviewBanner({ surface }: { surface: string }) {
   );
 }
 
-function PreviewAddress({ label = "Sample wallet" }: { label?: string }) {
+export function PreviewAddress({ label = "Sample wallet" }: { label?: string }) {
   return (
     <span className="protocol-address">
       <span>{label}</span>
@@ -30,7 +30,7 @@ function PreviewAddress({ label = "Sample wallet" }: { label?: string }) {
   );
 }
 
-function PreviewAction({ children }: { children: React.ReactNode }) {
+export function PreviewAction({ children }: { children: React.ReactNode }) {
   return (
     <button className="dollar-submit" type="button" disabled>
       {children}
@@ -75,6 +75,18 @@ export function DollarOverviewPreview() {
           <strong>$186.42</strong>
           <small>4 selected assets</small>
           <Link href="/app/rewards">Review rewards →</Link>
+        </article>
+        <article>
+          <span>Loan tranches</span>
+          <strong>3</strong>
+          <small>1 nearing recovery</small>
+          <Link href="/app/loans">Review loans →</Link>
+        </article>
+        <article>
+          <span>Canonical LP NFTs</span>
+          <strong>3</strong>
+          <small>$84,220 sample liquidity</small>
+          <Link href="/app/liquidity">Review liquidity →</Link>
         </article>
       </section>
     </>
@@ -217,7 +229,10 @@ export function BasketListPreview() {
             <p className="dapp-section-label">Sample event-discovered catalog</p>
             <h2 id="preview-basket-catalog-title">Statics baskets</h2>
           </div>
-          <span>2 sample baskets</span>
+          <div className="basket-section-actions">
+            <span>2 sample baskets</span>
+            <Link href="/app/create">Create sample basket →</Link>
+          </div>
         </div>
         <div className="basket-grid">
           {sampleBaskets.map((basket) => (
@@ -545,6 +560,20 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
         </p>
         <PreviewAction>Claim selected rewards · Planned</PreviewAction>
       </section>
+      <section className="position-attached-grid" aria-label="Sample attached protocol legs">
+        <article>
+          <p className="dapp-section-label">Sample loan legs</p>
+          <h3>2 independent tranches</h3>
+          <p>$2,118.64 sample principal · one nearing recovery.</p>
+          <Link href="/app/loans">Review loan tranches →</Link>
+        </article>
+        <article>
+          <p className="dapp-section-label">Sample liquidity legs</p>
+          <h3>2 canonical LP NFTs</h3>
+          <p>One active and one eligible for next-block activation.</p>
+          <Link href="/app/liquidity">Review LP positions →</Link>
+        </article>
+      </section>
       <section className="position-close">
         <div>
           <p className="dapp-section-label">Sample terminal action</p>
@@ -560,6 +589,29 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
 }
 
 export function RewardsPreview() {
+  const [claimPosition, setClaimPosition] = useState("1042");
+  const [claimScope, setClaimScope] = useState<"selected" | "all">("selected");
+  const [claimAssets, setClaimAssets] = useState<readonly string[]>(["Dollar", "WETH"]);
+  const pendingAssets = [
+    ["Dollar", claimPosition === "1042" ? "128.42" : "24.18", "$128.42"],
+    [
+      "WETH",
+      claimPosition === "1042" ? "0.0241" : "0.0062",
+      claimPosition === "1042" ? "$92.59" : "$23.82",
+    ],
+    ["sRESERVE", claimPosition === "1042" ? "18.20" : "0", "$36.95"],
+    ["USDC", claimPosition === "1042" ? "42.80" : "4.20", "$42.80"],
+  ] as const;
+
+  const visibleClaimAssets =
+    claimScope === "all" ? pendingAssets.map(([symbol]) => symbol) : claimAssets;
+
+  const toggleClaimAsset = (symbol: string) => {
+    setClaimAssets((current) =>
+      current.includes(symbol) ? current.filter((asset) => asset !== symbol) : [...current, symbol]
+    );
+  };
+
   return (
     <>
       <PreviewBanner surface="staking and rewards" />
@@ -596,34 +648,70 @@ export function RewardsPreview() {
           <div className="position-section-heading">
             <div>
               <p className="dapp-section-label">Sample wallet-owned positions</p>
-              <h2>Selected rewards</h2>
+              <h2>Claim multi-asset rewards</h2>
             </div>
-            <span>Claims planned</span>
+            <span>{visibleClaimAssets.length} assets in sample claim</span>
           </div>
-          <div className="reward-position-list">
-            {positions.slice(0, 2).map((position, index) => (
-              <article key={position.id}>
-                <div>
-                  <h3>Position #{position.id}</h3>
-                  <span>{position.stake} staked</span>
-                </div>
-                <ul>
-                  <li>
-                    <span>Dollar</span>
-                    <strong>{index === 0 ? "128.42" : "24.18"} pending</strong>
-                  </li>
-                  <li>
-                    <span>WETH</span>
-                    <strong>{index === 0 ? "0.0241" : "0.0062"} pending</strong>
-                  </li>
-                </ul>
-                <Link href={`/app/positions/${position.id}`}>
-                  Manage sample selections and stake →
-                </Link>
-              </article>
+          <div className="remaining-form-grid">
+            <label className="basket-field">
+              <span>PositionNFT</span>
+              <select
+                value={claimPosition}
+                onChange={(event) => setClaimPosition(event.target.value)}
+              >
+                {positions.slice(0, 2).map((position) => (
+                  <option value={position.id} key={position.id}>
+                    #{position.id} · {position.stake} staked
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="basket-field">
+              <span>Receiver</span>
+              <input value="0xA11c…1042" readOnly />
+              <small>Sample PositionNFT owner</small>
+            </label>
+          </div>
+          <div className="dollar-tabs" aria-label="Sample reward claim scope">
+            {(["selected", "all"] as const).map((scope) => (
+              <button
+                type="button"
+                key={scope}
+                className={claimScope === scope ? "active" : undefined}
+                onClick={() => setClaimScope(scope)}
+              >
+                {scope === "selected" ? "Selected assets" : "Claim all pending"}
+              </button>
             ))}
           </div>
-          <PreviewAction>Claim selected rewards · Planned</PreviewAction>
+          <fieldset className="claim-selector">
+            <legend>Pending assets and minimum outputs</legend>
+            {pendingAssets.map(([symbol, amount, usd]) => {
+              const checked = visibleClaimAssets.includes(symbol);
+              return (
+                <label key={symbol}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={claimScope === "all"}
+                    onChange={() => toggleClaimAsset(symbol)}
+                  />
+                  <span>
+                    <strong>{symbol}</strong>
+                    {amount} pending · {usd} sample value
+                  </span>
+                  <small>
+                    Minimum: {amount} {symbol}
+                  </small>
+                </label>
+              );
+            })}
+          </fieldset>
+          <p className="dollar-warning">
+            Claims settle only the assets submitted for this PositionNFT. Opting out stops future
+            accrual but does not erase already earned balances.
+          </p>
+          <PreviewAction>Claim {visibleClaimAssets.length} assets · Preview only</PreviewAction>
         </section>
       </div>
     </>

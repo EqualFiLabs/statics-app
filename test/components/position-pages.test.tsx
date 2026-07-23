@@ -45,5 +45,8 @@ describe("position and reward routes without wallet configuration", () => {
     expect(
       screen.getByRole("button", { name: "Approve or create staking position · Preview" })
     ).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Claim multi-asset rewards" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Claim all pending" }));
+    expect(screen.getByRole("button", { name: "Claim 4 assets · Preview only" })).toBeDisabled();
   });
 });

@@ -118,7 +118,7 @@ test.describe("Dollar DApp foundation", () => {
     });
   });
 
-  test("provides Dollar, baskets, positions, rewards, activity, and settings", async ({ page }) => {
+  test("provides every reviewable DApp destination", async ({ page }) => {
     await page.goto("/app");
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
@@ -130,14 +130,25 @@ test.describe("Dollar DApp foundation", () => {
     await navigateDapp(page, "/app/baskets");
     await expect(page).toHaveURL(/\/app\/baskets$/);
     await expect(page.getByRole("heading", { name: "Statics baskets" })).toBeVisible();
+    await page.getByRole("link", { name: /create sample basket/i }).click();
+    await expect(page).toHaveURL(/\/app\/create$/);
+    await expect(page.getByRole("heading", { name: "Create a static basket" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
     await expect(page.getByRole("heading", { name: "Your PositionNFTs" })).toBeVisible();
 
+    await navigateDapp(page, "/app/loans");
+    await expect(page).toHaveURL(/\/app\/loans$/);
+    await expect(page.getByRole("heading", { name: "Position-owned loans" })).toBeVisible();
+
     await navigateDapp(page, "/app/rewards");
     await expect(page).toHaveURL(/\/app\/rewards$/);
     await expect(page.getByRole("heading", { name: "Create and stake" })).toBeVisible();
+
+    await navigateDapp(page, "/app/liquidity");
+    await expect(page).toHaveURL(/\/app\/liquidity$/);
+    await expect(page.getByRole("heading", { name: "Pools, POL, and user LP NFTs" })).toBeVisible();
 
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
@@ -193,9 +204,12 @@ test.describe("Dollar DApp foundation", () => {
       ["dollar", "/app/dollar"],
       ["basket-catalog", "/app/baskets"],
       ["basket-detail", "/app/baskets/0"],
+      ["basket-create", "/app/create"],
       ["position-catalog", "/app/positions"],
       ["position-detail", "/app/positions/1042"],
+      ["loans", "/app/loans"],
       ["rewards", "/app/rewards"],
+      ["liquidity", "/app/liquidity"],
       ["activity", "/app/activity"],
       ["settings", "/app/settings"],
     ] as const;
@@ -210,6 +224,37 @@ test.describe("Dollar DApp foundation", () => {
         maxDiffPixelRatio: 0.005,
       });
     }
+  });
+
+  test("captures the basket creation economics and review steps", async ({ page }, testInfo) => {
+    await page.goto("/app/create");
+
+    await page
+      .locator(".creation-steps")
+      .getByRole("button", { name: /economics/i })
+      .evaluate((button: HTMLButtonElement) => button.click());
+    await expect(page.getByRole("heading", { name: "Borrowing and flash policy" })).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      `app-basket-create-economics-${testInfo.project.name}.png`,
+      {
+        fullPage: true,
+        animations: "disabled",
+        caret: "hide",
+        maxDiffPixelRatio: 0.005,
+      }
+    );
+
+    await page
+      .locator(".creation-steps")
+      .getByRole("button", { name: /review/i })
+      .evaluate((button: HTMLButtonElement) => button.click());
+    await expect(page.getByText("Configuration passes local review")).toBeVisible();
+    await expect(page).toHaveScreenshot(`app-basket-create-review-${testInfo.project.name}.png`, {
+      fullPage: true,
+      animations: "disabled",
+      caret: "hide",
+      maxDiffPixelRatio: 0.005,
+    });
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {
@@ -235,8 +280,15 @@ test.describe("Dollar DApp foundation", () => {
     expect(blocking).toEqual([]);
   });
 
-  test("keeps position and reward routes responsive and accessible", async ({ page }) => {
-    for (const route of ["/app/positions", "/app/positions/1042", "/app/rewards"]) {
+  test("keeps broader protocol routes responsive and accessible", async ({ page }) => {
+    for (const route of [
+      "/app/create",
+      "/app/positions",
+      "/app/positions/1042",
+      "/app/loans",
+      "/app/rewards",
+      "/app/liquidity",
+    ]) {
       await page.goto(route);
       const overflow = await page
         .locator("html")
