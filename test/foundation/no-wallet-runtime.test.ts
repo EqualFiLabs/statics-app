@@ -11,21 +11,32 @@ function sourceFiles(root: string): string[] {
   });
 }
 
-describe("Phase 1 wallet boundary", () => {
-  it("does not install or import wallet runtime packages", () => {
-    const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
-      dependencies?: Record<string, string>;
-    };
-    const dependencies = Object.keys(packageJson.dependencies ?? {});
-    expect(dependencies).not.toContain("@privy-io/react-auth");
-    expect(dependencies).not.toContain("@privy-io/wagmi");
-    expect(dependencies).not.toContain("wagmi");
-    expect(dependencies).not.toContain("viem");
+describe("wallet runtime boundary", () => {
+  it("keeps Privy, Wagmi, and Viem outside the marketing route", () => {
+    const marketingFiles = [
+      ...sourceFiles("app/(marketing)"),
+      ...sourceFiles("components/landing"),
+      "app/layout.tsx",
+      "lib/site-config.ts",
+    ];
+    const source = marketingFiles.map((file) => fs.readFileSync(file, "utf8")).join("\n");
 
-    const source = ["app", "components", "lib"]
-      .flatMap((directory) => sourceFiles(directory))
-      .map((file) => fs.readFileSync(file, "utf8"))
-      .join("\n");
     expect(source).not.toMatch(/from ["'](?:@privy-io\/|wagmi|viem)/);
+    expect(source).not.toMatch(/DAppProviders|wallet-context|wallet-config/);
+  });
+
+  it("keeps the configured provider order explicit", () => {
+    const source = fs.readFileSync("providers/DAppProviders.tsx", "utf8");
+    const queryProvider = source.indexOf("<QueryClientProvider");
+    const configuredProviders = source.indexOf("<ConfiguredWalletProviders>");
+    const privyProvider = source.indexOf("<PrivyProvider");
+    const wagmiProvider = source.indexOf("<WagmiProvider");
+    const bridge = source.indexOf("<WalletBridge>");
+
+    expect(queryProvider).toBeGreaterThan(-1);
+    expect(configuredProviders).toBeGreaterThan(queryProvider);
+    expect(privyProvider).toBeGreaterThan(-1);
+    expect(wagmiProvider).toBeGreaterThan(privyProvider);
+    expect(bridge).toBeGreaterThan(wagmiProvider);
   });
 });

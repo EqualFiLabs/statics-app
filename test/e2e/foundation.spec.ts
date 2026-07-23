@@ -43,7 +43,7 @@ test.describe("landing foundation", () => {
       .click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(
-      page.getByRole("heading", { name: "Protocol interface foundation." })
+      page.getByRole("heading", { name: "Wallet access, without shared sessions." })
     ).toBeVisible();
   });
 
@@ -83,12 +83,16 @@ test.describe("landing foundation", () => {
   });
 });
 
-test.describe("DApp foundation", () => {
-  test("shows a read-only shell with no simulated wallet state", async ({ page }, testInfo) => {
+test.describe("DApp wallet foundation", () => {
+  test("shows honest missing configuration without simulated wallet state", async ({
+    page,
+  }, testInfo) => {
     await page.goto("/app");
-    await expect(page.getByText("Foundation ready")).toBeVisible();
-    await expect(page.getByText("Not integrated")).toBeVisible();
-    await expect(page.getByRole("button", { name: /connect/i })).toHaveCount(0);
+    await expect(
+      page.locator(".dapp-status-card strong").filter({ hasText: "Wallet foundation" })
+    ).toBeVisible();
+    await expect(page.getByText("Not configured", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Wallet not configured" })).toBeDisabled();
     await expect(page.getByText(/0x[0-9a-f]{8}/i)).toHaveCount(0);
 
     await expect(page).toHaveScreenshot(`app-${testInfo.project.name}.png`, {
@@ -97,6 +101,16 @@ test.describe("DApp foundation", () => {
       caret: "hide",
       maxDiffPixelRatio: 0.005,
     });
+  });
+
+  test("provides a real settings route while future protocol routes stay inert", async ({
+    page,
+  }) => {
+    await page.goto("/app");
+    await page.getByRole("link", { name: /settings/i }).click();
+    await expect(page).toHaveURL(/\/app\/settings$/);
+    await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
+    await expect(page.getByText("Dollar")).toHaveAttribute("aria-disabled", "true");
   });
 
   test("renders the branded not-found state", async ({ page }) => {

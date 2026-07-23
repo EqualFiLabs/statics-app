@@ -54,11 +54,11 @@ export const protocolStatus = {
 } as const;
 
 export const appNavigation = [
-  { label: "Overview", enabled: true },
-  { label: "Dollar", enabled: false },
-  { label: "Baskets", enabled: false },
-  { label: "Positions", enabled: false },
-  { label: "Rewards", enabled: false },
-  { label: "Activity", enabled: false },
-  { label: "Settings", enabled: false },
+  { label: "Overview", enabled: true, href: "/app" },
+  { label: "Dollar", enabled: false, href: null },
+  { label: "Baskets", enabled: false, href: null },
+  { label: "Positions", enabled: false, href: null },
+  { label: "Rewards", enabled: false, href: null },
+  { label: "Activity", enabled: false, href: null },
+  { label: "Settings", enabled: true, href: "/app/settings" },
 ] as const;

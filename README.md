@@ -5,7 +5,11 @@ The Statics marketing site and DApp foundation are built with Next.js 16 and Rea
 ## Routes
 
 - `/` — static marketing landing page with no wallet runtime.
-- `/app` — read-only DApp foundation for the upcoming Privy and protocol integration.
+- `/app` — route-scoped Privy/Wagmi wallet foundation targeting Robinhood Chain Testnet.
+
+Statics and Eves Market intentionally keep separate login sessions. Configure Statics with the
+same public Privy App ID and use the same user credential to resolve the same embedded EVM wallet;
+no Eves delegation or server signer is reused.
 
 ## Development
 
