@@ -103,7 +103,7 @@ test.describe("Dollar DApp foundation", () => {
     });
   });
 
-  test("provides Dollar, activity, and settings while future routes stay inert", async ({
+  test("provides Dollar, baskets, activity, and settings while future routes stay inert", async ({
     page,
   }) => {
     await page.goto("/app");
@@ -113,18 +113,47 @@ test.describe("Dollar DApp foundation", () => {
       page.getByRole("heading", { name: "No verified deployment is configured." })
     ).toBeVisible();
 
+    await page.getByRole("link", { name: /baskets/i }).click();
+    await expect(page).toHaveURL(/\/app\/baskets$/);
+    await expect(
+      page.getByRole("heading", { name: "Configure Privy to inspect the local basket deployment." })
+    ).toBeVisible();
+
     await page.getByRole("link", { name: /activity/i }).click();
     await expect(page).toHaveURL(/\/app\/activity$/);
     await expect(
-      page.getByRole("heading", { name: "Connect your wallet to see local Dollar activity." })
+      page.getByRole("heading", { name: "Connect your wallet to see local Statics activity." })
     ).toBeVisible();
 
     await page.getByRole("link", { name: /settings/i }).click();
     await expect(page).toHaveURL(/\/app\/settings$/);
     await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
     await expect(
-      page.locator(".dapp-nav-item[aria-disabled='true']").filter({ hasText: "Baskets" })
+      page.locator(".dapp-nav-item[aria-disabled='true']").filter({ hasText: "Positions" })
     ).toBeVisible();
+  });
+
+  test("keeps the basket route responsive and accessible", async ({ page }) => {
+    await page.goto("/app/baskets");
+    await expect(
+      page.getByRole("heading", { name: "Inspect, mint, and redeem static baskets." })
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /baskets/i })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    const overflow = await page
+      .locator("html")
+      .evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Skip to application content" })).toBeFocused();
+    const results = await new AxeBuilder({ page }).analyze();
+    const blocking = results.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical"
+    );
+    expect(blocking).toEqual([]);
   });
 
   test("renders the branded not-found state", async ({ page }) => {

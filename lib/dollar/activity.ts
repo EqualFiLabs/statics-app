@@ -20,7 +20,10 @@ export type DollarActivityKind =
   | "deposit-eth"
   | "deposit-weth"
   | "recombine-eth"
-  | "recombine-weth";
+  | "recombine-weth"
+  | "approve-basket-asset"
+  | "mint-basket"
+  | "redeem-basket";
 
 export type DollarActivity = Readonly<{
   id: string;
@@ -38,7 +41,7 @@ export type DollarActivity = Readonly<{
   error?: string;
 }>;
 
-const activityEvent = "statics-dollar-activity";
+const activityEvent = "statics-protocol-activity";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
 const activityStatuses = new Set<DollarActivityStatus>([
   "simulating",
@@ -52,38 +55,58 @@ const activityStatuses = new Set<DollarActivityStatus>([
 ]);
 
 function storageKey(wallet: Address, chainId: number): string {
+  return `statics:protocol:activity:${chainId}:${wallet.toLowerCase()}`;
+}
+
+function legacyStorageKey(wallet: Address, chainId: number): string {
   return `statics:dollar:activity:${chainId}:${wallet.toLowerCase()}`;
 }
 
 export function readDollarActivity(wallet: Address, chainId: number): DollarActivity[] {
   if (typeof window === "undefined") return [];
   const key = storageKey(wallet, chainId);
-  const raw = window.localStorage.getItem(key) || "[]";
+  const protocolRaw = window.localStorage.getItem(key) || "[]";
+  const legacyRaw = window.localStorage.getItem(legacyStorageKey(wallet, chainId)) || "[]";
+  const raw = `${protocolRaw}\n${legacyRaw}`;
   const cached = activityCache.get(key);
   if (cached?.raw === raw) return cached.value;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const value = Array.isArray(parsed)
-      ? parsed.filter(
-          (item): item is DollarActivity =>
-            typeof item === "object" &&
-            item !== null &&
-            typeof (item as DollarActivity).id === "string" &&
-            typeof (item as DollarActivity).wallet === "string" &&
-            Number.isInteger((item as DollarActivity).chainId) &&
-            typeof (item as DollarActivity).kind === "string" &&
-            typeof (item as DollarActivity).label === "string" &&
-            typeof (item as DollarActivity).amount === "string" &&
-            activityStatuses.has((item as DollarActivity).status) &&
-            Number.isFinite((item as DollarActivity).createdAt)
-        )
-      : [];
+    const parsed: unknown[] = [JSON.parse(protocolRaw), JSON.parse(legacyRaw)];
+    const value = parsed
+      .flatMap((items) => (Array.isArray(items) ? items : []))
+      .filter(
+        (item): item is DollarActivity =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as DollarActivity).id === "string" &&
+          typeof (item as DollarActivity).wallet === "string" &&
+          Number.isInteger((item as DollarActivity).chainId) &&
+          typeof (item as DollarActivity).kind === "string" &&
+          typeof (item as DollarActivity).label === "string" &&
+          typeof (item as DollarActivity).amount === "string" &&
+          activityStatuses.has((item as DollarActivity).status) &&
+          Number.isFinite((item as DollarActivity).createdAt)
+      )
+      .filter(
+        (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index
+      )
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, 50);
     activityCache.set(key, { raw, value });
     return value;
   } catch {
     return [];
   }
 }
+
+export type ProtocolActivity = DollarActivity;
+export type ProtocolActivityKind = DollarActivityKind;
+export type ProtocolActivityStatus = DollarActivityStatus;
+export type ProtocolReplacementReason = DollarReplacementReason;
+export const readProtocolActivity = readDollarActivity;
+export const writeProtocolActivity = writeDollarActivity;
+export const updateProtocolActivity = updateDollarActivity;
+export const subscribeProtocolActivity = subscribeDollarActivity;
 
 export function writeDollarActivity(activity: DollarActivity): void {
   const current = readDollarActivity(activity.wallet, activity.chainId);

@@ -27,6 +27,7 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText("Dollar flows", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getAllByText("Not configured")).toHaveLength(1);
     expect(screen.getByRole("link", { name: /dollar/i })).toHaveAttribute("href", "/app/dollar");
+    expect(screen.getByRole("link", { name: /baskets/i })).toHaveAttribute("href", "/app/baskets");
     expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute(
       "href",
       "/app/settings"

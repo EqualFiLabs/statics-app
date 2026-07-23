@@ -11,9 +11,19 @@ describe("vendored Statics SDK", () => {
       readFileSync(resolve(root, "vendor/statics-sdk/provenance.json"), "utf8")
     ) as {
       protocolCommit: string;
+      sdkTreeState: "clean" | "dirty";
+      sourceChecksums: Record<string, string>;
       checksums: Record<string, string>;
     };
     expect(provenance.protocolCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(["clean", "dirty"]).toContain(provenance.sdkTreeState);
+    expect(Object.keys(provenance.sourceChecksums).sort()).toEqual([
+      "package.json",
+      "src/index.ts",
+    ]);
+    for (const expected of Object.values(provenance.sourceChecksums)) {
+      expect(expected).toMatch(/^[a-f0-9]{64}$/);
+    }
     for (const [file, expected] of Object.entries(provenance.checksums)) {
       const actual = createHash("sha256")
         .update(readFileSync(resolve(root, "vendor/statics-sdk", file)))

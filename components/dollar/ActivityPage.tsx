@@ -4,14 +4,14 @@ import { useSyncExternalStore } from "react";
 import { getAddress } from "viem";
 
 import {
-  readDollarActivity,
-  subscribeDollarActivity,
-  type DollarActivity,
+  readProtocolActivity,
+  subscribeProtocolActivity,
+  type ProtocolActivity,
 } from "@/lib/dollar/activity";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
 
-function statusLabel(activity: DollarActivity): string {
+function statusLabel(activity: ProtocolActivity): string {
   if (activity.status === "simulating") return "Simulating";
   if (activity.status === "signing") return "Awaiting signature";
   if (activity.status === "submitted") return "Confirming";
@@ -30,10 +30,10 @@ export function ActivityPage() {
   const wallet = useWalletState();
   const address = wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
   const chainId = wallet.status === "ready" ? wallet.chainId : null;
-  const emptyActivity: DollarActivity[] = [];
+  const emptyActivity: ProtocolActivity[] = [];
   const activity = useSyncExternalStore(
-    (listener) => (address && chainId ? subscribeDollarActivity(listener) : () => undefined),
-    () => (address && chainId ? readDollarActivity(address, chainId) : emptyActivity),
+    (listener) => (address && chainId ? subscribeProtocolActivity(listener) : () => undefined),
+    () => (address && chainId ? readProtocolActivity(address, chainId) : emptyActivity),
     () => emptyActivity
   );
 
@@ -41,7 +41,7 @@ export function ActivityPage() {
     return (
       <section className="dollar-unavailable">
         <p className="dapp-section-label">Activity</p>
-        <h2>Connect your wallet to see local Dollar activity.</h2>
+        <h2>Connect your wallet to see local Statics activity.</h2>
       </section>
     );
   }
@@ -50,12 +50,12 @@ export function ActivityPage() {
     <section className="activity-panel" aria-labelledby="activity-title">
       <div>
         <p className="dapp-section-label">Wallet and network scoped</p>
-        <h2 id="activity-title">Dollar activity</h2>
+        <h2 id="activity-title">Protocol activity</h2>
         <p>Pending and receipt-confirmed actions stored only in this browser.</p>
       </div>
       {activity.length === 0 ? (
         <p className="activity-empty">
-          No Dollar activity for this wallet on chain {wallet.chainId}.
+          No Statics activity for this wallet on chain {wallet.chainId}.
         </p>
       ) : (
         <ol>
@@ -68,7 +68,7 @@ export function ActivityPage() {
   );
 }
 
-function ActivityItem({ activity }: { activity: DollarActivity }) {
+function ActivityItem({ activity }: { activity: ProtocolActivity }) {
   const displayHash = activity.confirmedHash ?? activity.replacementHash ?? activity.hash;
   const explorerUrl = displayHash ? getTransactionExplorerUrl(activity.chainId, displayHash) : null;
   const hashLabel = displayHash ? `${displayHash.slice(0, 10)}…${displayHash.slice(-8)}` : null;

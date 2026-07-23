@@ -5,6 +5,7 @@ export type DollarContractName =
 
 export type DollarDeployment = Readonly<{
   chainId: number;
+  deploymentStartBlock: bigint;
   wethProfileId: bigint;
   protocolCommit: string;
   source: "development-environment";
@@ -57,6 +58,7 @@ export function readDollarDeployment(
 ): DollarDeploymentState {
   const configuredValues = [
     environment.NEXT_PUBLIC_STATICS_CHAIN_ID,
+    environment.NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK,
     environment.NEXT_PUBLIC_STATICS_PROTOCOL_COMMIT,
     ...Object.values(addressVariables).map((variable) => environment[variable]),
     ...Object.values(hashVariables).map((variable) => environment[variable]),
@@ -88,6 +90,11 @@ export function readDollarDeployment(
     throw new Error("NEXT_PUBLIC_STATICS_WETH_PROFILE_ID must be a positive integer.");
   }
 
+  const deploymentStartBlock = environment.NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK;
+  if (!deploymentStartBlock || !/^\d+$/.test(deploymentStartBlock)) {
+    throw new Error("NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK must be a non-negative integer.");
+  }
+
   const protocolCommit = environment.NEXT_PUBLIC_STATICS_PROTOCOL_COMMIT?.trim() || "";
   if (!/^[a-f0-9]{40}$/i.test(protocolCommit)) {
     throw new Error("NEXT_PUBLIC_STATICS_PROTOCOL_COMMIT must be a full Git commit.");
@@ -110,6 +117,7 @@ export function readDollarDeployment(
     status: "configured",
     deployment: {
       chainId,
+      deploymentStartBlock: BigInt(deploymentStartBlock),
       wethProfileId: BigInt(profile),
       protocolCommit,
       source: "development-environment",
@@ -123,6 +131,8 @@ export function readClientDollarDeployment(): DollarDeploymentState {
   return readDollarDeployment({
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_STATICS_CHAIN_ID: process.env.NEXT_PUBLIC_STATICS_CHAIN_ID,
+    NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK:
+      process.env.NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK,
     NEXT_PUBLIC_STATICS_DIAMOND_ADDRESS: process.env.NEXT_PUBLIC_STATICS_DIAMOND_ADDRESS,
     NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: process.env.NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS,
     NEXT_PUBLIC_STATICS_DOLLAR_GATEWAY_ADDRESS:

@@ -4,8 +4,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  basketTokenAbi,
   buildDepositETHTransaction,
   buildDepositWETHCall,
+  buildMintCall,
+  buildRedeemCall,
   buildRecombineToETHCall,
   buildRecombineToWETHCall,
   staticsAbi,
@@ -26,7 +29,11 @@ import {
 import { generateMnemonic, mnemonicToAccount } from "viem/accounts";
 import { wordlist } from "@scure/bip39/wordlists/english";
 
-import { defaultProtocolRoot, deployLocalDollar } from "../../scripts/lib/local-dollar.mjs";
+import {
+  defaultProtocolRoot,
+  deployLocalDollar,
+  seedLocalBasket,
+} from "../../scripts/lib/local-dollar.mjs";
 
 const siteRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const protocolRoot = defaultProtocolRoot(siteRoot);
@@ -97,6 +104,24 @@ try {
   });
   const publicClient = createPublicClient({ transport: http(rpcUrl) });
   const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
+  const fixture = await seedLocalBasket({ deployment, rpcUrl, privateKey });
+  if (
+    deployment.chainId !== 31_337 ||
+    fixture.receipt.blockNumber < deployment.deploymentStartBlock
+  ) {
+    throw new Error("Local basket fixture is not bound to the verified deployment range.");
+  }
+  const creationEvents = await publicClient.getContractEvents({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    eventName: "BasketCreated",
+    fromBlock: deployment.deploymentStartBlock,
+    toBlock: "latest",
+    strict: true,
+  });
+  if (!creationEvents.some((event) => event.args.basketId === fixture.basketId)) {
+    throw new Error("Local basket fixture is not discoverable from its indexed creation event.");
+  }
 
   const send = async (to, data, value = 0n) => {
     const simulation = await publicClient.call({ account: account.address, to, data, value });
@@ -277,8 +302,130 @@ try {
     throw new Error("Local Dollar lifecycle did not return to the expected balances.");
   }
 
+  const basketDepositAmount = parseEther("0.01");
+  const basketDepositPreview = await publicClient.readContract({
+    address: deployment.contracts.core,
+    abi: staticsDollarCoreAbi,
+    functionName: "previewDeposit",
+    args: [1n, basketDepositAmount],
+  });
+  await send(
+    deployment.contracts.gateway,
+    buildDepositETHTransaction(
+      basketDepositAmount,
+      account.address,
+      account.address,
+      minimum(basketDepositPreview.staticsDollarMinted),
+      minimum(basketDepositPreview.sharesMinted)
+    ).data,
+    basketDepositAmount
+  );
+  const configuredBasket = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basket",
+    args: [fixture.basketId],
+  });
+  if (
+    configuredBasket.assets.length !== 1 ||
+    configuredBasket.assets[0].toLowerCase() !== deployment.contracts.dollar.toLowerCase()
+  ) {
+    throw new Error("Local basket fixture is not backed by the verified Statics Dollar token.");
+  }
+  const basketShares = parseEther("1");
+  const mintQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteMint",
+    args: [fixture.basketId, basketShares],
+  });
+  const mintMaximums = mintQuote.map(maximum);
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, mintMaximums[0]],
+    })
+  );
+  const exactAllowance = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "allowance",
+    args: [account.address, deployment.contracts.diamond],
+  });
+  if (exactAllowance !== mintMaximums[0]) {
+    throw new Error("Local basket lifecycle did not establish the exact bounded allowance.");
+  }
+  const mintResult = await send(
+    deployment.contracts.diamond,
+    buildMintCall(fixture.basketId, basketShares, account.address, mintMaximums)
+  );
+  if (!mintResult.simulationData) throw new Error("Basket mint simulation returned no result.");
+  const simulatedMintAmounts = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "mint",
+    data: mintResult.simulationData,
+  });
+  if (simulatedMintAmounts.length !== 1 || simulatedMintAmounts[0] === 0n) {
+    throw new Error("Basket mint simulation did not prove a nonzero constituent transfer.");
+  }
+  const mintedBasketBalance = await publicClient.readContract({
+    address: configuredBasket.token,
+    abi: basketTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (mintedBasketBalance !== basketShares) {
+    throw new Error("Confirmed basket mint did not produce the expected BasketToken balance.");
+  }
+  const redeemQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteRedeem",
+    args: [fixture.basketId, mintedBasketBalance],
+  });
+  const redeemMinimums = redeemQuote.map(minimum);
+  const redeemResult = await send(
+    deployment.contracts.diamond,
+    buildRedeemCall(fixture.basketId, mintedBasketBalance, account.address, redeemMinimums)
+  );
+  if (!redeemResult.simulationData) {
+    throw new Error("Basket redemption simulation returned no result.");
+  }
+  const simulatedRedeemAmounts = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "redeem",
+    data: redeemResult.simulationData,
+  });
+  if (simulatedRedeemAmounts.length !== 1 || simulatedRedeemAmounts[0] === 0n) {
+    throw new Error("Basket redemption simulation did not prove a nonzero constituent output.");
+  }
+  const [endingBasketBalance, endingBasketSupply, endingVaultBalance] = await Promise.all([
+    publicClient.readContract({
+      address: configuredBasket.token,
+      abi: basketTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+    publicClient.readContract({
+      address: configuredBasket.token,
+      abi: basketTokenAbi,
+      functionName: "totalSupply",
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "vaultBalance",
+      args: [fixture.basketId, deployment.contracts.dollar],
+    }),
+  ]);
+  if (endingBasketBalance !== 0n || endingBasketSupply !== 0n || endingVaultBalance !== 0n) {
+    throw new Error("Basket redemption did not clear the user shares, supply, and backing.");
+  }
+
   console.log(
-    "Local Dollar integration passed: ETH and WETH deposits and recombinations confirmed."
+    "Local protocol integration passed: Dollar lifecycles plus bounded basket mint and redemption confirmed."
   );
 } finally {
   anvil.kill("SIGTERM");

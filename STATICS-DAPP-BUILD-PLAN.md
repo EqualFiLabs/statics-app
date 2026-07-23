@@ -123,12 +123,12 @@ Proposed routes may change during UX design, but the product capabilities should
 
 ### Basket release
 
-- [ ] Discover baskets from indexed creation/configuration events and reconcile them with current onchain state.
-- [ ] Show one-to-sixteen constituents, bundle amounts, lifecycle, fee tiers, LTV, loan duration, and token-risk warnings.
-- [ ] Quote mint/redeem immediately before submission.
-- [ ] Present constituent approvals sequentially and use exact/bounded amounts.
-- [ ] Apply receiver-side minimum outputs and caller-selected slippage limits.
-- [ ] Do not imply that holding BasketTokens earns basket-specific fees.
+- [x] Discover baskets from indexed creation events and reconcile them with current onchain state.
+- [x] Show one-to-sixteen constituents, bundle amounts, lifecycle, fee tiers, LTV, loan duration, and token-risk warnings.
+- [x] Quote mint/redeem immediately before submission.
+- [x] Present constituent approvals sequentially and use exact/bounded amounts.
+- [x] Apply receiver-side minimum outputs and caller-selected slippage limits.
+- [x] Do not imply that holding BasketTokens earns basket-specific fees.
 
 ### Positions, lending, and rewards release
 
@@ -259,7 +259,7 @@ identity, browser-wallet, public-network, or production proof is claimed.
 
 ### Broader protocol DApp
 
-- [ ] Basket discovery, details, mint, and redemption.
+- [x] Basket discovery, details, mint, and redemption.
 - [ ] PositionNFT, basket collateral, and global staking.
 - [ ] Loan quote, borrow, repay, extend, maturity, and recovery displays.
 - [ ] Multi-asset reward claims.
@@ -267,6 +267,18 @@ identity, browser-wallet, public-network, or production proof is claimed.
 - [ ] Canonical v4 liquidity and user LP NFT management.
 
 Gate: each lifecycle has focused unit coverage plus at least one real local integration flow. Current onchain state remains authoritative over cached/indexed data.
+
+Basket evidence (2026-07-23): canonical SDK commit
+`643c979d3aa64a177b123becb91cf92df762929e` added authoritative basket reads, events, token
+metadata, and basket errors; its 25 tests and TypeScript build passed. The vendored artifact records
+that clean protocol commit plus source and generated-artifact checksums. The focused Foundry basket
+lifecycle suite passed 17 tests. `npm run test:integration:local` deployed the unified stack to
+ephemeral Anvil, recorded its deployment event range, created the exact-fee local Dollar-backed
+fixture, discovered its indexed creation event, funded the wallet through the real Dollar ETH
+deposit flow, established a bounded constituent approval, minted and redeemed BasketTokens with
+fresh caller/receiver bounds, and verified receipts, supply, vault backing, and wallet balances.
+This is local proof only; no Privy, browser-wallet, public-network, or production transaction was
+performed.
 
 ### Live-network readiness
 
@@ -331,14 +343,15 @@ These decisions do not block documenting or scaffolding the application, but the
 
 Add dated entries with concrete evidence. Keep plans and completed work distinct.
 
-| Date       | Area                    | Status                  | Evidence / note                                                                                                                                                                                                                                             |
-| ---------- | ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-22 | Landing prototype       | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                                                                                         |
-| 2026-07-22 | Phase 1 foundation      | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                                                                                    |
-| 2026-07-22 | Eves Privy/Wagmi review | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                                                                                 |
-| 2026-07-22 | Statics DApp plan       | Documented              | This file created as the implementation and release tracker.                                                                                                                                                                                                |
-| 2026-07-22 | Wallet foundation       | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending.                                                             |
-| 2026-07-22 | Dollar safety rehearsal | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked. |
+| Date       | Area                    | Status                  | Evidence / note                                                                                                                                                                                                                                                                                                       |
+| ---------- | ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-22 | Landing prototype       | Superseded by migration | Legacy static sources were migrated into the Next.js route and component structure; approved assets were moved to `public/assets/`.                                                                                                                                                                                   |
+| 2026-07-22 | Phase 1 foundation      | Locally verified        | `npm run verify` passed lint, format, typecheck, 8 Vitest tests, production build, and 21 Playwright tests; `npm audit` found no issues.                                                                                                                                                                              |
+| 2026-07-22 | Eves Privy/Wagmi review | Verified                | Current provider boundary and delegated/manual authorization paths reviewed; focused suite passed 36 tests and TypeScript typecheck passed.                                                                                                                                                                           |
+| 2026-07-22 | Statics DApp plan       | Documented              | This file created as the implementation and release tracker.                                                                                                                                                                                                                                                          |
+| 2026-07-22 | Wallet foundation       | Locally verified        | `npm run verify` passed lint, format, typecheck, 18 Vitest tests, production build, and 24 Playwright tests. Reviewed three updated `/app` snapshots. Interactive Privy parity remains pending.                                                                                                                       |
+| 2026-07-22 | Dollar safety rehearsal | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked.                                                           |
+| 2026-07-23 | Basket use flows        | Locally verified        | Event-backed discovery, chain reconciliation, basket detail, sequential bounded approvals, mint/redeem quotes, protocol activity, and responsive route checks passed focused tests. Real ephemeral-Anvil Dollar funding, basket mint, and redemption passed; interactive wallet and public-network proof remain open. |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 

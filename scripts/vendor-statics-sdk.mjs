@@ -16,6 +16,12 @@ const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: protocolRoot,
   encoding: "utf8",
 }).trim();
+const sdkTreeState = execFileSync("git", ["status", "--porcelain", "--", "sdk"], {
+  cwd: protocolRoot,
+  encoding: "utf8",
+}).trim()
+  ? "dirty"
+  : "clean";
 
 execFileSync("npm", ["run", "build"], { cwd: sdkRoot, stdio: "inherit" });
 
@@ -36,6 +42,14 @@ for (const file of files) {
   writeFileSync(target, content);
   checksums[file] = createHash("sha256").update(content).digest("hex");
 }
+const sourceChecksums = Object.fromEntries(
+  ["src/index.ts", "package.json"].map((file) => [
+    file,
+    createHash("sha256")
+      .update(readFileSync(resolve(sdkRoot, file)))
+      .digest("hex"),
+  ])
+);
 
 const sourcePackage = JSON.parse(readFileSync(resolve(sdkRoot, "package.json"), "utf8"));
 const vendoredPackage = {
@@ -60,6 +74,8 @@ writeFileSync(
     {
       protocolCommit,
       source: "sdk",
+      sdkTreeState,
+      sourceChecksums,
       checksums,
     },
     null,

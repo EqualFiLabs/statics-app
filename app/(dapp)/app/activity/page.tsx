@@ -4,7 +4,7 @@ import { ActivityPage } from "@/components/dollar/ActivityPage";
 
 export const metadata: Metadata = {
   title: "Activity",
-  description: "Wallet-scoped Statics Dollar transaction activity.",
+  description: "Wallet-scoped Statics transaction activity.",
 };
 
 export default function StaticsActivityPage() {

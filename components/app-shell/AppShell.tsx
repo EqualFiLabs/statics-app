@@ -103,8 +103,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const dollarDeployment = readClientDollarDeployment();
+  const basketRoute = currentPath.startsWith("/app/baskets");
   const statusCards = [
-    { label: "DApp", value: "Dollar flows", ready: true },
+    { label: "DApp", value: basketRoute ? "Basket flows" : "Dollar flows", ready: true },
     { label: "Wallet", value: walletStatusLabel(wallet.status), ready: wallet.status === "ready" },
     {
       label: "Network",
@@ -140,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="dapp-phase">
           <span className="dapp-pulse" aria-hidden="true" />
-          Dollar DApp
+          Protocol DApp
         </div>
         <div className="dapp-header-actions">
           <Link className="dapp-return" href="/">
@@ -188,10 +189,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="dapp-content" className="dapp-content">
           <section className="dapp-intro">
             <p className="dapp-eyebrow">{"// Statics application"}</p>
-            <h1>Issue and redeem Statics Dollar.</h1>
+            <h1>
+              {basketRoute
+                ? "Inspect, mint, and redeem static baskets."
+                : "Issue and redeem Statics Dollar."}
+            </h1>
             <p>
-              Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk
-              shares. Every quote comes from current protocol state before signing.
+              {basketRoute
+                ? "Discover basket creation events, reconcile current protocol state, and enforce bounded constituent flows before signing."
+                : "Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk shares. Every quote comes from current protocol state before signing."}
             </p>
           </section>
 

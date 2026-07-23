@@ -9,6 +9,7 @@ function localDeploymentEnvironment() {
   return {
     NEXT_PUBLIC_APP_ENV: "development",
     NEXT_PUBLIC_STATICS_CHAIN_ID: "31337",
+    NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK: "1",
     NEXT_PUBLIC_STATICS_DIAMOND_ADDRESS: address,
     NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: address,
     NEXT_PUBLIC_STATICS_DOLLAR_GATEWAY_ADDRESS: address,
@@ -41,6 +42,7 @@ describe("Dollar deployment configuration", () => {
     expect(state.status).toBe("configured");
     if (state.status === "configured") {
       expect(state.deployment.chainId).toBe(31_337);
+      expect(state.deployment.deploymentStartBlock).toBe(1n);
       expect(state.deployment.wethProfileId).toBe(1n);
       expect(state.deployment.runtimeCodeHashes.gateway).toBe(hash);
     }

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "deploy:protocol:local": "node scripts/deploy-local-dollar.mjs",
     "deploy:dollar:local": "node scripts/deploy-local-dollar.mjs",
     "build": "next build",
     "start": "next start",

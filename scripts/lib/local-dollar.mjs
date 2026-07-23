@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createPublicClient, http, keccak256 } from "viem";
+import { buildCreateBasketTransaction, staticsAbi } from "@statics-protocol/sdk";
+import { createPublicClient, createWalletClient, http, keccak256, parseEther } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 const labels = {
   core: "STATICS_DOLLAR_CORE_ADDRESS",
@@ -17,6 +19,8 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
   if (!privateKey) {
     throw new Error("PRIVATE_KEY is required for local deployment and is never persisted.");
   }
+  const client = createPublicClient({ transport: http(rpcUrl) });
+  const deploymentStartBlock = (await client.getBlockNumber()) + 1n;
   const output = execFileSync(
     "forge",
     [
@@ -45,7 +49,6 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     contracts[name] = match[1];
   }
 
-  const client = createPublicClient({ transport: http(rpcUrl) });
   const runtimeCodeHashes = {};
   for (const [name, address] of Object.entries(contracts)) {
     const code = await client.getCode({ address });
@@ -57,7 +60,65 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     cwd: protocolRoot,
     encoding: "utf8",
   }).trim();
-  return { chainId: await client.getChainId(), contracts, runtimeCodeHashes, protocolCommit };
+  return {
+    chainId: await client.getChainId(),
+    deploymentStartBlock,
+    contracts,
+    runtimeCodeHashes,
+    protocolCommit,
+  };
+}
+
+export async function seedLocalBasket({ deployment, rpcUrl, privateKey }) {
+  if (!privateKey) {
+    throw new Error("PRIVATE_KEY is required for local fixture setup and is never persisted.");
+  }
+  const account = privateKeyToAccount(privateKey);
+  const publicClient = createPublicClient({ transport: http(rpcUrl) });
+  const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
+  const basketId = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basketCount",
+  });
+  const transaction = buildCreateBasketTransaction(
+    {
+      name: "Local Dollar Reserve",
+      symbol: "lsUSD",
+      assets: [deployment.contracts.dollar],
+      bundleAmounts: [parseEther("1")],
+      mintFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
+      redemptionFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
+      flashFeeBps: 5,
+      originationFeeBps: 100,
+      extensionFeeBps: 25,
+      ltvBps: 7_500,
+      loanDuration: 30 * 24 * 60 * 60,
+    },
+    parseEther("1")
+  );
+  await publicClient.call({
+    account: account.address,
+    to: deployment.contracts.diamond,
+    data: transaction.data,
+    value: transaction.value,
+  });
+  const hash = await walletClient.sendTransaction({
+    to: deployment.contracts.diamond,
+    data: transaction.data,
+    value: transaction.value,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`Local basket fixture ${hash} reverted.`);
+  const nextCount = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basketCount",
+  });
+  if (nextCount !== basketId + 1n) {
+    throw new Error("Local basket fixture did not increment the authoritative basket count.");
+  }
+  return { basketId, hash, receipt };
 }
 
 export function writeLocalEnvironment(path, deployment, rpcUrl) {
@@ -73,6 +134,7 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
     NEXT_PUBLIC_APP_NETWORK: "anvil",
     NEXT_PUBLIC_ANVIL_RPC_URL: rpcUrl,
     NEXT_PUBLIC_STATICS_CHAIN_ID: String(deployment.chainId),
+    NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK: String(deployment.deploymentStartBlock),
     NEXT_PUBLIC_STATICS_DIAMOND_ADDRESS: deployment.contracts.diamond,
     NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: deployment.contracts.core,
     NEXT_PUBLIC_STATICS_DOLLAR_GATEWAY_ADDRESS: deployment.contracts.gateway,

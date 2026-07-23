@@ -982,3 +982,348 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.basket-catalog,
+.basket-hero,
+.basket-composition,
+.basket-action-card,
+.basket-parameters {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  background: rgba(8, 10, 8, 0.76);
+}
+
+.basket-catalog,
+.basket-composition,
+.basket-action-card,
+.basket-parameters,
+.basket-hero {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.basket-section-heading,
+.basket-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.basket-section-heading h2,
+.basket-section-heading h3,
+.basket-hero h2,
+.basket-action-card h3 {
+  margin: 0.45rem 0 0;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.basket-section-heading > span,
+.basket-status,
+.basket-card > div > span:last-child {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.basket-status {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+}
+
+.basket-status.is-0 {
+  border-color: rgba(117, 241, 45, 0.45);
+  color: var(--green);
+}
+
+.basket-status.is-1 {
+  border-color: #9d8141;
+  color: #d1b46e;
+}
+
+.basket-status.is-2 {
+  border-color: #8f493f;
+  color: #e5a79d;
+}
+
+.basket-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 1.5rem;
+}
+
+.basket-card {
+  display: block;
+  min-width: 0;
+  padding: 1.35rem;
+  border: 1px solid var(--line);
+  background: #080a08;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.basket-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--green);
+}
+
+.basket-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.basket-card h3 {
+  margin: 1.5rem 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.basket-card > p,
+.basket-hero > div > p:last-child,
+.basket-back {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.basket-card dl,
+.basket-hero dl,
+.basket-parameters dl {
+  display: grid;
+  gap: 1px;
+  margin: 1.3rem 0;
+  background: var(--line);
+}
+
+.basket-card dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.basket-card dl > div,
+.basket-hero dl > div,
+.basket-parameters dl > div {
+  min-width: 0;
+  padding: 0.75rem;
+  background: #080a08;
+}
+
+.basket-card dt,
+.basket-hero dt,
+.basket-parameters dt {
+  color: var(--muted);
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+
+.basket-card dd,
+.basket-hero dd,
+.basket-parameters dd {
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.basket-card-link {
+  color: var(--green);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.basket-empty {
+  margin-top: 1.5rem;
+  padding: 2rem;
+  border: 1px dashed var(--line-bright);
+}
+
+.basket-empty h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.basket-empty p {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.basket-back {
+  display: inline-block;
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+
+.basket-back:hover {
+  color: var(--green);
+}
+
+.basket-hero dl {
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  margin: 0;
+}
+
+.basket-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(310px, 0.75fr);
+  gap: 10px;
+}
+
+.basket-composition ol {
+  padding: 0;
+  margin: 1.5rem 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.basket-composition li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(120px, auto);
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.basket-composition li > span,
+.basket-composition small {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.basket-composition li > div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.basket-composition li > div:last-child {
+  text-align: right;
+}
+
+.basket-composition .is-warning {
+  color: #d1b46e;
+}
+
+.basket-action-card .dollar-tabs {
+  margin-bottom: 1.5rem;
+}
+
+.basket-field {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.basket-field > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: #050605;
+}
+
+.basket-field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line);
+  background: #050605;
+  color: var(--text);
+  font: inherit;
+}
+
+.basket-field > div input {
+  border: 0;
+}
+
+.basket-field > div strong {
+  padding: 0 0.85rem;
+  color: var(--muted);
+}
+
+.basket-field small {
+  color: var(--muted);
+  font-size: 0.54rem;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+.basket-quote {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+}
+
+.basket-quote > span,
+.basket-quote > small {
+  color: var(--muted);
+  font-size: 0.56rem;
+}
+
+.basket-quote ul {
+  padding: 0;
+  margin: 0.8rem 0;
+  list-style: none;
+}
+
+.basket-quote li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.68rem;
+}
+
+.basket-quote > strong {
+  display: block;
+  margin: 0.8rem 0;
+  font-size: 0.72rem;
+}
+
+.basket-action-card .dollar-submit {
+  width: 100%;
+  margin-top: 1.25rem;
+}
+
+.basket-parameters dl {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .basket-grid,
+  .basket-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .basket-parameters dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .basket-section-heading,
+  .basket-hero {
+    display: grid;
+  }
+
+  .basket-card dl,
+  .basket-hero dl,
+  .basket-parameters dl {
+    grid-template-columns: 1fr;
+  }
+
+  .basket-composition li {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .basket-composition li > div:last-child {
+    grid-column: 2;
+    text-align: left;
+  }
+}

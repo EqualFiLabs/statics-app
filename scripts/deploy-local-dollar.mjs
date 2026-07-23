@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   defaultProtocolRoot,
   deployLocalDollar,
+  seedLocalBasket,
   writeLocalEnvironment,
 } from "./lib/local-dollar.mjs";
 
@@ -19,5 +20,11 @@ if (deployment.chainId !== 31_337) {
   throw new Error(`Refusing to write local deployment state for chain ${deployment.chainId}.`);
 }
 
+const fixture = await seedLocalBasket({
+  deployment,
+  rpcUrl,
+  privateKey: process.env.PRIVATE_KEY,
+});
 writeLocalEnvironment(resolve(siteRoot, ".env.local"), deployment, rpcUrl);
+console.log(`Seeded local basket ${fixture.basketId}.`);
 console.log("Wrote public Anvil deployment addresses and code hashes to ignored .env.local.");
