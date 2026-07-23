@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
-import { LiquidityPreview } from "@/components/preview/RemainingSurfacesPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { LiquidityPage } from "@/components/liquidity/LiquidityPage";
 
 export const metadata: Metadata = {
   title: "Liquidity | Statics",
@@ -9,12 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function LiquidityRoute() {
-  if (dappPreviewEnabled) return <LiquidityPreview />;
-  return (
-    <section className="dollar-unavailable">
-      <p className="dapp-section-label">Liquidity management not released</p>
-      <h2>Canonical LP transaction plumbing is not available in this release.</h2>
-      <p>This route remains disabled outside the local development design preview.</p>
-    </section>
-  );
+  return <LiquidityPage />;
 }
