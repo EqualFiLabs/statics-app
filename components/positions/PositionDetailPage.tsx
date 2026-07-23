@@ -46,6 +46,8 @@ import {
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { PositionDetailPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -67,6 +69,12 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <PositionDetailPreview positionId={positionId} />;
+  }
   if (wallet.status === "unconfigured") {
     return (
       <section className="dollar-unavailable">

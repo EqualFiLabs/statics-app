@@ -11,26 +11,32 @@ function renderWithoutWallet(ui: React.ReactNode) {
 }
 
 describe("position and reward routes without wallet configuration", () => {
-  it("keeps PositionNFT discovery behind the wallet provider boundary", () => {
+  it("shows the sample PositionNFT portfolio", () => {
     renderWithoutWallet(<PositionListPage />);
-    expect(
-      screen.getByRole("heading", { name: "Configure Privy to inspect local PositionNFTs." })
-    ).toBeInTheDocument();
+    expect(screen.getByText("Sample PositionNFT portfolio data")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your PositionNFTs" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Position #1042" })).toHaveAttribute(
+      "href",
+      "/app/positions/1042"
+    );
   });
 
-  it("keeps position mutations behind the wallet provider boundary", () => {
-    renderWithoutWallet(<PositionDetailPage positionId={1n} />);
+  it("shows sample position detail while keeping mutations disabled", () => {
+    renderWithoutWallet(<PositionDetailPage positionId={1042n} />);
+    expect(screen.getByText("Sample PositionNFT detail data")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Position #1042" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        name: "Configure Privy to inspect and manage local PositionNFTs.",
-      })
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "deposit collateral · Preview only" })
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Claim selected rewards · Planned" })).toBeDisabled();
   });
 
-  it("keeps staking and reward reads behind the wallet provider boundary", () => {
+  it("shows sample staking and selected rewards while keeping actions disabled", () => {
     renderWithoutWallet(<RewardsPage />);
+    expect(screen.getByText("Sample staking and rewards data")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create and stake" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Configure Privy to inspect local staking and rewards." })
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Approve or create staking position · Preview" })
+    ).toBeDisabled();
   });
 });

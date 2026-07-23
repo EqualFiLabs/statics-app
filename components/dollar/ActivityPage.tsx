@@ -8,6 +8,8 @@ import {
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
+import { ActivityPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -37,6 +39,9 @@ export function ActivityPage() {
     () => emptyActivity
   );
 
+  if (dappPreviewEnabled && wallet.status === "unconfigured") {
+    return <ActivityPreview />;
+  }
   if (wallet.status !== "ready" || !wallet.address || !wallet.chainId) {
     return (
       <section className="dollar-unavailable">

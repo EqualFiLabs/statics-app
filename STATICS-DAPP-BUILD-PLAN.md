@@ -33,6 +33,7 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 
 - The approved landing page is served at `/` by Next.js 16 and React 19, with its copy, responsive visual system, Statics branding, and Robin Hood hero preserved.
 - A branded DApp is served at `/app`, with route-scoped Privy, Wagmi, Viem, and React Query providers; normal sign-in and connection controls; local Anvil switching; Dollar, basket, PositionNFT collateral, staking, and reward-selection flows; wallet-scoped activity; and wallet settings/export guidance.
+- In development, `/app` renders clearly labelled deterministic sample portfolios when wallet or deployment configuration is absent. The complete information hierarchy remains reviewable while every value-moving control stays disabled; staging and production never allow sample mode.
 - Final brand assets live in `public/assets/`; `mockup.png` remains the design reference.
 - Vitest component/foundation tests and Playwright desktop, tablet, and mobile checks cover the landing, DApp shell, accessibility, route behavior, security headers, and visual snapshots.
 - There is no delegated authority, API layer, database, or public Statics deployment configuration. Local development can generate code-hash-bound Anvil configuration from the protocol deployment script.
@@ -88,6 +89,11 @@ Eves signer IDs, authorization keys, policies, delegation records, or capability
 ## DApp information architecture
 
 Proposed routes may change during UX design, but the product capabilities should remain grouped as follows:
+
+Functional integration and visual approval are separate tracks. A checked protocol workflow means
+the implementation and stated evidence exist; it does not mean the DApp's final visual design has
+been approved. Development sample states keep implemented and planned screens visible for product
+review without fabricating a deployment or enabling a transaction.
 
 | Route               | User outcome                                                                                                       | Initial release                        |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
@@ -295,6 +301,19 @@ were not invoked. `npm run verify` passed lint, formatting, TypeScript, 73 Vites
 production build, and 30 Playwright checks across desktop, tablet, and mobile. This is local proof
 only; no Privy, browser-wallet, public-network, or production transaction was performed.
 
+### DApp visual design and product review
+
+- [x] Render deterministic development sample states for every existing `/app` route when wallet or deployment configuration is absent.
+- [x] Label all sample balances, addresses, activity, protocol state, and status indicators as preview data.
+- [x] Keep every sample-state transaction, wallet, copy, explorer, and export control disabled.
+- [ ] Review and approve desktop, tablet, and mobile visuals for the overview, Dollar, basket catalog/detail, PositionNFT catalog/detail, rewards, activity, and settings.
+- [ ] Design and approve the remaining loan, reward-claim, basket-creation, and canonical-liquidity surfaces before their functional implementation is treated as product-complete.
+- [ ] Replace deterministic samples with verified local onchain states during integration review, without changing the approved information hierarchy.
+
+Gate: reviewed screenshots cover every current DApp surface at desktop, tablet, and mobile sizes;
+sample mode is impossible outside development; production still fails closed without verified
+wallet, network, and deployment configuration.
+
 ### Live-network readiness
 
 - [ ] Record the authorized target network and verified deployment manifest.
@@ -368,6 +387,7 @@ Add dated entries with concrete evidence. Keep plans and completed work distinct
 | 2026-07-22 | Dollar safety rehearsal    | Locally verified        | Operation-specific guards, stale-preview blocking, decoded recombination simulation, and accurate activity states passed focused and complete checks. Real Anvil ETH/WETH lifecycles passed; interactive Privy and external-wallet outcomes remain blocked.                                                                                        |
 | 2026-07-23 | Basket use flows           | Locally verified        | Event-backed discovery, chain reconciliation, basket detail, sequential bounded approvals, mint/redeem quotes, protocol activity, and responsive route checks passed focused tests. Real ephemeral-Anvil Dollar funding, basket mint, and redemption passed; interactive wallet and public-network proof remain open.                              |
 | 2026-07-23 | Position and rewards flows | Locally verified        | Ownership-reconciled PositionNFT discovery, exact/bounded basket collateral actions, WETH staking, per-position reward selection, chain-time cooldowns, pending reads, and closure guards passed focused and full checks. Ephemeral-Anvil receipts proved the lifecycle; reward claims, interactive wallets, and public-network proof remain open. |
+| 2026-07-23 | DApp sample design preview | Locally verified        | Unconfigured development now renders labelled deterministic sample states across every current DApp route with value-moving controls disabled. `npm run verify` passed lint, formatting, TypeScript, 78 Vitest tests, production build, and 33 Playwright checks; desktop and mobile detailed previews were inspected before snapshot acceptance.  |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 

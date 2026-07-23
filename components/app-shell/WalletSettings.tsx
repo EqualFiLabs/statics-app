@@ -1,5 +1,7 @@
 "use client";
 
+import { WalletSettingsPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -8,6 +10,9 @@ function formatAddress(address: string): string {
 
 export function WalletSettings() {
   const wallet = useWalletState();
+  if (dappPreviewEnabled && wallet.status === "unconfigured") {
+    return <WalletSettingsPreview />;
+  }
 
   return (
     <section className="dapp-settings" aria-labelledby="wallet-settings-title">

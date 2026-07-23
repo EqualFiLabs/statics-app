@@ -6,6 +6,8 @@ import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import { basketStatusLabel, describeBasketError, loadBasketCatalog } from "@/lib/baskets/baskets";
+import { BasketListPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -19,6 +21,12 @@ function displayAmount(value: bigint, decimals = 18): string {
 
 export function BasketListPage() {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <BasketListPreview />;
+  }
   if (wallet.status === "unconfigured") {
     return (
       <section className="dollar-unavailable">

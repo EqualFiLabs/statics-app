@@ -27,6 +27,8 @@ import {
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
+import { BasketDetailPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   updateProtocolActivity,
   writeProtocolActivity,
@@ -66,6 +68,12 @@ function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
 
 export function BasketDetailPage({ basketId }: { basketId: bigint }) {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <BasketDetailPreview basketId={basketId} />;
+  }
   if (wallet.status === "unconfigured") {
     return (
       <section className="dollar-unavailable">

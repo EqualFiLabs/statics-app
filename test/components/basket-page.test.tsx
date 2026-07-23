@@ -6,29 +6,30 @@ import { BasketListPage } from "@/components/baskets/BasketListPage";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 describe("basket routes without wallet configuration", () => {
-  it("fails closed before initializing wallet-dependent discovery", () => {
+  it("shows the sample catalog without initializing wallet-dependent discovery", () => {
     render(
       <WalletContext.Provider value={defaultWalletState}>
         <BasketListPage />
       </WalletContext.Provider>
     );
-    expect(
-      screen.getByRole("heading", {
-        name: "Configure Privy to inspect the local basket deployment.",
-      })
-    ).toBeInTheDocument();
+    expect(screen.getByText("Sample basket catalog data")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Statics baskets" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Dollar Reserve/ })).toHaveAttribute(
+      "href",
+      "/app/baskets/0"
+    );
   });
 
-  it("keeps wallet-dependent detail rendering behind the provider boundary", () => {
+  it("shows sample basket detail while keeping transactions disabled", () => {
     render(
       <WalletContext.Provider value={defaultWalletState}>
         <BasketDetailPage basketId={0n} />
       </WalletContext.Provider>
     );
+    expect(screen.getByText("Sample basket detail data")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dollar Reserve" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        name: "Configure Privy to inspect and use the local basket deployment.",
-      })
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Preview only · transaction disabled" })
+    ).toBeDisabled();
   });
 });

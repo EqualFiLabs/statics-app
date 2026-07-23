@@ -50,6 +50,8 @@ import {
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
+import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readEvesMarketUrl } from "@/lib/site-config";
 
 const deploymentState = readClientDollarDeployment();
@@ -258,6 +260,12 @@ function DollarOverviewConnected({
 
 export function DollarOverview() {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <DollarOverviewPreview />;
+  }
   if (deploymentState.status === "unavailable") {
     return deploymentUnavailable(deploymentState.reason);
   }
@@ -838,6 +846,12 @@ function DollarActionPanel({
 
 export function DollarPage() {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <DollarPagePreview />;
+  }
   if (deploymentState.status === "unavailable") {
     return deploymentUnavailable(deploymentState.reason);
   }

@@ -14,7 +14,7 @@ function renderWithWallet(ui: React.ReactNode, overrides: Partial<WalletState> =
 }
 
 describe("DApp wallet shell", () => {
-  it("shows honest missing configuration without inventing an address", () => {
+  it("labels the development preview without inventing live status", () => {
     renderWithWallet(
       <AppShell>
         <section>Overview body</section>
@@ -24,7 +24,10 @@ describe("DApp wallet shell", () => {
     expect(
       screen.getByRole("heading", { name: "Issue and redeem Statics Dollar." })
     ).toBeInTheDocument();
-    expect(screen.getByText("Dollar flows", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Design preview")).toBeInTheDocument();
+    expect(screen.getByText("Sample interface", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Sample data only")).toBeInTheDocument();
+    expect(screen.getByText("Not connected")).toBeInTheDocument();
     expect(screen.getAllByText("Not configured")).toHaveLength(1);
     expect(screen.getByRole("link", { name: /dollar/i })).toHaveAttribute("href", "/app/dollar");
     expect(screen.getByRole("link", { name: /baskets/i })).toHaveAttribute("href", "/app/baskets");
@@ -78,6 +81,15 @@ describe("DApp wallet shell", () => {
 });
 
 describe("wallet settings", () => {
+  it("shows a labelled, inert sample account without wallet configuration", () => {
+    renderWithWallet(<WalletSettings />);
+
+    expect(screen.getByText("Sample wallet settings data")).toBeInTheDocument();
+    expect(screen.getByText("Connected · Sample")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy sample address" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Review secure export · Preview" })).toBeDisabled();
+  });
+
   it("warns before embedded-wallet export and exposes logout", () => {
     const exportWallet = vi.fn().mockResolvedValue(undefined);
     const logout = vi.fn().mockResolvedValue(undefined);

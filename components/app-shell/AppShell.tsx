@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { appNavigation, protocolStatus } from "@/lib/site-config";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -103,6 +104,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const dollarDeployment = readClientDollarDeployment();
+  const designPreview =
+    dappPreviewEnabled &&
+    (dollarDeployment.status === "unavailable" || wallet.status === "unconfigured");
   const basketRoute = currentPath.startsWith("/app/baskets");
   const positionRoute = currentPath.startsWith("/app/positions");
   const rewardsRoute = currentPath.startsWith("/app/rewards");
@@ -134,21 +138,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               "Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk shares. Every quote comes from current protocol state before signing.",
           };
   const statusCards = [
-    { label: "DApp", value: routeCopy.status, ready: true },
+    {
+      label: "DApp",
+      value: designPreview ? "Sample interface" : routeCopy.status,
+      ready: !designPreview,
+    },
     { label: "Wallet", value: walletStatusLabel(wallet.status), ready: wallet.status === "ready" },
     {
       label: "Network",
       value:
         wallet.status === "ready" && wallet.isTargetChain
           ? wallet.networkName
-          : "Target configured",
+          : designPreview
+            ? "Not connected"
+            : "Target configured",
       ready: wallet.status === "ready" && wallet.isTargetChain,
     },
     {
       label: "Deployment",
-      value:
-        dollarDeployment.status === "configured" ? "Local verified" : protocolStatus.deployment,
-      ready: dollarDeployment.status === "configured",
+      value: designPreview
+        ? "Sample data only"
+        : dollarDeployment.status === "configured"
+          ? "Local verified"
+          : protocolStatus.deployment,
+      ready: !designPreview && dollarDeployment.status === "configured",
     },
   ] as const;
 
@@ -170,7 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="dapp-phase">
           <span className="dapp-pulse" aria-hidden="true" />
-          Protocol DApp
+          {designPreview ? "Design preview" : "Protocol DApp"}
         </div>
         <div className="dapp-header-actions">
           <Link className="dapp-return" href="/">
@@ -219,7 +232,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <section className="dapp-intro">
             <p className="dapp-eyebrow">{"// Statics application"}</p>
             <h1>{routeCopy.title}</h1>
-            <p>{routeCopy.description}</p>
+            <p>
+              {designPreview
+                ? "Review the intended information hierarchy with deterministic local sample data. Wallet and transaction controls remain disabled."
+                : routeCopy.description}
+            </p>
           </section>
 
           {wallet.error && (

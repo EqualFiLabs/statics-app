@@ -14,6 +14,8 @@ import { useState } from "react";
 
 import { basketTokenAbi, buildCreateAndStakeCall, staticsAbi } from "@statics-protocol/sdk";
 
+import { RewardsPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -37,6 +39,12 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function RewardsPage() {
   const wallet = useWalletState();
+  if (
+    dappPreviewEnabled &&
+    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
+  ) {
+    return <RewardsPreview />;
+  }
   if (wallet.status === "unconfigured") {
     return (
       <section className="dollar-unavailable">
