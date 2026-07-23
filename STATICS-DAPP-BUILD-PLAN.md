@@ -1,7 +1,7 @@
 # Statics Site and DApp Build Plan
 
 - Last updated: 2026-07-22
-- Status: Phase 2 wallet foundation implemented and locally verified; interactive Privy proof pending
+- Status: Phase 3 local Dollar flows implemented and locally verified; interactive Privy and public deployment proofs pending
 - Primary workspace: `statics-site`
 - Protocol source: `../statics`
 - Reference wallet implementation: `../market-ui/eves-market-ui`
@@ -32,12 +32,13 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 ## Current state
 
 - The approved landing page is served at `/` by Next.js 16 and React 19, with its copy, responsive visual system, Statics branding, and Robin Hood hero preserved.
-- A branded wallet foundation is served at `/app`, with route-scoped Privy, Wagmi, Viem, and React Query providers; normal sign-in and connection controls; Robinhood Chain Testnet switching; and wallet settings/export guidance.
+- A branded Dollar DApp is served at `/app`, with route-scoped Privy, Wagmi, Viem, and React Query providers; normal sign-in and connection controls; local Anvil switching; Dollar reads and actions; wallet-scoped activity; and wallet settings/export guidance.
 - Final brand assets live in `public/assets/`; `mockup.png` remains the design reference.
 - Vitest component/foundation tests and Playwright desktop, tablet, and mobile checks cover the landing, DApp shell, accessibility, route behavior, security headers, and visual snapshots.
-- There is no delegated authority, API layer, database, contract configuration, contract action, or public deployment configuration in this repository yet.
+- There is no delegated authority, API layer, database, or public Statics deployment configuration. Local development can generate code-hash-bound Anvil configuration from the protocol deployment script.
 - The live protocol source is maintained separately in `../statics`.
 - The protocol repository records no public Statics deployment. The DApp must not show a production address, live TVL, or “deployed” status until a verified deployment manifest exists.
+- The canonical SDK is vendored from protocol commit `be81deec2424dd6ad18ab9cbd192632ed39c4921` with SHA-256 provenance for every copied artifact.
 - Eves Market already treats Statics Dollar as its default collateral/trading asset and contains a working Privy/Wagmi and delegated-signing reference implementation.
 
 ## Architecture decisions
@@ -107,16 +108,16 @@ Proposed routes may change during UX design, but the product capabilities should
 
 ### Statics Dollar release
 
-- [ ] Display active wallet and network with no stale-address fallback.
-- [ ] Display Statics Dollar, WETH/ETH, configured pegged collateral, and Risk Share balances.
-- [ ] Read profile configuration, debt ceilings, health state, exit availability, and current fees.
-- [ ] Support typed ETH and WETH deposits through `StaticsDiamond`.
-- [ ] Support ordinary recombination to WETH or ETH.
-- [ ] Support EIP-2612 permit recombination when available.
-- [ ] Support configured pegged-profile mint and redemption with authoritative onchain previews.
-- [ ] Keep Risk Share ERC-1155 operator approval separate and clearly explained.
-- [ ] Disable actions when profile health, sequencer, debt ceiling, pause, or exit state forbids them.
-- [ ] Refresh the shared wallet balance after confirmation so Eves Market can immediately observe the same onchain collateral.
+- [x] Display active wallet and network with no stale-address fallback (`providers/wallet-context.tsx`, `components/app-shell/AppShell.tsx`).
+- [x] Display Statics Dollar, WETH/ETH, and active-series Risk Share balances (`components/dollar/DollarPage.tsx`).
+- [x] Read profile configuration, debt ceilings, health state, exit availability, pause mask, oracle price, and current previews.
+- [x] Support typed ETH and WETH deposits through the verified local gateway.
+- [x] Support ordinary recombination to WETH or ETH.
+- [-] Support EIP-2612 permit recombination; deferred until after ordinary local flows.
+- [-] Support configured pegged-profile mint and redemption; outside the first local WETH profile scope.
+- [x] Keep Risk Share ERC-1155 operator approval separate, explain its all-series scope, and expose revocation.
+- [x] Refresh authoritative previews before simulation and refresh balances after confirmed receipts.
+- [~] Disable actions from profile health, debt ceiling, pause, and exit state; contract simulation fails closed, while proactive per-condition button messaging remains future UX work.
 
 ### Basket release
 
@@ -187,9 +188,9 @@ Required safeguards:
 
 - [x] `.env*`, private keys, credentials, build output, and local databases are ignored (`.gitignore`).
 - [x] Staging and production fail closed when the Privy App ID or Robinhood Testnet RPC is missing (`lib/wallet-config.ts`, wallet-config tests).
-- [ ] Contract addresses come from a verified deployment manifest, never placeholders or memory.
-- [ ] No server secret uses a `NEXT_PUBLIC_` prefix.
-- [ ] Logs redact access tokens, signatures, authorization headers, and private RPC URLs.
+- [~] Contract addresses come from a code-hash-bound local deployment record; no checked-in public deployment manifest exists.
+- [x] No server secret uses a `NEXT_PUBLIC_` prefix.
+- [x] The local deploy helper requires a caller-supplied key, never writes it, and persists only public addresses, provenance, and runtime hashes.
 
 ## Delivery phases and gates
 
@@ -223,12 +224,16 @@ Gate: provider-order regressions pass; missing configuration fails closed outsid
 
 ### Statics Dollar DApp
 
-- [ ] Implement the Dollar dashboard and authoritative protocol reads.
-- [ ] Implement the reviewed manual wallet-confirmed flows.
-- [ ] Add exact approval/permit sequencing and receipt-confirmed activity.
-- [ ] Add the Eves Market handoff/deep link without transferring custody or duplicating balances.
+- [x] Implement the Dollar dashboard and authoritative protocol reads.
+- [x] Implement ETH/WETH deposit and ordinary ETH/WETH recombination with normal wallet confirmation.
+- [x] Add exact ERC-20 approval sequencing, explicit ERC-1155 operator approval/revocation, and receipt-confirmed local activity.
+- [x] Add an optional validated Eves Market handoff that remains visibly disabled without configuration.
 
 Gate: every value-moving flow passes on a local fork/rehearsal using real contracts and real approvals; unit mocks alone do not satisfy this gate.
+
+Evidence (2026-07-22): `npm run test:integration:local` generated an ephemeral Anvil identity, deployed the full stack through `DeployStaticsDollar.runLocal`, and confirmed two real lifecycles. The test deposited ETH, verified Dollar and Risk minting, approved exact Dollar plus the Risk gateway operator, and recombined to ETH. It then wrapped fixture ETH, approved exact WETH, deposited WETH, recombined to WETH, and asserted the final Dollar, Risk, and WETH balances. This is local proof only and is not a Robinhood Testnet deployment or broadcast.
+
+The final site gate passed lint, formatting, TypeScript, 31 Vitest tests, the Next.js production build, and 24 Playwright checks across desktop, tablet, and mobile. The canonical protocol SDK separately passed 24 tests and its TypeScript build before commit `be81deec2424dd6ad18ab9cbd192632ed39c4921`.
 
 ### Broader protocol DApp
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { appNavigation, protocolStatus } from "@/lib/site-config";
+import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -99,9 +100,11 @@ function walletStatusLabel(status: ReturnType<typeof useWalletState>["status"]):
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
+  const dollarDeployment = readClientDollarDeployment();
   const statusCards = [
-    { label: "DApp", value: "Wallet foundation", ready: true },
+    { label: "DApp", value: "Dollar flows", ready: true },
     { label: "Wallet", value: walletStatusLabel(wallet.status), ready: wallet.status === "ready" },
     {
       label: "Network",
@@ -111,7 +114,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           : "Target configured",
       ready: wallet.status === "ready" && wallet.isTargetChain,
     },
-    { label: "Deployment", value: protocolStatus.deployment, ready: false },
+    {
+      label: "Deployment",
+      value:
+        dollarDeployment.status === "configured" ? "Local verified" : protocolStatus.deployment,
+      ready: dollarDeployment.status === "configured",
+    },
   ] as const;
 
   return (
@@ -132,7 +140,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="dapp-phase">
           <span className="dapp-pulse" aria-hidden="true" />
-          Wallet foundation
+          Dollar DApp
         </div>
         <div className="dapp-header-actions">
           <Link className="dapp-return" href="/">
@@ -147,7 +155,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="dapp-nav-label">Navigation</p>
           <nav>
             {appNavigation.map((item, index) => {
-              const active = item.href === pathname;
+              const active =
+                item.href === currentPath ||
+                (item.href !== "/app" &&
+                  Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
               return item.enabled && item.href ? (
                 <Link
                   key={item.label}
@@ -177,10 +188,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="dapp-content" className="dapp-content">
           <section className="dapp-intro">
             <p className="dapp-eyebrow">{"// Statics application"}</p>
-            <h1>Wallet access, without shared sessions.</h1>
+            <h1>Issue and redeem Statics Dollar.</h1>
             <p>
-              Sign into Statics independently with the same Privy account you use in Eves Market.
-              Wallet identity is shared; sessions and application permissions are not.
+              Deposit ETH or WETH into the active local profile, or recombine Dollar and Risk
+              shares. Every quote comes from current protocol state before signing.
             </p>
           </section>
 

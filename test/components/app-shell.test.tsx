@@ -22,11 +22,11 @@ describe("DApp wallet shell", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Wallet access, without shared sessions." })
+      screen.getByRole("heading", { name: "Issue and redeem Statics Dollar." })
     ).toBeInTheDocument();
-    expect(screen.getByText("Wallet foundation", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Dollar flows", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getAllByText("Not configured")).toHaveLength(1);
-    expect(screen.getByText("Dollar")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("link", { name: /dollar/i })).toHaveAttribute("href", "/app/dollar");
     expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute(
       "href",
       "/app/settings"

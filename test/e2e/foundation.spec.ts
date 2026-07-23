@@ -43,7 +43,7 @@ test.describe("landing foundation", () => {
       .click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(
-      page.getByRole("heading", { name: "Wallet access, without shared sessions." })
+      page.getByRole("heading", { name: "Issue and redeem Statics Dollar." })
     ).toBeVisible();
   });
 
@@ -83,13 +83,13 @@ test.describe("landing foundation", () => {
   });
 });
 
-test.describe("DApp wallet foundation", () => {
+test.describe("Dollar DApp foundation", () => {
   test("shows honest missing configuration without simulated wallet state", async ({
     page,
   }, testInfo) => {
     await page.goto("/app");
     await expect(
-      page.locator(".dapp-status-card strong").filter({ hasText: "Wallet foundation" })
+      page.locator(".dapp-status-card strong").filter({ hasText: "Dollar flows" })
     ).toBeVisible();
     await expect(page.getByText("Not configured", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Wallet not configured" })).toBeDisabled();
@@ -103,14 +103,28 @@ test.describe("DApp wallet foundation", () => {
     });
   });
 
-  test("provides a real settings route while future protocol routes stay inert", async ({
+  test("provides Dollar, activity, and settings while future routes stay inert", async ({
     page,
   }) => {
     await page.goto("/app");
+    await page.getByRole("link", { name: /dollar/i }).click();
+    await expect(page).toHaveURL(/\/app\/dollar$/);
+    await expect(
+      page.getByRole("heading", { name: "No verified deployment is configured." })
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: /activity/i }).click();
+    await expect(page).toHaveURL(/\/app\/activity$/);
+    await expect(
+      page.getByRole("heading", { name: "Connect your wallet to see local Dollar activity." })
+    ).toBeVisible();
+
     await page.getByRole("link", { name: /settings/i }).click();
     await expect(page).toHaveURL(/\/app\/settings$/);
     await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
-    await expect(page.getByText("Dollar")).toHaveAttribute("aria-disabled", "true");
+    await expect(
+      page.locator(".dapp-nav-item[aria-disabled='true']").filter({ hasText: "Baskets" })
+    ).toBeVisible();
   });
 
   test("renders the branded not-found state", async ({ page }) => {

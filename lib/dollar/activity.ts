@@ -1,0 +1,78 @@
+"use client";
+
+import type { Address, Hex } from "viem";
+
+export type DollarActivityStatus = "signing" | "submitted" | "confirmed" | "reverted" | "replaced";
+export type DollarActivityKind =
+  | "approve-weth"
+  | "approve-dollar"
+  | "approve-risk"
+  | "revoke-risk"
+  | "deposit-eth"
+  | "deposit-weth"
+  | "recombine-eth"
+  | "recombine-weth";
+
+export type DollarActivity = Readonly<{
+  id: string;
+  wallet: Address;
+  chainId: number;
+  kind: DollarActivityKind;
+  label: string;
+  amount: string;
+  status: DollarActivityStatus;
+  createdAt: number;
+  hash?: Hex;
+  replacementHash?: Hex;
+  error?: string;
+}>;
+
+const activityEvent = "statics-dollar-activity";
+const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
+
+function storageKey(wallet: Address, chainId: number): string {
+  return `statics:dollar:activity:${chainId}:${wallet.toLowerCase()}`;
+}
+
+export function readDollarActivity(wallet: Address, chainId: number): DollarActivity[] {
+  if (typeof window === "undefined") return [];
+  const key = storageKey(wallet, chainId);
+  const raw = window.localStorage.getItem(key) || "[]";
+  const cached = activityCache.get(key);
+  if (cached?.raw === raw) return cached.value;
+  try {
+    const value = JSON.parse(raw) as DollarActivity[];
+    activityCache.set(key, { raw, value });
+    return value;
+  } catch {
+    return [];
+  }
+}
+
+export function writeDollarActivity(activity: DollarActivity): void {
+  const current = readDollarActivity(activity.wallet, activity.chainId);
+  const next = [activity, ...current.filter((item) => item.id !== activity.id)].slice(0, 50);
+  window.localStorage.setItem(storageKey(activity.wallet, activity.chainId), JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent(activityEvent));
+}
+
+export function updateDollarActivity(
+  wallet: Address,
+  chainId: number,
+  id: string,
+  update: Partial<DollarActivity>
+): void {
+  const current = readDollarActivity(wallet, chainId);
+  const existing = current.find((item) => item.id === id);
+  if (!existing) return;
+  writeDollarActivity({ ...existing, ...update });
+}
+
+export function subscribeDollarActivity(listener: () => void): () => void {
+  window.addEventListener(activityEvent, listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    window.removeEventListener(activityEvent, listener);
+    window.removeEventListener("storage", listener);
+  };
+}

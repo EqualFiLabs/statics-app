@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readPublicEnvironment } from "@/lib/site-config";
+import { readEvesMarketUrl, readPublicEnvironment } from "@/lib/site-config";
 
 describe("public environment", () => {
   it("defaults to a development environment without inventing a site URL", () => {
@@ -32,5 +32,18 @@ describe("public environment", () => {
     expect(() => readPublicEnvironment({ NEXT_PUBLIC_SITE_URL: "javascript:alert(1)" })).toThrow(
       "must use HTTP or HTTPS"
     );
+  });
+});
+
+describe("Eves Market handoff", () => {
+  it("keeps the handoff unavailable until a destination is configured", () => {
+    expect(readEvesMarketUrl(undefined)).toBeNull();
+  });
+
+  it("accepts credential-free HTTP destinations and rejects embedded credentials", () => {
+    expect(readEvesMarketUrl("https://trade.example.test/dollar")).toBe(
+      "https://trade.example.test/dollar"
+    );
+    expect(() => readEvesMarketUrl("https://user:secret@example.test")).toThrow("credential-free");
   });
 });

@@ -26,6 +26,20 @@ function parseSiteUrl(value: string | undefined): string | null {
   return url.toString();
 }
 
+export function readEvesMarketUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("NEXT_PUBLIC_EVES_MARKET_URL must be an absolute HTTP(S) URL.");
+  }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+    throw new Error("NEXT_PUBLIC_EVES_MARKET_URL must be a credential-free HTTP(S) URL.");
+  }
+  return url.toString();
+}
+
 export function readPublicEnvironment(
   environment: Record<string, string | undefined> = process.env
 ) {
@@ -55,10 +69,10 @@ export const protocolStatus = {
 
 export const appNavigation = [
   { label: "Overview", enabled: true, href: "/app" },
-  { label: "Dollar", enabled: false, href: null },
+  { label: "Dollar", enabled: true, href: "/app/dollar" },
   { label: "Baskets", enabled: false, href: null },
   { label: "Positions", enabled: false, href: null },
   { label: "Rewards", enabled: false, href: null },
-  { label: "Activity", enabled: false, href: null },
+  { label: "Activity", enabled: true, href: "/app/activity" },
   { label: "Settings", enabled: true, href: "/app/settings" },
 ] as const;
