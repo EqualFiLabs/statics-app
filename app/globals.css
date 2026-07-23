@@ -1,0 +1,92 @@
+:root {
+  color-scheme: dark;
+  --bg: #050605;
+  --surface: #080a08;
+  --surface-2: #0b0d0b;
+  --line: rgba(232, 238, 232, 0.16);
+  --line-bright: rgba(232, 238, 232, 0.38);
+  --text: #e3e6e3;
+  --muted: #969b96;
+  --green: #75f12d;
+  --green-soft: #55a82a;
+  --font-mono:
+    "IBM Plex Mono", "Roboto Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  min-width: 320px;
+  background: var(--bg);
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+a {
+  font: inherit;
+}
+
+::selection {
+  background: var(--green);
+  color: var(--bg);
+}
+
+.system-page {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: start;
+  padding: 2rem;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px), var(--bg);
+  background-size: 48px 48px;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.system-page img {
+  width: 190px;
+  height: auto;
+  margin-bottom: 3rem;
+}
+
+.system-page p {
+  margin: 0;
+  color: var(--green);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.system-page h1 {
+  max-width: 720px;
+  margin: 1rem 0;
+  font-size: clamp(3rem, 9vw, 7rem);
+  font-weight: 500;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.system-page span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.system-page a,
+.system-page button {
+  margin-top: 2rem;
+  padding: 0.8rem 1.2rem;
+  border: 1px solid var(--green-soft);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: 700 0.72rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}

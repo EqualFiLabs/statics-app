@@ -1,0 +1,30 @@
+# Dependencies and framework output
+node_modules/
+.next/
+out/
+
+# Tests and local reports
+coverage/
+playwright-report/
+test-results/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+
+# Local state
+*.db
+*.sqlite
+*.sqlite3
+cache/
+.cache/
+
+# Editors and operating systems
+.DS_Store
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
