@@ -33,13 +33,7 @@ export type SwapFeeConfiguration = {
     stakerShareBps: bigint;
     treasuryShareBps: bigint;
 };
-export type FeeAllocation = {
-    polShareBps: bigint;
-    liquidityProviderShareBps: bigint;
-    stakerShareBps: bigint;
-    treasuryShareBps: bigint;
-};
-export type PoolFeeAllocation = FeeAllocation & {
+export type PoolFeeConfiguration = SwapFeeConfiguration & {
     overridden: boolean;
 };
 export type SwapFeeSplit = {
@@ -152,6 +146,23 @@ export type StakedLiquidityIncreaseRequest = {
     amount1Max: bigint;
     deadline: bigint;
 };
+export type V4PoolKey = {
+    currency0: Address;
+    currency1: Address;
+    fee: number;
+    tickSpacing: number;
+    hooks: Address;
+};
+export type V4MintPositionRequest = {
+    poolKey: V4PoolKey;
+    tickLower: number;
+    tickUpper: number;
+    liquidity: bigint;
+    amount0Max: bigint;
+    amount1Max: bigint;
+    recipient: Address;
+    deadline: bigint;
+};
 export type CanonicalLiquidityInput = {
     asset: Address;
     currency0: Address;
@@ -187,6 +198,7 @@ export declare function quoteRangeAmounts(sqrtPriceX96: bigint, tickLower: numbe
     amount0: bigint;
     amount1: bigint;
 };
+export declare function maximumLiquidityForAmounts(sqrtPriceX96: bigint, tickLower: number, tickUpper: number, amount0Max: bigint, amount1Max: bigint): bigint;
 export declare function pendingLpFees(liquidity: bigint, currentFeeGrowth0X128: bigint, currentFeeGrowth1X128: bigint, lastFeeGrowth0X128: bigint, lastFeeGrowth1X128: bigint): {
     amount0: bigint;
     amount1: bigint;
@@ -1855,7 +1867,7 @@ export declare const staticsAbi: readonly [{
         readonly name: "configuration";
     }];
 }, {
-    readonly name: "setCanonicalPoolFeeAllocation";
+    readonly name: "setCanonicalPoolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -1867,6 +1879,12 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint16";
+            readonly name: "inputFeeBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "outputFeeBps";
+        }, {
             readonly type: "uint16";
             readonly name: "polShareBps";
         }, {
@@ -1879,11 +1897,11 @@ export declare const staticsAbi: readonly [{
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
         }];
-        readonly name: "allocation";
+        readonly name: "configuration";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "clearCanonicalPoolFeeAllocation";
+    readonly name: "clearCanonicalPoolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -1895,7 +1913,7 @@ export declare const staticsAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "canonicalPoolFeeAllocation";
+    readonly name: "canonicalPoolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -1908,6 +1926,12 @@ export declare const staticsAbi: readonly [{
     readonly outputs: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint16";
+            readonly name: "inputFeeBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "outputFeeBps";
+        }, {
             readonly type: "uint16";
             readonly name: "polShareBps";
         }, {
@@ -1923,7 +1947,7 @@ export declare const staticsAbi: readonly [{
             readonly type: "bool";
             readonly name: "overridden";
         }];
-        readonly name: "allocation";
+        readonly name: "configuration";
     }];
 }, {
     readonly name: "liquidityManager";
@@ -2256,6 +2280,15 @@ export declare const staticsAbi: readonly [{
     readonly inputs: readonly [];
     readonly outputs: readonly [{
         readonly type: "address";
+    }];
+}, {
+    readonly name: "creationFee";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
     }];
 }, {
     readonly name: "BasketCreated";
@@ -2875,7 +2908,7 @@ export declare const staticsAbi: readonly [{
         readonly name: "configuration";
     }];
 }, {
-    readonly name: "CanonicalPoolFeeAllocationSet";
+    readonly name: "CanonicalPoolFeeConfigurationSet";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -2891,6 +2924,12 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint16";
+        readonly name: "inputFeeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "outputFeeBps";
+    }, {
+        readonly type: "uint16";
         readonly name: "polShareBps";
     }, {
         readonly type: "uint16";
@@ -2903,7 +2942,7 @@ export declare const staticsAbi: readonly [{
         readonly name: "treasuryShareBps";
     }];
 }, {
-    readonly name: "CanonicalPoolFeeAllocationCleared";
+    readonly name: "CanonicalPoolFeeConfigurationCleared";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -3250,7 +3289,7 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "setPoolFeeAllocation";
+    readonly name: "setPoolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -3259,6 +3298,12 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     }, {
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint16";
+            readonly name: "inputFeeBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "outputFeeBps";
+        }, {
             readonly type: "uint16";
             readonly name: "polShareBps";
         }, {
@@ -3271,11 +3316,11 @@ export declare const staticsSwapFeeHookAbi: readonly [{
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
         }];
-        readonly name: "allocation";
+        readonly name: "configuration";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "clearPoolFeeAllocation";
+    readonly name: "clearPoolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -3284,7 +3329,7 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "poolFeeAllocation";
+    readonly name: "poolFeeConfiguration";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -3294,6 +3339,12 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     readonly outputs: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint16";
+            readonly name: "inputFeeBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "outputFeeBps";
+        }, {
             readonly type: "uint16";
             readonly name: "polShareBps";
         }, {
@@ -3309,7 +3360,7 @@ export declare const staticsSwapFeeHookAbi: readonly [{
             readonly type: "bool";
             readonly name: "overridden";
         }];
-        readonly name: "allocation";
+        readonly name: "configuration";
     }];
 }, {
     readonly name: "registerPool";
@@ -3731,12 +3782,18 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "treasuryShareBps";
     }];
 }, {
-    readonly name: "PoolFeeAllocationSet";
+    readonly name: "PoolFeeConfigurationSet";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "bytes32";
         readonly name: "poolId";
         readonly indexed: true;
+    }, {
+        readonly type: "uint16";
+        readonly name: "inputFeeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "outputFeeBps";
     }, {
         readonly type: "uint16";
         readonly name: "polShareBps";
@@ -3751,7 +3808,7 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "treasuryShareBps";
     }];
 }, {
-    readonly name: "PoolFeeAllocationCleared";
+    readonly name: "PoolFeeConfigurationCleared";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "bytes32";
@@ -4611,6 +4668,60 @@ export declare const staticsLiquidityManagerAbi: readonly [{
     }];
 }];
 export declare const v4PositionManagerReadAbi: readonly [{
+    readonly name: "nextTokenId";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "ownerOf";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "getApproved";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "approve";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "modifyLiquidities";
+    readonly type: "function";
+    readonly stateMutability: "payable";
+    readonly inputs: readonly [{
+        readonly type: "bytes";
+        readonly name: "unlockData";
+    }, {
+        readonly type: "uint256";
+        readonly name: "deadline";
+    }];
+    readonly outputs: readonly [];
+}, {
     readonly name: "getPositionLiquidity";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -4671,6 +4782,35 @@ export declare const v4PositionManagerReadAbi: readonly [{
     }];
 }];
 export declare const v4StateViewReadAbi: readonly [{
+    readonly name: "poolManager";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "getSlot0";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "bytes32";
+        readonly name: "poolId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint160";
+        readonly name: "sqrtPriceX96";
+    }, {
+        readonly type: "int24";
+        readonly name: "tick";
+    }, {
+        readonly type: "uint24";
+        readonly name: "protocolFee";
+    }, {
+        readonly type: "uint24";
+        readonly name: "lpFee";
+    }];
+}, {
     readonly name: "getPositionInfo";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -4722,13 +4862,56 @@ export declare const v4StateViewReadAbi: readonly [{
         readonly name: "feeGrowthInside1X128";
     }];
 }];
-export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeAllocationSet" | "CanonicalPoolFeeAllocationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
+export declare const permit2AllowanceAbi: readonly [{
+    readonly name: "allowance";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "address";
+        readonly name: "spender";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint160";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint48";
+        readonly name: "expiration";
+    }, {
+        readonly type: "uint48";
+        readonly name: "nonce";
+    }];
+}, {
+    readonly name: "approve";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "address";
+        readonly name: "spender";
+    }, {
+        readonly type: "uint160";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint48";
+        readonly name: "expiration";
+    }];
+    readonly outputs: readonly [];
+}];
+export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
 export type StaticsLiquidityEventArgs<Name extends StaticsLiquidityEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "PositionRewardSettled";
 export type StaticsPositionEventArgs<Name extends StaticsPositionEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsLendingEventName = "LoanOriginated" | "LoanRepaid" | "LoanExtended" | "LoanExtensionFeePaid" | "LoanRecovered";
 export type StaticsLendingEventArgs<Name extends StaticsLendingEventName> = ContractEventArgs<typeof staticsAbi, Name>;
-export type StaticsHookEventName = "PoolRegistered" | "SwapLegFeeAccrued" | "PermanentLiquidityAdded" | "PermanentLiquidityFeesCollected" | "PermanentLiquidityReleased" | "PoolDecommissioned" | "FeeConfigurationSet" | "PoolFeeAllocationSet" | "PoolFeeAllocationCleared" | "TickObservationRecorded";
+export type StaticsHookEventName = "PoolRegistered" | "SwapLegFeeAccrued" | "PermanentLiquidityAdded" | "PermanentLiquidityFeesCollected" | "PermanentLiquidityReleased" | "PoolDecommissioned" | "FeeConfigurationSet" | "PoolFeeConfigurationSet" | "PoolFeeConfigurationCleared" | "TickObservationRecorded";
 export type StaticsHookEventArgs<Name extends StaticsHookEventName> = ContractEventArgs<typeof staticsSwapFeeHookAbi, Name>;
 export type StaticsLiquidityManagerEventName = "CanonicalPoolRegistered" | "ProtocolInventoryCredited" | "ProtocolInventoryReturned" | "ProtocolPositionMinted" | "ProtocolPositionIncreased" | "ProtocolPositionCollected" | "ProtocolPositionReduced" | "ProtocolPositionTransferred" | "ProtocolPositionBurned" | "UserPositionMinted";
 export type StaticsLiquidityManagerEventArgs<Name extends StaticsLiquidityManagerEventName> = ContractEventArgs<typeof staticsLiquidityManagerAbi, Name>;
@@ -6304,6 +6487,9 @@ export declare const staticsDollarErrorAbi: readonly [{
     }];
 }];
 export declare function buildCreateBasketTransaction(params: CreateBasketParams, creationFee: bigint): PreparedTransaction;
+export declare function buildApproveV4PositionCall(operator: Address, tokenId: bigint): Hex;
+export declare function buildPermit2ApproveCall(token: Address, spender: Address, amount: bigint, expiration: number): Hex;
+export declare function buildMintV4PositionCall(request: V4MintPositionRequest): Hex;
 export declare function buildMintCall(basketId: bigint, shares: bigint, receiver: Address, maxAmountsIn: readonly bigint[]): Hex;
 export declare function buildRedeemCall(basketId: bigint, shares: bigint, receiver: Address, minAmountsOut: readonly bigint[]): Hex;
 export declare function buildCreateAndDepositBasketCollateralCall(basketId: bigint, shares: bigint, receiver: Address): Hex;
@@ -6333,8 +6519,8 @@ export declare function buildCheckpointCanonicalPoolCall(basketId: bigint, asset
 export declare function buildActivateCanonicalPoolCall(basketId: bigint, asset: Address): Hex;
 export declare function buildSyncCanonicalPoolToManagerCall(basketId: bigint, asset: Address): Hex;
 export declare function buildSetSwapFeeConfigurationCall(configuration: SwapFeeConfiguration): Hex;
-export declare function buildSetCanonicalPoolFeeAllocationCall(basketId: bigint, asset: Address, allocation: FeeAllocation): Hex;
-export declare function buildClearCanonicalPoolFeeAllocationCall(basketId: bigint, asset: Address): Hex;
+export declare function buildSetCanonicalPoolFeeConfigurationCall(basketId: bigint, asset: Address, configuration: SwapFeeConfiguration): Hex;
+export declare function buildClearCanonicalPoolFeeConfigurationCall(basketId: bigint, asset: Address): Hex;
 export declare function buildUnwindBasketLiquidityCall(basketId: bigint, asset: Address): Hex;
 export declare function buildBorrowAndProvideLiquidityCall(positionId: bigint, basketId: bigint, sharesIn: bigint, pools: readonly LiquidityParams[], lpRecipient: Address): Hex;
 export declare function buildStakeLiquidityPositionCall(positionId: bigint, tokenId: bigint): Hex;

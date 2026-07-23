@@ -2,6 +2,13 @@ import { getAddress, isHash, keccak256, type Address, type Hex, type PublicClien
 
 export type DollarContractName =
   "diamond" | "core" | "gateway" | "dollar" | "risk" | "weth" | "oracle";
+export type LiquidityContractName =
+  "poolManager" | "positionManager" | "permit2" | "swapFeeHook" | "liquidityManager" | "stateView";
+
+export type LiquidityDeployment = Readonly<{
+  contracts: Readonly<Record<LiquidityContractName, Address>>;
+  runtimeCodeHashes: Readonly<Record<LiquidityContractName, Hex>>;
+}>;
 
 export type DollarDeployment = Readonly<{
   chainId: number;
@@ -11,6 +18,7 @@ export type DollarDeployment = Readonly<{
   source: "development-environment";
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
+  liquidity?: LiquidityDeployment | null;
 }>;
 
 export type DollarDeploymentState =
@@ -35,6 +43,24 @@ const hashVariables: Readonly<Record<DollarContractName, string>> = {
   risk: "NEXT_PUBLIC_STATICS_DOLLAR_RISK_CODE_HASH",
   weth: "NEXT_PUBLIC_STATICS_WETH_CODE_HASH",
   oracle: "NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH",
+};
+
+const liquidityAddressVariables: Readonly<Record<LiquidityContractName, string>> = {
+  poolManager: "NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS",
+  positionManager: "NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS",
+  permit2: "NEXT_PUBLIC_STATICS_PERMIT2_ADDRESS",
+  swapFeeHook: "NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_ADDRESS",
+  liquidityManager: "NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_ADDRESS",
+  stateView: "NEXT_PUBLIC_STATICS_STATE_VIEW_ADDRESS",
+};
+
+const liquidityHashVariables: Readonly<Record<LiquidityContractName, string>> = {
+  poolManager: "NEXT_PUBLIC_STATICS_POOL_MANAGER_CODE_HASH",
+  positionManager: "NEXT_PUBLIC_STATICS_POSITION_MANAGER_CODE_HASH",
+  permit2: "NEXT_PUBLIC_STATICS_PERMIT2_CODE_HASH",
+  swapFeeHook: "NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_CODE_HASH",
+  liquidityManager: "NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH",
+  stateView: "NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH",
 };
 
 function parseAddress(value: string | undefined, variable: string): Address {
@@ -112,6 +138,30 @@ export function readDollarDeployment(
       parseHash(environment[variable], variable),
     ])
   ) as Record<DollarContractName, Hex>;
+  const liquidityValues = [
+    ...Object.values(liquidityAddressVariables).map((variable) => environment[variable]),
+    ...Object.values(liquidityHashVariables).map((variable) => environment[variable]),
+  ];
+  let liquidity: LiquidityDeployment | null = null;
+  if (liquidityValues.some(Boolean)) {
+    if (!liquidityValues.every(Boolean)) {
+      throw new Error("Liquidity deployment configuration must be complete or omitted.");
+    }
+    liquidity = {
+      contracts: Object.fromEntries(
+        Object.entries(liquidityAddressVariables).map(([name, variable]) => [
+          name,
+          parseAddress(environment[variable], variable),
+        ])
+      ) as Record<LiquidityContractName, Address>,
+      runtimeCodeHashes: Object.fromEntries(
+        Object.entries(liquidityHashVariables).map(([name, variable]) => [
+          name,
+          parseHash(environment[variable], variable),
+        ])
+      ) as Record<LiquidityContractName, Hex>,
+    };
+  }
 
   return {
     status: "configured",
@@ -123,6 +173,7 @@ export function readDollarDeployment(
       source: "development-environment",
       contracts,
       runtimeCodeHashes,
+      liquidity,
     },
   };
 }
@@ -156,6 +207,11 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_WETH_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_WETH_CODE_HASH,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH,
+    ...Object.fromEntries(
+      [...Object.values(liquidityAddressVariables), ...Object.values(liquidityHashVariables)].map(
+        (variable) => [variable, process.env[variable]]
+      )
+    ),
   });
 }
 
@@ -178,4 +234,22 @@ export async function verifyDollarDeployment(
       }
     })
   );
+}
+
+export async function verifyLiquidityDeployment(
+  publicClient: PublicClient,
+  deployment: DollarDeployment
+): Promise<LiquidityDeployment> {
+  const liquidity = deployment.liquidity;
+  if (!liquidity) throw new Error("No verified Statics liquidity deployment is configured.");
+  await Promise.all(
+    (Object.keys(liquidity.contracts) as LiquidityContractName[]).map(async (name) => {
+      const code = await publicClient.getCode({ address: liquidity.contracts[name] });
+      if (!code || code === "0x") throw new Error(`${name} has no runtime code.`);
+      if (keccak256(code).toLowerCase() !== liquidity.runtimeCodeHashes[name].toLowerCase()) {
+        throw new Error(`${name} runtime code does not match the deployment manifest.`);
+      }
+    })
+  );
+  return liquidity;
 }

@@ -14,6 +14,14 @@ const labels = {
   weth: "WETH_ADDRESS",
   oracle: "STATICS_DOLLAR_ORACLE_ADDRESS",
 };
+const liquidityLabels = {
+  poolManager: "STATICS_POOL_MANAGER_ADDRESS",
+  positionManager: "STATICS_POSITION_MANAGER_ADDRESS",
+  permit2: "STATICS_PERMIT2_ADDRESS",
+  swapFeeHook: "STATICS_SWAP_FEE_HOOK_ADDRESS",
+  liquidityManager: "STATICS_LIQUIDITY_MANAGER_ADDRESS",
+  stateView: "STATICS_STATE_VIEW_ADDRESS",
+};
 
 export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quiet = false }) {
   if (!privateKey) {
@@ -25,9 +33,9 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     "forge",
     [
       "script",
-      "script/dollar/DeployStaticsDollar.s.sol:DeployStaticsDollar",
+      "script/dollar/DeployLocalStaticsWithLiquidity.s.sol:DeployLocalStaticsWithLiquidity",
       "--sig",
-      "runLocal()",
+      "runLocalWithLiquidity()",
       "--broadcast",
       "--slow",
       "--rpc-url",
@@ -48,12 +56,24 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     if (!match) throw new Error(`Forge output did not include ${label}.`);
     contracts[name] = match[1];
   }
+  const liquidityContracts = {};
+  for (const [name, label] of Object.entries(liquidityLabels)) {
+    const match = output.match(new RegExp(`${label}\\s+(0x[a-fA-F0-9]{40})`));
+    if (!match) throw new Error(`Forge output did not include ${label}.`);
+    liquidityContracts[name] = match[1];
+  }
 
   const runtimeCodeHashes = {};
   for (const [name, address] of Object.entries(contracts)) {
     const code = await client.getCode({ address });
     if (!code || code === "0x") throw new Error(`${name} has no runtime code after deployment.`);
     runtimeCodeHashes[name] = keccak256(code);
+  }
+  const liquidityRuntimeCodeHashes = {};
+  for (const [name, address] of Object.entries(liquidityContracts)) {
+    const code = await client.getCode({ address });
+    if (!code || code === "0x") throw new Error(`${name} has no runtime code after deployment.`);
+    liquidityRuntimeCodeHashes[name] = keccak256(code);
   }
 
   const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -65,6 +85,10 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     deploymentStartBlock,
     contracts,
     runtimeCodeHashes,
+    liquidity: {
+      contracts: liquidityContracts,
+      runtimeCodeHashes: liquidityRuntimeCodeHashes,
+    },
     protocolCommit,
   };
 }
@@ -151,6 +175,20 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
     NEXT_PUBLIC_STATICS_DOLLAR_RISK_CODE_HASH: deployment.runtimeCodeHashes.risk,
     NEXT_PUBLIC_STATICS_WETH_CODE_HASH: deployment.runtimeCodeHashes.weth,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH: deployment.runtimeCodeHashes.oracle,
+    NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: deployment.liquidity.contracts.poolManager,
+    NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS: deployment.liquidity.contracts.positionManager,
+    NEXT_PUBLIC_STATICS_PERMIT2_ADDRESS: deployment.liquidity.contracts.permit2,
+    NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_ADDRESS: deployment.liquidity.contracts.swapFeeHook,
+    NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_ADDRESS: deployment.liquidity.contracts.liquidityManager,
+    NEXT_PUBLIC_STATICS_STATE_VIEW_ADDRESS: deployment.liquidity.contracts.stateView,
+    NEXT_PUBLIC_STATICS_POOL_MANAGER_CODE_HASH: deployment.liquidity.runtimeCodeHashes.poolManager,
+    NEXT_PUBLIC_STATICS_POSITION_MANAGER_CODE_HASH:
+      deployment.liquidity.runtimeCodeHashes.positionManager,
+    NEXT_PUBLIC_STATICS_PERMIT2_CODE_HASH: deployment.liquidity.runtimeCodeHashes.permit2,
+    NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_CODE_HASH: deployment.liquidity.runtimeCodeHashes.swapFeeHook,
+    NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH:
+      deployment.liquidity.runtimeCodeHashes.liquidityManager,
+    NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH: deployment.liquidity.runtimeCodeHashes.stateView,
   };
 
   const lines = current ? current.trimEnd().split("\n") : [];

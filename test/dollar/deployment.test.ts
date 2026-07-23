@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { readDollarDeployment } from "@/lib/dollar/deployment";
+import {
+  readDollarDeployment,
+  verifyLiquidityDeployment,
+} from "@/lib/dollar/deployment";
 
 const address = "0x0000000000000000000000000000000000000001";
 const hash = `0x${"11".repeat(32)}`;
@@ -29,6 +32,23 @@ function localDeploymentEnvironment() {
   };
 }
 
+function liquidityDeploymentEnvironment() {
+  return {
+    NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_PERMIT2_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_STATE_VIEW_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_POOL_MANAGER_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_POSITION_MANAGER_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_PERMIT2_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH: hash,
+  };
+}
+
 describe("Dollar deployment configuration", () => {
   it("is honestly unavailable when no deployment exists", () => {
     expect(readDollarDeployment({})).toEqual({
@@ -38,14 +58,42 @@ describe("Dollar deployment configuration", () => {
   });
 
   it("accepts complete code-bound Anvil configuration", () => {
-    const state = readDollarDeployment(localDeploymentEnvironment());
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      ...liquidityDeploymentEnvironment(),
+    });
     expect(state.status).toBe("configured");
     if (state.status === "configured") {
       expect(state.deployment.chainId).toBe(31_337);
       expect(state.deployment.deploymentStartBlock).toBe(1n);
       expect(state.deployment.wethProfileId).toBe(1n);
       expect(state.deployment.runtimeCodeHashes.gateway).toBe(hash);
+      expect(state.deployment.liquidity?.contracts.stateView).toBe(address);
     }
+  });
+
+  it("rejects a partial liquidity deployment", () => {
+    expect(() =>
+      readDollarDeployment({
+        ...localDeploymentEnvironment(),
+        NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: address,
+      })
+    ).toThrow("Liquidity deployment configuration must be complete or omitted.");
+  });
+
+  it("verifies every liquidity runtime hash", async () => {
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      ...liquidityDeploymentEnvironment(),
+    });
+    if (state.status !== "configured") throw new Error("expected configured deployment");
+
+    const publicClient = {
+      getCode: async () => "0x6000",
+    };
+    await expect(
+      verifyLiquidityDeployment(publicClient as never, state.deployment)
+    ).rejects.toThrow("runtime code does not match");
   });
 
   it("rejects environment-generated public deployments", () => {
