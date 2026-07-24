@@ -829,7 +829,7 @@ try {
         STATICS_NEXT_DIST_DIR: ".local/next-connected",
         STATICS_NEXT_TSCONFIG: ".local/tsconfig.connected.json",
       },
-    },
+    }
   );
   await waitForApp(next);
   const status = await verifiedStatus(publicClient, deployment, fixtureIds, account.address);

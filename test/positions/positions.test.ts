@@ -79,9 +79,9 @@ describe("position action guards", () => {
       second,
     ]);
     expect(claimablePositionRewards(rewards, [second])).toEqual([rewards[1]]);
-    expect(
-      claimablePositionRewards(rewards.map((reward) => ({ ...reward, pending: 0n })))
-    ).toEqual([]);
+    expect(claimablePositionRewards(rewards.map((reward) => ({ ...reward, pending: 0n })))).toEqual(
+      []
+    );
   });
 
   it("computes unlocked collateral and blocks close while any leg is active", () => {
