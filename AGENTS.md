@@ -54,6 +54,17 @@ git diff --check
 
 Expand verification in proportion to risk. Report exactly which checks ran and whether they passed. Never describe an unrun or skipped check as passing.
 
+## Testing scope and resource discipline
+
+- Tests exist to prove behavior, state transitions, safety boundaries, parsing, configuration, and transaction correctness. Do not use tests to duplicate or approve visual design.
+- Do not assert placeholder text such as `--`, headings, labels, explanatory copy, sample values, exact card or row counts, CSS classes, spacing, or other presentational details unless that exact text or semantic attribute is itself a functional requirement.
+- Do not add or replace tests one-for-one merely because visible copy or fixture values changed. Delete obsolete presentation assertions and retain only the smallest behavioral regression that protects the changed invariant.
+- Do not create broad route matrices, screenshot suites, or per-surface component tests to prove that screens look populated. One focused behavioral test should cover shared fallback or availability logic.
+- Playwright should test browser behavior such as navigation, keyboard interaction, accessibility semantics, route boundaries, and critical workflows. Do not treat screenshot comparison as evidence that a design is correct.
+- Do not create or update visual snapshots unless the user explicitly requests automated visual regression coverage. Visual acceptance requires actual browser inspection and user judgment.
+- Reuse existing coverage before adding new tests. Avoid custom verification scripts when an existing focused test can prove the same behavior.
+- Keep the verification effort proportional to the implementation risk. A presentation-only change does not justify exhaustive application or protocol test expansion.
+
 ## Test fidelity
 
 - Use unit tests for parsing, validation, configuration, error branches, and deterministic state transitions.
@@ -111,7 +122,8 @@ Ambiguous identity is not permission to guess. Clarify whenever more than one wa
 - Keep onchain buttons single-submit and visibly pending while a request is in flight.
 - Present one valid next action at a time: switch network, approve or permit, then execute.
 - Display addresses, token amounts, USD values, network, contract target, fees, and slippage bounds unambiguously.
-- Show unavailable links and future features as visibly disabled or inert. Do not give placeholders fake destinations or live-looking state.
+- Keep navigation to every implemented screen usable even when wallet, deployment, or RPC data is unavailable. Blank-data cards may use stable local route IDs solely to open their implemented detail screens.
+- Disable only unimplemented or unknown external destinations and controls that would perform wallet, signing, or onchain work without their required data. Runtime unavailability must not block tabs, local selectors, form exploration, or navigation.
 - Treat provider order and wallet context boundaries as application-critical; test wallet-dependent rendering under the real provider tree.
 
 ## Protocol and ABI changes

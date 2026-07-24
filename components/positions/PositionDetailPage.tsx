@@ -76,14 +76,7 @@ export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   if (dappPreviewEnabled) {
     return <PositionDetailPreview positionId={positionId} />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect and manage local PositionNFTs.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <PositionDetailPreview positionId={positionId} />;
   return <PositionDetailRuntime positionId={positionId} />;
 }
 
@@ -566,57 +559,17 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     setCustomRewardAddress("");
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Position unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-      </section>
-    );
-  }
-  if (walletState.status !== "ready" || !walletState.isTargetChain) {
-    const label =
-      walletState.status === "signed-out" || walletState.status === "error"
-        ? "Sign in to inspect this position"
-        : walletState.status === "wallet-missing"
-          ? "Create embedded wallet"
-          : walletState.status === "ready"
-            ? `Switch to ${walletState.networkName}`
-            : "Wallet loading…";
-    const action =
-      walletState.status === "signed-out" || walletState.status === "error"
-        ? walletState.login
-        : walletState.status === "wallet-missing"
-          ? () => void walletState.createWallet()
-          : walletState.status === "ready"
-            ? () => void walletState.switchNetwork()
-            : undefined;
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Position wallet required</p>
-        <h2>Connect the owning wallet on the verified network.</h2>
-        <button className="dollar-submit" type="button" onClick={action} disabled={!action}>
-          {label}
-        </button>
-      </section>
-    );
-  }
-  if (catalog.isPending) return <p className="dollar-loading">Reconciling position state…</p>;
-  if (catalog.isError) {
-    return (
-      <p className="dapp-inline-error" role="alert">
-        {describePositionError(catalog.error)}
-      </p>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    walletState.status !== "ready" ||
+    !walletState.isTargetChain ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <PositionDetailPreview positionId={positionId} />;
   }
   if (!position || !catalog.data) {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Position not found</p>
-        <h2>This wallet does not own PositionNFT #{positionId.toString()}.</h2>
-        <Link href="/app/positions">Return to positions</Link>
-      </section>
-    );
+    return <PositionDetailPreview positionId={positionId} />;
   }
 
   const cooldownRemaining = Number(position.unstakeAvailableAt - catalog.data.currentTimestamp);

@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
-import { basketStatusLabel, describeBasketError, loadBasketCatalog } from "@/lib/baskets/baskets";
+import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
 import { BasketListPreview } from "@/components/preview/DappPreview";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
@@ -24,14 +24,7 @@ export function BasketListPage() {
   if (dappPreviewEnabled) {
     return <BasketListPreview />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect the local basket deployment.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <BasketListPreview />;
   return <BasketListRuntime />;
 }
 
@@ -59,22 +52,12 @@ function BasketListRuntime() {
     },
   });
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Baskets unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-        <p>{deploymentState.reason}</p>
-      </section>
-    );
-  }
-  if (catalog.isPending) return <p className="dollar-loading">Discovering baskets…</p>;
-  if (catalog.isError) {
-    return (
-      <p className="dapp-inline-error" role="alert">
-        {describeBasketError(catalog.error)}
-      </p>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <BasketListPreview />;
   }
 
   return (
@@ -92,6 +75,11 @@ function BasketListRuntime() {
       {catalog.data.warning && (
         <p className="dollar-warning" role="status">
           {catalog.data.warning}
+        </p>
+      )}
+      {catalog.isError && (
+        <p className="dollar-warning" role="status">
+          Basket data is temporarily unavailable. Showing the last received state.
         </p>
       )}
       {catalog.data.baskets.length === 0 ? (

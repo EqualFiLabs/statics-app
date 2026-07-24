@@ -43,18 +43,6 @@ describe("Dollar activity page", () => {
     window.localStorage.clear();
   });
 
-  it("shows representative local preview states without wallet configuration", () => {
-    render(
-      <WalletContext.Provider value={defaultWalletState}>
-        <ActivityPage />
-      </WalletContext.Provider>
-    );
-
-    expect(screen.getByText("Sample activity data")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Protocol activity" })).toBeInTheDocument();
-    expect(screen.getByText("Confirming")).toBeInTheDocument();
-  });
-
   it("distinguishes a wallet rejection from an onchain revert", () => {
     writeDollarActivity({
       id: "rejected",

@@ -71,14 +71,7 @@ export function BasketDetailPage({ basketId }: { basketId: bigint }) {
   if (dappPreviewEnabled) {
     return <BasketDetailPreview basketId={basketId} />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect and use the local basket deployment.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <BasketDetailPreview basketId={basketId} />;
   return <BasketDetailRuntime basketId={basketId} />;
 }
 
@@ -336,30 +329,15 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Basket unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-      </section>
-    );
-  }
-  if (catalog.isPending) return <p className="dollar-loading">Reconciling basket state…</p>;
-  if (catalog.isError) {
-    return (
-      <p className="dapp-inline-error" role="alert">
-        {describeBasketError(catalog.error)}
-      </p>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <BasketDetailPreview basketId={basketId} />;
   }
   if (!basket) {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Basket not found</p>
-        <h2>No current basket exists with ID {basketId.toString()}.</h2>
-        <Link href="/app/baskets">Return to baskets</Link>
-      </section>
-    );
+    return <BasketDetailPreview basketId={basketId} />;
   }
 
   const quoteLabel =

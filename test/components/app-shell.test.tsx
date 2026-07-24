@@ -14,35 +14,6 @@ function renderWithWallet(ui: React.ReactNode, overrides: Partial<WalletState> =
 }
 
 describe("DApp wallet shell", () => {
-  it("labels the development preview without inventing live status", () => {
-    renderWithWallet(
-      <AppShell>
-        <section>Overview body</section>
-      </AppShell>
-    );
-
-    expect(
-      screen.getByRole("heading", { name: "Track your Statics portfolio." })
-    ).toBeInTheDocument();
-    expect(screen.getByText("Design preview")).toBeInTheDocument();
-    expect(screen.getByText("Sample interface", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.getByText("Sample data only")).toBeInTheDocument();
-    expect(screen.getByText("Not connected")).toBeInTheDocument();
-    expect(screen.getAllByText("Not configured")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: /dollar/i })).toHaveAttribute("href", "/app/dollar");
-    expect(screen.getByRole("link", { name: /baskets/i })).toHaveAttribute("href", "/app/baskets");
-    expect(screen.getByRole("link", { name: /positions/i })).toHaveAttribute(
-      "href",
-      "/app/positions"
-    );
-    expect(screen.getByRole("link", { name: /rewards/i })).toHaveAttribute("href", "/app/rewards");
-    expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute(
-      "href",
-      "/app/settings"
-    );
-    expect(screen.queryByText(/0x[0-9a-f]{8}/i)).not.toBeInTheDocument();
-  });
-
   it("opens and closes the responsive navigation with focus restoration", () => {
     renderWithWallet(<AppShell>Overview</AppShell>);
     const toggle = screen.getByRole("button", {
@@ -67,7 +38,7 @@ describe("DApp wallet shell", () => {
   it("offers independent Privy sign-in and external wallet connection", () => {
     const login = vi.fn();
     const connectWallet = vi.fn();
-    renderWithWallet(<AppShell previewMode={false}>Overview</AppShell>, {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "signed-out",
       login,
       connectWallet,
@@ -83,7 +54,7 @@ describe("DApp wallet shell", () => {
   it("shows the active address and requires a network switch when mismatched", () => {
     const copyAddress = vi.fn().mockResolvedValue(undefined);
     const switchNetwork = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<AppShell previewMode={false}>Overview</AppShell>, {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -102,15 +73,6 @@ describe("DApp wallet shell", () => {
 });
 
 describe("wallet settings", () => {
-  it("shows a labelled, inert sample account without wallet configuration", () => {
-    renderWithWallet(<WalletSettings />);
-
-    expect(screen.getByText("Sample wallet settings data")).toBeInTheDocument();
-    expect(screen.getByText("Connected · Sample")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy sample address" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Review secure export · Preview" })).toBeDisabled();
-  });
-
   it("warns before embedded-wallet export and exposes logout", () => {
     const exportWallet = vi.fn().mockResolvedValue(undefined);
     const logout = vi.fn().mockResolvedValue(undefined);

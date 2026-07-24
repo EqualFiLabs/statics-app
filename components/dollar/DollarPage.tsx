@@ -82,32 +82,6 @@ function globalHealthLabel(phase: number): string {
   return ["Available", "Impaired", "Recovering", "Health unavailable"][phase] ?? "Restricted";
 }
 
-function deploymentUnavailable(reason: string) {
-  return (
-    <section className="dollar-unavailable" aria-labelledby="dollar-unavailable-title">
-      <p className="dapp-section-label">Dollar unavailable</p>
-      <h2 id="dollar-unavailable-title">No verified deployment is configured.</h2>
-      <p>{reason} Robinhood Testnet actions remain disabled until a reviewed deployment exists.</p>
-    </section>
-  );
-}
-
-function walletPrompt(status: ReturnType<typeof useWalletState>["status"]) {
-  const message =
-    status === "signed-out"
-      ? "Sign in to read your balances and prepare a Dollar action."
-      : status === "wallet-missing"
-        ? "Create or connect a wallet before using Dollar."
-        : "Wallet configuration is required before Dollar can connect.";
-  return (
-    <section className="dollar-unavailable">
-      <p className="dapp-section-label">Wallet required</p>
-      <h2>{message}</h2>
-      <p>The app will present one required wallet or network step at a time.</p>
-    </section>
-  );
-}
-
 function useDollarSnapshot(deployment: DollarDeployment, wallet: Address) {
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   return useQuery({
@@ -232,11 +206,10 @@ function DollarOverviewConnected({
   wallet: Address;
 }) {
   const snapshot = useDollarSnapshot(deployment, wallet);
-  if (snapshot.isPending) return <p className="dollar-loading">Reading verified Dollar state…</p>;
-  if (snapshot.isError) {
-    return <p className="dapp-inline-error">{describeDollarError(snapshot.error)}</p>;
+  if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
+    return <DollarOverviewPreview />;
   }
-  const data = snapshot.data;
+  const data = snapshot.data!;
   return (
     <section className="dollar-overview-card" aria-labelledby="dollar-overview-title">
       <div>
@@ -264,10 +237,10 @@ export function DollarOverview() {
     return <DollarOverviewPreview />;
   }
   if (deploymentState.status === "unavailable") {
-    return deploymentUnavailable(deploymentState.reason);
+    return <DollarOverviewPreview />;
   }
   if (wallet.status !== "ready" || !wallet.address || !wallet.isTargetChain) {
-    return walletPrompt(wallet.status);
+    return <DollarOverviewPreview />;
   }
   return (
     <DollarOverviewConnected
@@ -583,13 +556,11 @@ function DollarActionPanel({
     }
   };
 
-  if (snapshot.isPending)
-    return <p className="dollar-loading">Verifying deployment and balances…</p>;
-  if (snapshot.isError) {
-    return <p className="dapp-inline-error">{describeDollarError(snapshot.error)}</p>;
+  if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
+    return <DollarPagePreview />;
   }
 
-  const state = snapshot.data;
+  const state = snapshot.data!;
   const actionAvailability = deriveDollarActionAvailability({
     mode,
     asset,
@@ -847,17 +818,11 @@ export function DollarPage() {
     return <DollarPagePreview />;
   }
   if (deploymentState.status === "unavailable") {
-    return deploymentUnavailable(deploymentState.reason);
+    return <DollarPagePreview />;
   }
-  if (wallet.status !== "ready" || !wallet.address) return walletPrompt(wallet.status);
+  if (wallet.status !== "ready" || !wallet.address) return <DollarPagePreview />;
   if (!wallet.isTargetChain) {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Network required</p>
-        <h2>Switch to {wallet.networkName} to continue.</h2>
-        <p>The wallet control above is the only required next action.</p>
-      </section>
-    );
+    return <DollarPagePreview />;
   }
   return (
     <DollarActionPanel

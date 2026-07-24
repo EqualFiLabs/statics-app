@@ -42,10 +42,12 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 ## Current state
 
 - The approved landing page is served at `/` by Next.js 16 and React 19, with its copy, responsive visual system, Statics branding, and Robin Hood hero preserved.
-- `/app` has separate explicit development modes. `npm run dev:preview` renders clearly labelled
-  deterministic samples with every value-moving control disabled. `npm run dev:connected` imports
-  only Eves Market's public Privy identifiers, deploys the current protocol to persistent Anvil,
-  verifies runtime code hashes, and serves the real runtime without sample fallback.
+- `/app` always renders its complete route-specific interface. Runtime values come from the
+  configured local Anvil deployment when available; missing wallet, deployment, loading, and RPC
+  states render `--` without removing the screen, and dependent actions stay disabled.
+  `npm run dev:preview` forces this unavailable-value presentation for visual regression work.
+  `npm run dev:connected` imports only Eves Market's public Privy identifiers, deploys the current
+  protocol to persistent Anvil, verifies runtime code hashes, and serves authoritative local data.
 - The connected signed-out application has rendered every current route, opened the real Privy
   login modal, and read the two seeded baskets from the verified local deployment. No authenticated
   Privy identity, embedded wallet, external wallet, or browser-signed protocol transaction has been
@@ -109,9 +111,9 @@ Proposed routes may change during UX design, but the product capabilities should
 
 Functional integration and visual approval are separate tracks. A checked browser workflow means
 the configured DApp rendered authoritative state and completed the stated behavior through an
-actual wallet; it does not mean the final visual design has been approved. Development sample
-states keep implemented and planned screens visible for product review, but never count as
-functional integration evidence.
+actual wallet; it does not mean the final visual design has been approved. Unavailable-value
+states keep implemented screens visible for product review, but never count as functional
+integration evidence.
 
 | Route               | User outcome                                                                                                       | Initial release         |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------- |
@@ -379,25 +381,26 @@ current fee; selected multi-asset reward claims with simulation, events, cleared
 wallet balance reconciliation; canonical pool warm-up and activation; bounded ERC-20 and Permit2
 allowances; wallet LP NFT creation, staking, next-block activation, increase, real-swap fee accrual,
 claim, and unstake; and atomic collateral-funded borrow-to-liquidity followed by repayment.
-`npm run verify` covers source, mock, sample-preview, and build checks. This is headless protocol
+`npm run verify` covers source, mock, unavailable-state, and build checks. This is headless protocol
 proof only; no Privy or external browser wallet rendered or exercised these workflows, and no
 public-network or production transaction was performed.
 
 ### DApp visual design and product review
 
-- [x] Render deterministic development sample states for every existing `/app` route when wallet or deployment configuration is absent.
-- [x] Label all sample balances, addresses, activity, protocol state, and status indicators as preview data.
-- [x] Keep every sample-state transaction, wallet, copy, explorer, and export control disabled.
+- [x] Keep every existing `/app` route fully rendered when wallet, deployment, or RPC data is absent.
+- [x] Render unavailable onchain and wallet values as `--` without fabricating balances, addresses, positions, or status.
+- [x] Keep every unavailable-state transaction, copy, explorer, and export control disabled.
 - [x] Desktop, tablet, and mobile implementation plus snapshot coverage is locally verified and product-approved for the overview, Dollar, basket catalog/detail, PositionNFT catalog/detail, rewards, activity, and settings.
-- [~] Loan, multi-asset reward-claim, permissionless basket-creation, and canonical-liquidity previews are implemented with deterministic fixtures, disabled value-moving controls, and inspected desktop, tablet, and mobile snapshots; explicit product approval remains pending before functional implementation is treated as product-complete.
-- [~] Replace deterministic samples with verified local onchain states during integration review,
-  without changing the approved information hierarchy. Every route now passes the real signed-out
-  runtime gate and baskets render authoritative local state; authenticated route state and
-  value-moving browser workflows remain open.
+- [~] Loan, multi-asset reward-claim, permissionless basket-creation, and canonical-liquidity
+  screens retain disabled unavailable-value states and responsive snapshot coverage; explicit
+  product approval remains pending before functional implementation is treated as product-complete.
+- [~] Populate the persistent screens with verified local onchain states during integration review
+  without changing their information hierarchy. Every route now survives an unavailable Anvil RPC
+  without collapsing; authenticated state and value-moving browser workflows remain open.
 
-Gate: reviewed screenshots cover every current DApp surface at desktop, tablet, and mobile sizes;
-sample mode is impossible outside development; production still fails closed without verified
-wallet, network, and deployment configuration.
+Gate: reviewed screenshots cover every current DApp surface at desktop, tablet, and mobile sizes.
+Production actions still fail closed without verified wallet, network, and deployment
+configuration, while the non-value-moving screen layout remains visible.
 
 ### Live-network readiness
 
@@ -480,6 +483,7 @@ Add dated entries with concrete evidence. Keep plans and completed work distinct
 | 2026-07-23 | Remaining protocol flows    | Source/headless proof only  | Direct-Viem Anvil exercised basket creation, multi-asset claims, canonical liquidity, LP NFTs, and borrow-to-liquidity. No connected Privy or external-wallet browser workflow ran; the earlier `Locally verified` status was invalid.                                                                                                                                                                                                                    |
 | 2026-07-24 | Completion-claim correction | Corrected                   | Browser-facing `[x]` marks and progress statuses unsupported by configured browser-wallet evidence were removed. Sample previews, mocks, and direct-Viem Anvil runs remain recorded only at their actual evidence level.                                                                                                                                                                                                                                  |
 | 2026-07-24 | Connected local runtime     | Signed-out runtime verified | Persistent Anvil deployment and code hashes were verified; all current routes rendered without sample fallback or browser errors; the real Privy modal opened; and authoritative basket discovery found both fixtures. Interactive identity, embedded/external wallet, and browser-signed value workflows remain open.                                                                                                                                    |
+| 2026-07-24 | Persistent unavailable UI   | Locally browser verified    | With the app configured for Anvil and `127.0.0.1:8545` unavailable, all twelve DApp routes retained their complete screen layouts, rendered unavailable values as `--`, kept dependent actions disabled, and exposed no raw Viem transport error.                                                                                                                                                                                                         |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 

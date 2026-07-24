@@ -23,6 +23,7 @@ import {
 
 import { loadTokenMetadata, type BasketRecord, type TokenMetadata } from "@/lib/baskets/baskets";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
+import { describeTransportFailure } from "@/lib/protocol/errors";
 import {
   loadPositionCatalog,
   unlockedCollateral,
@@ -552,6 +553,8 @@ export function describeLoanError(error: unknown): string {
     }
   }
   const message = error instanceof Error ? error.message : "The wallet request failed.";
+  const transportFailure = describeTransportFailure(message);
+  if (transportFailure) return transportFailure;
   const known = Object.entries(loanErrorMessages).find(([name]) => message.includes(name));
   if (known) return `${known[1]} (${known[0]})`;
   if (/rejected|denied|4001/i.test(message)) return "The wallet request was rejected.";

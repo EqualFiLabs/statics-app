@@ -19,6 +19,7 @@ import {
 } from "@statics-protocol/sdk";
 
 import type { DollarDeployment } from "@/lib/dollar/deployment";
+import { describeTransportFailure } from "@/lib/protocol/errors";
 
 const BPS = 10_000n;
 export const DEFAULT_BASKET_SLIPPAGE_BPS = 50;
@@ -384,6 +385,8 @@ export function describeBasketError(error: unknown): string {
     }
   }
   const message = error instanceof Error ? error.message : "The wallet request failed.";
+  const transportFailure = describeTransportFailure(message);
+  if (transportFailure) return transportFailure;
   const known = Object.entries(basketErrorMessages).find(([name]) => message.includes(name));
   if (known) return `${known[1]} (${known[0]})`;
   if (/rejected|denied|4001/i.test(message)) return "The wallet request was rejected.";

@@ -3,29 +3,24 @@
 import Link from "next/link";
 import { useState } from "react";
 
-const sampleWallet = "0xA11cE00000000000000000000000000000001042";
+const unavailable = "--";
 
 export function PreviewBanner({ surface }: { surface: string }) {
   return (
     <aside className="preview-banner" role="status" data-dapp-preview>
       <div>
-        <span>Local design preview</span>
-        <strong>Sample {surface} data</strong>
+        <span>Local Anvil</span>
+        <strong>{surface} data unavailable</strong>
       </div>
-      <p>
-        No wallet, RPC, or deployment is connected. Values are deterministic fixtures and every
-        value-moving control is disabled.
-      </p>
     </aside>
   );
 }
 
-export function PreviewAddress({ label = "Sample wallet" }: { label?: string }) {
+export function PreviewAddress({ label = "Wallet" }: { label?: string }) {
   return (
     <span className="protocol-address">
       <span>{label}</span>
-      <code title={sampleWallet}>0xA11c…1042</code>
-      <span className="preview-data-tag">Sample</span>
+      <code>{unavailable}</code>
     </span>
   );
 }
@@ -38,56 +33,51 @@ export function PreviewAction({ children }: { children: React.ReactNode }) {
   );
 }
 
+function UnavailableMetric({ label }: { label: string }) {
+  return (
+    <article>
+      <span>{label}</span>
+      <strong>{unavailable}</strong>
+    </article>
+  );
+}
+
 export function DollarOverviewPreview() {
   return (
     <>
-      <PreviewBanner surface="portfolio" />
+      <PreviewBanner surface="Portfolio" />
       <section className="dollar-overview-card" aria-labelledby="preview-overview-title">
         <div>
-          <p className="dapp-section-label">Statics Dollar · Sample</p>
-          <h2 id="preview-overview-title">12,480.52 Dollar</h2>
-          <p>Series 7 · 3,218.90 active Risk</p>
+          <p className="dapp-section-label">Statics Dollar</p>
+          <h2 id="preview-overview-title">{unavailable} Dollar</h2>
+          <p>
+            Series {unavailable} · {unavailable} active Risk
+          </p>
         </div>
         <div className="dollar-overview-health">
-          <span>Healthy</span>
-          <strong>$3,842.16</strong>
-          <small>Sample WETH oracle</small>
+          <span>{unavailable}</span>
+          <strong>{unavailable}</strong>
+          <small>WETH oracle</small>
         </div>
         <Link className="dollar-primary-link" href="/app/dollar">
           Open Dollar
         </Link>
       </section>
-      <section className="preview-overview-grid" aria-label="Sample portfolio summary">
-        <article>
-          <span>PositionNFTs</span>
-          <strong>3</strong>
-          <small>7 active protocol legs</small>
-          <Link href="/app/positions">Review positions →</Link>
-        </article>
-        <article>
-          <span>Basket collateral</span>
-          <strong>$18,420</strong>
-          <small>Across 2 baskets</small>
-          <Link href="/app/baskets">Review baskets →</Link>
-        </article>
-        <article>
-          <span>Pending rewards</span>
-          <strong>$186.42</strong>
-          <small>4 selected assets</small>
-          <Link href="/app/rewards">Review rewards →</Link>
-        </article>
-        <article>
-          <span>Loan tranches</span>
-          <strong>3</strong>
-          <small>1 nearing recovery</small>
-          <Link href="/app/loans">Review loans →</Link>
-        </article>
-        <article>
-          <span>Canonical LP NFTs</span>
-          <strong>3</strong>
-          <small>$84,220 sample liquidity</small>
-          <Link href="/app/liquidity">Review liquidity →</Link>
-        </article>
+      <section className="preview-overview-grid" aria-label="Portfolio summary">
+        {[
+          ["PositionNFTs", "/app/positions", "Review positions"],
+          ["Basket collateral", "/app/baskets", "Review baskets"],
+          ["Pending rewards", "/app/rewards", "Review rewards"],
+          ["Loan tranches", "/app/loans", "Review loans"],
+          ["Canonical LP NFTs", "/app/liquidity", "Review liquidity"],
+        ].map(([label, href, action]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{unavailable}</strong>
+            <small>{unavailable}</small>
+            <Link href={href}>{action} →</Link>
+          </article>
+        ))}
       </section>
     </>
   );
@@ -99,27 +89,15 @@ export function DollarPagePreview() {
   return (
     <>
       <PreviewBanner surface="Dollar" />
-      <section className="dollar-metrics" aria-label="Sample Dollar balances">
-        <article>
-          <span>Dollar balance</span>
-          <strong>12,480.52</strong>
-        </article>
-        <article>
-          <span>Risk series 7</span>
-          <strong>3,218.90</strong>
-        </article>
-        <article>
-          <span>WETH balance</span>
-          <strong>8.425</strong>
-        </article>
-        <article>
-          <span>WETH oracle</span>
-          <strong>$3,842.16</strong>
-        </article>
+      <section className="dollar-metrics" aria-label="Dollar balances">
+        <UnavailableMetric label="Dollar balance" />
+        <UnavailableMetric label="Risk series" />
+        <UnavailableMetric label="WETH balance" />
+        <UnavailableMetric label="WETH oracle" />
       </section>
       <section className="dollar-workspace">
         <div className="dollar-action-card">
-          <div className="dollar-tabs" aria-label="Sample Dollar action">
+          <div className="dollar-tabs" aria-label="Dollar action">
             <button
               type="button"
               className={mode === "deposit" ? "active" : undefined}
@@ -136,7 +114,7 @@ export function DollarPagePreview() {
             </button>
           </div>
           <fieldset className="dollar-asset-choice">
-            <legend>Sample collateral output</legend>
+            <legend>Collateral output</legend>
             {(["ETH", "WETH"] as const).map((choice) => (
               <button
                 type="button"
@@ -153,46 +131,32 @@ export function DollarPagePreview() {
               {mode === "deposit" ? `${asset} collateral` : "Dollar amount"}
             </label>
             <div>
-              <input id="preview-dollar-amount" value="2.50" readOnly />
-              <button type="button">Max</button>
+              <input id="preview-dollar-amount" value="" placeholder={unavailable} readOnly />
+              <button type="button" disabled>
+                Max
+              </button>
             </div>
-            <small>Sample wallet balance · 8.425 {asset}</small>
+            <small>
+              Wallet balance · {unavailable} {asset}
+            </small>
           </div>
           <div className="dollar-quote">
-            <span>Sample authoritative preview</span>
-            <strong>
-              {mode === "deposit"
-                ? "Receive 9,557.84 Dollar + 644.22 Risk"
-                : `Receive 2.43 ${asset} after recombination`}
-            </strong>
-            <small>0.50% bound · Series 7 · refreshed 3s ago</small>
+            <span>Quote</span>
+            <strong>{unavailable}</strong>
+            <small>{unavailable}</small>
           </div>
-          <PreviewAction>Preview only · connect local deployment</PreviewAction>
+          <PreviewAction>{mode === "deposit" ? "Deposit" : "Recombine"}</PreviewAction>
         </div>
         <aside className="dollar-protocol-card">
-          <p className="dapp-section-label">Sample protocol state</p>
+          <p className="dapp-section-label">Protocol state</p>
           <dl>
-            <div>
-              <dt>Profile</dt>
-              <dd>WETH · Active</dd>
-            </div>
-            <div>
-              <dt>Global health</dt>
-              <dd>Healthy</dd>
-            </div>
-            <div>
-              <dt>Debt ceiling</dt>
-              <dd>38.6% used</dd>
-            </div>
-            <div>
-              <dt>Exit state</dt>
-              <dd>Available</dd>
-            </div>
+            {["Profile", "Global health", "Debt ceiling", "Exit state"].map((label) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{unavailable}</dd>
+              </div>
+            ))}
           </dl>
-          <p className="dollar-warning">
-            Sample state only. Quotes and approvals will come from verified contracts when a local
-            deployment is connected.
-          </p>
           <PreviewAddress />
         </aside>
       </section>
@@ -200,64 +164,41 @@ export function DollarPagePreview() {
   );
 }
 
-const sampleBaskets = [
-  {
-    id: "0",
-    name: "Dollar Reserve",
-    symbol: "sRESERVE",
-    constituents: "4",
-    supply: "24,680.00",
-    balance: "1,250.00",
-  },
-  {
-    id: "1",
-    name: "Blue Chip Index",
-    symbol: "sBLUE",
-    constituents: "6",
-    supply: "8,412.75",
-    balance: "428.50",
-  },
-] as const;
+const placeholderRouteIds = ["0", "1"] as const;
 
 export function BasketListPreview() {
   return (
     <>
-      <PreviewBanner surface="basket catalog" />
+      <PreviewBanner surface="Basket catalog" />
       <section className="basket-catalog" aria-labelledby="preview-basket-catalog-title">
         <div className="basket-section-heading">
           <div>
-            <p className="dapp-section-label">Sample event-discovered catalog</p>
+            <p className="dapp-section-label">Basket catalog</p>
             <h2 id="preview-basket-catalog-title">Statics baskets</h2>
           </div>
           <div className="basket-section-actions">
-            <span>2 sample baskets</span>
-            <Link href="/app/create">Create sample basket →</Link>
+            <span>{unavailable} discovered</span>
+            <Link href="/app/create">Create basket →</Link>
           </div>
         </div>
         <div className="basket-grid">
-          {sampleBaskets.map((basket) => (
-            <Link className="basket-card" href={`/app/baskets/${basket.id}`} key={basket.id}>
+          {placeholderRouteIds.map((routeId) => (
+            <Link className="basket-card" href={`/app/baskets/${routeId}`} key={routeId}>
               <div>
-                <span className="basket-status is-0">Active</span>
-                <span>#{basket.id}</span>
+                <span className="basket-status">{unavailable}</span>
+                <span>#{unavailable}</span>
               </div>
-              <h3>{basket.name}</h3>
-              <p>{basket.symbol}</p>
+              <h3>{unavailable}</h3>
+              <p>{unavailable}</p>
               <dl>
-                <div>
-                  <dt>Constituents</dt>
-                  <dd>{basket.constituents}</dd>
-                </div>
-                <div>
-                  <dt>Total supply</dt>
-                  <dd>{basket.supply}</dd>
-                </div>
-                <div>
-                  <dt>Your balance</dt>
-                  <dd>{basket.balance}</dd>
-                </div>
+                {["Constituents", "Total supply", "Your balance"].map((label) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{unavailable}</dd>
+                  </div>
+                ))}
               </dl>
-              <span className="basket-card-link">Inspect sample basket →</span>
+              <span className="basket-card-link">Inspect basket →</span>
             </Link>
           ))}
         </div>
@@ -270,116 +211,85 @@ export function BasketDetailPreview({ basketId }: { basketId: bigint }) {
   const [mode, setMode] = useState<"mint" | "redeem">("mint");
   return (
     <>
-      <PreviewBanner surface="basket detail" />
+      <PreviewBanner surface="Basket" />
       <Link className="basket-back" href="/app/baskets">
         ← All baskets
       </Link>
       <section className="basket-hero">
         <div>
-          <p className="dapp-section-label">Sample basket #{basketId.toString()}</p>
-          <h2>Dollar Reserve</h2>
-          <p>sRESERVE · Active</p>
+          <p className="dapp-section-label">Basket #{basketId.toString()}</p>
+          <h2>{unavailable}</h2>
+          <p>{unavailable}</p>
         </div>
         <dl>
-          <div>
-            <dt>Total supply</dt>
-            <dd>24,680.00</dd>
-          </div>
-          <div>
-            <dt>Your balance</dt>
-            <dd>1,250.00</dd>
-          </div>
-          <div>
-            <dt>Vault value</dt>
-            <dd>$1.84M</dd>
-          </div>
+          {["Total supply", "Your balance", "Vault value"].map((label) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{unavailable}</dd>
+            </div>
+          ))}
         </dl>
       </section>
       <div className="basket-detail-grid">
         <section className="basket-composition">
-          <p className="dapp-section-label">Sample composition</p>
+          <p className="dapp-section-label">Composition</p>
           <ol>
-            {[
-              ["01", "Statics Dollar", "50.00%", "12,340.00"],
-              ["02", "Wrapped Ether", "25.00%", "4.0125"],
-              ["03", "Wrapped Bitcoin", "15.00%", "0.0842"],
-              ["04", "USDC", "10.00%", "18,420.00"],
-            ].map(([number, name, weight, amount]) => (
+            {["01", "02", "03", "04"].map((number) => (
               <li key={number}>
                 <span>{number}</span>
                 <div>
-                  <strong>{name}</strong>
-                  <small>{weight} target bundle</small>
+                  <strong>{unavailable}</strong>
+                  <small>{unavailable} target bundle</small>
                 </div>
                 <div>
-                  <strong>{amount}</strong>
-                  <small>Sample vault balance</small>
+                  <strong>{unavailable}</strong>
+                  <small>Vault balance</small>
                 </div>
               </li>
             ))}
           </ol>
         </section>
         <section className="basket-action-card">
-          <p className="dapp-section-label">Sample basket action</p>
+          <p className="dapp-section-label">Basket action</p>
           <div className="dollar-tabs">
-            <button
-              type="button"
-              className={mode === "mint" ? "active" : undefined}
-              onClick={() => setMode("mint")}
-            >
-              Mint
-            </button>
-            <button
-              type="button"
-              className={mode === "redeem" ? "active" : undefined}
-              onClick={() => setMode("redeem")}
-            >
-              Redeem
-            </button>
+            {(["mint", "redeem"] as const).map((choice) => (
+              <button
+                type="button"
+                key={choice}
+                className={mode === choice ? "active" : undefined}
+                onClick={() => setMode(choice)}
+              >
+                {choice}
+              </button>
+            ))}
           </div>
           <label className="basket-field">
-            <span>sRESERVE shares</span>
-            <input value="100.00" readOnly />
-            <small>Sample balance: 1,250.00 sRESERVE</small>
+            <span>Basket shares</span>
+            <input value="" placeholder={unavailable} readOnly />
+            <small>Balance: {unavailable}</small>
           </label>
           <div className="basket-quote">
-            <span>Sample bounded quote</span>
-            <strong>{mode === "mint" ? "4 constituent inputs" : "4 constituent outputs"}</strong>
-            <small>0.50% slippage tolerance</small>
+            <span>Bounded quote</span>
+            <strong>{unavailable}</strong>
+            <small>{unavailable}</small>
           </div>
-          <PreviewAction>Preview only · transaction disabled</PreviewAction>
+          <PreviewAction>{mode === "mint" ? "Mint basket" : "Redeem basket"}</PreviewAction>
         </section>
       </div>
       <section className="basket-parameters">
-        <p className="dapp-section-label">Sample risk parameters</p>
+        <p className="dapp-section-label">Risk parameters</p>
         <dl>
-          <div>
-            <dt>LTV</dt>
-            <dd>75.00%</dd>
-          </div>
-          <div>
-            <dt>Loan duration</dt>
-            <dd>30 days</dd>
-          </div>
-          <div>
-            <dt>Mint fee</dt>
-            <dd>0.10%</dd>
-          </div>
-          <div>
-            <dt>Flash fee</dt>
-            <dd>0.05%</dd>
-          </div>
+          {["LTV", "Loan duration", "Mint fee", "Flash fee"].map((label) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{unavailable}</dd>
+            </div>
+          ))}
         </dl>
       </section>
     </>
   );
 }
-
-const positions = [
-  { id: "1042", legs: "3", baskets: "2", stake: "4.250 WETH", rewards: "4" },
-  { id: "981", legs: "1", baskets: "0", stake: "1.500 WETH", rewards: "2" },
-  { id: "744", legs: "3", baskets: "1", stake: "0 WETH", rewards: "0" },
-] as const;
 
 export function PositionListPreview() {
   return (
@@ -388,39 +298,29 @@ export function PositionListPreview() {
       <section className="position-catalog" aria-labelledby="preview-position-title">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Sample ownership-reconciled portfolio</p>
+            <p className="dapp-section-label">PositionNFT portfolio</p>
             <h2 id="preview-position-title">Your PositionNFTs</h2>
-            <p>
-              Each NFT carries every attached collateral, staking, reward, loan, and liquidity leg
-              when transferred.
-            </p>
           </div>
-          <PreviewAction>Create PositionNFT · Preview</PreviewAction>
+          <PreviewAction>Create PositionNFT</PreviewAction>
         </div>
         <div className="position-grid">
-          {positions.map((position) => (
-            <article className="position-card" key={position.id}>
+          {placeholderRouteIds.map((routeId) => (
+            <article className="position-card" key={routeId}>
               <div>
-                <Link href={`/app/positions/${position.id}`}>Position #{position.id}</Link>
-                <span>{position.legs} active legs</span>
+                <strong>Position #{unavailable}</strong>
+                <span>{unavailable} active legs</span>
               </div>
-              <PreviewAddress label="Sample owner" />
+              <PreviewAddress label="Owner" />
               <dl>
-                <div>
-                  <dt>Basket collateral</dt>
-                  <dd>{position.baskets} baskets</dd>
-                </div>
-                <div>
-                  <dt>Global stake</dt>
-                  <dd>{position.stake}</dd>
-                </div>
-                <div>
-                  <dt>Reward selections</dt>
-                  <dd>{position.rewards}</dd>
-                </div>
+                {["Basket collateral", "Global stake", "Reward selections"].map((label) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{unavailable}</dd>
+                  </div>
+                ))}
               </dl>
-              <Link className="position-card-link" href={`/app/positions/${position.id}`}>
-                Manage sample position →
+              <Link className="position-card-link" href={`/app/positions/${routeId}`}>
+                Manage position →
               </Link>
             </article>
           ))}
@@ -435,150 +335,130 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
   const [stakeMode, setStakeMode] = useState("stake");
   return (
     <>
-      <PreviewBanner surface="PositionNFT detail" />
+      <PreviewBanner surface="PositionNFT" />
       <Link className="basket-back" href="/app/positions">
         ← All positions
       </Link>
       <section className="position-hero">
         <div>
-          <p className="dapp-section-label">Sample wallet-owned PositionNFT</p>
+          <p className="dapp-section-label">PositionNFT</p>
           <h2>Position #{positionId.toString()}</h2>
-          <PreviewAddress label="Sample owner" />
+          <PreviewAddress label="Owner" />
         </div>
         <dl>
-          <div>
-            <dt>Active legs</dt>
-            <dd>3</dd>
-          </div>
-          <div>
-            <dt>Basket legs</dt>
-            <dd>2</dd>
-          </div>
-          <div>
-            <dt>Reward assets</dt>
-            <dd>4/64</dd>
-          </div>
+          {["Active legs", "Basket legs", "Reward assets"].map((label) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{unavailable}</dd>
+            </div>
+          ))}
         </dl>
       </section>
-      <p className="dollar-warning">
-        Transferring this PositionNFT transfers every attached collateral, staking, reward, loan,
-        Dollar, and liquidity obligation.
-      </p>
       <div className="position-detail-grid">
         <section className="position-panel">
-          <p className="dapp-section-label">Sample basket collateral</p>
+          <p className="dapp-section-label">Basket collateral</p>
           <h3>Manage collateral legs</h3>
-          <div className="dollar-tabs preview-four-tabs" aria-label="Sample collateral action">
-            {["deposit", "mint", "withdraw", "redeem"].map((mode) => (
+          <div className="dollar-tabs preview-four-tabs" aria-label="Collateral action">
+            {["deposit", "mint", "withdraw", "redeem"].map((choice) => (
               <button
                 type="button"
-                key={mode}
-                className={collateralMode === mode ? "active" : undefined}
-                onClick={() => setCollateralMode(mode)}
+                key={choice}
+                className={collateralMode === choice ? "active" : undefined}
+                onClick={() => setCollateralMode(choice)}
               >
-                {mode}
+                {choice}
               </button>
             ))}
           </div>
           <label className="basket-field">
             <span>Basket</span>
-            <select value="0" disabled>
-              <option value="0">#0 · sRESERVE</option>
-              <option value="1">#1 · sBLUE</option>
+            <select disabled>
+              <option>{unavailable}</option>
             </select>
           </label>
           <label className="basket-field">
-            <span>sRESERVE shares</span>
-            <input value="250.00" readOnly />
-            <small>Sample wallet: 1,250.00 · Position unlocked: 825.00</small>
+            <span>Basket shares</span>
+            <input value="" placeholder={unavailable} readOnly />
+            <small>
+              Wallet: {unavailable} · Position unlocked: {unavailable}
+            </small>
           </label>
-          <PreviewAction>{collateralMode} collateral · Preview only</PreviewAction>
+          <PreviewAction>{collateralMode} collateral</PreviewAction>
         </section>
         <section className="position-panel">
-          <p className="dapp-section-label">Sample global staking</p>
+          <p className="dapp-section-label">Global staking</p>
           <h3>Stake WETH</h3>
-          <div className="dollar-tabs" aria-label="Sample staking action">
-            {["stake", "unstake"].map((mode) => (
+          <div className="dollar-tabs" aria-label="Staking action">
+            {["stake", "unstake"].map((choice) => (
               <button
                 type="button"
-                key={mode}
-                className={stakeMode === mode ? "active" : undefined}
-                onClick={() => setStakeMode(mode)}
+                key={choice}
+                className={stakeMode === choice ? "active" : undefined}
+                onClick={() => setStakeMode(choice)}
               >
-                {mode}
+                {choice}
               </button>
             ))}
           </div>
           <dl className="position-metrics">
             <div>
               <dt>Wallet balance</dt>
-              <dd>8.425 WETH</dd>
+              <dd>{unavailable}</dd>
             </div>
             <div>
               <dt>Position stake</dt>
-              <dd>4.250 WETH</dd>
+              <dd>{unavailable}</dd>
             </div>
           </dl>
           <label className="basket-field">
             <span>WETH amount</span>
-            <input value="1.00" readOnly />
+            <input value="" placeholder={unavailable} readOnly />
           </label>
-          <p className="position-cooldown">Sample cooldown · unstaking available in 18 hours.</p>
-          <PreviewAction>{stakeMode} WETH · Preview only</PreviewAction>
+          <PreviewAction>{stakeMode} WETH</PreviewAction>
         </section>
       </div>
       <section className="position-panel position-rewards">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Sample position-selected rewards</p>
-            <h3>Choose up to 64 fee assets</h3>
+            <p className="dapp-section-label">Position rewards</p>
+            <h3>Selected fee assets</h3>
           </div>
-          <span>4 selected</span>
+          <span>{unavailable} selected</span>
         </div>
         <div className="reward-grid">
-          {[
-            ["Dollar", "128.42", true],
-            ["WETH", "0.0241", true],
-            ["sRESERVE", "18.20", true],
-            ["USDC", "42.80", false],
-          ].map(([symbol, pending, selected]) => (
-            <article key={String(symbol)} className={selected ? "is-selected" : undefined}>
+          {["01", "02", "03", "04"].map((row) => (
+            <article key={row}>
               <div>
-                <strong>{symbol}</strong>
-                <span>Sample fee history</span>
+                <strong>{unavailable}</strong>
+                <span>{unavailable}</span>
               </div>
-              <p>Pending: {pending}</p>
+              <p>Pending: {unavailable}</p>
               <button type="button" disabled>
-                {selected ? "Remove selection" : "Select reward"} · Preview
+                Select reward
               </button>
             </article>
           ))}
         </div>
-        <p className="dollar-warning">
-          Claims remain planned. This preview includes earned balances so the final claim UX can be
-          reviewed before implementation.
-        </p>
-        <PreviewAction>Claim selected rewards · Planned</PreviewAction>
+        <PreviewAction>Claim selected rewards</PreviewAction>
       </section>
-      <section className="position-attached-grid" aria-label="Sample attached protocol legs">
+      <section className="position-attached-grid" aria-label="Attached protocol legs">
         <article>
-          <p className="dapp-section-label">Sample loan legs</p>
-          <h3>2 independent tranches</h3>
-          <p>$2,118.64 sample principal · one nearing recovery.</p>
+          <p className="dapp-section-label">Loan legs</p>
+          <h3>{unavailable}</h3>
+          <p>{unavailable}</p>
           <Link href="/app/loans">Review loan tranches →</Link>
         </article>
         <article>
-          <p className="dapp-section-label">Sample liquidity legs</p>
-          <h3>2 canonical LP NFTs</h3>
-          <p>One active and one eligible for next-block activation.</p>
+          <p className="dapp-section-label">Liquidity legs</p>
+          <h3>{unavailable}</h3>
+          <p>{unavailable}</p>
           <Link href="/app/liquidity">Review LP positions →</Link>
         </article>
       </section>
       <section className="position-close">
         <div>
-          <p className="dapp-section-label">Sample terminal action</p>
+          <p className="dapp-section-label">Terminal action</p>
           <h3>Close PositionNFT</h3>
-          <p>Remove all 3 active legs before closing.</p>
         </div>
         <button type="button" disabled>
           Close PositionNFT
@@ -589,129 +469,67 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
 }
 
 export function RewardsPreview() {
-  const [claimPosition, setClaimPosition] = useState("1042");
-  const [claimScope, setClaimScope] = useState<"selected" | "all">("selected");
-  const [claimAssets, setClaimAssets] = useState<readonly string[]>(["Dollar", "WETH"]);
-  const pendingAssets = [
-    ["Dollar", claimPosition === "1042" ? "128.42" : "24.18", "$128.42"],
-    [
-      "WETH",
-      claimPosition === "1042" ? "0.0241" : "0.0062",
-      claimPosition === "1042" ? "$92.59" : "$23.82",
-    ],
-    ["sRESERVE", claimPosition === "1042" ? "18.20" : "0", "$36.95"],
-    ["USDC", claimPosition === "1042" ? "42.80" : "4.20", "$42.80"],
-  ] as const;
-
-  const visibleClaimAssets =
-    claimScope === "all" ? pendingAssets.map(([symbol]) => symbol) : claimAssets;
-
-  const toggleClaimAsset = (symbol: string) => {
-    setClaimAssets((current) =>
-      current.includes(symbol) ? current.filter((asset) => asset !== symbol) : [...current, symbol]
-    );
-  };
-
   return (
     <>
-      <PreviewBanner surface="staking and rewards" />
+      <PreviewBanner surface="Rewards" />
       <div className="rewards-page">
         <section className="position-panel">
           <div className="position-section-heading">
             <div>
-              <p className="dapp-section-label">Sample atomic position creation</p>
+              <p className="dapp-section-label">Atomic position creation</p>
               <h2>Create and stake</h2>
-              <p>Select only the fee assets this PositionNFT should earn.</p>
             </div>
-            <span>Total staked: 1,284.52 WETH</span>
+            <span>Total staked: {unavailable}</span>
           </div>
           <label className="basket-field">
-            <span>WETH amount</span>
-            <input value="2.50" readOnly />
-            <small>Sample wallet balance: 8.425 WETH</small>
+            <span>Staking amount</span>
+            <input value="" placeholder={unavailable} readOnly />
+            <small>Wallet balance: {unavailable}</small>
           </label>
-          <fieldset className="reward-selector">
-            <legend>Initial reward selections · 3/64</legend>
-            {["Dollar", "WETH", "sRESERVE", "USDC"].map((symbol, index) => (
-              <label key={symbol}>
-                <input type="checkbox" checked={index < 3} readOnly />
+          <fieldset className="reward-selector" disabled>
+            <legend>Initial reward selections · {unavailable}</legend>
+            {["01", "02", "03", "04"].map((row) => (
+              <label key={row}>
+                <input type="checkbox" />
                 <span>
-                  <strong>{symbol}</strong>
-                  Sample discovered asset
+                  <strong>{unavailable}</strong>
+                  {unavailable}
                 </span>
               </label>
             ))}
           </fieldset>
-          <PreviewAction>Approve or create staking position · Preview</PreviewAction>
+          <PreviewAction>Approve or create staking position</PreviewAction>
         </section>
         <section className="position-panel">
           <div className="position-section-heading">
             <div>
-              <p className="dapp-section-label">Sample wallet-owned positions</p>
-              <h2>Claim multi-asset rewards</h2>
+              <p className="dapp-section-label">Wallet-owned positions</p>
+              <h2>Selected rewards</h2>
             </div>
-            <span>{visibleClaimAssets.length} assets in sample claim</span>
+            <span>Multi-asset claims</span>
           </div>
-          <div className="remaining-form-grid">
-            <label className="basket-field">
-              <span>PositionNFT</span>
-              <select
-                value={claimPosition}
-                onChange={(event) => setClaimPosition(event.target.value)}
-              >
-                {positions.slice(0, 2).map((position) => (
-                  <option value={position.id} key={position.id}>
-                    #{position.id} · {position.stake} staked
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="basket-field">
-              <span>Receiver</span>
-              <input value="0xA11c…1042" readOnly />
-              <small>Sample PositionNFT owner</small>
-            </label>
-          </div>
-          <div className="dollar-tabs" aria-label="Sample reward claim scope">
-            {(["selected", "all"] as const).map((scope) => (
-              <button
-                type="button"
-                key={scope}
-                className={claimScope === scope ? "active" : undefined}
-                onClick={() => setClaimScope(scope)}
-              >
-                {scope === "selected" ? "Selected assets" : "Claim all pending"}
-              </button>
+          <div className="reward-position-list">
+            {placeholderRouteIds.map((routeId) => (
+              <article key={routeId}>
+                <div>
+                  <h3>Position #{unavailable}</h3>
+                  <span>{unavailable} staked</span>
+                </div>
+                <ul>
+                  {["01", "02"].map((reward) => (
+                    <li key={reward}>
+                      <label>
+                        <input type="checkbox" disabled />
+                        <span>{unavailable}</span>
+                      </label>
+                      <strong>{unavailable} pending</strong>
+                    </li>
+                  ))}
+                </ul>
+                <PreviewAction>Claim selected rewards</PreviewAction>
+              </article>
             ))}
           </div>
-          <fieldset className="claim-selector">
-            <legend>Pending assets and minimum outputs</legend>
-            {pendingAssets.map(([symbol, amount, usd]) => {
-              const checked = visibleClaimAssets.includes(symbol);
-              return (
-                <label key={symbol}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={claimScope === "all"}
-                    onChange={() => toggleClaimAsset(symbol)}
-                  />
-                  <span>
-                    <strong>{symbol}</strong>
-                    {amount} pending · {usd} sample value
-                  </span>
-                  <small>
-                    Minimum: {amount} {symbol}
-                  </small>
-                </label>
-              );
-            })}
-          </fieldset>
-          <p className="dollar-warning">
-            Claims settle only the assets submitted for this PositionNFT. Opting out stops future
-            accrual but does not erase already earned balances.
-          </p>
-          <PreviewAction>Claim {visibleClaimAssets.length} assets · Preview only</PreviewAction>
         </section>
       </div>
     </>
@@ -719,32 +537,26 @@ export function RewardsPreview() {
 }
 
 export function ActivityPreview() {
-  const sampleActivity = [
-    ["Deposit ETH", "2.50 ETH", "Confirmed", "is-confirmed", "2 minutes ago"],
-    ["Stake WETH", "1.00 WETH", "Confirming", "is-submitted", "Just now"],
-    ["Select Dollar reward", "Dollar", "Rejected", "is-rejected", "Yesterday"],
-  ] as const;
   return (
     <>
-      <PreviewBanner surface="activity" />
-      <section className="activity-panel" aria-labelledby="preview-activity-title">
+      <PreviewBanner surface="Activity" />
+      <section className="activity-panel" aria-labelledby="activity-title">
         <div>
-          <p className="dapp-section-label">Sample wallet and network scoped</p>
-          <h2 id="preview-activity-title">Protocol activity</h2>
-          <p>Representative pending, confirmed, and failed states for visual review.</p>
+          <p className="dapp-section-label">Wallet and network scoped</p>
+          <h2 id="activity-title">Protocol activity</h2>
         </div>
         <ol>
-          {sampleActivity.map(([label, amount, status, statusClass, time]) => (
-            <li key={label}>
+          {["01", "02", "03"].map((row) => (
+            <li key={row}>
               <div>
-                <strong>{label}</strong>
-                <span>{amount}</span>
+                <strong>{unavailable}</strong>
+                <span>{unavailable}</span>
               </div>
               <div>
-                <strong className={`activity-status ${statusClass}`}>{status}</strong>
-                <time>{time}</time>
+                <strong className="activity-status">{unavailable}</strong>
+                <time>{unavailable}</time>
               </div>
-              <code>0xSample…transaction</code>
+              <code>{unavailable}</code>
             </li>
           ))}
         </ol>
@@ -756,49 +568,31 @@ export function ActivityPreview() {
 export function WalletSettingsPreview() {
   return (
     <>
-      <PreviewBanner surface="wallet settings" />
-      <section className="dapp-settings" aria-labelledby="preview-settings-title">
+      <PreviewBanner surface="Wallet" />
+      <section className="dapp-settings" aria-labelledby="wallet-settings-title">
         <div className="dapp-settings-heading">
-          <p className="dapp-section-label">Sample account</p>
-          <h2 id="preview-settings-title">Wallet settings</h2>
-          <p>Manage only this Statics sign-in. Logging out does not log you out of Eves Market.</p>
+          <p className="dapp-section-label">Account</p>
+          <h2 id="wallet-settings-title">Wallet settings</h2>
         </div>
         <dl className="dapp-wallet-details">
-          <div>
-            <dt>Status</dt>
-            <dd>Connected · Sample</dd>
-          </div>
-          <div>
-            <dt>Wallet type</dt>
-            <dd>Embedded</dd>
-          </div>
-          <div>
-            <dt>Address</dt>
-            <dd>0xA11cE000…00001042</dd>
-          </div>
-          <div>
-            <dt>Target network</dt>
-            <dd>Robinhood Chain Testnet</dd>
-          </div>
+          {["Status", "Wallet type", "Address", "Target network"].map((label) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{unavailable}</dd>
+            </div>
+          ))}
         </dl>
         <div className="dapp-settings-actions">
           <button type="button" disabled>
-            Copy sample address
+            Copy full address
           </button>
           <button type="button" disabled>
-            View sample explorer
+            View on explorer
           </button>
         </div>
-        <div className="dapp-export-warning">
-          <h3>Export embedded wallet</h3>
-          <p>
-            The production flow will open Privy’s secure export UI. No recovery material exists in
-            this design preview.
-          </p>
-          <button type="button" disabled>
-            Review secure export · Preview
-          </button>
-        </div>
+        <button className="dapp-logout" type="button" disabled>
+          Sign out of Statics
+        </button>
       </section>
     </>
   );

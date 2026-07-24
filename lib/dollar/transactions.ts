@@ -8,6 +8,8 @@ import {
 
 import { staticsAbi, staticsDollarErrorAbi } from "@statics-protocol/sdk";
 
+import { describeTransportFailure } from "@/lib/protocol/errors";
+
 export const DOLLAR_SLIPPAGE_BPS = 50n;
 const BPS = 10_000n;
 
@@ -80,6 +82,8 @@ export function describeDollarError(error: unknown): string {
   }
 
   const message = error instanceof Error ? error.message : "The wallet request failed.";
+  const transportFailure = describeTransportFailure(message);
+  if (transportFailure) return transportFailure;
   const known = Object.entries(errorMessages).find(([name]) => message.includes(name));
   if (known) return `${known[1]} (${known[0]})`;
   if (/rejected|denied/i.test(message)) return "The wallet request was rejected.";

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { readDappPreviewMode } from "@/lib/dapp-preview";
 
-describe("DApp sample preview mode", () => {
+describe("DApp unavailable-data preview mode", () => {
   it("defaults off in every environment", () => {
     expect(readDappPreviewMode({})).toBe(false);
     expect(readDappPreviewMode({ NEXT_PUBLIC_APP_ENV: "development" })).toBe(false);
@@ -19,7 +19,7 @@ describe("DApp sample preview mode", () => {
     ).toBe(true);
   });
 
-  it("rejects invalid values and sample mode outside development", () => {
+  it("rejects invalid values and preview mode outside development", () => {
     expect(() =>
       readDappPreviewMode({
         NEXT_PUBLIC_APP_ENV: "development",

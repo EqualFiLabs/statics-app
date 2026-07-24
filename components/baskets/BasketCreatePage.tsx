@@ -62,14 +62,7 @@ export function BasketCreatePage() {
   if (dappPreviewEnabled) {
     return <BasketCreatePreview />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to create a basket.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <BasketCreatePreview />;
   return <BasketCreateRuntime />;
 }
 
@@ -315,12 +308,7 @@ function BasketCreateRuntime() {
     }
   };
 
-  if (deploymentState.status === "unavailable")
-    return (
-      <section className="dollar-unavailable">
-        <h2>No verified deployment is configured.</h2>
-      </section>
-    );
+  if (deploymentState.status === "unavailable") return <BasketCreatePreview />;
 
   let actionLabel = "Create basket";
   let action: (() => void) | null = () => void submit();

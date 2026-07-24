@@ -5,23 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
-import { appNavigation, protocolStatus } from "@/lib/site-config";
+import { appNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function WalletHeaderControls({ previewMode }: { previewMode: boolean }) {
+function WalletHeaderControls() {
   const wallet = useWalletState();
 
-  if (previewMode || wallet.status === "unconfigured") {
+  if (wallet.status === "unconfigured") {
     return (
       <button className="dapp-wallet-button" type="button" disabled>
-        Wallet not configured
+        Wallet unavailable
       </button>
     );
   }
@@ -101,13 +100,7 @@ function walletStatusLabel(status: ReturnType<typeof useWalletState>["status"]):
   return "Connected";
 }
 
-export function AppShell({
-  children,
-  previewMode = dappPreviewEnabled,
-}: {
-  children: React.ReactNode;
-  previewMode?: boolean;
-}) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
@@ -116,7 +109,6 @@ export function AppShell({
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
-  const designPreview = previewMode;
   const routeCopy = getDappRoutePresentation(currentPath);
 
   const closeNavigation = (restoreFocus = true) => {
@@ -151,32 +143,23 @@ export function AppShell({
   const statusCards = [
     {
       label: "DApp",
-      value: designPreview ? "Sample interface" : routeCopy.status,
-      ready: !designPreview,
+      value: routeCopy.status,
+      ready: true,
     },
     {
       label: "Wallet",
-      value: designPreview ? "Not configured" : walletStatusLabel(wallet.status),
-      ready: !designPreview && wallet.status === "ready",
+      value: walletStatusLabel(wallet.status),
+      ready: wallet.status === "ready",
     },
     {
       label: "Network",
-      value:
-        wallet.status === "ready" && wallet.isTargetChain
-          ? wallet.networkName
-          : designPreview
-            ? "Not connected"
-            : "Target configured",
+      value: wallet.status === "ready" && wallet.isTargetChain ? wallet.networkName : "--",
       ready: wallet.status === "ready" && wallet.isTargetChain,
     },
     {
       label: "Deployment",
-      value: designPreview
-        ? "Sample data only"
-        : dollarDeployment.status === "configured"
-          ? "Local verified"
-          : protocolStatus.deployment,
-      ready: !designPreview && dollarDeployment.status === "configured",
+      value: dollarDeployment.status === "configured" ? "Local Anvil" : "--",
+      ready: dollarDeployment.status === "configured",
     },
   ] as const;
 
@@ -198,13 +181,13 @@ export function AppShell({
         </Link>
         <div className="dapp-phase">
           <span className="dapp-pulse" aria-hidden="true" />
-          {designPreview ? "Design preview" : "Protocol DApp"}
+          Protocol DApp
         </div>
         <div className="dapp-header-actions">
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
           </Link>
-          <WalletHeaderControls previewMode={designPreview} />
+          <WalletHeaderControls />
         </div>
       </header>
 
@@ -267,11 +250,6 @@ export function AppShell({
                 );
               })}
             </nav>
-            <div className="dapp-sidebar-note">
-              <span aria-hidden="true">{"///"}</span>
-              Statics and Eves use separate sign-ins. Using the same Privy account preserves the
-              same embedded wallet address.
-            </div>
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
               Return to site <span aria-hidden="true">↗</span>
             </Link>
@@ -282,11 +260,7 @@ export function AppShell({
           <section className="dapp-intro">
             <p className="dapp-eyebrow">{"// Statics application"}</p>
             <h1>{routeCopy.title}</h1>
-            <p>
-              {designPreview
-                ? "Review the intended information hierarchy with deterministic local sample data. Wallet and transaction controls remain disabled."
-                : routeCopy.description}
-            </p>
+            <p>{routeCopy.description}</p>
           </section>
 
           {wallet.error && (

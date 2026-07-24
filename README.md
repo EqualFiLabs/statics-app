@@ -21,9 +21,10 @@ npm run dev
 ```
 
 Copy `.env.example` to `.env.local` only when environment overrides are needed. Do not commit
-environment files or credentials. Normal development keeps sample data off and shows the honest
-runtime or setup state. Use `npm run dev:preview` only to inspect the approved sample-filled visual
-design.
+environment files or credentials. Normal development uses the configured runtime, including local
+Anvil when selected. Every DApp route keeps its complete layout visible when wallet, deployment, or
+RPC data is unavailable; affected values render as `--` and dependent actions remain disabled.
+Use `npm run dev:preview` to force that unavailable-data presentation for visual regression work.
 
 To reuse the same Privy app and embedded-wallet identity as the sibling Eves Market checkout,
 import its browser-safe identifiers:
@@ -66,8 +67,8 @@ PositionNFT and LP NFT to have been created, opted in, staked, and activated thr
 Recovery seeding advances an existing loan beyond its grace period but leaves the permissionless
 recovery action for the browser rehearsal.
 
-With `dev:connected` still running, verify every route is using the real runtime rather than sample
-fallbacks:
+With `dev:connected` still running, verify every route is using authoritative local runtime data
+rather than unavailable-value fallbacks:
 
 ```bash
 npm run verify:connected:local

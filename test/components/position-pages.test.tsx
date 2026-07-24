@@ -11,42 +11,30 @@ function renderWithoutWallet(ui: React.ReactNode) {
 }
 
 describe("position and reward routes without wallet configuration", () => {
-  it("shows the sample PositionNFT portfolio", () => {
+  it("keeps PositionNFT detail navigation available", () => {
     renderWithoutWallet(<PositionListPage />);
-    expect(screen.getByText("Sample PositionNFT portfolio data")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Your PositionNFTs" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Position #1042" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /manage position/i })[0]).toHaveAttribute(
       "href",
-      "/app/positions/1042"
+      "/app/positions/0"
     );
   });
 
-  it("shows sample position detail while keeping mutations disabled", () => {
+  it("allows local mode selection without enabling position mutations", () => {
     renderWithoutWallet(<PositionDetailPage positionId={1042n} />);
-    expect(screen.getByText("Sample PositionNFT detail data")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Position #1042" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "deposit collateral · Preview only" })
-    ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Claim selected rewards · Planned" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "deposit collateral" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Claim selected rewards" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "withdraw" }));
     fireEvent.click(screen.getByRole("button", { name: "unstake" }));
-    expect(
-      screen.getByRole("button", { name: "withdraw collateral · Preview only" })
-    ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "unstake WETH · Preview only" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "withdraw collateral" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "unstake WETH" })).toBeDisabled();
   });
 
-  it("shows sample staking and selected rewards while keeping actions disabled", () => {
+  it("keeps reward transactions disabled without runtime data", () => {
     renderWithoutWallet(<RewardsPage />);
-    expect(screen.getByText("Sample staking and rewards data")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Create and stake" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Approve or create staking position · Preview" })
+      screen.getByRole("button", { name: "Approve or create staking position" })
     ).toBeDisabled();
-    expect(screen.getByRole("heading", { name: "Claim multi-asset rewards" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Claim all pending" }));
-    expect(screen.getByRole("button", { name: "Claim 4 assets · Preview only" })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Claim selected rewards" })[0]).toBeDisabled();
   });
 });

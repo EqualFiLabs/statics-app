@@ -95,14 +95,7 @@ export function LoansPage() {
   if (dappPreviewEnabled) {
     return <LoansPreview />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect PositionNFT loans.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <LoansPreview />;
   return <LoansRuntime />;
 }
 
@@ -650,13 +643,14 @@ function LoansRuntime() {
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Loans unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-      </section>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    !wallet ||
+    !walletState.isTargetChain ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <LoansPreview />;
   }
 
   let primaryLabel = verificationBlocked ? "Refresh protocol state" : action.label;
@@ -716,9 +710,9 @@ function LoansRuntime() {
           {warning}
         </p>
       ))}
-      {catalog.isError && (
-        <p className="dapp-inline-error" role="alert">
-          {describeLoanError(catalog.error)}
+      {catalog.isError && catalog.data && (
+        <p className="dollar-warning" role="status">
+          Loan data is temporarily unavailable. Showing the last received state.
         </p>
       )}
       {actionError && (

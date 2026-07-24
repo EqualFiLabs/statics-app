@@ -10,7 +10,7 @@ function formatAddress(address: string): string {
 
 export function WalletSettings({ previewMode = dappPreviewEnabled }: { previewMode?: boolean }) {
   const wallet = useWalletState();
-  if (previewMode) {
+  if (previewMode || wallet.status === "unconfigured") {
     return <WalletSettingsPreview />;
   }
 
@@ -19,7 +19,6 @@ export function WalletSettings({ previewMode = dappPreviewEnabled }: { previewMo
       <div className="dapp-settings-heading">
         <p className="dapp-section-label">Account</p>
         <h2 id="wallet-settings-title">Wallet settings</h2>
-        <p>Manage only this Statics sign-in. Logging out does not log you out of Eves Market.</p>
       </div>
 
       <dl className="dapp-wallet-details">
@@ -29,11 +28,11 @@ export function WalletSettings({ previewMode = dappPreviewEnabled }: { previewMo
         </div>
         <div>
           <dt>Wallet type</dt>
-          <dd>{wallet.walletKind ?? "Unavailable"}</dd>
+          <dd>{wallet.walletKind ?? "--"}</dd>
         </div>
         <div>
           <dt>Address</dt>
-          <dd>{wallet.address ? formatAddress(wallet.address) : "Unavailable"}</dd>
+          <dd>{wallet.address ? formatAddress(wallet.address) : "--"}</dd>
         </div>
         <div>
           <dt>Target network</dt>

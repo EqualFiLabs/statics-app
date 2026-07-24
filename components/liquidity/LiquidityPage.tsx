@@ -89,7 +89,9 @@ function amount(value: bigint, decimals: number): string {
 }
 
 export function LiquidityPage() {
+  const wallet = useWalletState();
   if (dappPreviewEnabled) return <LiquidityPreview />;
+  if (wallet.status === "unconfigured") return <LiquidityPreview />;
   return <LiquidityRuntime />;
 }
 
@@ -1033,13 +1035,13 @@ function LiquidityRuntime() {
   if (
     walletState.status === "unconfigured" ||
     deploymentState.status === "unavailable" ||
-    !deploymentState.deployment.liquidity
+    !deploymentState.deployment.liquidity ||
+    !wallet ||
+    !walletState.isTargetChain ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
   )
-    return (
-      <section className="dollar-unavailable">
-        <h2>No verified canonical-v4 deployment is configured.</h2>
-      </section>
-    );
+    return <LiquidityPreview />;
 
   let actionLabel = `${mode} reviewed liquidity action`;
   let action: (() => void) | null = () => void run();
@@ -1301,9 +1303,9 @@ function LiquidityRuntime() {
               {error}
             </p>
           )}
-          {catalog.error && (
-            <p className="dapp-inline-error" role="alert">
-              {describePositionError(catalog.error)}
+          {catalog.error && catalog.data && (
+            <p className="dollar-warning" role="status">
+              Liquidity data is temporarily unavailable. Showing the last received state.
             </p>
           )}
           <button

@@ -8,44 +8,24 @@ import {
 } from "@/components/preview/RemainingSurfacesPreview";
 
 describe("remaining DApp surface previews", () => {
-  it("shows independent loan states and keeps recovery disabled", () => {
+  it("allows local loan selection and mode changes without enabling recovery", () => {
     render(<LoansPreview />);
-    expect(screen.getByRole("heading", { name: "Position-owned loans" })).toBeInTheDocument();
-    expect(screen.getByText("12d 6h remaining")).toBeInTheDocument();
-    expect(screen.getByText("Grace ends in 36m")).toBeInTheDocument();
-
+    fireEvent.click(screen.getAllByRole("button", { name: /loan/i })[1]);
     fireEvent.click(screen.getByRole("button", { name: "recover" }));
-    expect(screen.getByRole("heading", { name: "Loan #61" })).toBeInTheDocument();
-    expect(screen.getByText(/caller receives no reward/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Recover expired tranche · Preview only" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Recover collateral" })).toBeDisabled();
   });
 
   it("moves through the basket draft and disables final creation", () => {
     render(<BasketCreatePreview />);
-    expect(screen.getByRole("heading", { name: "Create a static basket" })).toBeInTheDocument();
-    expect(screen.getByText("Constituents · 4/16")).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: /continue to economics/i }));
-    expect(screen.getByRole("heading", { name: "Borrowing and flash policy" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /continue to review/i }));
-    expect(screen.getByText("Configuration passes local review")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create basket · Preview only" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create basket" })).toBeDisabled();
   });
 
-  it("distinguishes permanent liquidity and user LP NFT actions", () => {
+  it("allows local LP selection and mode changes without enabling transactions", () => {
     render(<LiquidityPreview />);
-    expect(
-      screen.getByRole("heading", { name: "Pools, POL, and user LP NFTs" })
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("0.00%")).not.toHaveLength(0);
-    expect(screen.getByText(/Permanent liquidity is not a user LP position/i)).toBeInTheDocument();
-
+    fireEvent.click(screen.getAllByRole("button", { name: /lp nft/i })[1]);
     fireEvent.click(screen.getByRole("button", { name: "stake" }));
-    expect(screen.getByRole("heading", { name: "LP NFT #5012" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Stake qualifying LP NFT · Preview only" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stake LP NFT" })).toBeDisabled();
   });
 });

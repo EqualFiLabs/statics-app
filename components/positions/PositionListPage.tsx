@@ -29,14 +29,7 @@ export function PositionListPage() {
   if (dappPreviewEnabled) {
     return <PositionListPreview />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect local PositionNFTs.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <PositionListPreview />;
   return <PositionListRuntime />;
 }
 
@@ -116,13 +109,13 @@ function PositionListRuntime() {
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Positions unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-      </section>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    (!wallet && !catalog.data) ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <PositionListPreview />;
   }
 
   let primaryLabel = "Create PositionNFT";
@@ -168,13 +161,12 @@ function PositionListRuntime() {
         </p>
       )}
 
-      {catalog.isPending && wallet ? (
-        <p className="dollar-loading">Reconciling PositionNFT ownership…</p>
-      ) : catalog.isError ? (
-        <p className="dapp-inline-error" role="alert">
-          {describePositionError(catalog.error)}
+      {catalog.isError && (
+        <p className="dollar-warning" role="status">
+          Position data is temporarily unavailable. Showing the last received state.
         </p>
-      ) : !catalog.data || catalog.data.positions.length === 0 ? (
+      )}
+      {!catalog.data || catalog.data.positions.length === 0 ? (
         <div className="position-empty">
           <h3>No PositionNFT is owned by this wallet.</h3>
           <p>Create an empty position, or create one atomically from collateral or staking.</p>

@@ -52,14 +52,7 @@ export function RewardsPage() {
   if (dappPreviewEnabled) {
     return <RewardsPreview />;
   }
-  if (wallet.status === "unconfigured") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Wallet runtime unavailable</p>
-        <h2>Configure Privy to inspect local staking and rewards.</h2>
-      </section>
-    );
-  }
+  if (wallet.status === "unconfigured") return <RewardsPreview />;
   return <RewardsRuntime />;
 }
 
@@ -309,13 +302,14 @@ function RewardsRuntime() {
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Rewards unavailable</p>
-        <h2>No verified local protocol deployment is configured.</h2>
-      </section>
-    );
+  if (
+    deploymentState.status === "unavailable" ||
+    !wallet ||
+    !walletState.isTargetChain ||
+    (catalog.isPending && !catalog.data) ||
+    (catalog.isError && !catalog.data)
+  ) {
+    return <RewardsPreview />;
   }
 
   let primaryLabel = "Approve or create staking position";
@@ -434,13 +428,12 @@ function RewardsRuntime() {
           </div>
           <span>Multi-asset claims</span>
         </div>
-        {catalog.isPending && wallet ? (
-          <p className="dollar-loading">Loading selected reward state…</p>
-        ) : catalog.isError ? (
-          <p className="dapp-inline-error" role="alert">
-            {describePositionError(catalog.error)}
+        {catalog.isError && catalog.data && (
+          <p className="dollar-warning" role="status">
+            Reward data is temporarily unavailable. Showing the last received state.
           </p>
-        ) : catalog.data?.positions.length ? (
+        )}
+        {catalog.data?.positions.length ? (
           <div className="reward-position-list">
             {catalog.data.positions.map((position) => {
               const key = position.positionId.toString();

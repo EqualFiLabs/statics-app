@@ -15,7 +15,7 @@ export function readDappPreviewMode(
     throw new Error("NEXT_PUBLIC_DAPP_PREVIEW must be true or false.");
   }
   if (configured === "true" && appEnvironment !== "development") {
-    throw new Error("DApp sample-data preview is available only in development.");
+    throw new Error("DApp unavailable-data preview is available only in development.");
   }
   return configured === "true";
 }

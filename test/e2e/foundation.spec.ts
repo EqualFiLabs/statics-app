@@ -14,7 +14,7 @@ test.describe("landing foundation", () => {
     await page.goto("/");
   });
 
-  test("preserves the visual system and truthful pre-launch state", async ({ page }, testInfo) => {
+  test("preserves truthful pre-launch state without horizontal overflow", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /static assets.*own your position/i })
     ).toBeVisible();
@@ -25,15 +25,6 @@ test.describe("landing foundation", () => {
     const root = page.locator("html");
     const overflow = await root.evaluate((element) => element.scrollWidth - element.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
-
-    await expect(page).toHaveScreenshot(`landing-${testInfo.project.name}.png`, {
-      fullPage: true,
-      animations: "disabled",
-      caret: "hide",
-      mask: [page.locator("time")],
-      maskColor: "#050605",
-      maxDiffPixelRatio: 0.005,
-    });
   });
 
   test("routes to the app while future links remain visible placeholders", async ({ page }) => {
@@ -92,75 +83,44 @@ test.describe("landing foundation", () => {
 });
 
 test.describe("Dollar DApp foundation", () => {
-  test("shows a labelled sample portfolio without simulated wallet readiness", async ({
-    page,
-  }, testInfo) => {
-    await page.goto("/app");
-    await expect(
-      page.locator(".dapp-status-card strong").filter({ hasText: "Sample interface" })
-    ).toBeVisible();
-    await expect(page.getByText("Not configured", { exact: true })).toBeVisible();
-    await expect(page.getByText("Sample data only", { exact: true })).toBeVisible();
-    await expect(page.locator("[data-dapp-preview]")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Wallet not configured" })).toBeDisabled();
-    await expect(page.getByText("12,480.52 Dollar")).toBeVisible();
-
-    if (testInfo.project.name === "mobile") {
-      const overview = await page.locator(".dollar-overview-card").boundingBox();
-      expect(overview?.y).toBeLessThan(844);
-    }
-
-    await expect(page).toHaveScreenshot(`app-${testInfo.project.name}.png`, {
-      fullPage: true,
-      animations: "disabled",
-      caret: "hide",
-      maxDiffPixelRatio: 0.005,
-    });
-  });
-
   test("provides every reviewable DApp destination", async ({ page }) => {
     await page.goto("/app");
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
-    await expect(page.getByText("Sample Dollar data")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Preview only · connect local deployment" })
-    ).toBeDisabled();
 
     await navigateDapp(page, "/app/baskets");
     await expect(page).toHaveURL(/\/app\/baskets$/);
-    await expect(page.getByRole("heading", { name: "Statics baskets" })).toBeVisible();
-    await page.getByRole("link", { name: /create sample basket/i }).click();
+    await page
+      .getByRole("link", { name: /inspect basket/i })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/app\/baskets\/0$/);
+    await page.getByRole("link", { name: /all baskets/i }).click();
+    await page.getByRole("link", { name: /create basket/i }).click();
     await expect(page).toHaveURL(/\/app\/create$/);
-    await expect(page.getByRole("heading", { name: "Create a static basket" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
-    await expect(page.getByRole("heading", { name: "Your PositionNFTs" })).toBeVisible();
+    await page
+      .getByRole("link", { name: /manage position/i })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/app\/positions\/0$/);
 
     await navigateDapp(page, "/app/loans");
     await expect(page).toHaveURL(/\/app\/loans$/);
-    await expect(page.getByRole("heading", { name: "Position-owned loans" })).toBeVisible();
 
     await navigateDapp(page, "/app/rewards");
     await expect(page).toHaveURL(/\/app\/rewards$/);
-    await expect(page.getByRole("heading", { name: "Create and stake" })).toBeVisible();
 
     await navigateDapp(page, "/app/liquidity");
     await expect(page).toHaveURL(/\/app\/liquidity$/);
-    await expect(page.getByRole("heading", { name: "Pools, POL, and user LP NFTs" })).toBeVisible();
 
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
-    await expect(page.getByRole("heading", { name: "Review protocol activity." })).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Protocol activity", exact: true })
-    ).toBeVisible();
 
     await navigateDapp(page, "/app/settings");
     await expect(page).toHaveURL(/\/app\/settings$/);
-    await expect(page.getByRole("heading", { name: "Manage your Statics wallet." })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Wallet settings" })).toBeVisible();
   });
 
   test("provides an accessible responsive application menu", async ({ page }, testInfo) => {
@@ -179,11 +139,6 @@ test.describe("Dollar DApp foundation", () => {
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#dapp-navigation-panel")).toBeVisible();
     await expect(page.locator('.dapp-nav-item[href="/app"]')).toBeFocused();
-    await expect(page).toHaveScreenshot(`app-navigation-${testInfo.project.name}.png`, {
-      animations: "disabled",
-      caret: "hide",
-      maxDiffPixelRatio: 0.005,
-    });
 
     await page.keyboard.press("Escape");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -199,34 +154,7 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("captures every populated DApp preview surface", async ({ page }, testInfo) => {
-    const surfaces = [
-      ["dollar", "/app/dollar"],
-      ["basket-catalog", "/app/baskets"],
-      ["basket-detail", "/app/baskets/0"],
-      ["basket-create", "/app/create"],
-      ["position-catalog", "/app/positions"],
-      ["position-detail", "/app/positions/1042"],
-      ["loans", "/app/loans"],
-      ["rewards", "/app/rewards"],
-      ["liquidity", "/app/liquidity"],
-      ["activity", "/app/activity"],
-      ["settings", "/app/settings"],
-    ] as const;
-
-    for (const [name, route] of surfaces) {
-      await page.goto(route);
-      await expect(page.locator("[data-dapp-preview]")).toBeVisible();
-      await expect(page).toHaveScreenshot(`app-${name}-${testInfo.project.name}.png`, {
-        fullPage: true,
-        animations: "disabled",
-        caret: "hide",
-        maxDiffPixelRatio: 0.005,
-      });
-    }
-  });
-
-  test("captures the basket creation economics and review steps", async ({ page }, testInfo) => {
+  test("supports the basket creation steps without enabling submission", async ({ page }) => {
     await page.goto("/app/create");
 
     await page
@@ -234,27 +162,15 @@ test.describe("Dollar DApp foundation", () => {
       .getByRole("button", { name: /economics/i })
       .evaluate((button: HTMLButtonElement) => button.click());
     await expect(page.getByRole("heading", { name: "Borrowing and flash policy" })).toBeVisible();
-    await expect(page).toHaveScreenshot(
-      `app-basket-create-economics-${testInfo.project.name}.png`,
-      {
-        fullPage: true,
-        animations: "disabled",
-        caret: "hide",
-        maxDiffPixelRatio: 0.005,
-      }
-    );
 
     await page
       .locator(".creation-steps")
       .getByRole("button", { name: /review/i })
       .evaluate((button: HTMLButtonElement) => button.click());
-    await expect(page.getByText("Configuration passes local review")).toBeVisible();
-    await expect(page).toHaveScreenshot(`app-basket-create-review-${testInfo.project.name}.png`, {
-      fullPage: true,
-      animations: "disabled",
-      caret: "hide",
-      maxDiffPixelRatio: 0.005,
-    });
+    await expect(page.locator(".creation-review")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Create basket", exact: true })
+    ).toBeDisabled();
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {

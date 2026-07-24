@@ -44,12 +44,7 @@ export function ActivityPage() {
     return <ActivityPreview />;
   }
   if (wallet.status !== "ready" || !wallet.address || !wallet.chainId) {
-    return (
-      <section className="dollar-unavailable">
-        <p className="dapp-section-label">Activity</p>
-        <h2>Connect your wallet to see local Statics activity.</h2>
-      </section>
-    );
+    return <ActivityPreview />;
   }
 
   return (
