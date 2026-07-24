@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalFullRange, lpStakeEligibility } from "@/components/liquidity/LiquidityPage";
 import {
+  basketLiquiditySnapshot,
   canonicalStatusLabel,
   v4PoolId,
   type CanonicalPoolRecord,
   type LpPositionRecord,
 } from "@/lib/liquidity/liquidity";
+import type { BasketRecord } from "@/lib/baskets/baskets";
 
 describe("canonical liquidity identifiers", () => {
   it("derives a stable pool ID from the complete canonical key", () => {
@@ -50,5 +52,40 @@ describe("canonical liquidity identifiers", () => {
       /full-range/
     );
     expect(lpStakeEligibility(position, { ...pool, decommissioned: true })).toMatch(/available/);
+  });
+
+  it("builds the borrow quote snapshot from chain-reconciled basket data", () => {
+    const basket = {
+      basketId: 7n,
+      status: 1,
+      totalSupply: 1_000n,
+      token: { address: "0x0000000000000000000000000000000000000001" },
+      mintFeeTiers: [],
+      redemptionFeeTiers: [],
+      originationFeeBps: 100,
+      extensionFeeBps: 25,
+      ltvBps: 7_500,
+      constituents: [
+        {
+          token: { address: "0x0000000000000000000000000000000000000002" },
+          bundleAmount: 5n,
+          vaultBalance: 9n,
+        },
+      ],
+    } as unknown as BasketRecord;
+    expect(basketLiquiditySnapshot(basket)).toMatchObject({
+      basketId: 7n,
+      totalSupply: 1_000n,
+      originationFeeBps: 100n,
+      extensionFeeBps: 25n,
+      ltvBps: 7_500n,
+      constituents: [
+        {
+          asset: "0x0000000000000000000000000000000000000002",
+          bundleAmount: 5n,
+          vaultBalance: 9n,
+        },
+      ],
+    });
   });
 });

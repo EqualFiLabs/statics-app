@@ -11,6 +11,7 @@ import {
 } from "viem";
 
 import {
+  BasketStatus,
   CanonicalPoolStatus,
   decodePositionInfo,
   staticsAbi,
@@ -19,6 +20,7 @@ import {
   v4PositionManagerReadAbi,
   v4StateViewReadAbi,
   type PoolFeeConfiguration,
+  type BasketSnapshot,
   type V4PoolKey,
 } from "@statics-protocol/sdk";
 
@@ -96,6 +98,25 @@ export function v4PoolId(key: V4PoolKey): Hex {
       [key]
     )
   );
+}
+
+export function basketLiquiditySnapshot(basket: BasketRecord): BasketSnapshot {
+  return {
+    basketId: basket.basketId,
+    basketToken: basket.token.address,
+    status: basket.status as BasketStatus,
+    totalSupply: basket.totalSupply,
+    mintFeeTiers: basket.mintFeeTiers,
+    redemptionFeeTiers: basket.redemptionFeeTiers,
+    originationFeeBps: BigInt(basket.originationFeeBps),
+    extensionFeeBps: BigInt(basket.extensionFeeBps),
+    ltvBps: BigInt(basket.ltvBps),
+    constituents: basket.constituents.map((item) => ({
+      asset: item.token.address,
+      bundleAmount: item.bundleAmount,
+      vaultBalance: item.vaultBalance,
+    })),
+  };
 }
 
 async function loadPool(
