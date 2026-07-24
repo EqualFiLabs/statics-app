@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  readDollarDeployment,
-  verifyLiquidityDeployment,
-} from "@/lib/dollar/deployment";
+import { readDollarDeployment, verifyLiquidityDeployment } from "@/lib/dollar/deployment";
 
 const address = "0x0000000000000000000000000000000000000001";
 const hash = `0x${"11".repeat(32)}`;
