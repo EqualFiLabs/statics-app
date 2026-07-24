@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
 import { useWalletState } from "@/providers/wallet-context";
 
 export type PortalMode = "swap" | "bridge" | "dollar";
@@ -34,21 +35,7 @@ export function PortalWorkspace({
         ))}
       </div>
 
-      {mode === "swap" && (
-        <div className="portal-panel" role="tabpanel">
-          <NetworkField />
-          <AssetAmountField label="You pay" value={amount} onChange={setAmount} />
-          <AssetAmountField label="You receive" value="" readOnly />
-          <dl className="portal-quote-grid">
-            <QuoteDatum label="Rate" />
-            <QuoteDatum label="Minimum received" />
-            <QuoteDatum label="Network cost" />
-          </dl>
-          <button className="portal-primary-action" type="button" disabled>
-            Review swap
-          </button>
-        </div>
-      )}
+      {mode === "swap" && <EvmSwapPanel />}
 
       {mode === "bridge" && (
         <div className="portal-panel" role="tabpanel">
