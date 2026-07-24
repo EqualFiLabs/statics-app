@@ -38,6 +38,28 @@ prints secrets, delegated signer settings, policies, or authorization material. 
 `EVES_MARKET_ENV_PATH` to an alternate file path when the sibling checkout is elsewhere. Statics
 and Eves still have separate login sessions.
 
+For a persistent connected DApp with a fresh verified protocol deployment, use:
+
+```bash
+npm run dev:connected
+```
+
+This starts loopback-only Anvil and Next.js processes, deploys the current sibling Statics
+checkout, seeds two discoverable baskets, and keeps the randomly generated local operator key only
+in the supervisor process. The public deployment addresses, protocol commit, and runtime code
+hashes are written to ignored `.env.local`; the local control socket is mode `0600`.
+
+In another terminal, inspect or prepare the exact browser wallet:
+
+```bash
+npm run local:status
+npm run local:fund-wallet -- 0xYourWallet --eth 5 --weth 25
+npm run local:advance -- 3600
+```
+
+These controls accept only chain `31337`, bounded typed inputs, and exact wallet addresses. They
+cannot submit arbitrary targets or calldata.
+
 To deploy a fresh local Dollar stack, start Anvil and supply a funded development key without
 placing it in a file:
 

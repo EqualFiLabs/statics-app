@@ -44,7 +44,11 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     {
       cwd: protocolRoot,
       encoding: "utf8",
-      env: { ...process.env, PRIVATE_KEY: privateKey },
+      env: {
+        ...process.env,
+        FOUNDRY_ETH_RPC_TIMEOUT: process.env.FOUNDRY_ETH_RPC_TIMEOUT || "300",
+        PRIVATE_KEY: privateKey,
+      },
       maxBuffer: 20 * 1024 * 1024,
     }
   );
@@ -93,7 +97,7 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
   };
 }
 
-export async function seedLocalBasket({ deployment, rpcUrl, privateKey }) {
+export async function seedLocalBasket({ deployment, rpcUrl, privateKey, basket = {} }) {
   if (!privateKey) {
     throw new Error("PRIVATE_KEY is required for local fixture setup and is never persisted.");
   }
@@ -107,10 +111,10 @@ export async function seedLocalBasket({ deployment, rpcUrl, privateKey }) {
   });
   const transaction = buildCreateBasketTransaction(
     {
-      name: "Local Dollar Reserve",
-      symbol: "lsUSD",
-      assets: [deployment.contracts.dollar],
-      bundleAmounts: [parseEther("1")],
+      name: basket.name ?? "Local Dollar Reserve",
+      symbol: basket.symbol ?? "lsUSD",
+      assets: basket.assets ?? [deployment.contracts.dollar],
+      bundleAmounts: basket.bundleAmounts ?? [parseEther("1")],
       mintFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
       redemptionFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
       flashFeeBps: 5,
@@ -155,6 +159,7 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
 
   const values = {
     NEXT_PUBLIC_APP_ENV: "development",
+    NEXT_PUBLIC_DAPP_PREVIEW: "false",
     NEXT_PUBLIC_APP_NETWORK: "anvil",
     NEXT_PUBLIC_ANVIL_RPC_URL: rpcUrl,
     NEXT_PUBLIC_STATICS_CHAIN_ID: String(deployment.chainId),

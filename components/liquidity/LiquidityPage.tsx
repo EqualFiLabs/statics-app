@@ -89,7 +89,6 @@ function amount(value: bigint, decimals: number): string {
 }
 
 export function LiquidityPage() {
-  const wallet = useWalletState();
   if (dappPreviewEnabled) return <LiquidityPreview />;
   return <LiquidityRuntime />;
 }
