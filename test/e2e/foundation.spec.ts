@@ -85,6 +85,13 @@ test.describe("landing foundation", () => {
 test.describe("Dollar DApp foundation", () => {
   test("provides every reviewable DApp destination", async ({ page }) => {
     await page.goto("/app");
+    await navigateDapp(page, "/app/wallet");
+    await expect(page).toHaveURL(/\/app\/wallet$/);
+    await page.getByRole("button", { name: /portal/i }).click();
+    await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Funding Portal" })).toHaveCount(0);
+
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
 
@@ -168,9 +175,7 @@ test.describe("Dollar DApp foundation", () => {
       .getByRole("button", { name: /review/i })
       .evaluate((button: HTMLButtonElement) => button.click());
     await expect(page.locator(".creation-review")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Create basket", exact: true })
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Create basket", exact: true })).toBeDisabled();
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {

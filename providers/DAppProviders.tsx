@@ -231,6 +231,26 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
   );
 }
 
+function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
+  const [fundingChainId, setFundingChainId] = useState(8_453);
+  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
+  const value = useMemo<WalletState>(
+    () => ({
+      ...defaultWalletState,
+      fundingChainId,
+      fundingNetworkName: fundingNetwork.label,
+      fundingNetworks: fundingNetworkSummaries,
+      selectFundingNetwork: async (nextChainId) => {
+        const nextNetwork = getFundingNetwork(nextChainId);
+        if (!nextNetwork) return;
+        setFundingChainId(nextChainId);
+      },
+    }),
+    [fundingChainId, fundingNetwork.label]
+  );
+  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+}
+
 export function DAppProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
@@ -239,7 +259,7 @@ export function DAppProviders({ children }: { children: React.ReactNode }) {
       {walletEnvironment.configured ? (
         <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
       ) : (
-        <WalletContext.Provider value={defaultWalletState}>{children}</WalletContext.Provider>
+        <UnconfiguredWalletBridge>{children}</UnconfiguredWalletBridge>
       )}
     </QueryClientProvider>
   );

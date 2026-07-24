@@ -20,6 +20,20 @@ const routePresentations = {
     description:
       "Deposit ETH or WETH into the active profile, or recombine Dollar and Risk shares using fresh protocol quotes before signing.",
   },
+  wallet: {
+    label: "Wallet",
+    status: "Funding wallet",
+    title: "Fund and manage your wallet.",
+    description:
+      "Review balances, move assets, swap, bridge into Robinhood, and enter or exit Statics Dollar.",
+  },
+  portal: {
+    label: "Portal",
+    status: "Funding portal",
+    title: "Move assets into Statics.",
+    description:
+      "Swap on the active funding network, bridge into Robinhood, or convert between USDG and Statics Dollar.",
+  },
   baskets: {
     label: "Baskets",
     status: "Basket flows",
@@ -79,6 +93,8 @@ const routePresentations = {
 } as const satisfies Record<string, DappRoutePresentation>;
 
 export function getDappRoutePresentation(pathname: string): DappRoutePresentation {
+  if (pathname.startsWith("/app/wallet")) return routePresentations.wallet;
+  if (pathname.startsWith("/app/portal")) return routePresentations.portal;
   if (pathname.startsWith("/app/dollar")) return routePresentations.dollar;
   if (pathname.startsWith("/app/baskets")) return routePresentations.baskets;
   if (pathname.startsWith("/app/create")) return routePresentations.create;

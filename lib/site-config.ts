@@ -69,6 +69,7 @@ export const protocolStatus = {
 
 export const appNavigation = [
   { label: "Overview", enabled: true, href: "/app" },
+  { label: "Wallet", enabled: true, href: "/app/wallet" },
   { label: "Dollar", enabled: true, href: "/app/dollar" },
   { label: "Baskets", enabled: true, href: "/app/baskets" },
   { label: "Positions", enabled: true, href: "/app/positions" },

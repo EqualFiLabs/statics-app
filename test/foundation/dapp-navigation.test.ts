@@ -5,6 +5,8 @@ import { getDappRoutePresentation } from "@/lib/dapp-navigation";
 describe("DApp route presentation", () => {
   it.each([
     ["/app", "Overview", "Track your Statics portfolio."],
+    ["/app/wallet", "Wallet", "Fund and manage your wallet."],
+    ["/app/portal", "Portal", "Move assets into Statics."],
     ["/app/dollar", "Dollar", "Issue and redeem Statics Dollar."],
     ["/app/baskets", "Baskets", "Inspect, mint, and redeem static baskets."],
     ["/app/create", "Create basket", "Configure a new static basket."],
