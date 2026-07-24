@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   decodeFunctionResult,
   encodeFunctionData,
@@ -50,7 +50,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
-type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake" | "borrow";
+export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake" | "borrow";
 
 export function canonicalFullRange(spacing: number): readonly [number, number] {
   return [Math.ceil(-887_272 / spacing) * spacing, Math.floor(887_272 / spacing) * spacing];
@@ -69,6 +69,17 @@ export function lpStakeEligibility(
     return "Only full-range LP NFTs can be staked.";
   if (position.liquidity === 0n) return "The LP NFT has no liquidity.";
   return null;
+}
+
+export function resolveLiquidityPool(
+  mode: Mode,
+  pools: readonly CanonicalPoolRecord[] | undefined,
+  selectedPoolId: string,
+  position: LpPositionRecord | undefined
+): CanonicalPoolRecord | undefined {
+  const selected = pools?.find((item) => item.poolId === selectedPoolId) ?? pools?.[0];
+  if (mode === "create" || mode === "borrow" || !position) return selected;
+  return pools?.find((item) => item.poolId === position.poolId) ?? selected;
 }
 
 function amount(value: bigint, decimals: number): string {
@@ -122,34 +133,13 @@ function LiquidityRuntime() {
       return loadLiquidityCatalog(publicClient, deploymentState.deployment, wallet);
     },
   });
-  const pool = catalog.data?.pools.find((item) => item.poolId === poolId) ?? catalog.data?.pools[0];
   const position =
     catalog.data?.positions.find((item) => item.tokenId.toString() === tokenId) ??
     catalog.data?.positions[0];
+  const pool = resolveLiquidityPool(mode, catalog.data?.pools, poolId, position);
   const positionNft =
     catalog.data?.positionNftIds.find((item) => item.toString() === positionId) ??
     catalog.data?.positionNftIds[0];
-  useEffect(() => {
-    if (pool && !poolId) setPoolId(pool.poolId);
-    if (position && !tokenId) setTokenId(position.tokenId.toString());
-    if (positionNft !== undefined && !positionId) setPositionId(positionNft.toString());
-    const firstBasket = catalog.data?.baskets[0];
-    if (firstBasket && !borrowBasketId) setBorrowBasketId(firstBasket.basketId.toString());
-  }, [
-    borrowBasketId,
-    catalog.data?.baskets,
-    pool,
-    poolId,
-    position,
-    positionId,
-    positionNft,
-    tokenId,
-  ]);
-  useEffect(() => {
-    if (mode !== "create" && position && position.poolId !== poolId) {
-      setPoolId(position.poolId);
-    }
-  }, [mode, poolId, position]);
   const tokens = useMemo(() => {
     if (!pool) return null;
     return [
@@ -157,9 +147,11 @@ function LiquidityRuntime() {
       pool.key.currency1 === pool.basketToken.address ? pool.basketToken : pool.asset,
     ] as const;
   }, [pool]);
-  const borrowBasket = catalog.data?.baskets.find(
-    (item) => item.basketId.toString() === borrowBasketId
-  );
+  const borrowBasket =
+    catalog.data?.baskets.find((item) => item.basketId.toString() === borrowBasketId) ??
+    catalog.data?.baskets[0];
+  const selectedPositionId = positionNft?.toString() ?? "";
+  const selectedBorrowBasketId = borrowBasket?.basketId.toString() ?? "";
   const borrowPools =
     borrowBasket?.constituents
       .map((constituent) =>
@@ -411,9 +403,11 @@ function LiquidityRuntime() {
     const refreshed = await catalog.refetch();
     const fresh = refreshed.data;
     if (!fresh) throw new Error("Fresh liquidity state is unavailable.");
-    const basket = fresh.baskets.find((item) => item.basketId.toString() === borrowBasketId);
+    const basket = fresh.baskets.find(
+      (item) => item.basketId.toString() === selectedBorrowBasketId
+    );
     const selectedPosition = fresh.positionRecords.find(
-      (item) => item.positionId.toString() === positionId
+      (item) => item.positionId.toString() === selectedPositionId
     );
     if (!basket || !selectedPosition) throw new Error("Select a basket and PositionNFT.");
     if (basket.status !== BasketStatus.Active)

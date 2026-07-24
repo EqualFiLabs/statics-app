@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalFullRange, lpStakeEligibility } from "@/components/liquidity/LiquidityPage";
+import {
+  canonicalFullRange,
+  lpStakeEligibility,
+  resolveLiquidityPool,
+} from "@/components/liquidity/LiquidityPage";
 import {
   basketLiquiditySnapshot,
   canonicalStatusLabel,
@@ -52,6 +56,23 @@ describe("canonical liquidity identifiers", () => {
       /full-range/
     );
     expect(lpStakeEligibility(position, { ...pool, decommissioned: true })).toMatch(/available/);
+  });
+
+  it("derives defaults and keeps management on the selected NFT's pool", () => {
+    const firstPool = {
+      poolId: `0x${"11".repeat(32)}`,
+    } as CanonicalPoolRecord;
+    const positionPool = {
+      poolId: `0x${"22".repeat(32)}`,
+    } as CanonicalPoolRecord;
+    const position = {
+      poolId: positionPool.poolId,
+    } as LpPositionRecord;
+
+    expect(resolveLiquidityPool("create", [firstPool, positionPool], "", position)).toBe(firstPool);
+    expect(resolveLiquidityPool("stake", [firstPool, positionPool], "", position)).toBe(
+      positionPool
+    );
   });
 
   it("builds the borrow quote snapshot from chain-reconciled basket data", () => {
