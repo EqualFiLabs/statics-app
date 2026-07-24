@@ -40,7 +40,7 @@ function metadataClient(
 }
 
 describe("position action guards", () => {
-  it("defaults claims to every nonzero reward and honors a selected subset", () => {
+  it("builds the exact all-pending claim set and leaves an empty claim disabled", () => {
     const second = "0x0000000000000000000000000000000000000022" as Address;
     const rewards = [
       {
@@ -79,6 +79,9 @@ describe("position action guards", () => {
       second,
     ]);
     expect(claimablePositionRewards(rewards, [second])).toEqual([rewards[1]]);
+    expect(
+      claimablePositionRewards(rewards.map((reward) => ({ ...reward, pending: 0n })))
+    ).toEqual([]);
   });
 
   it("computes unlocked collateral and blocks close while any leg is active", () => {
