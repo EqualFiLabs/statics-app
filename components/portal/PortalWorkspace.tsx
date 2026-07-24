@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
+import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
 import { useWalletState } from "@/providers/wallet-context";
 
 export type PortalMode = "swap" | "bridge" | "dollar";
@@ -18,6 +19,7 @@ export function PortalWorkspace({
   const [mode, setMode] = useState<PortalMode>(initialMode);
   const [amount, setAmount] = useState("");
   const [dollarDirection, setDollarDirection] = useState<"mint" | "redeem">("mint");
+  const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">("evm");
 
   return (
     <section className={`portal-workspace${compact ? " is-compact" : ""}`}>
@@ -35,7 +37,27 @@ export function PortalWorkspace({
         ))}
       </div>
 
-      {mode === "swap" && <EvmSwapPanel />}
+      {mode === "swap" && (
+        <>
+          <div className="portal-chain-tabs" aria-label="Swap chain type">
+            <button
+              type="button"
+              aria-pressed={swapRuntime === "evm"}
+              onClick={() => setSwapRuntime("evm")}
+            >
+              EVM
+            </button>
+            <button
+              type="button"
+              aria-pressed={swapRuntime === "solana"}
+              onClick={() => setSwapRuntime("solana")}
+            >
+              Solana
+            </button>
+          </div>
+          {swapRuntime === "evm" ? <EvmSwapPanel /> : <SolanaSwapPanel />}
+        </>
+      )}
 
       {mode === "bridge" && (
         <div className="portal-panel" role="tabpanel">

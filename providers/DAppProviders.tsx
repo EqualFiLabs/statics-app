@@ -11,6 +11,13 @@ import {
   type ConnectedWallet,
   type User,
 } from "@privy-io/react-auth";
+import {
+  defaultSolanaRpcsPlugin,
+  toSolanaWalletConnectors,
+  useCreateWallet as useCreateSolanaWallet,
+  useSignTransaction as useSignSolanaTransaction,
+  useWallets as useSolanaWallets,
+} from "@privy-io/react-auth/solana";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +30,11 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
+import {
+  defaultSolanaWalletState,
+  SolanaWalletContext,
+  type SolanaWalletState,
+} from "./solana-context";
 
 const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
@@ -69,6 +81,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
   const wagmiAccount = useAccount();
+  const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
+  const { signTransaction: signSolanaTransaction } = useSignSolanaTransaction();
+  const { wallets: solanaWallets, ready: solanaWalletsReady } = useSolanaWallets();
   const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
@@ -200,7 +215,22 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     ]
   );
 
-  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+  const solanaValue = useMemo<SolanaWalletState>(
+    () => ({
+      configured: true,
+      ready: solanaWalletsReady,
+      wallets: solanaWallets,
+      createWallet: createSolanaWallet,
+      signTransaction: signSolanaTransaction,
+    }),
+    [createSolanaWallet, signSolanaTransaction, solanaWallets, solanaWalletsReady]
+  );
+
+  return (
+    <WalletContext.Provider value={value}>
+      <SolanaWalletContext.Provider value={solanaValue}>{children}</SolanaWalletContext.Provider>
+    </WalletContext.Provider>
+  );
 }
 
 function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) {
@@ -214,14 +244,19 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
         defaultChain: walletEnvironment.defaultChain,
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
+          solana: { createOnLogin: "off" },
           showWalletUIs: true,
+        },
+        externalWallets: {
+          solana: { connectors: toSolanaWalletConnectors() },
         },
         appearance: {
           theme: "dark",
           accentColor: "#75f12d",
           logo: "/assets/statics-icon.png",
-          walletChainType: "ethereum-only",
+          walletChainType: "ethereum-and-solana",
         },
+        plugins: [defaultSolanaRpcsPlugin()],
       }}
     >
       <WagmiProvider config={wagmiConfig} setActiveWalletForWagmi={selectWallet}>
@@ -248,7 +283,13 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
     }),
     [fundingChainId, fundingNetwork.label]
   );
-  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+  return (
+    <WalletContext.Provider value={value}>
+      <SolanaWalletContext.Provider value={defaultSolanaWalletState}>
+        {children}
+      </SolanaWalletContext.Provider>
+    </WalletContext.Provider>
+  );
 }
 
 export function DAppProviders({ children }: { children: React.ReactNode }) {

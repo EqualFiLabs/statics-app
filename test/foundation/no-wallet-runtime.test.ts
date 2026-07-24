@@ -38,6 +38,8 @@ describe("wallet runtime boundary", () => {
     expect(privyProvider).toBeGreaterThan(-1);
     expect(wagmiProvider).toBeGreaterThan(privyProvider);
     expect(bridge).toBeGreaterThan(wagmiProvider);
-    expect(source).toContain('walletChainType: "ethereum-only"');
+    expect(source).toContain('walletChainType: "ethereum-and-solana"');
+    expect(source).toContain("defaultSolanaRpcsPlugin()");
+    expect(source).not.toMatch(/addSigners|delegateWallet|policyIds/);
   });
 });

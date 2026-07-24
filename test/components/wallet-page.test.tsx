@@ -29,6 +29,8 @@ describe("wallet interactions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /portal/i }));
     expect(screen.getByRole("dialog", { name: "Funding Portal" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Solana" }));
+    expect(screen.getByRole("button", { name: "Create Solana wallet" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /bridge/i }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

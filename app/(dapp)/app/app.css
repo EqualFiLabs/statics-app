@@ -518,6 +518,7 @@
 .portal-field button,
 .portal-mode-tabs button,
 .portal-direction-tabs button,
+.portal-chain-tabs button,
 .portal-primary-action,
 .wallet-quick-actions button {
   min-height: 44px;
@@ -538,6 +539,7 @@
 .portal-field button,
 .portal-mode-tabs button,
 .portal-direction-tabs button,
+.portal-chain-tabs button,
 .portal-primary-action,
 .wallet-quick-actions button {
   padding: 0.75rem 1rem;
@@ -597,7 +599,8 @@
 
 .wallet-quick-actions button:hover,
 .portal-mode-tabs button:hover,
-.portal-direction-tabs button:hover {
+.portal-direction-tabs button:hover,
+.portal-chain-tabs button:hover {
   color: var(--green);
 }
 
@@ -683,7 +686,8 @@
 }
 
 .portal-mode-tabs,
-.portal-direction-tabs {
+.portal-direction-tabs,
+.portal-chain-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   padding: 0.6rem;
@@ -696,15 +700,23 @@
   border: 0;
 }
 
+.portal-chain-tabs {
+  grid-template-columns: repeat(2, 1fr);
+  padding: 0.6rem 2rem 0;
+  border-bottom: 0;
+}
+
 .portal-mode-tabs button,
-.portal-direction-tabs button {
+.portal-direction-tabs button,
+.portal-chain-tabs button {
   border-color: transparent;
   background: transparent;
   color: var(--muted);
 }
 
 .portal-mode-tabs button[aria-selected="true"],
-.portal-direction-tabs button[aria-pressed="true"] {
+.portal-direction-tabs button[aria-pressed="true"],
+.portal-chain-tabs button[aria-pressed="true"] {
   border-color: var(--green-soft);
   background: rgba(117, 241, 45, 0.07);
   color: var(--green);
