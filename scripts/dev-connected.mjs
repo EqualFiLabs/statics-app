@@ -7,7 +7,17 @@ import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { staticsAbi, wethAbi } from "@statics-protocol/sdk";
+import {
+  LOAN_RECOVERY_GRACE_PERIOD,
+  basketTokenAbi,
+  buildDepositETHTransaction,
+  buildMintCall,
+  staticsAbi,
+  staticsDollarCoreAbi,
+  staticsDollarTokenAbi,
+  v4PositionManagerReadAbi,
+  wethAbi,
+} from "@statics-protocol/sdk";
 import {
   createPublicClient,
   createWalletClient,
@@ -32,6 +42,10 @@ const siteRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const localDirectory = resolve(siteRoot, ".local");
 const socketPath = resolve(localDirectory, "connected.sock");
 const sessionPath = resolve(localDirectory, "connected-session.json");
+const nextDirectory = resolve(localDirectory, "next-connected");
+const connectedTypeScriptPath = resolve(localDirectory, "tsconfig.connected.json");
+const nextEnvironmentDeclarationPath = resolve(siteRoot, "next-env.d.ts");
+const nextEnvironmentDeclaration = readFileSync(nextEnvironmentDeclarationPath, "utf8");
 const environmentPath = resolve(siteRoot, ".env.local");
 const rpcPort = 8_545;
 const rpcUrl = `http://127.0.0.1:${rpcPort}`;
@@ -58,6 +72,9 @@ const account = mnemonicToAccount(mnemonic);
 const derivedPrivateKey = account.getHdKey().privateKey;
 if (!derivedPrivateKey) throw new Error("Could not derive the ephemeral local operator.");
 const privateKey = toHex(derivedPrivateKey);
+const BPS = 10_000n;
+const minimum = (amount) => (amount * 9_950n) / BPS;
+const maximum = (amount) => (amount * 10_050n + BPS - 1n) / BPS;
 
 function wait(milliseconds) {
   return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
@@ -249,6 +266,362 @@ async function advanceTime(command, publicClient) {
   };
 }
 
+async function ensureWeth(context, required) {
+  const { publicClient, deployment, account, walletClient } = context;
+  const balance = await publicClient.readContract({
+    address: deployment.contracts.weth,
+    abi: wethAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (balance >= required) return;
+  await confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    deployment.contracts.weth,
+    encodeFunctionData({ abi: wethAbi, functionName: "deposit" }),
+    required - balance
+  );
+}
+
+async function ensureDollar(context, required) {
+  const { publicClient, deployment, account, walletClient } = context;
+  let balance = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (balance >= required) return;
+
+  const collateralAmount = parseEther("0.1");
+  const preview = await publicClient.readContract({
+    address: deployment.contracts.core,
+    abi: staticsDollarCoreAbi,
+    functionName: "previewDeposit",
+    args: [1n, collateralAmount],
+  });
+  const transaction = buildDepositETHTransaction(
+    collateralAmount,
+    account.address,
+    account.address,
+    minimum(preview.staticsDollarMinted),
+    minimum(preview.sharesMinted)
+  );
+  await confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    deployment.contracts.gateway,
+    transaction.data,
+    transaction.value
+  );
+  balance = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (balance < required) {
+    throw new Error("The local operator could not mint enough Dollar for this bounded fixture.");
+  }
+}
+
+async function mintBasket(context, basketId, shares) {
+  const { publicClient, deployment, account, walletClient } = context;
+  const basket = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basket",
+    args: [basketId],
+  });
+  if (basket.assets.length !== 1) {
+    throw new Error("This local generator supports the seeded single-asset baskets only.");
+  }
+  const quote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteMint",
+    args: [basketId, shares],
+  });
+  const required = maximum(quote[0]);
+  const asset = basket.assets[0];
+  if (asset.toLowerCase() === deployment.contracts.dollar.toLowerCase()) {
+    await ensureDollar(context, required);
+  } else if (asset.toLowerCase() === deployment.contracts.weth.toLowerCase()) {
+    await ensureWeth(context, required);
+  } else {
+    throw new Error("The seeded basket asset is not fundable by the local operator.");
+  }
+  await confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    asset,
+    encodeFunctionData({
+      abi: basketTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, required],
+    })
+  );
+  return confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    deployment.contracts.diamond,
+    buildMintCall(basketId, shares, account.address, [required])
+  );
+}
+
+async function generateRewards(command, context) {
+  const { publicClient, deployment } = context;
+  const positionId = BigInt(command.positionId);
+  const owner = await publicClient
+    .readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "ownerOf",
+      args: [positionId],
+    })
+    .catch(() => null);
+  if (!owner) {
+    throw new Error(
+      `PositionNFT #${command.positionId} does not exist on the connected local deployment.`
+    );
+  }
+  const selected = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "positionRewardAssets",
+    args: [positionId],
+  });
+  const supported = selected.filter(
+    (asset) =>
+      asset.toLowerCase() === deployment.contracts.dollar.toLowerCase() ||
+      asset.toLowerCase() === deployment.contracts.weth.toLowerCase()
+  );
+  if (!supported.length) {
+    throw new Error("Select Dollar or WETH rewards on the PositionNFT before generating fees.");
+  }
+  const before = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingRewards",
+    args: [positionId, supported],
+  });
+  const shares = parseEther(command.shares);
+  const hashes = [];
+  if (
+    supported.some((asset) => asset.toLowerCase() === deployment.contracts.dollar.toLowerCase())
+  ) {
+    hashes.push(await mintBasket(context, BigInt(context.fixtureIds[0]), shares));
+  }
+  if (supported.some((asset) => asset.toLowerCase() === deployment.contracts.weth.toLowerCase())) {
+    hashes.push(await mintBasket(context, BigInt(context.fixtureIds[1]), shares));
+  }
+  const after = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingRewards",
+    args: [positionId, supported],
+  });
+  if (after.some((amount, index) => amount <= (before[index] ?? 0n))) {
+    throw new Error("Fee-bearing mints did not increase every requested PositionNFT reward.");
+  }
+  return {
+    ok: true,
+    action: command.action,
+    positionId: command.positionId,
+    assets: supported,
+    generated: after.map((amount, index) => (amount - (before[index] ?? 0n)).toString()),
+    hashes,
+  };
+}
+
+async function ensureSwapToken(context, token, amount) {
+  const { publicClient, deployment, account } = context;
+  let balance = await publicClient.readContract({
+    address: token,
+    abi: basketTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (balance >= amount) return;
+  if (token.toLowerCase() === deployment.contracts.dollar.toLowerCase()) {
+    await ensureDollar(context, amount);
+  } else if (token.toLowerCase() === deployment.contracts.weth.toLowerCase()) {
+    await ensureWeth(context, amount);
+  } else {
+    const basketCount = await publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "basketCount",
+    });
+    let basketId = null;
+    for (let candidate = 0n; candidate < basketCount; candidate += 1n) {
+      const basket = await publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "basket",
+        args: [candidate],
+      });
+      if (basket.token.toLowerCase() === token.toLowerCase()) {
+        basketId = candidate;
+        break;
+      }
+    }
+    if (basketId === null) throw new Error("The selected pool input token is not a known basket.");
+    await mintBasket(context, basketId, amount * 2n);
+  }
+  balance = await publicClient.readContract({
+    address: token,
+    abi: basketTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (balance < amount) throw new Error("The local operator could not fund the canonical swap.");
+}
+
+async function generateLpFees(command, context) {
+  const { publicClient, walletClient, deployment, account, protocolRoot } = context;
+  const positionId = BigInt(command.positionId);
+  const tokenId = BigInt(command.tokenId);
+  const staked = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "stakedLiquidityPosition",
+    args: [tokenId],
+  });
+  if (!staked.staked || staked.positionId !== positionId) {
+    throw new Error("The LP NFT is not staked under the requested PositionNFT.");
+  }
+  await publicClient.request({ method: "evm_mine", params: [] });
+  const [poolKey] = await publicClient.readContract({
+    address: deployment.liquidity.contracts.positionManager,
+    abi: v4PositionManagerReadAbi,
+    functionName: "getPoolAndPositionInfo",
+    args: [tokenId],
+  });
+  const before = await publicClient.readContract({
+    account: account.address,
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingLiquidityRewards",
+    args: [positionId, tokenId],
+  });
+  const swapAmount = parseEther(command.amount);
+  await ensureSwapToken(context, poolKey.currency0, swapAmount);
+
+  const artifact = JSON.parse(
+    readFileSync(resolve(protocolRoot, "out/PoolSwapTest.sol/PoolSwapTest.json"), "utf8")
+  );
+  const deployHash = await walletClient.deployContract({
+    abi: artifact.abi,
+    bytecode: artifact.bytecode.object,
+    args: [deployment.liquidity.contracts.poolManager],
+  });
+  const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployHash });
+  if (deployReceipt.status !== "success" || !deployReceipt.contractAddress) {
+    throw new Error("The local canonical swap router did not deploy.");
+  }
+  await confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    poolKey.currency0,
+    encodeFunctionData({
+      abi: basketTokenAbi,
+      functionName: "approve",
+      args: [deployReceipt.contractAddress, swapAmount],
+    })
+  );
+  const swapHash = await confirmedSend(
+    publicClient,
+    walletClient,
+    account,
+    deployReceipt.contractAddress,
+    encodeFunctionData({
+      abi: artifact.abi,
+      functionName: "swap",
+      args: [
+        poolKey,
+        {
+          zeroForOne: true,
+          amountSpecified: -swapAmount,
+          sqrtPriceLimitX96: 4_295_128_740n,
+        },
+        { takeClaims: false, settleUsingBurn: false },
+        "0x",
+      ],
+    })
+  );
+  const after = await publicClient.readContract({
+    account: account.address,
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingLiquidityRewards",
+    args: [positionId, tokenId],
+  });
+  if (after[1] <= before[1] && after[3] <= before[3]) {
+    throw new Error("The canonical swap did not increase LP NFT hook rewards.");
+  }
+  return {
+    ok: true,
+    action: command.action,
+    positionId: command.positionId,
+    tokenId: command.tokenId,
+    swapHash,
+    pending0: after[1].toString(),
+    pending1: after[3].toString(),
+  };
+}
+
+async function seedRecovery(command, context) {
+  const { publicClient, deployment } = context;
+  const loanId = BigInt(command.loanId);
+  const loan = await publicClient
+    .readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "loan",
+      args: [loanId],
+    })
+    .catch(() => null);
+  if (!loan) {
+    throw new Error(`Loan #${command.loanId} does not exist on the connected local deployment.`);
+  }
+  const recoveryTimestamp = BigInt(loan.maturity) + LOAN_RECOVERY_GRACE_PERIOD + 1n;
+  const current = await publicClient.getBlock();
+  if (current.timestamp < recoveryTimestamp) {
+    await publicClient.request({
+      method: "evm_setNextBlockTimestamp",
+      params: [Number(recoveryTimestamp)],
+    });
+    await publicClient.request({ method: "evm_mine", params: [] });
+  }
+  const confirmed = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "loan",
+    args: [loanId],
+  });
+  const block = await publicClient.getBlock();
+  if (confirmed.positionId !== loan.positionId || block.timestamp < recoveryTimestamp) {
+    throw new Error("The loan did not enter the recoverable fixture state.");
+  }
+  return {
+    ok: true,
+    action: command.action,
+    loanId: command.loanId,
+    positionId: loan.positionId.toString(),
+    basketId: loan.basketId.toString(),
+    maturity: BigInt(loan.maturity).toString(),
+    recoveryTimestamp: recoveryTimestamp.toString(),
+    currentTimestamp: block.timestamp.toString(),
+  };
+}
+
 function createControlServer(context) {
   let commandQueue = Promise.resolve();
   return createHttpServer((request, response) => {
@@ -276,6 +649,9 @@ function createControlServer(context) {
           }
           if (command.action === "fund-wallet") return fundWallet(command, context);
           if (command.action === "advance") return advanceTime(command, context.publicClient);
+          if (command.action === "generate-rewards") return generateRewards(command, context);
+          if (command.action === "generate-lp-fees") return generateLpFees(command, context);
+          if (command.action === "seed-recovery") return seedRecovery(command, context);
           throw new Error("The connected fixture accepts typed local actions only.");
         })
         .then(
@@ -304,6 +680,21 @@ appUrl = `http://127.0.0.1:${appPort}`;
 mkdirSync(localDirectory, { recursive: true, mode: 0o700 });
 rmSync(socketPath, { force: true });
 rmSync(sessionPath, { force: true });
+rmSync(nextDirectory, { recursive: true, force: true });
+writeFileSync(
+  connectedTypeScriptPath,
+  `${JSON.stringify(
+    {
+      extends: "../tsconfig.json",
+      compilerOptions: { incremental: false },
+      include: ["../next-env.d.ts", "../**/*.ts", "../**/*.tsx"],
+      exclude: ["../node_modules"],
+    },
+    null,
+    2
+  )}\n`,
+  { mode: 0o600 }
+);
 
 importPublicPrivyConfig({ sourcePath, targetPath: environmentPath });
 const importedEnvironment = readFileSync(environmentPath, "utf8");
@@ -333,12 +724,31 @@ const anvil = spawn(
 let next = null;
 let controlServer = null;
 
-const cleanup = () => {
-  controlServer?.close();
-  next?.kill("SIGTERM");
-  anvil.kill("SIGTERM");
-  rmSync(socketPath, { force: true });
-  rmSync(sessionPath, { force: true });
+async function stopChild(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise((resolveExit) => child.once("exit", resolveExit));
+  child.kill("SIGTERM");
+  await Promise.race([exited, wait(5_000)]);
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill("SIGKILL");
+    await exited;
+  }
+}
+
+const cleanup = async () => {
+  if (controlServer?.listening) {
+    await new Promise((resolveClose) => controlServer.close(resolveClose));
+  }
+  await stopChild(next);
+  await stopChild(anvil);
+  try {
+    rmSync(socketPath, { force: true });
+    rmSync(sessionPath, { force: true });
+    rmSync(nextDirectory, { recursive: true, force: true });
+    rmSync(connectedTypeScriptPath, { force: true });
+  } finally {
+    writeFileSync(nextEnvironmentDeclarationPath, nextEnvironmentDeclaration);
+  }
 };
 
 try {
@@ -351,6 +761,7 @@ try {
   });
   if (deployment.chainId !== 31_337) throw new Error("Refusing a non-Anvil local deployment.");
 
+  const protocolRoot = defaultProtocolRoot(siteRoot);
   const dollarFixture = await seedLocalBasket({ deployment, rpcUrl, privateKey });
   const wethFixture = await seedLocalBasket({
     deployment,
@@ -374,6 +785,7 @@ try {
     fixtureIds,
     publicClient,
     walletClient,
+    protocolRoot,
   });
   await new Promise((resolveListen, reject) => {
     controlServer.once("error", reject);
@@ -397,10 +809,28 @@ try {
     { mode: 0o600 }
   );
 
-  next = spawn("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(appPort)], {
-    cwd: siteRoot,
-    stdio: "inherit",
-  });
+  next = spawn(
+    process.execPath,
+    [
+      resolve(siteRoot, "node_modules/next/dist/bin/next"),
+      "dev",
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      String(appPort),
+    ],
+    {
+      cwd: siteRoot,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_APP_ENV: "development",
+        NEXT_PUBLIC_DAPP_PREVIEW: "false",
+        STATICS_NEXT_DIST_DIR: ".local/next-connected",
+        STATICS_NEXT_TSCONFIG: ".local/tsconfig.connected.json",
+      },
+    },
+  );
   await waitForApp(next);
   const status = await verifiedStatus(publicClient, deployment, fixtureIds, account.address);
   process.stdout.write(
@@ -421,5 +851,5 @@ try {
     });
   });
 } finally {
-  cleanup();
+  await cleanup();
 }

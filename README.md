@@ -55,10 +55,27 @@ In another terminal, inspect or prepare the exact browser wallet:
 npm run local:status
 npm run local:fund-wallet -- 0xYourWallet --eth 5 --weth 25
 npm run local:advance -- 3600
+npm run local:generate-rewards -- 1 --shares 0.1
+npm run local:generate-lp-fees -- 1 1001 --amount 0.000001
+npm run local:seed-recovery -- 1
 ```
 
 These controls accept only chain `31337`, bounded typed inputs, and exact wallet addresses. They
-cannot submit arbitrary targets or calldata.
+cannot submit arbitrary targets or calldata. Reward and LP-fee generation require the referenced
+PositionNFT and LP NFT to have been created, opted in, staked, and activated through the DApp.
+Recovery seeding advances an existing loan beyond its grace period but leaves the permissionless
+recovery action for the browser rehearsal.
+
+With `dev:connected` still running, verify every route is using the real runtime rather than sample
+fallbacks:
+
+```bash
+npm run verify:connected:local
+```
+
+This writes ignored local evidence for the route/runtime gate. It explicitly records Privy identity
+and external-wallet lifecycle proof as not executed; complete those interactive checks with
+`WALLET-DOLLAR-REHEARSAL.md`.
 
 To deploy a fresh local Dollar stack, start Anvil and supply a funded development key without
 placing it in a file:

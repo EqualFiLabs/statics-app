@@ -175,6 +175,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
           theme: "dark",
           accentColor: "#75f12d",
           logo: "/assets/statics-icon.png",
+          walletChainType: "ethereum-only",
         },
       }}
     >

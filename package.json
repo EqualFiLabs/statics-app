@@ -17,6 +17,9 @@
     "local:status": "node scripts/local-control.mjs status",
     "local:fund-wallet": "node scripts/local-control.mjs fund-wallet",
     "local:advance": "node scripts/local-control.mjs advance",
+    "local:generate-rewards": "node scripts/local-control.mjs generate-rewards",
+    "local:generate-lp-fees": "node scripts/local-control.mjs generate-lp-fees",
+    "local:seed-recovery": "node scripts/local-control.mjs seed-recovery",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -27,6 +30,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build:preview && playwright test",
+    "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },

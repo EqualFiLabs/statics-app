@@ -25,6 +25,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  distDir: process.env.STATICS_NEXT_DIST_DIR || ".next",
+  typescript: {
+    tsconfigPath: process.env.STATICS_NEXT_TSCONFIG || "tsconfig.json",
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

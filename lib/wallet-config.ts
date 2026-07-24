@@ -112,7 +112,9 @@ export function readWalletEnvironment(
     defaultChain: network === "anvil" ? anvil : robinhoodTestnet,
     supportedChains:
       appEnvironment === "development"
-        ? ([robinhoodTestnet, anvil] as const)
+        ? network === "anvil"
+          ? ([anvil, robinhoodTestnet] as const)
+          : ([robinhoodTestnet, anvil] as const)
         : ([robinhoodTestnet] as const),
     configured: Boolean(appId),
   };

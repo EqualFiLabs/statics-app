@@ -45,4 +45,27 @@ describe("connected local fixture commands", () => {
     expect(() => parseLocalControlCommand("status", ["extra"])).toThrow("does not accept");
     expect(() => parseLocalControlCommand("send-calldata", ["0x"])).toThrow("Unknown");
   });
+
+  it("parses bounded protocol fixture generation", () => {
+    expect(parseLocalControlCommand("generate-rewards", ["12"])).toEqual({
+      action: "generate-rewards",
+      positionId: "12",
+      shares: "0.1",
+    });
+    expect(parseLocalControlCommand("generate-lp-fees", ["12", "44", "--amount", "0.001"])).toEqual(
+      {
+        action: "generate-lp-fees",
+        positionId: "12",
+        tokenId: "44",
+        amount: "0.001",
+      }
+    );
+    expect(parseLocalControlCommand("seed-recovery", ["7"])).toEqual({
+      action: "seed-recovery",
+      loanId: "7",
+    });
+    expect(() => parseLocalControlCommand("generate-lp-fees", ["1", "2", "--amount", "1"])).toThrow(
+      "up to 0.01"
+    );
+  });
 });

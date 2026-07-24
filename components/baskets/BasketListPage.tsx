@@ -86,9 +86,7 @@ function BasketListRuntime() {
         </div>
         <div className="basket-section-actions">
           <span>{catalog.data.baskets.length} discovered</span>
-          <button type="button" disabled>
-            Basket creation · Planned
-          </button>
+          <Link href="/app/create">Create basket →</Link>
         </div>
       </div>
       {catalog.data.warning && (

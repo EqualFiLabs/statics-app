@@ -19,9 +19,9 @@ describe("wallet environment", () => {
   });
 
   it("accepts Anvil only for local development", () => {
-    expect(readWalletEnvironment({ NEXT_PUBLIC_APP_NETWORK: "anvil" }).defaultChain.id).toBe(
-      31_337
-    );
+    const environment = readWalletEnvironment({ NEXT_PUBLIC_APP_NETWORK: "anvil" });
+    expect(environment.defaultChain.id).toBe(31_337);
+    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([31_337, 46_630]);
     expect(() =>
       readWalletEnvironment({
         NEXT_PUBLIC_APP_ENV: "staging",
