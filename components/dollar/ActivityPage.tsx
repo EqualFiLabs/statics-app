@@ -40,7 +40,7 @@ export function ActivityPage() {
     () => emptyActivity
   );
 
-  if (dappPreviewEnabled && wallet.status === "unconfigured") {
+  if (dappPreviewEnabled) {
     return <ActivityPreview />;
   }
   if (wallet.status !== "ready" || !wallet.address || !wallet.chainId) {

@@ -20,7 +20,23 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env.local` only when environment overrides are needed. Do not commit environment files or credentials.
+Copy `.env.example` to `.env.local` only when environment overrides are needed. Do not commit
+environment files or credentials. Normal development keeps sample data off and shows the honest
+runtime or setup state. Use `npm run dev:preview` only to inspect the approved sample-filled visual
+design.
+
+To reuse the same Privy app and embedded-wallet identity as the sibling Eves Market checkout,
+import its browser-safe identifiers:
+
+```bash
+npm run config:privy:local
+```
+
+The importer reads `../market-ui/eves-market-ui/.env.local`, copies only
+`NEXT_PUBLIC_PRIVY_APP_ID` and the optional `NEXT_PUBLIC_PRIVY_CLIENT_ID`, and never copies or
+prints secrets, delegated signer settings, policies, or authorization material. Set
+`EVES_MARKET_ENV_PATH` to an alternate file path when the sibling checkout is elsewhere. Statics
+and Eves still have separate login sessions.
 
 To deploy a fresh local Dollar stack, start Anvil and supply a funded development key without
 placing it in a file:

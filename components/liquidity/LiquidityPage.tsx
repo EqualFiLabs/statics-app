@@ -90,13 +90,7 @@ function amount(value: bigint, decimals: number): string {
 
 export function LiquidityPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" ||
-      !deploymentState.deployment.liquidity ||
-      wallet.status === "unconfigured")
-  )
-    return <LiquidityPreview />;
+  if (dappPreviewEnabled) return <LiquidityPreview />;
   return <LiquidityRuntime />;
 }
 

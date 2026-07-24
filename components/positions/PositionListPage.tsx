@@ -26,10 +26,7 @@ function displayAmount(value: bigint, decimals = 18): string {
 
 export function PositionListPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <PositionListPreview />;
   }
   if (wallet.status === "unconfigured") {

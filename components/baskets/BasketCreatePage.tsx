@@ -59,10 +59,7 @@ export function parseBasketCreationTiers(tiers: readonly TierDraft[]): readonly 
 
 export function BasketCreatePage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <BasketCreatePreview />;
   }
   if (wallet.status === "unconfigured") {

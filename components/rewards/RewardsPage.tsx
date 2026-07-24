@@ -49,10 +49,7 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function RewardsPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <RewardsPreview />;
   }
   if (wallet.status === "unconfigured") {

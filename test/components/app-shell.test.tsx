@@ -67,7 +67,7 @@ describe("DApp wallet shell", () => {
   it("offers independent Privy sign-in and external wallet connection", () => {
     const login = vi.fn();
     const connectWallet = vi.fn();
-    renderWithWallet(<AppShell>Overview</AppShell>, {
+    renderWithWallet(<AppShell previewMode={false}>Overview</AppShell>, {
       status: "signed-out",
       login,
       connectWallet,
@@ -83,7 +83,7 @@ describe("DApp wallet shell", () => {
   it("shows the active address and requires a network switch when mismatched", () => {
     const copyAddress = vi.fn().mockResolvedValue(undefined);
     const switchNetwork = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<AppShell>Overview</AppShell>, {
+    renderWithWallet(<AppShell previewMode={false}>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -114,7 +114,7 @@ describe("wallet settings", () => {
   it("warns before embedded-wallet export and exposes logout", () => {
     const exportWallet = vi.fn().mockResolvedValue(undefined);
     const logout = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<WalletSettings />, {
+    renderWithWallet(<WalletSettings previewMode={false} />, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -137,7 +137,7 @@ describe("wallet settings", () => {
   });
 
   it("does not offer private-key export for an external wallet", () => {
-    renderWithWallet(<WalletSettings />, {
+    renderWithWallet(<WalletSettings previewMode={false} />, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",

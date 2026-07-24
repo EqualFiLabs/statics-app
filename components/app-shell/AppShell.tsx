@@ -15,10 +15,10 @@ function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function WalletHeaderControls() {
+function WalletHeaderControls({ previewMode }: { previewMode: boolean }) {
   const wallet = useWalletState();
 
-  if (wallet.status === "unconfigured") {
+  if (previewMode || wallet.status === "unconfigured") {
     return (
       <button className="dapp-wallet-button" type="button" disabled>
         Wallet not configured
@@ -101,7 +101,13 @@ function walletStatusLabel(status: ReturnType<typeof useWalletState>["status"]):
   return "Connected";
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  previewMode = dappPreviewEnabled,
+}: {
+  children: React.ReactNode;
+  previewMode?: boolean;
+}) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
@@ -110,9 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
-  const designPreview =
-    dappPreviewEnabled &&
-    (dollarDeployment.status === "unavailable" || wallet.status === "unconfigured");
+  const designPreview = previewMode;
   const routeCopy = getDappRoutePresentation(currentPath);
 
   const closeNavigation = (restoreFocus = true) => {
@@ -150,7 +154,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       value: designPreview ? "Sample interface" : routeCopy.status,
       ready: !designPreview,
     },
-    { label: "Wallet", value: walletStatusLabel(wallet.status), ready: wallet.status === "ready" },
+    {
+      label: "Wallet",
+      value: designPreview ? "Not configured" : walletStatusLabel(wallet.status),
+      ready: !designPreview && wallet.status === "ready",
+    },
     {
       label: "Network",
       value:
@@ -196,7 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
           </Link>
-          <WalletHeaderControls />
+          <WalletHeaderControls previewMode={designPreview} />
         </div>
       </header>
 

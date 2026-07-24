@@ -9,6 +9,10 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    env: {
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_DAPP_PREVIEW: "true",
+    },
     setupFiles: ["./test/setup.ts"],
     include: ["test/**/*.test.{ts,tsx}"],
     exclude: ["test/e2e/**"],

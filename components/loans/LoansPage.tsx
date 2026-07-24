@@ -92,10 +92,7 @@ function parseGrossAmounts(
 
 export function LoansPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <LoansPreview />;
   }
   if (wallet.status === "unconfigured") {

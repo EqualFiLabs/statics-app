@@ -260,10 +260,7 @@ function DollarOverviewConnected({
 
 export function DollarOverview() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <DollarOverviewPreview />;
   }
   if (deploymentState.status === "unavailable") {
@@ -846,10 +843,7 @@ function DollarActionPanel({
 
 export function DollarPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <DollarPagePreview />;
   }
   if (deploymentState.status === "unavailable") {

@@ -8,9 +8,9 @@ function formatAddress(address: string): string {
   return `${address.slice(0, 10)}…${address.slice(-8)}`;
 }
 
-export function WalletSettings() {
+export function WalletSettings({ previewMode = dappPreviewEnabled }: { previewMode?: boolean }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled && wallet.status === "unconfigured") {
+  if (previewMode) {
     return <WalletSettingsPreview />;
   }
 

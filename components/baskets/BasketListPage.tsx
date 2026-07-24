@@ -21,10 +21,7 @@ function displayAmount(value: bigint, decimals = 18): string {
 
 export function BasketListPage() {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <BasketListPreview />;
   }
   if (wallet.status === "unconfigured") {

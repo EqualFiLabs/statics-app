@@ -68,10 +68,7 @@ function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
 
 export function BasketDetailPage({ basketId }: { basketId: bigint }) {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <BasketDetailPreview basketId={basketId} />;
   }
   if (wallet.status === "unconfigured") {

@@ -8,6 +8,9 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:preview": "NEXT_PUBLIC_APP_ENV=development NEXT_PUBLIC_DAPP_PREVIEW=true next dev",
+    "build:preview": "NEXT_PUBLIC_APP_ENV=development NEXT_PUBLIC_DAPP_PREVIEW=true next build",
+    "config:privy:local": "node scripts/import-local-privy.mjs",
     "deploy:protocol:local": "node scripts/deploy-local-dollar.mjs",
     "deploy:dollar:local": "node scripts/deploy-local-dollar.mjs",
     "build": "next build",
@@ -19,7 +22,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build:preview && playwright test",
     "test:integration:local": "node test/integration/local-dollar.mjs",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },

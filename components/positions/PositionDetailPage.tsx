@@ -69,10 +69,7 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
-  if (
-    dappPreviewEnabled &&
-    (deploymentState.status === "unavailable" || wallet.status === "unconfigured")
-  ) {
+  if (dappPreviewEnabled) {
     return <PositionDetailPreview positionId={positionId} />;
   }
   if (wallet.status === "unconfigured") {

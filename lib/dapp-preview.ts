@@ -17,7 +17,7 @@ export function readDappPreviewMode(
   if (configured === "true" && appEnvironment !== "development") {
     throw new Error("DApp sample-data preview is available only in development.");
   }
-  return configured === undefined ? appEnvironment === "development" : configured === "true";
+  return configured === "true";
 }
 
 export const dappPreviewEnabled = readDappPreviewMode({
