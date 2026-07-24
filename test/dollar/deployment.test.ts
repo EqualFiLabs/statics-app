@@ -78,6 +78,28 @@ describe("Dollar deployment configuration", () => {
     ).toThrow("Liquidity deployment configuration must be complete or omitted.");
   });
 
+  it("accepts only a complete code-bound pegged USDG profile", () => {
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      NEXT_PUBLIC_STATICS_USDG_ADDRESS: address,
+      NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS: address,
+      NEXT_PUBLIC_STATICS_USDG_PROFILE_ID: "2",
+      NEXT_PUBLIC_STATICS_USDG_CODE_HASH: hash,
+      NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH: hash,
+    });
+    expect(state.status).toBe("configured");
+    if (state.status === "configured") {
+      expect(state.deployment.pegged?.profileId).toBe(2n);
+      expect(state.deployment.pegged?.collateral).toBe(address);
+    }
+    expect(() =>
+      readDollarDeployment({
+        ...localDeploymentEnvironment(),
+        NEXT_PUBLIC_STATICS_USDG_ADDRESS: address,
+      })
+    ).toThrow("Pegged USDG deployment configuration must be complete or omitted.");
+  });
+
   it("verifies every liquidity runtime hash", async () => {
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),

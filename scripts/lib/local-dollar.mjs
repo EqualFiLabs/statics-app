@@ -22,6 +22,11 @@ const liquidityLabels = {
   liquidityManager: "STATICS_LIQUIDITY_MANAGER_ADDRESS",
   stateView: "STATICS_STATE_VIEW_ADDRESS",
 };
+const peggedLabels = {
+  collateral: "STATICS_DOLLAR_USDG_ADDRESS",
+  oracle: "STATICS_DOLLAR_USDG_ORACLE_ADDRESS",
+  profileId: "STATICS_DOLLAR_USDG_PROFILE_ID",
+};
 
 export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quiet = false }) {
   if (!privateKey) {
@@ -66,6 +71,13 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     if (!match) throw new Error(`Forge output did not include ${label}.`);
     liquidityContracts[name] = match[1];
   }
+  const pegged = {};
+  for (const [name, label] of Object.entries(peggedLabels)) {
+    const pattern = name === "profileId" ? `${label}\\s+([0-9]+)` : `${label}\\s+(0x[a-fA-F0-9]{40})`;
+    const match = output.match(new RegExp(pattern));
+    if (!match) throw new Error(`Forge output did not include ${label}.`);
+    pegged[name] = match[1];
+  }
 
   const runtimeCodeHashes = {};
   for (const [name, address] of Object.entries(contracts)) {
@@ -78,6 +90,11 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     const code = await client.getCode({ address });
     if (!code || code === "0x") throw new Error(`${name} has no runtime code after deployment.`);
     liquidityRuntimeCodeHashes[name] = keccak256(code);
+  }
+  for (const name of ["collateral", "oracle"]) {
+    const code = await client.getCode({ address: pegged[name] });
+    if (!code || code === "0x") throw new Error(`${name} has no runtime code after deployment.`);
+    pegged[`${name}CodeHash`] = keccak256(code);
   }
 
   const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -93,6 +110,7 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
       contracts: liquidityContracts,
       runtimeCodeHashes: liquidityRuntimeCodeHashes,
     },
+    pegged,
     protocolCommit,
   };
 }
@@ -172,6 +190,11 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
     NEXT_PUBLIC_STATICS_WETH_ADDRESS: deployment.contracts.weth,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_ADDRESS: deployment.contracts.oracle,
     NEXT_PUBLIC_STATICS_WETH_PROFILE_ID: "1",
+    NEXT_PUBLIC_STATICS_USDG_ADDRESS: deployment.pegged.collateral,
+    NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS: deployment.pegged.oracle,
+    NEXT_PUBLIC_STATICS_USDG_PROFILE_ID: deployment.pegged.profileId,
+    NEXT_PUBLIC_STATICS_USDG_CODE_HASH: deployment.pegged.collateralCodeHash,
+    NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH: deployment.pegged.oracleCodeHash,
     NEXT_PUBLIC_STATICS_PROTOCOL_COMMIT: deployment.protocolCommit,
     NEXT_PUBLIC_STATICS_DIAMOND_CODE_HASH: deployment.runtimeCodeHashes.diamond,
     NEXT_PUBLIC_STATICS_DOLLAR_CORE_CODE_HASH: deployment.runtimeCodeHashes.core,

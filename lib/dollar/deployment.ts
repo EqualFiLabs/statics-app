@@ -19,6 +19,13 @@ export type DollarDeployment = Readonly<{
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
   liquidity?: LiquidityDeployment | null;
+  pegged?: Readonly<{
+    collateral: Address;
+    oracle: Address;
+    profileId: bigint;
+    collateralCodeHash: Hex;
+    oracleCodeHash: Hex;
+  }> | null;
 }>;
 
 export type DollarDeploymentState =
@@ -162,6 +169,42 @@ export function readDollarDeployment(
       ) as Record<LiquidityContractName, Hex>,
     };
   }
+  const peggedValues = [
+    environment.NEXT_PUBLIC_STATICS_USDG_ADDRESS,
+    environment.NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS,
+    environment.NEXT_PUBLIC_STATICS_USDG_PROFILE_ID,
+    environment.NEXT_PUBLIC_STATICS_USDG_CODE_HASH,
+    environment.NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH,
+  ];
+  let pegged: DollarDeployment["pegged"] = null;
+  if (peggedValues.some(Boolean)) {
+    if (!peggedValues.every(Boolean)) {
+      throw new Error("Pegged USDG deployment configuration must be complete or omitted.");
+    }
+    const profileId = environment.NEXT_PUBLIC_STATICS_USDG_PROFILE_ID!;
+    if (!/^[1-9]\d*$/.test(profileId)) {
+      throw new Error("NEXT_PUBLIC_STATICS_USDG_PROFILE_ID must be a positive integer.");
+    }
+    pegged = {
+      collateral: parseAddress(
+        environment.NEXT_PUBLIC_STATICS_USDG_ADDRESS,
+        "NEXT_PUBLIC_STATICS_USDG_ADDRESS"
+      ),
+      oracle: parseAddress(
+        environment.NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS,
+        "NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS"
+      ),
+      profileId: BigInt(profileId),
+      collateralCodeHash: parseHash(
+        environment.NEXT_PUBLIC_STATICS_USDG_CODE_HASH,
+        "NEXT_PUBLIC_STATICS_USDG_CODE_HASH"
+      ),
+      oracleCodeHash: parseHash(
+        environment.NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH,
+        "NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH"
+      ),
+    };
+  }
 
   return {
     status: "configured",
@@ -174,6 +217,7 @@ export function readDollarDeployment(
       contracts,
       runtimeCodeHashes,
       liquidity,
+      pegged,
     },
   };
 }
@@ -226,6 +270,12 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH,
     NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH,
+    NEXT_PUBLIC_STATICS_USDG_ADDRESS: process.env.NEXT_PUBLIC_STATICS_USDG_ADDRESS,
+    NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS: process.env.NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS,
+    NEXT_PUBLIC_STATICS_USDG_PROFILE_ID: process.env.NEXT_PUBLIC_STATICS_USDG_PROFILE_ID,
+    NEXT_PUBLIC_STATICS_USDG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_USDG_CODE_HASH,
+    NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH:
+      process.env.NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH,
   });
 }
 
@@ -248,6 +298,22 @@ export async function verifyDollarDeployment(
       }
     })
   );
+  if (deployment.pegged) {
+    const [collateralCode, oracleCode] = await Promise.all([
+      publicClient.getCode({ address: deployment.pegged.collateral }),
+      publicClient.getCode({ address: deployment.pegged.oracle }),
+    ]);
+    if (!collateralCode || collateralCode === "0x" || !oracleCode || oracleCode === "0x") {
+      throw new Error("Pegged USDG deployment has missing runtime code.");
+    }
+    if (
+      keccak256(collateralCode).toLowerCase() !==
+        deployment.pegged.collateralCodeHash.toLowerCase() ||
+      keccak256(oracleCode).toLowerCase() !== deployment.pegged.oracleCodeHash.toLowerCase()
+    ) {
+      throw new Error("Pegged USDG runtime code does not match the deployment manifest.");
+    }
+  }
 }
 
 export async function verifyLiquidityDeployment(
