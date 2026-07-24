@@ -1,9 +1,25 @@
 import { defineChain, http, type Chain, type Transport } from "viem";
 
 export type WalletAppEnvironment = "development" | "staging" | "production";
-export type WalletNetwork = "robinhood-testnet" | "anvil";
+export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
 
 const ROBINHOOD_TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com";
+const ROBINHOOD_MAINNET_RPC = "https://rpc.mainnet.chain.robinhood.com";
+
+export const robinhoodMainnet = defineChain({
+  id: 4_663,
+  name: "Robinhood Chain",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: [ROBINHOOD_MAINNET_RPC] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Robinhood Chain Explorer",
+      url: "https://robinhoodchain.blockscout.com",
+    },
+  },
+});
 
 export const robinhoodTestnet = defineChain({
   id: 46_630,
@@ -42,8 +58,8 @@ function parseNetwork(
   appEnvironment: WalletAppEnvironment
 ): WalletNetwork {
   const network = value || "robinhood-testnet";
-  if (network !== "robinhood-testnet" && network !== "anvil") {
-    throw new Error("NEXT_PUBLIC_APP_NETWORK must be robinhood-testnet or anvil.");
+  if (network !== "robinhood" && network !== "robinhood-testnet" && network !== "anvil") {
+    throw new Error("NEXT_PUBLIC_APP_NETWORK must be robinhood, robinhood-testnet, or anvil.");
   }
   if (network === "anvil" && appEnvironment !== "development") {
     throw new Error("Anvil is only available when NEXT_PUBLIC_APP_ENV is development.");
@@ -73,9 +89,10 @@ export type WalletEnvironment = Readonly<{
   appId: string | null;
   clientId: string | null;
   robinhoodRpcUrl: string;
+  robinhoodTestnetRpcUrl: string;
   anvilRpcUrl: string;
   defaultChain: Chain;
-  supportedChains: readonly [Chain] | readonly [Chain, Chain];
+  supportedChains: readonly [Chain, ...Chain[]];
   configured: boolean;
 }>;
 
@@ -87,6 +104,10 @@ export function readWalletEnvironment(
   const appId = environment.NEXT_PUBLIC_PRIVY_APP_ID?.trim() || null;
   const clientId = environment.NEXT_PUBLIC_PRIVY_CLIENT_ID?.trim() || null;
   const configuredRobinhoodRpc = parsePublicRpc(
+    environment.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
+    "NEXT_PUBLIC_ROBINHOOD_RPC_URL"
+  );
+  const configuredRobinhoodTestnetRpc = parsePublicRpc(
     environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
     "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL"
   );
@@ -98,31 +119,45 @@ export function readWalletEnvironment(
   if (appEnvironment !== "development" && !appId) {
     throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
   }
-  if (appEnvironment !== "development" && !configuredRobinhoodRpc) {
-    throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required outside development.");
+  if (appEnvironment !== "development" && network === "robinhood" && !configuredRobinhoodRpc) {
+    throw new Error("NEXT_PUBLIC_ROBINHOOD_RPC_URL is required for Robinhood mainnet.");
+  }
+  if (
+    appEnvironment !== "development" &&
+    network === "robinhood-testnet" &&
+    !configuredRobinhoodTestnetRpc
+  ) {
+    throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required for Robinhood testnet.");
   }
 
+  const defaultChain =
+    network === "anvil" ? anvil : network === "robinhood" ? robinhoodMainnet : robinhoodTestnet;
   return {
     appEnvironment,
     network,
     appId,
     clientId,
-    robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_TESTNET_RPC,
+    robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
+    robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
     anvilRpcUrl: configuredAnvilRpc ?? "http://127.0.0.1:8545/",
-    defaultChain: network === "anvil" ? anvil : robinhoodTestnet,
+    defaultChain,
     supportedChains:
       appEnvironment === "development"
-        ? network === "anvil"
-          ? ([anvil, robinhoodTestnet] as const)
-          : ([robinhoodTestnet, anvil] as const)
-        : ([robinhoodTestnet] as const),
+        ? ([
+            defaultChain,
+            ...[robinhoodMainnet, robinhoodTestnet, anvil].filter(
+              (chain) => chain.id !== defaultChain.id
+            ),
+          ] as [Chain, ...Chain[]])
+        : ([defaultChain] as const),
     configured: Boolean(appId),
   };
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
   const transports: Record<number, Transport> = {
-    [robinhoodTestnet.id]: http(environment.robinhoodRpcUrl),
+    [robinhoodMainnet.id]: http(environment.robinhoodRpcUrl),
+    [robinhoodTestnet.id]: http(environment.robinhoodTestnetRpcUrl),
   };
   if (environment.appEnvironment === "development") {
     transports[anvil.id] = http(environment.anvilRpcUrl);
@@ -136,11 +171,21 @@ export function getAddressExplorerUrl(chain: Chain, address: string): string | n
 }
 
 export function getTransactionExplorerUrl(chainId: number, hash: string): string | null {
-  if (chainId !== robinhoodTestnet.id) return null;
-  return `${robinhoodTestnet.blockExplorers.default.url}/tx/${hash}`;
+  const chain =
+    chainId === robinhoodMainnet.id
+      ? robinhoodMainnet
+      : chainId === robinhoodTestnet.id
+        ? robinhoodTestnet
+        : null;
+  return chain ? `${chain.blockExplorers.default.url}/tx/${hash}` : null;
 }
 
 export function getAddressExplorerUrlForChain(chainId: number, address: string): string | null {
-  if (chainId !== robinhoodTestnet.id) return null;
-  return `${robinhoodTestnet.blockExplorers.default.url}/address/${address}`;
+  const chain =
+    chainId === robinhoodMainnet.id
+      ? robinhoodMainnet
+      : chainId === robinhoodTestnet.id
+        ? robinhoodTestnet
+        : null;
+  return chain ? `${chain.blockExplorers.default.url}/address/${address}` : null;
 }

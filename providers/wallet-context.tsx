@@ -1,11 +1,21 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import type { ConnectedWallet } from "@privy-io/react-auth";
 
 export type WalletRuntimeStatus =
   "unconfigured" | "loading" | "signed-out" | "wallet-missing" | "ready" | "error";
 
 export type WalletKind = "embedded" | "external" | null;
+
+export type FundingNetworkSummary = Readonly<{
+  chainId: number;
+  label: string;
+  nativeSymbol: string;
+  supportsUniswap: boolean;
+}>;
+
+export type WalletEthereumProvider = Awaited<ReturnType<ConnectedWallet["getEthereumProvider"]>>;
 
 export type WalletState = Readonly<{
   status: WalletRuntimeStatus;
@@ -16,14 +26,20 @@ export type WalletState = Readonly<{
   chainId: number | null;
   targetChainId: number;
   isTargetChain: boolean;
+  fundingChainId: number;
+  fundingNetworkName: string;
+  fundingWalletOnSelectedChain: boolean;
+  fundingNetworks: readonly FundingNetworkSummary[];
   explorerUrl: string | null;
   error: string | null;
-  busyAction: "create" | "logout" | "switch" | "export" | null;
+  busyAction: "create" | "logout" | "switch" | "funding-switch" | "export" | null;
   login: () => void;
   connectWallet: () => void;
   createWallet: () => Promise<void>;
   logout: () => Promise<void>;
   switchNetwork: () => Promise<void>;
+  selectFundingNetwork: (chainId: number) => Promise<void>;
+  getEthereumProvider: () => Promise<WalletEthereumProvider | null>;
   exportWallet: () => Promise<void>;
   copyAddress: () => Promise<void>;
 }>;
@@ -39,6 +55,10 @@ export const defaultWalletState: WalletState = {
   chainId: null,
   targetChainId: 46_630,
   isTargetChain: false,
+  fundingChainId: 8_453,
+  fundingNetworkName: "Base",
+  fundingWalletOnSelectedChain: false,
+  fundingNetworks: [],
   explorerUrl: null,
   error: null,
   busyAction: null,
@@ -47,6 +67,8 @@ export const defaultWalletState: WalletState = {
   createWallet: unavailable,
   logout: unavailable,
   switchNetwork: unavailable,
+  selectFundingNetwork: unavailable,
+  getEthereumProvider: async () => null,
   exportWallet: unavailable,
   copyAddress: unavailable,
 };

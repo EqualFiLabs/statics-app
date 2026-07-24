@@ -13,7 +13,7 @@ import {
 } from "@privy-io/react-auth";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 
 import {
@@ -21,6 +21,7 @@ import {
   getAddressExplorerUrl,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
+import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 
 const walletEnvironment = readWalletEnvironment({
@@ -28,23 +29,37 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_APP_NETWORK: process.env.NEXT_PUBLIC_APP_NETWORK,
   NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
+  NEXT_PUBLIC_ROBINHOOD_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
   NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
 });
 const transports = createWalletTransports(walletEnvironment);
-const wagmiConfig =
-  walletEnvironment.supportedChains.length === 2
-    ? createConfig({
-        chains: [walletEnvironment.supportedChains[0], walletEnvironment.supportedChains[1]],
-        transports,
-      })
-    : createConfig({
-        chains: [walletEnvironment.supportedChains[0]],
-        transports,
-      });
+const wagmiConfig = createConfig({
+  chains: walletEnvironment.supportedChains,
+  transports,
+});
+const privySupportedChains = [
+  ...fundingNetworks.map((network) => network.chain),
+  ...walletEnvironment.supportedChains,
+].filter(
+  (chain, index, chains) => chains.findIndex((candidate) => candidate.id === chain.id) === index
+);
+const fundingNetworkSummaries = fundingNetworks.map((network) => ({
+  chainId: network.chain.id,
+  label: network.label,
+  nativeSymbol: network.chain.nativeCurrency.symbol,
+  supportsUniswap: network.supportsUniswap,
+}));
+const FUNDING_CHAIN_STORAGE_KEY = "statics:funding-chain";
 
 function selectWallet({ wallets }: { wallets: ConnectedWallet[]; user: User | null }) {
   return getEmbeddedConnectedWallet(wallets) ?? wallets[0];
+}
+
+function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
+  if (!wallet?.chainId) return null;
+  const parsed = Number(wallet.chainId.replace(/^eip155:/, ""));
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function WalletBridge({ children }: { children: React.ReactNode }) {
@@ -56,6 +71,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const wagmiAccount = useAccount();
   const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [fundingChainId, setFundingChainId] = useState(8_453);
 
   const activeEthereumWallet =
     activeWallet && "switchChain" in activeWallet ? activeWallet : undefined;
@@ -68,10 +84,19 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       : "external"
     : null;
   const chainId =
-    wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
+    connectedWalletChainId(selectedWallet) ??
+    (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
       ? (wagmiAccount.chainId ?? null)
-      : null;
+      : null);
   const targetChain = walletEnvironment.defaultChain;
+  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
+
+  useEffect(() => {
+    const stored = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
+    if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
+      setFundingChainId(stored);
+    }
+  }, []);
 
   const runAction = async (
     action: NonNullable<WalletState["busyAction"]>,
@@ -104,6 +129,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       chainId,
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
+      fundingChainId,
+      fundingNetworkName: fundingNetwork.label,
+      fundingWalletOnSelectedChain: chainId === fundingChainId,
+      fundingNetworks: fundingNetworkSummaries,
       explorerUrl: address ? getAddressExplorerUrl(targetChain, address) : null,
       error: actionError ?? privyError?.message ?? null,
       busyAction,
@@ -124,6 +153,20 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           await selectedWallet.switchChain(targetChain.id);
           setActiveWallet(selectedWallet);
         }),
+      selectFundingNetwork: (nextChainId) =>
+        runAction("funding-switch", async () => {
+          const nextNetwork = getFundingNetwork(nextChainId);
+          if (!nextNetwork) throw new Error("Choose a supported funding network.");
+          setFundingChainId(nextChainId);
+          window.localStorage.setItem(FUNDING_CHAIN_STORAGE_KEY, String(nextChainId));
+          if (!selectedWallet) return;
+          await selectedWallet.switchChain(nextChainId);
+          setActiveWallet(selectedWallet);
+        }),
+      getEthereumProvider: async () => {
+        if (!selectedWallet) return null;
+        return selectedWallet.getEthereumProvider();
+      },
       exportWallet: () =>
         runAction("export", async () => {
           if (!embeddedWallet) throw new Error("Only an embedded wallet can be exported here.");
@@ -143,6 +186,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       createWallet,
       embeddedWallet,
       exportWallet,
+      fundingChainId,
+      fundingNetwork,
       login,
       logout,
       privyError,
@@ -165,7 +210,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
       clientId={walletEnvironment.clientId ?? undefined}
       config={{
         loginMethods: ["wallet", "email"],
-        supportedChains: [...walletEnvironment.supportedChains],
+        supportedChains: privySupportedChains,
         defaultChain: walletEnvironment.defaultChain,
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
