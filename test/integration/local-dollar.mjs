@@ -1,21 +1,35 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  BasketStatus,
   basketTokenAbi,
+  buildActivateCanonicalPoolCall,
+  buildActivateLiquidityPositionCall,
+  buildApproveV4PositionCall,
   buildBorrowCall,
+  buildBorrowAndProvideLiquidityCall,
+  buildCheckpointCanonicalPoolCall,
+  buildClaimLiquidityRewardsCall,
+  buildClaimRewardsCall,
   buildClosePositionCall,
   buildCreateAndStakeCall,
+  buildCreateBasketTransaction,
   buildCreatePositionCall,
   buildDepositBasketCollateralCall,
   buildDepositETHTransaction,
   buildDepositWETHCall,
+  buildIncreaseStakedLiquidityCall,
+  buildInitializeCanonicalPoolCall,
   buildMintCall,
   buildMintBasketCollateralCall,
+  buildMintV4PositionCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
+  buildPermit2ApproveCall,
   buildExtendCall,
   buildRecoverCall,
   buildRepayCall,
@@ -24,11 +38,18 @@ import {
   buildRecombineToETHCall,
   buildRecombineToWETHCall,
   buildUnstakeCall,
+  buildStakeLiquidityPositionCall,
+  buildUnstakeLiquidityPositionCall,
   buildWithdrawBasketCollateralCall,
   staticsAbi,
   staticsDollarCoreAbi,
   staticsDollarRiskTokenAbi,
   staticsDollarTokenAbi,
+  maximumLiquidityForAmounts,
+  permit2AllowanceAbi,
+  quoteBorrowAndProvideLiquidity,
+  v4PositionManagerReadAbi,
+  v4StateViewReadAbi,
   wethAbi,
 } from "@statics-protocol/sdk";
 import {
@@ -55,6 +76,11 @@ const protocolRoot = defaultProtocolRoot(siteRoot);
 const BPS = 10_000n;
 const minimum = (amount) => (amount * 9_950n) / BPS;
 const maximum = (amount) => (amount * 10_050n + BPS - 1n) / BPS;
+const fullRange = (spacing) => [
+  Math.ceil(-887_272 / spacing) * spacing,
+  Math.floor(887_272 / spacing) * spacing,
+];
+const Q96 = 1n << 96n;
 
 async function availablePort() {
   const server = createServer();
@@ -103,8 +129,6 @@ const anvil = spawn(
     mnemonic,
     "--balance",
     "1000",
-    "--block-time",
-    "1",
     "--silent",
   ],
   { stdio: "ignore" }
@@ -953,6 +977,503 @@ try {
     );
   }
 
+  await send(
+    deployment.contracts.diamond,
+    buildInitializeCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar, Q96)
+  );
+  await publicClient.request({ method: "evm_increaseTime", params: [3_600] });
+  await publicClient.request({ method: "evm_mine" });
+  await send(
+    deployment.contracts.diamond,
+    buildCheckpointCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar)
+  );
+  await send(
+    deployment.contracts.diamond,
+    buildActivateCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar)
+  );
+  const canonicalPool = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "canonicalPool",
+    args: [fixture.basketId, deployment.contracts.dollar],
+  });
+  if (canonicalPool.status !== 2) {
+    throw new Error("Local canonical pool did not complete its real warmup and activation.");
+  }
+  const poolKey = {
+    currency0: canonicalPool.currency0,
+    currency1: canonicalPool.currency1,
+    fee: canonicalPool.lpFee,
+    tickSpacing: canonicalPool.tickSpacing,
+    hooks: canonicalPool.hook,
+  };
+  const slot0 = await publicClient.readContract({
+    address: deployment.liquidity.contracts.stateView,
+    abi: v4StateViewReadAbi,
+    functionName: "getSlot0",
+    args: [canonicalPool.poolId],
+  });
+  const lpBasketShares = parseEther("0.02");
+  const lpBasketQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteMint",
+    args: [fixture.basketId, lpBasketShares],
+  });
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, maximum(lpBasketQuote[0])],
+    })
+  );
+  await send(
+    deployment.contracts.diamond,
+    buildMintCall(fixture.basketId, lpBasketShares, account.address, lpBasketQuote.map(maximum))
+  );
+  const poolTokens = [
+    canonicalPool.currency0.toLowerCase() === configuredBasket.token.toLowerCase()
+      ? configuredBasket.token
+      : deployment.contracts.dollar,
+    canonicalPool.currency1.toLowerCase() === configuredBasket.token.toLowerCase()
+      ? configuredBasket.token
+      : deployment.contracts.dollar,
+  ];
+  const walletLpMaximums = [parseEther("0.005"), parseEther("0.005")];
+  const [lpTickLower, lpTickUpper] = fullRange(canonicalPool.tickSpacing);
+  const walletLpLiquidity =
+    (maximumLiquidityForAmounts(
+      slot0[0],
+      lpTickLower,
+      lpTickUpper,
+      walletLpMaximums[0],
+      walletLpMaximums[1]
+    ) *
+      9_950n) /
+    BPS;
+  const permitExpiration = Number((await publicClient.getBlock()).timestamp) + 3_600;
+  for (let index = 0; index < poolTokens.length; index += 1) {
+    await send(
+      poolTokens[index],
+      encodeFunctionData({
+        abi: basketTokenAbi,
+        functionName: "approve",
+        args: [deployment.liquidity.contracts.permit2, walletLpMaximums[index]],
+      })
+    );
+    await send(
+      deployment.liquidity.contracts.permit2,
+      buildPermit2ApproveCall(
+        poolTokens[index],
+        deployment.liquidity.contracts.positionManager,
+        walletLpMaximums[index],
+        permitExpiration
+      )
+    );
+    const permitAllowance = await publicClient.readContract({
+      address: deployment.liquidity.contracts.permit2,
+      abi: permit2AllowanceAbi,
+      functionName: "allowance",
+      args: [account.address, poolTokens[index], deployment.liquidity.contracts.positionManager],
+    });
+    if (permitAllowance[0] !== walletLpMaximums[index] || permitAllowance[1] !== permitExpiration) {
+      throw new Error("Local LP creation did not establish its bounded Permit2 allowance.");
+    }
+  }
+  const walletLpTokenId = await publicClient.readContract({
+    address: deployment.liquidity.contracts.positionManager,
+    abi: v4PositionManagerReadAbi,
+    functionName: "nextTokenId",
+  });
+  await send(
+    deployment.liquidity.contracts.positionManager,
+    buildMintV4PositionCall({
+      poolKey,
+      tickLower: lpTickLower,
+      tickUpper: lpTickUpper,
+      liquidity: walletLpLiquidity,
+      amount0Max: walletLpMaximums[0],
+      amount1Max: walletLpMaximums[1],
+      recipient: account.address,
+      deadline: BigInt(permitExpiration),
+    })
+  );
+  const [walletLpOwner, walletLpAmount] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.liquidity.contracts.positionManager,
+      abi: v4PositionManagerReadAbi,
+      functionName: "ownerOf",
+      args: [walletLpTokenId],
+    }),
+    publicClient.readContract({
+      address: deployment.liquidity.contracts.positionManager,
+      abi: v4PositionManagerReadAbi,
+      functionName: "getPositionLiquidity",
+      args: [walletLpTokenId],
+    }),
+  ]);
+  if (
+    walletLpOwner.toLowerCase() !== account.address.toLowerCase() ||
+    walletLpAmount !== walletLpLiquidity
+  ) {
+    throw new Error("Wallet-funded PositionManager NFT did not match its reviewed liquidity.");
+  }
+
+  await send(
+    deployment.liquidity.contracts.positionManager,
+    buildApproveV4PositionCall(deployment.contracts.diamond, walletLpTokenId)
+  );
+  await send(
+    deployment.contracts.diamond,
+    buildStakeLiquidityPositionCall(loanPositionId, walletLpTokenId)
+  );
+  await publicClient.request({ method: "evm_mine" });
+  await send(deployment.contracts.diamond, buildActivateLiquidityPositionCall(walletLpTokenId));
+  const increaseMaximums = [parseEther("0.002"), parseEther("0.002")];
+  const increaseLiquidity =
+    (maximumLiquidityForAmounts(
+      slot0[0],
+      lpTickLower,
+      lpTickUpper,
+      increaseMaximums[0],
+      increaseMaximums[1]
+    ) *
+      9_950n) /
+    BPS;
+  for (let index = 0; index < poolTokens.length; index += 1) {
+    await send(
+      poolTokens[index],
+      encodeFunctionData({
+        abi: basketTokenAbi,
+        functionName: "approve",
+        args: [deployment.contracts.diamond, increaseMaximums[index]],
+      })
+    );
+  }
+  const increaseResult = await send(
+    deployment.contracts.diamond,
+    buildIncreaseStakedLiquidityCall(
+      loanPositionId,
+      walletLpTokenId,
+      {
+        liquidityDelta: increaseLiquidity,
+        amount0Max: increaseMaximums[0],
+        amount1Max: increaseMaximums[1],
+        deadline: BigInt(permitExpiration),
+      },
+      account.address
+    )
+  );
+  const increasedEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "StakedLiquidityIncreased",
+    logs: increaseResult.receipt.logs,
+    strict: true,
+  });
+  const increasedLiquidity = await publicClient.readContract({
+    address: deployment.liquidity.contracts.positionManager,
+    abi: v4PositionManagerReadAbi,
+    functionName: "getPositionLiquidity",
+    args: [walletLpTokenId],
+  });
+  if (
+    increasedEvents.length !== 1 ||
+    increasedLiquidity !== walletLpLiquidity + increaseLiquidity
+  ) {
+    throw new Error("Staked LP NFT increase did not update its real PositionManager liquidity.");
+  }
+  // Local-only v4-core harness: production users swap through a venue router, but the
+  // rehearsal needs one real PoolManager swap to prove fee accrual without external state.
+  const swapArtifact = JSON.parse(
+    readFileSync(resolve(protocolRoot, "out/PoolSwapTest.sol/PoolSwapTest.json"), "utf8")
+  );
+  const swapRouterHash = await walletClient.deployContract({
+    abi: swapArtifact.abi,
+    bytecode: swapArtifact.bytecode.object,
+    args: [deployment.liquidity.contracts.poolManager],
+  });
+  const swapRouterReceipt = await publicClient.waitForTransactionReceipt({
+    hash: swapRouterHash,
+  });
+  if (swapRouterReceipt.status !== "success" || !swapRouterReceipt.contractAddress) {
+    throw new Error("Ephemeral v4 swap rehearsal router did not deploy.");
+  }
+  const swapAmount = parseEther("0.000001");
+  await send(
+    poolTokens[0],
+    encodeFunctionData({
+      abi: basketTokenAbi,
+      functionName: "approve",
+      args: [swapRouterReceipt.contractAddress, swapAmount],
+    })
+  );
+  await send(
+    swapRouterReceipt.contractAddress,
+    encodeFunctionData({
+      abi: swapArtifact.abi,
+      functionName: "swap",
+      args: [
+        poolKey,
+        {
+          zeroForOne: true,
+          amountSpecified: -swapAmount,
+          sqrtPriceLimitX96: 4_295_128_740n,
+        },
+        { takeClaims: false, settleUsingBurn: false },
+        "0x",
+      ],
+    })
+  );
+  const pendingLpRewards = await publicClient.readContract({
+    account: account.address,
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingLiquidityRewards",
+    args: [loanPositionId, walletLpTokenId],
+  });
+  if (pendingLpRewards[1] === 0n && pendingLpRewards[3] === 0n) {
+    throw new Error("A real canonical swap did not accrue LP NFT rewards.");
+  }
+  const lpRewardBalancesBefore = await Promise.all([
+    publicClient.readContract({
+      address: pendingLpRewards[0],
+      abi: basketTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+    publicClient.readContract({
+      address: pendingLpRewards[2],
+      abi: basketTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+  ]);
+  const lpClaimResult = await send(
+    deployment.contracts.diamond,
+    buildClaimLiquidityRewardsCall(
+      loanPositionId,
+      walletLpTokenId,
+      account.address,
+      pendingLpRewards[1],
+      pendingLpRewards[3]
+    )
+  );
+  const lpClaimEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "LiquidityRewardClaimed",
+    logs: lpClaimResult.receipt.logs,
+    strict: true,
+  });
+  const [pendingLpRewardsAfter, lpRewardBalancesAfter] = await Promise.all([
+    publicClient.readContract({
+      account: account.address,
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "pendingLiquidityRewards",
+      args: [loanPositionId, walletLpTokenId],
+    }),
+    Promise.all([
+      publicClient.readContract({
+        address: pendingLpRewards[0],
+        abi: basketTokenAbi,
+        functionName: "balanceOf",
+        args: [account.address],
+      }),
+      publicClient.readContract({
+        address: pendingLpRewards[2],
+        abi: basketTokenAbi,
+        functionName: "balanceOf",
+        args: [account.address],
+      }),
+    ]),
+  ]);
+  if (
+    lpClaimEvents.length === 0 ||
+    pendingLpRewardsAfter[1] !== 0n ||
+    pendingLpRewardsAfter[3] !== 0n ||
+    lpRewardBalancesAfter[0] - lpRewardBalancesBefore[0] < pendingLpRewards[1] ||
+    lpRewardBalancesAfter[1] - lpRewardBalancesBefore[1] < pendingLpRewards[3]
+  ) {
+    throw new Error("LP reward claim did not clear and transfer its reviewed outputs.");
+  }
+  await send(
+    deployment.contracts.diamond,
+    buildUnstakeLiquidityPositionCall(loanPositionId, walletLpTokenId, account.address)
+  );
+  const returnedLpOwner = await publicClient.readContract({
+    address: deployment.liquidity.contracts.positionManager,
+    abi: v4PositionManagerReadAbi,
+    functionName: "ownerOf",
+    args: [walletLpTokenId],
+  });
+  if (returnedLpOwner.toLowerCase() !== account.address.toLowerCase()) {
+    throw new Error("Unstaking did not return the LP NFT to its wallet owner.");
+  }
+
+  const combinedShares = parseEther("0.04");
+  const combinedLiquidity =
+    (maximumLiquidityForAmounts(
+      slot0[0],
+      lpTickLower,
+      lpTickUpper,
+      parseEther("0.002"),
+      parseEther("0.002")
+    ) *
+      9_500n) /
+    BPS;
+  const combinedBasketSupply = await publicClient.readContract({
+    address: configuredBasket.token,
+    abi: basketTokenAbi,
+    functionName: "totalSupply",
+  });
+  const combinedSnapshot = {
+    basketId: fixture.basketId,
+    basketToken: configuredBasket.token,
+    status: BasketStatus.Active,
+    totalSupply: combinedBasketSupply,
+    mintFeeTiers: configuredBasket.mintFeeTiers,
+    redemptionFeeTiers: configuredBasket.redemptionFeeTiers,
+    originationFeeBps: BigInt(configuredBasket.originationFeeBps),
+    extensionFeeBps: BigInt(configuredBasket.extensionFeeBps),
+    ltvBps: BigInt(configuredBasket.ltvBps),
+    constituents: [
+      {
+        asset: deployment.contracts.dollar,
+        bundleAmount: configuredBasket.bundleAmounts[0],
+        vaultBalance: await publicClient.readContract({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          functionName: "vaultBalance",
+          args: [fixture.basketId, deployment.contracts.dollar],
+        }),
+      },
+    ],
+  };
+  const combinedDeadline = BigInt(permitExpiration);
+  const combinedQuote = quoteBorrowAndProvideLiquidity(
+    combinedSnapshot,
+    combinedShares,
+    [
+      {
+        asset: deployment.contracts.dollar,
+        currency0: canonicalPool.currency0,
+        currency1: canonicalPool.currency1,
+        sqrtPriceX96: slot0[0],
+        tickLower: lpTickLower,
+        tickUpper: lpTickUpper,
+        liquidity: combinedLiquidity,
+        deadline: combinedDeadline,
+      },
+    ],
+    50n
+  );
+  const combinedResult = await send(
+    deployment.contracts.diamond,
+    buildBorrowAndProvideLiquidityCall(
+      loanPositionId,
+      fixture.basketId,
+      combinedShares,
+      combinedQuote.pools,
+      account.address
+    )
+  );
+  if (!combinedResult.simulationData) {
+    throw new Error("Borrow-to-liquidity simulation returned no result.");
+  }
+  const [combinedLoanId, combinedTokenIds] = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "borrowAndProvideLiquidity",
+    data: combinedResult.simulationData,
+  });
+  const [combinedLoan, combinedLpOwner] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "loan",
+      args: [combinedLoanId],
+    }),
+    publicClient.readContract({
+      address: deployment.liquidity.contracts.positionManager,
+      abi: v4PositionManagerReadAbi,
+      functionName: "ownerOf",
+      args: [combinedTokenIds[0]],
+    }),
+  ]);
+  if (
+    combinedTokenIds.length !== 1 ||
+    combinedLoan.collateralShares !== combinedQuote.borrow.collateralShares ||
+    combinedLpOwner.toLowerCase() !== account.address.toLowerCase()
+  ) {
+    throw new Error(
+      "Atomic borrow-to-liquidity did not create its verified loan and wallet LP NFT."
+    );
+  }
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, combinedLoan.principals[0]],
+    })
+  );
+  await send(deployment.contracts.diamond, buildRepayCall(combinedLoanId));
+
+  const wethBasketId = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basketCount",
+  });
+  const currentCreationFee = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "creationFee",
+  });
+  const wethBasketCreation = buildCreateBasketTransaction(
+    {
+      name: "Local Wrapped Ether Reserve",
+      symbol: "lwETH",
+      assets: [deployment.contracts.weth],
+      bundleAmounts: [parseEther("1")],
+      mintFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
+      redemptionFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
+      flashFeeBps: 5,
+      originationFeeBps: 100,
+      extensionFeeBps: 25,
+      ltvBps: 7_500,
+      loanDuration: 30 * 24 * 60 * 60,
+    },
+    currentCreationFee
+  );
+  const wethBasketCreationResult = await send(
+    deployment.contracts.diamond,
+    wethBasketCreation.data,
+    wethBasketCreation.value
+  );
+  const wethBasketEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "BasketCreated",
+    logs: wethBasketCreationResult.receipt.logs,
+    strict: true,
+  });
+  const wethBasketEvent = wethBasketEvents.find((event) => event.args.basketId === wethBasketId);
+  if (!wethBasketEvent) {
+    throw new Error("Permissionless WETH basket creation did not emit its registry event.");
+  }
+  const configuredWethBasket = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basket",
+    args: [wethBasketId],
+  });
+  if (
+    configuredWethBasket.assets.length !== 1 ||
+    configuredWethBasket.assets[0].toLowerCase() !== deployment.contracts.weth.toLowerCase() ||
+    configuredWethBasket.token.toLowerCase() !== wethBasketEvent.args.token.toLowerCase()
+  ) {
+    throw new Error("Confirmed permissionless WETH basket state does not match its review.");
+  }
+
   const stakingToken = await publicClient.readContract({
     address: deployment.contracts.diamond,
     abi: staticsAbi,
@@ -994,7 +1515,10 @@ try {
   }
   const createStakeResult = await send(
     deployment.contracts.diamond,
-    buildCreateAndStakeCall(stakeAmount, account.address, [deployment.contracts.dollar])
+    buildCreateAndStakeCall(stakeAmount, account.address, [
+      deployment.contracts.dollar,
+      deployment.contracts.weth,
+    ])
   );
   if (!createStakeResult.simulationData) {
     throw new Error("Create-and-stake simulation returned no PositionNFT ID.");
@@ -1012,10 +1536,11 @@ try {
     args: [stakingPositionId],
   });
   if (
-    initialSelections.length !== 1 ||
-    initialSelections[0].toLowerCase() !== deployment.contracts.dollar.toLowerCase()
+    initialSelections.length !== 2 ||
+    initialSelections[0].toLowerCase() !== deployment.contracts.dollar.toLowerCase() ||
+    initialSelections[1].toLowerCase() !== deployment.contracts.weth.toLowerCase()
   ) {
-    throw new Error("Atomic create-and-stake did not persist the selected reward asset.");
+    throw new Error("Atomic create-and-stake did not persist both selected reward assets.");
   }
 
   const mintForReward = async (shares) => {
@@ -1041,6 +1566,51 @@ try {
   };
 
   await mintForReward(parseEther("0.1"));
+  const wethRewardShares = parseEther("0.1");
+  const wethRewardQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteMint",
+    args: [wethBasketId, wethRewardShares],
+  });
+  const wethRewardMaximums = wethRewardQuote.map(maximum);
+  const wethRewardBalance = await publicClient.readContract({
+    address: deployment.contracts.weth,
+    abi: wethAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (wethRewardBalance < wethRewardMaximums[0]) {
+    await send(
+      deployment.contracts.weth,
+      encodeFunctionData({ abi: wethAbi, functionName: "deposit" }),
+      wethRewardMaximums[0] - wethRewardBalance
+    );
+  }
+  await send(
+    deployment.contracts.weth,
+    encodeFunctionData({
+      abi: wethAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, wethRewardMaximums[0]],
+    })
+  );
+  await send(
+    deployment.contracts.diamond,
+    buildMintCall(wethBasketId, wethRewardShares, account.address, wethRewardMaximums)
+  );
+
+  const selectedRewards = [deployment.contracts.dollar, deployment.contracts.weth];
+  const pendingBothAssets = await publicClient.readContract({
+    account: account.address,
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingRewards",
+    args: [stakingPositionId, selectedRewards],
+  });
+  if (pendingBothAssets.some((pending) => pending === 0n)) {
+    throw new Error("Fee-bearing mints did not accrue both selected reward assets.");
+  }
   const selectedReward = [deployment.contracts.dollar];
   const pendingBeforeOptOut = await publicClient.readContract({
     account: account.address,
@@ -1081,6 +1651,78 @@ try {
     deployment.contracts.diamond,
     buildOptInRewardAssetsCall(stakingPositionId, selectedReward)
   );
+  const claimMinimums = await publicClient.readContract({
+    account: account.address,
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "pendingRewards",
+    args: [stakingPositionId, selectedRewards],
+  });
+  const rewardBalancesBefore = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.dollar,
+      abi: staticsDollarTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.weth,
+      abi: wethAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    }),
+  ]);
+  const claimResult = await send(
+    deployment.contracts.diamond,
+    buildClaimRewardsCall(stakingPositionId, selectedRewards, account.address, claimMinimums)
+  );
+  if (!claimResult.simulationData) {
+    throw new Error("Multi-asset reward claim simulation returned no outputs.");
+  }
+  const simulatedClaim = decodeFunctionResult({
+    abi: staticsAbi,
+    functionName: "claimRewards",
+    data: claimResult.simulationData,
+  });
+  const claimedEvents = parseEventLogs({
+    abi: staticsAbi,
+    eventName: "RewardClaimed",
+    logs: claimResult.receipt.logs,
+    strict: true,
+  }).filter((event) => event.args.positionId === stakingPositionId);
+  const [pendingAfterClaim, rewardBalancesAfter] = await Promise.all([
+    publicClient.readContract({
+      account: account.address,
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "pendingRewards",
+      args: [stakingPositionId, selectedRewards],
+    }),
+    Promise.all([
+      publicClient.readContract({
+        address: deployment.contracts.dollar,
+        abi: staticsDollarTokenAbi,
+        functionName: "balanceOf",
+        args: [account.address],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.weth,
+        abi: wethAbi,
+        functionName: "balanceOf",
+        args: [account.address],
+      }),
+    ]),
+  ]);
+  if (
+    simulatedClaim.some((claimed, index) => claimed < claimMinimums[index]) ||
+    claimedEvents.length !== 2 ||
+    pendingAfterClaim.some((pending) => pending !== 0n) ||
+    rewardBalancesAfter.some(
+      (balance, index) => balance - rewardBalancesBefore[index] < claimMinimums[index]
+    )
+  ) {
+    throw new Error("Multi-asset reward claim did not clear and transfer both reviewed assets.");
+  }
   const restakedPosition = await publicClient.readContract({
     account: account.address,
     address: deployment.contracts.diamond,
@@ -1133,23 +1775,24 @@ try {
     functionName: "activeLegCount",
     args: [stakingPositionId],
   });
-  if (stakingLegCount === 0n) {
-    throw new Error("Unclaimed pending rewards did not keep the PositionNFT closure guard active.");
+  if (stakingLegCount !== 0n) {
+    throw new Error("Claimed rewards and full unstake did not clear the PositionNFT active leg.");
   }
-  const closeWithPendingRewards = await publicClient
-    .call({
-      account: account.address,
-      to: deployment.contracts.diamond,
-      data: buildClosePositionCall(stakingPositionId),
+  await send(deployment.contracts.diamond, buildClosePositionCall(stakingPositionId));
+  const closedStakingOwner = await publicClient
+    .readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "ownerOf",
+      args: [stakingPositionId],
     })
-    .then(() => true)
-    .catch(() => false);
-  if (closeWithPendingRewards) {
-    throw new Error("A PositionNFT with pending reward obligations simulated as closable.");
+    .catch(() => null);
+  if (closedStakingOwner !== null) {
+    throw new Error("Claimed and unstaked PositionNFT did not close cleanly.");
   }
 
   console.log(
-    "Local protocol integration passed: Dollar, basket, PositionNFT collateral, loan borrow/extend/repay/recovery, staking, reward opt-in, cooldown, and closure guards confirmed."
+    "Local protocol integration passed: Dollar, basket creation, collateral, lending, multi-asset rewards, canonical LP NFT lifecycle, LP claims, and borrow-to-liquidity confirmed."
   );
 } finally {
   anvil.kill("SIGTERM");

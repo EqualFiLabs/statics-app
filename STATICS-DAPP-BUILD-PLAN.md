@@ -141,7 +141,7 @@ review without fabricating a deployment or enabling a transaction.
 - [x] Create and inspect wallet-owned PositionNFTs from event discovery reconciled against current ownership (`components/positions`, `lib/positions/positions.ts`).
 - [x] Explain that transferring a PositionNFT transfers every attached protocol leg and obligation.
 - [x] Support global staking, authoritative cooldown state, per-position reward opt-in/out, and pending multi-asset reward reads.
-- [-] Support multi-asset reward claims; intentionally deferred while pending rewards and closure guards remain visible.
+- [x] Support selected multi-asset reward claims with fresh minimums, receipt checks, balance reconciliation, and closure after obligations clear.
 - [x] Support basket collateral deposits, direct mint-to-collateral, withdrawals, and redemptions with exact approvals and fresh bounds.
 - [x] Show each loan as an independent tranche with principal vector, maturity, and recovery time.
 - [x] Support borrow, repay, extend, and permissionless recovery using fresh authoritative state and quotes.
@@ -149,11 +149,12 @@ review without fabricating a deployment or enabling a transaction.
 
 ### Canonical liquidity release
 
-- [ ] Show zero native v4 LP fee separately from bilateral Statics hook fees.
-- [ ] Show pool lifecycle, warm-up, observation state, manager sync, fee allocation, pending POL, and locked POL.
-- [ ] Support user-owned PositionManager NFT creation and discovery.
-- [ ] Support staking, next-block activation, increase, claim, and immediate unstake for qualifying full-range LP NFTs.
-- [ ] Clearly distinguish hook-owned permanent liquidity from user-owned LP NFTs.
+- [x] Show zero native v4 LP fee separately from bilateral Statics hook fees.
+- [x] Show pool lifecycle, warm-up, observation state, manager sync, fee allocation, pending POL, and locked POL.
+- [x] Support user-owned PositionManager NFT creation and discovery.
+- [x] Support staking, next-block activation, increase, claim, and immediate unstake for qualifying full-range LP NFTs.
+- [x] Support the advanced atomic collateral-funded borrow-to-liquidity path with one reviewed pool input per basket constituent.
+- [x] Clearly distinguish hook-owned permanent liquidity from user-owned LP NFTs.
 
 ## Transaction UX rules
 
@@ -269,9 +270,9 @@ identity, browser-wallet, public-network, or production proof is claimed.
 - [x] Basket discovery, details, mint, and redemption.
 - [x] PositionNFT, basket collateral, and global staking.
 - [x] Loan quote, borrow, repay, extend, maturity, and recovery displays.
-- [ ] Multi-asset reward claims.
-- [ ] Permissionless basket creation.
-- [ ] Canonical v4 liquidity and user LP NFT management.
+- [x] Multi-asset reward claims.
+- [x] Permissionless basket creation.
+- [x] Canonical v4 liquidity and user LP NFT management.
 
 Gate: each lifecycle has focused unit coverage plus at least one real local integration flow. Current onchain state remains authoritative over cached/indexed data.
 
@@ -316,6 +317,19 @@ the grace period with surplus reclassification, collateral removal, loan deletio
 token reward. This is local proof only; no Privy, browser-wallet, public-network, or production
 transaction was performed. `npm run verify` passed lint, formatting, TypeScript, 109 Vitest tests,
 the production build, and 39 Playwright checks across desktop, tablet, and mobile.
+
+Remaining protocol-flow evidence (2026-07-23): canonical SDK commit
+`df56e5c5166c8aab155e516ced1053340993eb87` adds the verified local Uniswap v4 deployment
+foundation, code-hashed PoolManager, PositionManager, Permit2, and StateView bindings, and the
+typed interfaces used by the final DApp flows. The vendored artifact records that clean protocol
+commit plus source and generated-artifact checksums. `npm run test:integration:local` deploys the
+current unified stack to ephemeral Anvil and confirms permissionless basket creation with the exact
+current fee; selected multi-asset reward claims with simulation, events, cleared pending state, and
+wallet balance reconciliation; canonical pool warm-up and activation; bounded ERC-20 and Permit2
+allowances; wallet LP NFT creation, staking, next-block activation, increase, real-swap fee accrual,
+claim, and unstake; and atomic collateral-funded borrow-to-liquidity followed by repayment.
+`npm run verify` covers the complete local repository gate. This is local proof only; no Privy,
+browser-wallet, public-network, or production transaction was performed.
 
 ### DApp visual design and product review
 
@@ -407,6 +421,7 @@ Add dated entries with concrete evidence. Keep plans and completed work distinct
 | 2026-07-23 | DApp visual review support | Awaiting product review | Route-specific presentation, accessible responsive navigation, compact mobile hierarchy, alternate sample states, and a complete nine-surface snapshot matrix are implemented. All desktop, tablet, and mobile surfaces plus both responsive drawers were inspected. `npm run verify` passed lint, formatting, TypeScript, 89 Vitest tests, production build, and 36 Playwright checks.                                                                                                                               |
 | 2026-07-23 | Remaining DApp previews    | Awaiting product review | Loans, multi-asset reward claims, three-step permissionless basket creation, and canonical-liquidity/user LP NFT management are implemented as deterministic development previews with all wallet and value-moving controls disabled. Desktop, tablet, and mobile surfaces plus the basket economics/review states were inspected. `npm run verify` passed lint, formatting, TypeScript, 98 Vitest tests, the production build, and 39 Playwright checks.                                                             |
 | 2026-07-23 | Loan lifecycle             | Locally verified        | Event-reconciled owned and public-recovery tranches, fresh borrow/extension quotes, sequential exact approvals, receipt and state verification, and the confirmed-unverified refresh state passed focused tests. Ephemeral Anvil proved borrow, extend, repay, and unrewarded third-party recovery against current contracts. `npm run verify` passed 109 Vitest and 39 Playwright checks plus all lint, formatting, TypeScript, and production-build gates; interactive wallet and public-network proof remain open. |
+| 2026-07-23 | Remaining protocol flows   | Locally verified        | Ephemeral Anvil proved permissionless basket creation, selected multi-asset claims, canonical pool activation, bounded wallet LP NFT create/stake/activate/increase/real-swap claim/unstake, and atomic collateral-funded borrow-to-liquidity with repayment. The complete repository gate passed; interactive Privy/browser-wallet and public-network proof remain open.                                                                                                                                             |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 
