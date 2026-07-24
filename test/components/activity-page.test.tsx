@@ -1,6 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Hex } from "viem";
+
+const previewMode = vi.hoisted(() => ({ enabled: true }));
+vi.mock("@/lib/dapp-preview", () => ({
+  get dappPreviewEnabled() {
+    return previewMode.enabled;
+  },
+}));
 
 import { ActivityPage } from "@/components/dollar/ActivityPage";
 import { writeDollarActivity } from "@/lib/dollar/activity";
@@ -11,6 +18,7 @@ const originalHash: Hex = `0x${"11".repeat(32)}`;
 const replacementHash: Hex = `0x${"22".repeat(32)}`;
 
 function renderActivity(chainId: number) {
+  previewMode.enabled = false;
   return render(
     <WalletContext.Provider
       value={{
@@ -31,6 +39,7 @@ function renderActivity(chainId: number) {
 
 describe("Dollar activity page", () => {
   beforeEach(() => {
+    previewMode.enabled = true;
     window.localStorage.clear();
   });
 
