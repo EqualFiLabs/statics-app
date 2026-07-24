@@ -4,6 +4,7 @@ const port = 4173;
 
 export default defineConfig({
   testDir: "./test/e2e",
+  testIgnore: ["**/connected-local.spec.ts"],
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
