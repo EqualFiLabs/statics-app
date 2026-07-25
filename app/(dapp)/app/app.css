@@ -823,6 +823,41 @@
   border: 1px solid var(--line);
 }
 
+.portal-bridge-networks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.8rem;
+}
+
+.portal-bridge-networks .portal-destination {
+  min-height: 100%;
+}
+
+.portal-bridge-status {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.portal-bridge-status strong {
+  color: var(--green);
+}
+
+.portal-bridge-status button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-transform: uppercase;
+}
+
 .portal-destination span,
 .portal-destination small {
   color: var(--muted);
@@ -1070,6 +1105,10 @@
 
   .wallet-asset-actions {
     flex-wrap: wrap;
+  }
+
+  .portal-bridge-networks {
+    grid-template-columns: 1fr;
   }
 
   .portal-mode-tabs {

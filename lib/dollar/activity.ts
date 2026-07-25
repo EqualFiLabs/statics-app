@@ -17,6 +17,8 @@ export type DollarActivityKind =
   | "send"
   | "approve-swap"
   | "swap"
+  | "approve-bridge"
+  | "bridge"
   | "approve-weth"
   | "approve-dollar"
   | "approve-risk"

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { AcrossBridgePanel } from "@/components/portal/AcrossBridgePanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
 import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
 import { useWalletState } from "@/providers/wallet-context";
@@ -59,25 +60,7 @@ export function PortalWorkspace({
         </>
       )}
 
-      {mode === "bridge" && (
-        <div className="portal-panel" role="tabpanel">
-          <NetworkField />
-          <AssetAmountField label="Fund from" value={amount} onChange={setAmount} />
-          <div className="portal-destination">
-            <span>Destination</span>
-            <strong>Robinhood Chain</strong>
-            <small>USDG</small>
-          </div>
-          <dl className="portal-quote-grid">
-            <QuoteDatum label="Expected on Robinhood" />
-            <QuoteDatum label="Bridge fee" />
-            <QuoteDatum label="Estimated time" />
-          </dl>
-          <button className="portal-primary-action" type="button" disabled>
-            Review bridge
-          </button>
-        </div>
-      )}
+      {mode === "bridge" && <AcrossBridgePanel />}
 
       {mode === "dollar" && (
         <div className="portal-panel" role="tabpanel">
