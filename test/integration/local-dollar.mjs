@@ -26,6 +26,7 @@ import {
   buildInitializeCanonicalPoolCall,
   buildMintCall,
   buildMintBasketCollateralCall,
+  buildMintPeggedCall,
   buildMintV4PositionCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
@@ -35,6 +36,7 @@ import {
   buildRepayCall,
   buildRedeemCall,
   buildRedeemBasketCollateralCall,
+  buildRedeemPeggedCall,
   buildRecombineToETHCall,
   buildRecombineToWETHCall,
   buildUnstakeCall,
@@ -81,6 +83,15 @@ const fullRange = (spacing) => [
   Math.floor(887_272 / spacing) * spacing,
 ];
 const Q96 = 1n << 96n;
+const mockOracleAbi = [
+  {
+    type: "function",
+    name: "setUpdatedAt",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "updatedAt_", type: "uint256" }],
+    outputs: [],
+  },
+];
 
 async function availablePort() {
   const server = createServer();
@@ -1791,8 +1802,102 @@ try {
     throw new Error("Claimed and unstaked PositionNFT did not close cleanly.");
   }
 
+  const currentBlock = await publicClient.getBlock();
+  for (const oracle of [deployment.contracts.oracle, deployment.pegged.oracle]) {
+    await send(
+      oracle,
+      encodeFunctionData({
+        abi: mockOracleAbi,
+        functionName: "setUpdatedAt",
+        args: [currentBlock.timestamp],
+      })
+    );
+  }
+
+  const peggedProfileId = BigInt(deployment.pegged.profileId);
+  const peggedAmount = parseEther("10");
+  const peggedMintPreview = await publicClient.readContract({
+    address: deployment.contracts.gateway,
+    abi: staticsAbi,
+    functionName: "previewPeggedMint",
+    args: [peggedProfileId, peggedAmount],
+  });
+  await send(
+    deployment.pegged.collateral,
+    encodeFunctionData({
+      abi: basketTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.gateway, maximum(peggedMintPreview.totalCollateralIn)],
+    })
+  );
+  const dollarBeforePeggedMint = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  await send(
+    deployment.contracts.gateway,
+    buildMintPeggedCall(
+      peggedProfileId,
+      peggedAmount,
+      maximum(peggedMintPreview.totalCollateralIn),
+      account.address
+    )
+  );
+  const dollarAfterPeggedMint = await publicClient.readContract({
+    address: deployment.contracts.dollar,
+    abi: staticsDollarTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (dollarAfterPeggedMint < dollarBeforePeggedMint + peggedAmount) {
+    throw new Error("Local pegged mint did not increase the Statics Dollar balance.");
+  }
+
+  const peggedRedemptionAmount = parseEther("4");
+  const peggedRedemptionPreview = await publicClient.readContract({
+    address: deployment.contracts.gateway,
+    abi: staticsAbi,
+    functionName: "previewPeggedRedemption",
+    args: [peggedProfileId, peggedRedemptionAmount],
+  });
+  await send(
+    deployment.contracts.dollar,
+    encodeFunctionData({
+      abi: staticsDollarTokenAbi,
+      functionName: "approve",
+      args: [deployment.contracts.gateway, peggedRedemptionAmount],
+    })
+  );
+  const collateralBeforeRedemption = await publicClient.readContract({
+    address: deployment.pegged.collateral,
+    abi: basketTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  const peggedRedemption = await send(
+    deployment.contracts.gateway,
+    buildRedeemPeggedCall(
+      peggedProfileId,
+      peggedRedemptionAmount,
+      minimum(peggedRedemptionPreview.collateralOut),
+      account.address
+    )
+  );
+  assertAvailableRecombination("redeemPegged", peggedRedemption.simulationData);
+  const collateralAfterRedemption = await publicClient.readContract({
+    address: deployment.pegged.collateral,
+    abi: basketTokenAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (collateralAfterRedemption <= collateralBeforeRedemption) {
+    throw new Error("Local pegged redemption did not increase the USDG balance.");
+  }
+
   console.log(
-    "Local protocol integration passed: Dollar, basket creation, collateral, lending, multi-asset rewards, canonical LP NFT lifecycle, LP claims, and borrow-to-liquidity confirmed."
+    "Local protocol integration passed: Dollar, pegged USDG mint and redemption, basket creation, collateral, lending, multi-asset rewards, canonical LP NFT lifecycle, LP claims, and borrow-to-liquidity confirmed."
   );
 } finally {
   anvil.kill("SIGTERM");
