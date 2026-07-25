@@ -56,9 +56,13 @@ steps on a public RPC.
    - Reject the first exact WETH approval and confirm activity records `Rejected`, not `Reverted`.
    - Retry the exact approval, deposit WETH, and confirm Dollar/Risk balances.
 7. Recombine the resulting pair to WETH and confirm the WETH output.
-8. Revoke the Risk operator and verify the authoritative approval state refreshes.
-9. Confirm `/app/activity` is scoped to the embedded wallet and chain, displays the final receipt
-   hashes, and does not create explorer links for Anvil.
+8. In the Dollar section of `/app/portal`, mint Statics Dollar with the local USDG fixture:
+   - Approve only the bounded USDG amount shown by the fresh quote.
+   - Confirm the mint receipt and resulting USDG and Statics Dollar balances.
+   - Redeem a subset with an exact Statics Dollar approval, then confirm the receipt and balances.
+9. Revoke the Risk operator and verify the authoritative approval state refreshes.
+10. Confirm `/app/activity` is scoped to the embedded wallet identity, identifies the exact network
+    for every row, displays final receipt hashes, and does not create explorer links for Anvil.
 
 ## External-wallet smoke test
 
@@ -80,6 +84,7 @@ boolean outcomes:
 - Statics logout left the Eves session intact.
 - Embedded ETH deposit/recombination passed with confirmed receipts and expected balances.
 - Embedded WETH deposit/recombination passed with exact approvals and expected balances.
+- Embedded pegged USDG mint/redemption passed with bounded approvals and expected balances.
 - Wallet rejection, activity history, and Risk operator revocation passed.
 - External connect, chain switch, rejection, and disconnect passed.
 

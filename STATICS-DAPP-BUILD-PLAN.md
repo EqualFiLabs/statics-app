@@ -1,7 +1,7 @@
 # Statics Site and DApp Build Plan
 
 - Last updated: 2026-07-24
-- Status: Connected local runtime and signed-out reads verified; interactive wallet workflows remain unproven
+- Status: Multi-chain wallet and Portal plumbing implemented; interactive wallet workflows remain unproven
 - Primary workspace: `statics-site`
 - Protocol source: `../statics`
 - Reference wallet implementation: `../market-ui/eves-market-ui`
@@ -45,16 +45,28 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 - `/app` always renders its complete route-specific interface. Runtime values come from the
   configured local Anvil deployment when available; missing wallet, deployment, loading, and RPC
   states render `--` without removing the screen, and dependent actions stay disabled.
-  `npm run dev:preview` forces this unavailable-value presentation for visual regression work.
+  `npm run dev:preview` renders labelled deterministic sample states for visual regression work.
   `npm run dev:connected` imports only Eves Market's public Privy identifiers, deploys the current
   protocol to persistent Anvil, verifies runtime code hashes, and serves authoritative local data.
 - The connected signed-out application has rendered every current route, opened the real Privy
   login modal, and read the two seeded baskets from the verified local deployment. No authenticated
   Privy identity, embedded wallet, external wallet, or browser-signed protocol transaction has been
   exercised yet.
+- `/app/wallet` now exposes EVM and Solana asset views, Eves-derived EVM token metadata and icons,
+  custom ERC-20 management, Jupiter token discovery, SPL/Token-2022 discovery, and native/token
+  sends. Unavailable RPC data leaves the complete surface visible with `--`.
+- `/app/portal` now exposes Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and pegged
+  Statics Dollar mint/redemption. The local USDG profile is code-hash-bound and headlessly
+  exercised; Across production execution remains unavailable until a checked-in verified
+  Robinhood mainnet USDG deployment manifest exists.
+- `/app/activity` aggregates local EVM, Solana, swap, bridge, and protocol transaction histories.
+  Submitted EVM receipts, Solana signatures, and Across deposits have reload recovery paths.
 - Final brand assets live in `public/assets/`; `mockup.png` remains the design reference.
 - Vitest component/foundation tests and Playwright desktop, tablet, and mobile checks cover the landing, DApp shell, accessibility, route behavior, security headers, and visual snapshots.
-- There is no delegated authority, API layer, database, or public Statics deployment configuration. Local development can generate code-hash-bound Anvil configuration from the protocol deployment script.
+- There is no delegated authority, autonomous signer, database, or public Statics deployment
+  configuration. Server routes proxy Uniswap, Jupiter, and Across without exposing provider
+  credentials. Local development can generate code-hash-bound Anvil configuration from the
+  protocol deployment script.
 - The live protocol source is maintained separately in `../statics`.
 - The protocol repository records no public Statics deployment. The DApp must not show a production address, live TVL, or “deployed” status until a verified deployment manifest exists.
 - The canonical SDK is vendored from protocol commit `df56e5c5166c8aab155e516ced1053340993eb87` with SHA-256 provenance for every copied artifact.
@@ -118,8 +130,10 @@ integration evidence.
 | Route               | User outcome                                                                                                       | Initial release         |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------- |
 | `/app`              | Portfolio overview, wallet, network, Statics Dollar balance, positions, pending rewards, and protocol status       | Yes                     |
+| `/app/wallet`       | Manage EVM and Solana assets, tokens, sends, receives, and launch the funding Portal                               | Yes                     |
+| `/app/portal`       | Swap on EVM/Solana, fund through Across, and mint or redeem configured pegged Statics Dollar                       | Yes                     |
 | `/app/dollar`       | Deposit ETH/WETH, obtain Statics Dollar and Risk Shares, recombine to ETH/WETH, and use configured pegged profiles | Yes                     |
-| `/app/activity`     | Pending, confirmed, failed, and replaced Statics actions with explorer links                                       | Yes                     |
+| `/app/activity`     | EVM, Solana, swap, bridge, and protocol lifecycle history with supported explorer links                            | Yes                     |
 | `/app/settings`     | Wallet information, embedded-wallet export guidance, and Statics-only logout                                       | Yes                     |
 | `/app/baskets`      | Discover and inspect permissionless baskets and their lifecycle/risk metadata                                      | Next release            |
 | `/app/baskets/[id]` | Quote, mint, redeem, and inspect constituent requirements and fees                                                 | Next release            |
@@ -128,7 +142,6 @@ integration evidence.
 | `/app/loans`        | Quote, borrow, repay, extend, and inspect recovery state per independent loan tranche                              | Planned broader release |
 | `/app/rewards`      | Global staking, activation/cooldown, multi-asset pending rewards, and claims                                       | Planned broader release |
 | `/app/liquidity`    | Canonical pool state, user v4 positions, staking, activation, claims, and exits                                    | Advanced release        |
-| `/app/protocol`     | Read-only health, custody, lifecycle, timelock, and deployed-address information                                   | Yes, read-only          |
 
 ## User-facing protocol requirements
 
@@ -140,12 +153,33 @@ integration evidence.
 - [~] Support typed ETH and WETH deposits through the verified local gateway and actual browser wallet.
 - [~] Support ordinary recombination to WETH or ETH through the actual browser wallet.
 - [-] Support EIP-2612 permit recombination; deferred until after ordinary local flows.
-- [-] Support configured pegged-profile mint and redemption; outside the first local WETH profile scope.
+- [~] Support configured pegged-profile mint and redemption with a fresh quote, bounded approval,
+  simulation, receipt verification, and post-receipt balance checks; local source and headless
+  USDG evidence exist, but no browser wallet has exercised the workflow.
 - [~] Keep Risk Share ERC-1155 operator approval separate, explain its all-series scope, and expose revocation through the connected browser application.
 - [~] Refresh authoritative previews before simulation and refresh balances after browser-wallet receipts.
 - [~] Apply the tested operation-specific profile, series, oracle, health, debt, pause, balance, quote, and exit eligibility rules in the connected browser application (`lib/dollar/action-state.ts`).
 - [~] Preserve prior previews during refresh without allowing stale input or series data to submit through the connected browser application.
 - [~] Distinguish simulation, signature, rejection, submission, replacement, confirmation, reversion, and local failure using actual browser-wallet activity.
+
+### Multi-chain wallet and Portal release
+
+- [~] Display managed EVM and Solana balances, imported/default token metadata and icons, detected
+  SPL/Token-2022 accounts, and custom tokens; source and focused behavior coverage exist, but no
+  configured Privy wallet has exercised the complete browser workflow.
+- [~] Send native EVM, ERC-20, SOL, and SPL assets with reviewed recipient and amount state; EVM
+  receipt and Solana signature lifecycle storage is implemented, but interactive wallet proof is
+  open.
+- [~] Execute Uniswap EVM swaps through server quotes, fresh approval checks, wallet simulation,
+  and receipt confirmation; route/normalization tests exist, but no browser-wallet swap has run.
+- [~] Execute Jupiter Solana swaps through order, wallet signing, managed execution, and signature
+  history; route/serialization tests exist, but no browser-wallet swap has run.
+- [!] Execute Across funding into Robinhood USDG. Chain/token discovery, quote construction,
+  EVM/Solana origin execution, and status recovery are implemented, but the destination fails
+  closed until a verified Robinhood mainnet USDG deployment manifest is checked in.
+- [~] Aggregate EVM, Solana, swap, bridge, and Dollar activity and recover submitted receipts,
+  signatures, and deposits after reload; focused behavior coverage exists, but interactive recovery
+  remains unproven.
 
 ### Basket release
 
@@ -351,8 +385,10 @@ PositionNFT rewards, generate canonical LP fees for a staked LP NFT, and move an
 its recoverable time window; they accept no arbitrary target or calldata. The current `npm run
 test:integration:local` also passed Dollar, basket creation, collateral, lending, multi-asset
 rewards, canonical LP NFT, LP claim, and borrow-to-liquidity lifecycles. That integration remains
-direct-Viem headless evidence. No Privy-authenticated address, embedded or external browser wallet,
-browser-signed value-moving lifecycle, public-network action, or production deployment is claimed.
+direct-Viem headless evidence. It also minted Statics Dollar against the local pegged USDG profile,
+redeemed a bounded amount back to USDG, and verified the resulting token balances. No
+Privy-authenticated address, embedded or external browser wallet, browser-signed value-moving
+lifecycle, public-network action, or production deployment is claimed.
 
 Headless loan protocol evidence (2026-07-23): canonical SDK commit
 `8bf30cd3bdd8d32f1b5e4cc6ae4e3d3c0269b18f` added authoritative loan reads, lifecycle
@@ -439,15 +475,15 @@ Gate: production QA checklist is signed off with URLs and evidence. A production
 
 ## Known risks and mitigations
 
-| Risk                                                      | Mitigation                                                                                    |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Same wallet is mistaken for a shared session or authority | Explain separate sign-ins and never import Eves session, signer, policy, or delegation state. |
-| Wallet children render before providers                   | Route-split runtime and regression tests for the strict provider tree.                        |
-| An unexpected wallet becomes active                       | Use Privy-first deterministic selection and display the exact address and wallet type.        |
-| Cached quotes or indexes contradict the chain             | Refresh before simulation/submission and treat onchain reads as authoritative.                |
-| Landing implies an undeployed protocol is live            | Derive status from verified configuration and show a clear unavailable/not-deployed state.    |
-| Statics and Eves show stale balances after an action      | Receipt-based invalidation/refetch and optional deep-link refresh hints.                      |
-| Secrets enter the client bundle or repository             | Environment schema, server-only modules, secret scans, and fail-closed builds.                |
+| Risk                                                      | Mitigation                                                                                               |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Same wallet is mistaken for a shared session or authority | Keep sessions and authority technically separate; never import Eves signer, policy, or delegation state. |
+| Wallet children render before providers                   | Route-split runtime and regression tests for the strict provider tree.                                   |
+| An unexpected wallet becomes active                       | Use Privy-first deterministic selection and display the exact address and wallet type.                   |
+| Cached quotes or indexes contradict the chain             | Refresh before simulation/submission and treat onchain reads as authoritative.                           |
+| Landing implies an undeployed protocol is live            | Derive status from verified configuration and show a clear unavailable/not-deployed state.               |
+| Statics and Eves show stale balances after an action      | Receipt-based invalidation/refetch and optional deep-link refresh hints.                                 |
+| Secrets enter the client bundle or repository             | Environment schema, server-only modules, secret scans, and fail-closed builds.                           |
 
 ## Open decisions and external dependencies
 
@@ -459,7 +495,8 @@ These decisions do not block documenting or scaffolding the application, but the
 - [x] Select Robinhood Chain Testnet (chain ID 46630) as the wallet foundation target; select a dedicated staging/production RPC before deployment.
 - [ ] Produce or select the verified Statics deployment manifest; none is currently recorded.
 - [x] Vendor the versioned canonical Statics SDK with protocol commit and SHA-256 provenance; production imports remain independent from `../statics`.
-- [ ] Confirm which pegged profiles are part of the first Dollar release.
+- [~] Use the generated local USDG profile for development; the public-release pegged profile and
+  verified deployment manifest remain unconfirmed.
 - [ ] Confirm final Eves Market URL and desired handoff behavior.
 
 ## Progress log
@@ -484,6 +521,9 @@ Add dated entries with concrete evidence. Keep plans and completed work distinct
 | 2026-07-24 | Completion-claim correction | Corrected                   | Browser-facing `[x]` marks and progress statuses unsupported by configured browser-wallet evidence were removed. Sample previews, mocks, and direct-Viem Anvil runs remain recorded only at their actual evidence level.                                                                                                                                                                                                                                  |
 | 2026-07-24 | Connected local runtime     | Signed-out runtime verified | Persistent Anvil deployment and code hashes were verified; all current routes rendered without sample fallback or browser errors; the real Privy modal opened; and authoritative basket discovery found both fixtures. Interactive identity, embedded/external wallet, and browser-signed value workflows remain open.                                                                                                                                    |
 | 2026-07-24 | Persistent unavailable UI   | Locally browser verified    | With the app configured for Anvil and `127.0.0.1:8545` unavailable, all twelve DApp routes retained their complete screen layouts, rendered unavailable values as `--`, kept dependent actions disabled, and exposed no raw Viem transport error.                                                                                                                                                                                                         |
+| 2026-07-24 | Multi-chain wallet/Portal   | Source/behavior verified    | EVM and Solana asset management and sends, Uniswap and Jupiter swaps, Across discovery/execution/recovery, and local pegged USDG controls are implemented. Focused behavior tests passed; no authenticated browser wallet has executed these flows, and production Across remains manifest-blocked.                                                                                                                                                       |
+| 2026-07-24 | Pegged USDG rehearsal       | Headless local proof only   | Ephemeral Anvil exercised code-hash-bound USDG mint and redemption with bounded approvals, simulations, confirmed receipts, and post-receipt balance reconciliation. No connected browser-wallet or public-network USDG workflow ran.                                                                                                                                                                                                                     |
+| 2026-07-24 | Unified wallet activity     | Source/behavior verified    | EVM, Solana, swap, bridge, and Dollar records share one activity surface, with reload recovery for submitted EVM receipts, Solana signatures, and Across deposits. Interactive recovery through an authenticated browser wallet remains unproven.                                                                                                                                                                                                         |
 
 Dependency note (2026-07-22): safe `axios` and `ws` overrides remove the high-severity advisories inherited by the current Privy stack. `npm audit --omit=dev` still reports 10 moderate `uuid` advisories through Privy -> x402 -> Wagmi/MetaMask. npm offers only a forced downgrade of `@privy-io/react-auth`; that downgrade was not applied.
 
