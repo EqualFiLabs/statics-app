@@ -3,17 +3,10 @@
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 
-import {
-  decodeJupiterTransaction,
-  encodeJupiterTransaction,
-  SOLANA_USDC_MINT,
-  SOL_MINT,
-} from "@/lib/portal/solana";
+import { useSolanaTokens } from "@/hooks/useSolanaTokens";
+import { decodeJupiterTransaction, encodeJupiterTransaction } from "@/lib/portal/solana";
+import type { SolanaToken } from "@/lib/solana-tokens";
 import { useSolanaWalletState } from "@/providers/solana-context";
-
-type Token = { mint: string; symbol: string; decimals: number };
-const sol: Token = { mint: SOL_MINT, symbol: "SOL", decimals: 9 };
-const usdc: Token = { mint: SOLANA_USDC_MINT, symbol: "USDC", decimals: 6 };
 
 type JupiterOrder = {
   inAmount?: string;
@@ -38,9 +31,11 @@ async function json(response: Response): Promise<JupiterOrder> {
 
 export function SolanaSwapPanel() {
   const runtime = useSolanaWalletState();
+  const managedTokens = useSolanaTokens();
+  const tokens = managedTokens.tokens;
   const wallet = runtime.wallets[0];
-  const [source, setSource] = useState<Token>(sol);
-  const [destination, setDestination] = useState<Token>(usdc);
+  const [source, setSource] = useState<SolanaToken>(tokens[0]!);
+  const [destination, setDestination] = useState<SolanaToken>(tokens[1]!);
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<JupiterOrder | null>(null);
   const [loading, setLoading] = useState(false);
@@ -157,11 +152,14 @@ export function SolanaSwapPanel() {
       <SolanaField
         label="You pay"
         amount={amount}
+        tokens={tokens}
         token={source}
         onAmount={setAmount}
         onToken={(next) => {
           setSource(next);
-          setDestination(next.mint === sol.mint ? usdc : sol);
+          if (next.mint === destination.mint) {
+            setDestination(tokens.find((token) => token.mint !== next.mint) ?? destination);
+          }
         }}
       />
       <button
@@ -175,7 +173,15 @@ export function SolanaSwapPanel() {
       >
         ⇅
       </button>
-      <SolanaField label="You receive" amount={output} token={destination} readOnly />
+      <SolanaField
+        label="You receive"
+        amount={output}
+        tokens={tokens}
+        token={destination}
+        excludedMint={source.mint}
+        readOnly
+        onToken={setDestination}
+      />
       <dl className="portal-quote-grid">
         <div>
           <dt>Minimum received</dt>
@@ -230,17 +236,21 @@ export function SolanaSwapPanel() {
 function SolanaField({
   label,
   amount,
+  tokens,
   token,
+  excludedMint,
   readOnly = false,
   onAmount,
   onToken,
 }: {
   label: string;
   amount: string;
-  token: Token;
+  tokens: readonly SolanaToken[];
+  token: SolanaToken;
+  excludedMint?: string;
   readOnly?: boolean;
   onAmount?: (value: string) => void;
-  onToken?: (token: Token) => void;
+  onToken?: (token: SolanaToken) => void;
 }) {
   return (
     <label className="portal-field portal-asset-field">
@@ -256,11 +266,18 @@ function SolanaField({
         <select
           aria-label={`${label} asset`}
           value={token.mint}
-          disabled={!onToken}
-          onChange={(event) => onToken?.(event.target.value === sol.mint ? sol : usdc)}
+          onChange={(event) => {
+            const selected = tokens.find((candidate) => candidate.mint === event.target.value);
+            if (selected) onToken?.(selected);
+          }}
         >
-          <option value={sol.mint}>SOL</option>
-          <option value={usdc.mint}>USDC</option>
+          {tokens
+            .filter((candidate) => candidate.mint !== excludedMint)
+            .map((candidate) => (
+              <option key={candidate.mint} value={candidate.mint}>
+                {candidate.symbol}
+              </option>
+            ))}
         </select>
       </div>
       <small>--</small>

@@ -16,6 +16,7 @@ import {
 } from "viem";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
+import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
@@ -73,6 +74,7 @@ export function WalletPage() {
   const network = getFundingNetwork(wallet.fundingChainId);
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
   const [modal, setModal] = useState<WalletModal>(null);
+  const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
   const [nativeBalance, setNativeBalance] = useState<AssetBalance>(null);
   const [tokenBalances, setTokenBalances] = useState<Record<string, AssetBalance>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -151,8 +153,18 @@ export function WalletPage() {
     })),
   ];
 
+  if (walletMode === "solana") {
+    return (
+      <>
+        <WalletModeSelector mode={walletMode} onChange={setWalletMode} />
+        <SolanaWalletPanel />
+      </>
+    );
+  }
+
   return (
     <>
+      <WalletModeSelector mode={walletMode} onChange={setWalletMode} />
       <section className="wallet-surface">
         <div className="wallet-network-row">
           <label>
@@ -287,6 +299,25 @@ export function WalletPage() {
         <SendDialog assets={assets} onConfirmed={refreshBalances} onClose={() => setModal(null)} />
       )}
     </>
+  );
+}
+
+function WalletModeSelector({
+  mode,
+  onChange,
+}: {
+  mode: "evm" | "solana";
+  onChange: (mode: "evm" | "solana") => void;
+}) {
+  return (
+    <div className="portal-chain-tabs wallet-mode-tabs" aria-label="Wallet chain type">
+      <button type="button" aria-pressed={mode === "evm"} onClick={() => onChange("evm")}>
+        EVM
+      </button>
+      <button type="button" aria-pressed={mode === "solana"} onClick={() => onChange("solana")}>
+        Solana
+      </button>
+    </div>
   );
 }
 

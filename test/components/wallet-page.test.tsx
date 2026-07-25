@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WalletPage } from "@/components/wallet/WalletPage";
@@ -30,10 +30,13 @@ describe("wallet interactions", () => {
     expect(selectFundingNetwork).toHaveBeenCalledWith(42_161);
 
     fireEvent.click(screen.getByRole("button", { name: /portal/i }));
-    expect(screen.getByRole("dialog", { name: "Funding Portal" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Solana" }));
-    expect(screen.getByRole("button", { name: "Create Solana wallet" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /bridge/i }));
+    const portal = screen.getByRole("dialog", { name: "Funding Portal" });
+    expect(portal).toBeInTheDocument();
+    fireEvent.click(within(portal).getByRole("button", { name: "Solana" }));
+    expect(
+      within(portal).getByRole("button", { name: "Create Solana wallet" })
+    ).toBeInTheDocument();
+    fireEvent.click(within(portal).getByRole("tab", { name: /bridge/i }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -64,5 +67,13 @@ describe("wallet interactions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /portal/i }));
     expect(screen.getAllByRole("option", { name: "AERO" })).toHaveLength(2);
+  });
+
+  it("keeps the Solana wallet surface navigable without RPC data", () => {
+    render(<WalletPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Solana" }));
+    expect(screen.getByRole("heading", { name: "Tokens" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Add token/ }));
+    expect(screen.getByRole("dialog", { name: "Browse Solana tokens" })).toBeInTheDocument();
   });
 });

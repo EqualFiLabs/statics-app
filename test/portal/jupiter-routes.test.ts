@@ -6,16 +6,20 @@ vi.mock("@/lib/server/jupiter", async (importOriginal) => {
     ...original,
     callJupiterOrder: vi.fn(),
     callJupiterExecute: vi.fn(),
+    callJupiterTokens: vi.fn(),
   };
 });
 
 const { POST: quote } = await import("@/app/api/jupiter/quote/route");
 const { POST: swap } = await import("@/app/api/jupiter/swap/route");
 const { POST: execute } = await import("@/app/api/jupiter/execute/route");
-const { callJupiterOrder, callJupiterExecute } = await import("@/lib/server/jupiter");
+const { GET: tokens } = await import("@/app/api/jupiter/tokens/route");
+const { callJupiterOrder, callJupiterExecute, callJupiterTokens } =
+  await import("@/lib/server/jupiter");
 
 const order = vi.mocked(callJupiterOrder);
 const relay = vi.mocked(callJupiterExecute);
+const tokenSearch = vi.mocked(callJupiterTokens);
 const sol = "So11111111111111111111111111111111111111112";
 const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const taker = "9xQeWvG816bUx9EPfSYKcF2qT1D3NEkxkyvTBQ5bB7hq";
@@ -32,6 +36,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   order.mockResolvedValue({ ok: true, status: 200, payload: { outAmount: "1" } });
   relay.mockResolvedValue({ ok: true, status: 200, payload: { signature: "signature", code: 0 } });
+  tokenSearch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    payload: [{ address: usdc, symbol: "USDC", name: "USD Coin", decimals: 6 }],
+  });
 });
 
 describe("Jupiter API routes", () => {
@@ -83,5 +92,16 @@ describe("Jupiter API routes", () => {
     expect(relay).toHaveBeenCalledWith(
       expect.objectContaining({ signedTransaction: "AQID", requestId: "request" })
     );
+  });
+
+  it("proxies bounded token searches", async () => {
+    const response = await tokens(new Request("http://localhost/api/jupiter/tokens?query=USDC"));
+    expect(response.status).toBe(200);
+    expect(tokenSearch).toHaveBeenCalledWith("USDC");
+
+    const tooLong = await tokens(
+      new Request(`http://localhost/api/jupiter/tokens?query=${"a".repeat(121)}`)
+    );
+    expect(tooLong.status).toBe(400);
   });
 });

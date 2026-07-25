@@ -1,7 +1,10 @@
 const JUPITER_ORDER_API = "https://api.jup.ag/swap/v2/order";
 const JUPITER_EXECUTE_API = "https://api.jup.ag/swap/v2/execute";
+const JUPITER_TOKEN_SEARCH_API = "https://api.jup.ag/tokens/v2/search";
+const JUPITER_TOKEN_TAG_API = "https://api.jup.ag/tokens/v2/tag";
 
 export const DEFAULT_JUPITER_SLIPPAGE_BPS = 50;
+const JUPITER_TOKEN_CACHE_MS = 5 * 60 * 1000;
 
 type JupiterResult =
   { ok: true; status: number; payload: unknown } | { ok: false; status: number; payload: unknown };
@@ -23,6 +26,78 @@ function headers(contentType = false) {
     ...(contentType ? { "content-type": "application/json" } : {}),
     ...(apiKey ? { "x-api-key": apiKey } : {}),
   };
+}
+
+export type JupiterToken = Readonly<{
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  icon?: string;
+  isVerified?: boolean;
+}>;
+
+const tokenCache = new Map<string, { expiresAt: number; tokens: JupiterToken[] }>();
+
+function normalizeJupiterTokens(value: unknown): JupiterToken[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): JupiterToken[] => {
+    if (!item || typeof item !== "object") return [];
+    const token = item as Record<string, unknown>;
+    if (
+      typeof token.address !== "string" ||
+      typeof token.symbol !== "string" ||
+      typeof token.name !== "string" ||
+      !Number.isInteger(token.decimals)
+    ) {
+      return [];
+    }
+    return [
+      {
+        address: token.address,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: Number(token.decimals),
+        ...(typeof token.icon === "string" ? { icon: token.icon } : {}),
+        ...(typeof token.isVerified === "boolean" ? { isVerified: token.isVerified } : {}),
+      },
+    ];
+  });
+}
+
+export async function callJupiterTokens(query = ""): Promise<JupiterResult> {
+  const normalizedQuery = query.trim();
+  const key = normalizedQuery.toLowerCase() || "verified";
+  const cached = tokenCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ok: true, status: 200, payload: cached.tokens };
+  }
+  const url = normalizedQuery
+    ? `${JUPITER_TOKEN_SEARCH_API}?query=${encodeURIComponent(normalizedQuery)}`
+    : `${JUPITER_TOKEN_TAG_API}?query=verified`;
+  try {
+    const response = await fetch(url, { headers: headers(), cache: "no-store" });
+    const body = await payload(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        payload: body ?? { detail: "Jupiter token search failed." },
+      };
+    }
+    const tokens = normalizeJupiterTokens(body);
+    tokenCache.set(key, { tokens, expiresAt: Date.now() + JUPITER_TOKEN_CACHE_MS });
+    return { ok: true, status: 200, payload: tokens };
+  } catch (error) {
+    if (cached) return { ok: true, status: 200, payload: cached.tokens };
+    return {
+      ok: false,
+      status: 502,
+      payload: {
+        detail: error instanceof Error ? error.message : "Could not reach Jupiter.",
+      },
+    };
+  }
 }
 
 export async function callJupiterOrder(input: {
