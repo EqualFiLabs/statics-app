@@ -73,7 +73,8 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
   }
   const pegged = {};
   for (const [name, label] of Object.entries(peggedLabels)) {
-    const pattern = name === "profileId" ? `${label}\\s+([0-9]+)` : `${label}\\s+(0x[a-fA-F0-9]{40})`;
+    const pattern =
+      name === "profileId" ? `${label}\\s+([0-9]+)` : `${label}\\s+(0x[a-fA-F0-9]{40})`;
     const match = output.match(new RegExp(pattern));
     if (!match) throw new Error(`Forge output did not include ${label}.`);
     pegged[name] = match[1];
