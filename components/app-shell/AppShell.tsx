@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { getDappRoutePresentation } from "@/lib/dapp-navigation";
+import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { appNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
@@ -110,6 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeCopy = getDappRoutePresentation(currentPath);
+  const showOverviewSummary = isDappOverviewPath(currentPath);
 
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
@@ -257,11 +258,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <main id="dapp-content" className="dapp-content">
-          <section className="dapp-intro">
-            <p className="dapp-eyebrow">{"// Statics application"}</p>
-            <h1>{routeCopy.title}</h1>
-            <p>{routeCopy.description}</p>
-          </section>
+          {showOverviewSummary && (
+            <section className="dapp-intro">
+              <p className="dapp-eyebrow">{"// Statics application"}</p>
+              <h1>{routeCopy.title}</h1>
+              <p>{routeCopy.description}</p>
+            </section>
+          )}
 
           {wallet.error && (
             <p className="dapp-inline-error" role="alert">
@@ -269,14 +272,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           )}
 
-          <section className="dapp-status-grid" aria-label="Application readiness">
-            {statusCards.map((card) => (
-              <article key={card.label} className="dapp-status-card">
-                <span>{card.label}</span>
-                <strong className={card.ready ? "is-ready" : undefined}>{card.value}</strong>
-              </article>
-            ))}
-          </section>
+          {showOverviewSummary && (
+            <section className="dapp-status-grid" aria-label="Application readiness">
+              {statusCards.map((card) => (
+                <article key={card.label} className="dapp-status-card">
+                  <span>{card.label}</span>
+                  <strong className={card.ready ? "is-ready" : undefined}>{card.value}</strong>
+                </article>
+              ))}
+            </section>
+          )}
 
           {children}
         </main>

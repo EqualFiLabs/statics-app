@@ -5,6 +5,10 @@ export type DappRoutePresentation = {
   description: string;
 };
 
+export function isDappOverviewPath(pathname: string): boolean {
+  return pathname === "/app" || pathname === "/app/";
+}
+
 const routePresentations = {
   overview: {
     label: "Overview",

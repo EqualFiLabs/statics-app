@@ -180,9 +180,6 @@ test.describe("Dollar DApp foundation", () => {
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {
     await page.goto("/app/baskets");
-    await expect(
-      page.getByRole("heading", { name: "Inspect, mint, and redeem static baskets." })
-    ).toBeVisible();
     await expect(page.locator('.dapp-nav-item[href="/app/baskets"]')).toHaveAttribute(
       "aria-current",
       "page"

@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { getDappRoutePresentation } from "@/lib/dapp-navigation";
+import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 
 describe("DApp route presentation", () => {
+  it("shows the shared summary only on the overview route", () => {
+    expect(isDappOverviewPath("/app")).toBe(true);
+    expect(isDappOverviewPath("/app/")).toBe(true);
+    expect(isDappOverviewPath("/app/wallet")).toBe(false);
+    expect(isDappOverviewPath("/app/baskets/1042")).toBe(false);
+  });
+
   it.each([
     ["/app", "Overview", "Track your Statics portfolio."],
     ["/app/wallet", "Wallet", "Fund and manage your wallet."],
