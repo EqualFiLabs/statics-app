@@ -1548,7 +1548,8 @@
   color: var(--muted);
 }
 
-.activity-status.is-confirmed {
+.activity-status.is-confirmed,
+.activity-status.is-confirmed-unverified {
   color: var(--green);
 }
 

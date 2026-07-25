@@ -82,6 +82,10 @@ export type DollarActivity = Readonly<{
 
 const activityEvent = "statics-protocol-activity";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
+const aggregateActivityCache = new Map<
+  string,
+  { sources: DollarActivity[][]; value: DollarActivity[] }
+>();
 const activityStatuses = new Set<DollarActivityStatus>([
   "simulating",
   "signing",
@@ -147,6 +151,31 @@ export const readProtocolActivity = readDollarActivity;
 export const writeProtocolActivity = writeDollarActivity;
 export const updateProtocolActivity = updateDollarActivity;
 export const subscribeProtocolActivity = subscribeDollarActivity;
+
+export function readProtocolActivityAcrossChains(
+  wallet: Address,
+  chainIds: readonly number[]
+): DollarActivity[] {
+  const uniqueChainIds = [...new Set(chainIds.filter(Number.isSafeInteger))].sort(
+    (left, right) => left - right
+  );
+  const key = `${wallet.toLowerCase()}:${uniqueChainIds.join(",")}`;
+  const sources = uniqueChainIds.map((chainId) => readDollarActivity(wallet, chainId));
+  const cached = aggregateActivityCache.get(key);
+  if (
+    cached &&
+    cached.sources.length === sources.length &&
+    cached.sources.every((source, index) => source === sources[index])
+  ) {
+    return cached.value;
+  }
+  const value = sources
+    .flat()
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .slice(0, 100);
+  aggregateActivityCache.set(key, { sources, value });
+  return value;
+}
 
 export function writeDollarActivity(activity: DollarActivity): void {
   const current = readDollarActivity(activity.wallet, activity.chainId);

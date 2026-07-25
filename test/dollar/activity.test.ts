@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   readDollarActivity,
+  readProtocolActivityAcrossChains,
   updateDollarActivity,
   writeDollarActivity,
   type DollarActivity,
@@ -58,6 +59,15 @@ describe("Dollar activity storage", () => {
 
     expect(readDollarActivity(wallet, 31_337)).toHaveLength(50);
     expect(readDollarActivity(wallet, 46_630)).toEqual([]);
+  });
+
+  it("combines activity for the same wallet across supported chains", () => {
+    writeDollarActivity(activity({ id: "local", chainId: 31_337, createdAt: 1 }));
+    writeDollarActivity(activity({ id: "base", chainId: 8_453, createdAt: 2 }));
+
+    expect(
+      readProtocolActivityAcrossChains(wallet, [31_337, 8_453]).map((entry) => entry.id)
+    ).toEqual(["base", "local"]);
   });
 
   it("fails closed for malformed browser storage", () => {

@@ -107,10 +107,13 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
 
   useEffect(() => {
-    const stored = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
-    if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
-      setFundingChainId(stored);
-    }
+    const timeout = window.setTimeout(() => {
+      const stored = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
+      if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
+        setFundingChainId(stored);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const runAction = async (

@@ -14,6 +14,7 @@ import {
   SOLANA_MAINNET_CHAIN,
 } from "@/lib/solana-wallet";
 import { validSolanaPublicKey, type SolanaToken } from "@/lib/solana-tokens";
+import { updateSolanaActivity, writeSolanaActivity } from "@/lib/portal/solana-activity";
 
 type SolanaModal = "send" | "receive" | "tokens" | null;
 
@@ -305,6 +306,16 @@ function SolanaSendDialog({
 
   const confirm = async () => {
     if (!wallet.wallet || !asset || !validSolanaPublicKey(recipient) || !valid || pending) return;
+    const activityId = crypto.randomUUID();
+    writeSolanaActivity({
+      id: activityId,
+      wallet: wallet.wallet.address,
+      kind: "send",
+      label: `Send ${asset.symbol}`,
+      amount: `${amount} ${asset.symbol}`,
+      status: "signing",
+      createdAt: Date.now(),
+    });
     setPending(true);
     setError(null);
     try {
@@ -360,15 +371,19 @@ function SolanaSendDialog({
       const signature = await wallet.connection.sendRawTransaction(signedTransaction, {
         skipPreflight: false,
       });
+      updateSolanaActivity(activityId, { status: "submitted", signature });
       const confirmation = await wallet.connection.confirmTransaction(
         { signature, ...latest },
         "confirmed"
       );
       if (confirmation.value.err) throw new Error("Solana transaction reverted.");
+      updateSolanaActivity(activityId, { status: "confirmed", signature });
       await wallet.refresh();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The transfer failed.");
+      const message = cause instanceof Error ? cause.message : "The transfer failed.";
+      updateSolanaActivity(activityId, { status: "failed", error: message });
+      setError(message);
     } finally {
       setPending(false);
     }

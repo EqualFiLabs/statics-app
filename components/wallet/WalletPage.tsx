@@ -79,6 +79,7 @@ export function WalletPage() {
   const [tokenBalances, setTokenBalances] = useState<Record<string, AssetBalance>>({});
   const [refreshing, setRefreshing] = useState(false);
   const refreshId = useRef(0);
+  const tokenAddresses = useMemo(() => tokens.map((token) => token.address).join(","), [tokens]);
 
   const refreshBalances = async () => {
     const currentRefresh = ++refreshId.current;
@@ -121,17 +122,15 @@ export function WalletPage() {
   };
 
   useEffect(() => {
-    setNativeBalance(null);
-    setTokenBalances({});
-    void refreshBalances();
+    const timeout = window.setTimeout(() => {
+      setNativeBalance(null);
+      setTokenBalances({});
+      void refreshBalances();
+    }, 0);
+    return () => window.clearTimeout(timeout);
     // Refresh identity is intentionally limited to wallet, network, and selected-token changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    wallet.address,
-    wallet.fundingChainId,
-    wallet.fundingWalletOnSelectedChain,
-    tokens.map((token) => token.address).join(","),
-  ]);
+  }, [wallet.address, wallet.fundingChainId, wallet.fundingWalletOnSelectedChain, tokenAddresses]);
 
   const nativeSymbol = network?.chain.nativeCurrency.symbol ?? "--";
   const nativeAsset = {
@@ -435,18 +434,28 @@ function CustomTokenDialog({
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const address = isAddress(input) && input !== zeroAddress ? getAddress(input) : null;
+  const {
+    address: walletAddress,
+    fundingChainId,
+    fundingWalletOnSelectedChain,
+    getEthereumProvider,
+  } = wallet;
 
   useEffect(() => {
-    setToken(null);
-    setError(null);
-    if (!address || !wallet.address || !wallet.fundingWalletOnSelectedChain) return;
+    if (!address || !walletAddress || !fundingWalletOnSelectedChain) {
+      const timeout = window.setTimeout(() => {
+        setToken(null);
+        setError(null);
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
     let active = true;
     const timeout = window.setTimeout(() => {
       setReading(true);
       void (async () => {
         try {
-          const provider = await wallet.getEthereumProvider();
-          const network = getFundingNetwork(wallet.fundingChainId);
+          const provider = await getEthereumProvider();
+          const network = getFundingNetwork(fundingChainId);
           if (!provider || !network) throw new Error("The selected wallet is unavailable.");
           const client = createPublicClient({ chain: network.chain, transport: custom(provider) });
           const [symbol, decimals] = await Promise.all([
@@ -472,13 +481,7 @@ function CustomTokenDialog({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [
-    address,
-    wallet.address,
-    wallet.fundingChainId,
-    wallet.fundingWalletOnSelectedChain,
-    wallet.getEthereumProvider,
-  ]);
+  }, [address, walletAddress, fundingChainId, fundingWalletOnSelectedChain, getEthereumProvider]);
 
   const duplicate = Boolean(
     address &&
@@ -494,7 +497,11 @@ function CustomTokenDialog({
           <input
             value={input}
             placeholder="0x…"
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value);
+              setToken(null);
+              setError(null);
+            }}
           />
         </label>
         <div className="wallet-token-metadata">

@@ -1,19 +1,59 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { getAddress } from "viem";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { Connection } from "@solana/web3.js";
+import { getAddress, isAddress } from "viem";
 
+import { ActivityPreview } from "@/components/preview/DappPreview";
+import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
-  readProtocolActivity,
+  readProtocolActivityAcrossChains,
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
-import { ActivityPreview } from "@/components/preview/DappPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
-import { getTransactionExplorerUrl } from "@/lib/wallet-config";
+import { getFundingNetwork } from "@/lib/funding-networks";
+import { ACROSS_SOLANA_CHAIN_ID } from "@/lib/portal/across";
+import {
+  readBridgeActivity,
+  refreshBridgeActivity,
+  subscribeBridgeActivity,
+  type BridgeActivity,
+} from "@/lib/portal/bridge-activity";
+import { recoverProtocolActivity, recoverSolanaActivity } from "@/lib/portal/activity-recovery";
+import {
+  readSolanaActivity,
+  subscribeSolanaActivity,
+  type SolanaActivity,
+} from "@/lib/portal/solana-activity";
+import { SOLANA_MAINNET_RPC_URL } from "@/lib/solana-wallet";
+import {
+  anvil,
+  getTransactionExplorerUrl,
+  robinhoodMainnet,
+  robinhoodTestnet,
+} from "@/lib/wallet-config";
+import { useSolanaWalletState } from "@/providers/solana-context";
 import { useWalletState } from "@/providers/wallet-context";
 
-function statusLabel(activity: ProtocolActivity): string {
+const emptyProtocolActivity: ProtocolActivity[] = [];
+const emptyBridgeActivity: BridgeActivity[] = [];
+const emptySolanaActivity: SolanaActivity[] = [];
+
+type UnifiedActivity = Readonly<{
+  id: string;
+  label: string;
+  amount: string;
+  network: string;
+  status: string;
+  statusClass: string;
+  createdAt: number;
+  reference?: string;
+  explorerUrl?: string | null;
+  originalReference?: string;
+  error?: string;
+}>;
+
+function protocolStatus(activity: ProtocolActivity): string {
   if (activity.status === "simulating") return "Simulating";
   if (activity.status === "signing") return "Awaiting signature";
   if (activity.status === "submitted") return "Confirming";
@@ -29,35 +69,197 @@ function statusLabel(activity: ProtocolActivity): string {
   return "Failed";
 }
 
+function chainName(chainId: number): string {
+  if (chainId === ACROSS_SOLANA_CHAIN_ID) return "Solana";
+  if (chainId === robinhoodMainnet.id) return robinhoodMainnet.name;
+  if (chainId === robinhoodTestnet.id) return robinhoodTestnet.name;
+  if (chainId === anvil.id) return anvil.name;
+  return getFundingNetwork(chainId)?.label ?? `Chain ${chainId}`;
+}
+
+function evmExplorerUrl(chainId: number, hash: string): string | null {
+  const known = getTransactionExplorerUrl(chainId, hash);
+  if (known) return known;
+  const explorer = getFundingNetwork(chainId)?.chain.blockExplorers?.default.url;
+  return explorer ? `${explorer}/tx/${hash}` : null;
+}
+
+function protocolItem(activity: ProtocolActivity): UnifiedActivity {
+  const reference = activity.confirmedHash ?? activity.replacementHash ?? activity.hash;
+  return {
+    id: `protocol:${activity.id}`,
+    label: activity.label,
+    amount: activity.amount,
+    network: chainName(activity.chainId),
+    status: protocolStatus(activity),
+    statusClass: activity.status,
+    createdAt: activity.createdAt,
+    reference,
+    explorerUrl: reference ? evmExplorerUrl(activity.chainId, reference) : null,
+    originalReference: activity.replacementHash && activity.hash ? activity.hash : undefined,
+    error: activity.error,
+  };
+}
+
+function bridgeItem(activity: BridgeActivity): UnifiedActivity {
+  const confirmed = activity.status === "filled";
+  const failed = ["expired", "refunded", "failed"].includes(activity.status);
+  const reference = activity.fillTxnRef ?? activity.depositTxnRef;
+  const referenceChainId = activity.fillTxnRef
+    ? activity.destinationChainId
+    : activity.originChainId;
+  return {
+    id: `bridge:${activity.id}`,
+    label: `Bridge ${activity.inputSymbol} to ${activity.outputSymbol}`,
+    amount: `${activity.amount} ${activity.inputSymbol}`,
+    network: `${chainName(activity.originChainId)} → ${chainName(activity.destinationChainId)}`,
+    status:
+      activity.status === "pending"
+        ? "Confirming"
+        : activity.status.charAt(0).toUpperCase() + activity.status.slice(1),
+    statusClass: confirmed ? "confirmed" : failed ? "failed" : "submitted",
+    createdAt: activity.createdAt,
+    reference,
+    explorerUrl:
+      referenceChainId === ACROSS_SOLANA_CHAIN_ID
+        ? `https://solscan.io/tx/${reference}`
+        : evmExplorerUrl(referenceChainId, reference),
+    originalReference: activity.fillTxnRef ? activity.depositTxnRef : undefined,
+    error: activity.error,
+  };
+}
+
+function solanaItem(activity: SolanaActivity): UnifiedActivity {
+  return {
+    id: `solana:${activity.id}`,
+    label: activity.label,
+    amount: activity.amount,
+    network: "Solana",
+    status:
+      activity.status === "signing"
+        ? "Awaiting signature"
+        : activity.status === "submitted"
+          ? "Confirming"
+          : activity.status === "confirmed"
+            ? "Confirmed"
+            : "Failed",
+    statusClass: activity.status,
+    createdAt: activity.createdAt,
+    reference: activity.signature,
+    explorerUrl: activity.signature ? `https://solscan.io/tx/${activity.signature}` : null,
+    error: activity.error,
+  };
+}
+
 export function ActivityPage() {
   const wallet = useWalletState();
-  const address = wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
-  const chainId = wallet.status === "ready" ? wallet.chainId : null;
-  const emptyActivity: ProtocolActivity[] = [];
-  const activity = useSyncExternalStore(
-    (listener) => (address && chainId ? subscribeProtocolActivity(listener) : () => undefined),
-    () => (address && chainId ? readProtocolActivity(address, chainId) : emptyActivity),
-    () => emptyActivity
+  const solana = useSolanaWalletState();
+  const evmAddress =
+    wallet.address && isAddress(wallet.address) ? getAddress(wallet.address) : null;
+  const solanaAddress = solana.wallets[0]?.address ?? null;
+  const chainIds = useMemo(
+    () => [
+      ...new Set([
+        wallet.targetChainId,
+        ...(wallet.chainId ? [wallet.chainId] : []),
+        ...wallet.fundingNetworks.map((network) => network.chainId),
+      ]),
+    ],
+    [wallet.chainId, wallet.fundingNetworks, wallet.targetChainId]
+  );
+  const protocolActivity = useSyncExternalStore(
+    subscribeProtocolActivity,
+    () =>
+      evmAddress ? readProtocolActivityAcrossChains(evmAddress, chainIds) : emptyProtocolActivity,
+    () => emptyProtocolActivity
+  );
+  const allBridgeActivity = useSyncExternalStore(
+    subscribeBridgeActivity,
+    () => readBridgeActivity(),
+    () => emptyBridgeActivity
+  );
+  const allSolanaActivity = useSyncExternalStore(
+    subscribeSolanaActivity,
+    () => readSolanaActivity(),
+    () => emptySolanaActivity
+  );
+  const solanaActivity = useMemo(
+    () =>
+      solanaAddress
+        ? allSolanaActivity.filter((activity) => activity.wallet === solanaAddress)
+        : emptySolanaActivity,
+    [allSolanaActivity, solanaAddress]
+  );
+  const bridgeActivity = useMemo(() => {
+    const identities = new Set(
+      [evmAddress?.toLowerCase(), solanaAddress].filter((identity): identity is string =>
+        Boolean(identity)
+      )
+    );
+    return allBridgeActivity.filter((activity) =>
+      identities.has(
+        activity.originChainId === ACROSS_SOLANA_CHAIN_ID
+          ? activity.wallet
+          : activity.wallet.toLowerCase()
+      )
+    );
+  }, [allBridgeActivity, evmAddress, solanaAddress]);
+  const activity = useMemo(
+    () =>
+      [
+        ...protocolActivity.map(protocolItem),
+        ...bridgeActivity.map(bridgeItem),
+        ...solanaActivity.map(solanaItem),
+      ]
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .slice(0, 100),
+    [bridgeActivity, protocolActivity, solanaActivity]
   );
 
-  if (dappPreviewEnabled) {
-    return <ActivityPreview />;
-  }
-  if (wallet.status !== "ready" || !wallet.address || !wallet.chainId) {
-    return <ActivityPreview />;
-  }
+  useEffect(() => {
+    for (const item of protocolActivity) void recoverProtocolActivity(item);
+  }, [protocolActivity]);
+
+  useEffect(() => {
+    if (!solanaAddress) return;
+    const connection = new Connection(SOLANA_MAINNET_RPC_URL, "confirmed");
+    for (const item of solanaActivity) void recoverSolanaActivity(item, connection);
+  }, [solanaActivity, solanaAddress]);
+
+  useEffect(() => {
+    const identities = new Set(
+      [evmAddress?.toLowerCase(), solanaAddress].filter((identity): identity is string =>
+        Boolean(identity)
+      )
+    );
+    if (identities.size === 0) return;
+    const refresh = () => {
+      for (const item of readBridgeActivity()) {
+        const identity =
+          item.originChainId === ACROSS_SOLANA_CHAIN_ID ? item.wallet : item.wallet.toLowerCase();
+        if (
+          identities.has(identity) &&
+          ["submitted", "pending", "received"].includes(item.status)
+        ) {
+          void refreshBridgeActivity(item);
+        }
+      }
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 10_000);
+    return () => window.clearInterval(interval);
+  }, [evmAddress, solanaAddress]);
+
+  if (dappPreviewEnabled) return <ActivityPreview />;
 
   return (
     <section className="activity-panel" aria-labelledby="activity-title">
       <div>
-        <p className="dapp-section-label">Wallet and network scoped</p>
-        <h2 id="activity-title">Protocol activity</h2>
-        <p>Pending and receipt-confirmed actions stored only in this browser.</p>
+        <p className="dapp-section-label">{"// Activity"}</p>
+        <h2 id="activity-title">Transactions</h2>
       </div>
       {activity.length === 0 ? (
-        <p className="activity-empty">
-          No Statics activity for this wallet on chain {wallet.chainId}.
-        </p>
+        <p className="activity-empty">No activity yet.</p>
       ) : (
         <ol>
           {activity.map((item) => (
@@ -69,40 +271,43 @@ export function ActivityPage() {
   );
 }
 
-function ActivityItem({ activity }: { activity: ProtocolActivity }) {
-  const displayHash = activity.confirmedHash ?? activity.replacementHash ?? activity.hash;
-  const explorerUrl = displayHash ? getTransactionExplorerUrl(activity.chainId, displayHash) : null;
-  const hashLabel = displayHash ? `${displayHash.slice(0, 10)}…${displayHash.slice(-8)}` : null;
+function ActivityItem({ activity }: { activity: UnifiedActivity }) {
+  const referenceLabel = activity.reference
+    ? `${activity.reference.slice(0, 10)}…${activity.reference.slice(-8)}`
+    : null;
 
   return (
     <li>
       <div>
         <strong>{activity.label}</strong>
-        <span>{activity.amount}</span>
+        <span>
+          {activity.amount} · {activity.network}
+        </span>
       </div>
       <div>
-        <strong className={`activity-status is-${activity.status}`}>{statusLabel(activity)}</strong>
+        <strong className={`activity-status is-${activity.statusClass}`}>{activity.status}</strong>
         <time dateTime={new Date(activity.createdAt).toISOString()}>
           {new Date(activity.createdAt).toLocaleString()}
         </time>
       </div>
-      {displayHash &&
-        (explorerUrl ? (
+      {activity.reference &&
+        (activity.explorerUrl ? (
           <a
             className="activity-hash"
-            href={explorerUrl}
+            href={activity.explorerUrl}
             target="_blank"
             rel="noreferrer"
-            title={displayHash}
+            title={activity.reference}
           >
-            {hashLabel} ↗
+            {referenceLabel} ↗
           </a>
         ) : (
-          <code title={displayHash}>{hashLabel}</code>
+          <code title={activity.reference}>{referenceLabel}</code>
         ))}
-      {activity.replacementHash && activity.hash && (
+      {activity.originalReference && (
         <p>
-          Original transaction {activity.hash.slice(0, 10)}…{activity.hash.slice(-8)}
+          Original transaction {activity.originalReference.slice(0, 10)}…
+          {activity.originalReference.slice(-8)}
         </p>
       )}
       {activity.error && <p>{activity.error}</p>}

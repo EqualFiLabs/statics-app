@@ -92,6 +92,12 @@ export function EvmSwapPanel() {
   const [error, setError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const {
+    address: walletAddress,
+    fundingChainId,
+    fundingWalletOnSelectedChain,
+    getEthereumProvider,
+  } = wallet;
   const source = tokens.find((token) => token.address === sourceAddress) ?? tokens[0];
   const destination =
     tokens.find(
@@ -113,22 +119,27 @@ export function EvmSwapPanel() {
     outputRaw;
 
   useEffect(() => {
-    setSourceAddress(tokens[0]?.address ?? "");
-    setDestinationAddress(tokens[1]?.address ?? "");
-    setAmount("");
-    setQuote(null);
-    setReviewing(false);
-    setError(null);
+    const timeout = window.setTimeout(() => {
+      setSourceAddress(tokens[0]?.address ?? "");
+      setDestinationAddress(tokens[1]?.address ?? "");
+      setAmount("");
+      setQuote(null);
+      setReviewing(false);
+      setError(null);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [tokens]);
 
   useEffect(() => {
     let active = true;
-    setBalance(null);
-    if (!wallet.address || !source || !wallet.fundingWalletOnSelectedChain) return;
+    const reset = window.setTimeout(() => {
+      if (active) setBalance(null);
+    }, 0);
+    if (!walletAddress || !source || !fundingWalletOnSelectedChain) return;
     void (async () => {
       try {
-        const provider = await wallet.getEthereumProvider();
-        const network = getFundingNetwork(wallet.fundingChainId);
+        const provider = await getEthereumProvider();
+        const network = getFundingNetwork(fundingChainId);
         if (!provider || !network) return;
         const publicClient = createPublicClient({
           chain: network.chain,
@@ -136,12 +147,12 @@ export function EvmSwapPanel() {
         });
         const value =
           source.kind === "native"
-            ? await publicClient.getBalance({ address: getAddress(wallet.address!) })
+            ? await publicClient.getBalance({ address: getAddress(walletAddress) })
             : await publicClient.readContract({
                 address: source.address,
                 abi: erc20BalanceAbi,
                 functionName: "balanceOf",
-                args: [getAddress(wallet.address!)],
+                args: [getAddress(walletAddress)],
               });
         if (active) setBalance(value);
       } catch {
@@ -150,14 +161,9 @@ export function EvmSwapPanel() {
     })();
     return () => {
       active = false;
+      window.clearTimeout(reset);
     };
-  }, [
-    source,
-    wallet.address,
-    wallet.fundingChainId,
-    wallet.fundingWalletOnSelectedChain,
-    wallet.getEthereumProvider,
-  ]);
+  }, [source, walletAddress, fundingChainId, fundingWalletOnSelectedChain, getEthereumProvider]);
 
   const requestQuote = async (): Promise<QuotePayload> => {
     if (!wallet.address || !source || !destination || parsedAmount <= 0n) {
@@ -190,9 +196,11 @@ export function EvmSwapPanel() {
       !insufficient &&
       Boolean(source && destination);
     if (!canQuote) {
-      setQuote(null);
-      setQuoteLoading(false);
-      return;
+      const timeout = window.setTimeout(() => {
+        setQuote(null);
+        setQuoteLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
@@ -358,7 +366,12 @@ export function EvmSwapPanel() {
         <span>Funding network</span>
         <select
           value={wallet.fundingChainId}
-          onChange={(event) => void wallet.selectFundingNetwork(Number(event.target.value))}
+          onChange={(event) => {
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+            void wallet.selectFundingNetwork(Number(event.target.value));
+          }}
         >
           {wallet.fundingNetworks.map((network) => (
             <option key={network.chainId} value={network.chainId}>
@@ -374,10 +387,17 @@ export function EvmSwapPanel() {
         excluded={destination?.address}
         amount={amount}
         balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
-        onAmount={setAmount}
+        onAmount={(value) => {
+          setAmount(value);
+          setQuote(null);
+          setReviewing(false);
+          setError(null);
+        }}
         onToken={(address) => {
           setSourceAddress(address);
+          setQuote(null);
           setReviewing(false);
+          setError(null);
         }}
       />
       <button
@@ -388,7 +408,9 @@ export function EvmSwapPanel() {
         onClick={() => {
           setSourceAddress(destination!.address);
           setDestinationAddress(source!.address);
+          setQuote(null);
           setReviewing(false);
+          setError(null);
         }}
       >
         ⇅
@@ -403,7 +425,9 @@ export function EvmSwapPanel() {
         readOnly
         onToken={(address) => {
           setDestinationAddress(address);
+          setQuote(null);
           setReviewing(false);
+          setError(null);
         }}
       />
       <dl className="portal-quote-grid">

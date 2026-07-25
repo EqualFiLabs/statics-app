@@ -17,11 +17,7 @@ import {
   staticsAbi,
 } from "@statics-protocol/sdk";
 
-import {
-  readClientDollarDeployment,
-  verifyDollarDeployment,
-  type DollarDeployment,
-} from "@/lib/dollar/deployment";
+import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   validatePeggedMintSimulation,
   validatePeggedRedemptionSimulation,
@@ -146,10 +142,11 @@ export function PeggedDollarPanel() {
 
   useEffect(() => {
     if (!deployment || !wallet.address || wallet.chainId !== deployment.chainId) {
-      setSnapshot(null);
-      return;
+      const timeout = window.setTimeout(() => setSnapshot(null), 0);
+      return () => window.clearTimeout(timeout);
     }
-    void readSnapshot().catch(() => undefined);
+    const timeout = window.setTimeout(() => void readSnapshot().catch(() => undefined), 0);
+    return () => window.clearTimeout(timeout);
   }, [deployment, readSnapshot, wallet.address, wallet.chainId]);
 
   const readQuote = useCallback(async () => {
@@ -187,16 +184,18 @@ export function PeggedDollarPanel() {
   }, [amount, deployment, direction, wallet]);
 
   useEffect(() => {
-    setReviewing(false);
-    setError(null);
     if (
       !deployment?.pegged ||
       !wallet.address ||
       wallet.chainId !== deployment.chainId ||
       amount <= 0n
     ) {
-      setQuote(null);
-      return;
+      const timeout = window.setTimeout(() => {
+        setReviewing(false);
+        setError(null);
+        setQuote(null);
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
     let active = true;
     const timeout = window.setTimeout(() => {
@@ -465,7 +464,9 @@ export function PeggedDollarPanel() {
             placeholder="0.00"
             onChange={(event) => {
               setAmountInput(event.target.value);
+              setQuote(null);
               setReviewing(false);
+              setError(null);
             }}
           />
           <button type="button">sUSD</button>

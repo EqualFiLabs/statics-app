@@ -5,6 +5,7 @@ import { formatUnits, parseUnits } from "viem";
 
 import { useSolanaTokens } from "@/hooks/useSolanaTokens";
 import { decodeJupiterTransaction, encodeJupiterTransaction } from "@/lib/portal/solana";
+import { updateSolanaActivity, writeSolanaActivity } from "@/lib/portal/solana-activity";
 import type { SolanaToken } from "@/lib/solana-tokens";
 import { useSolanaWalletState } from "@/providers/solana-context";
 
@@ -67,10 +68,7 @@ export function SolanaSwapPanel() {
   };
 
   useEffect(() => {
-    if (rawAmount <= 0n) {
-      setQuote(null);
-      return;
-    }
+    if (rawAmount <= 0n) return;
     let active = true;
     const timeout = window.setTimeout(() => {
       setLoading(true);
@@ -96,6 +94,16 @@ export function SolanaSwapPanel() {
 
   const confirm = async () => {
     if (!wallet || !quote || submitting) return;
+    const activityId = crypto.randomUUID();
+    writeSolanaActivity({
+      id: activityId,
+      wallet: wallet.address,
+      kind: "swap",
+      label: `${source.symbol} to ${destination.symbol}`,
+      amount: `${amount} ${source.symbol}`,
+      status: "signing",
+      createdAt: Date.now(),
+    });
     setSubmitting(true);
     setError(null);
     try {
@@ -127,11 +135,17 @@ export function SolanaSwapPanel() {
       if (!response.ok || (result.code !== undefined && result.code !== 0) || !result.signature) {
         throw new Error(result.detail ?? result.error ?? "Jupiter execution failed.");
       }
+      updateSolanaActivity(activityId, {
+        status: "confirmed",
+        signature: result.signature,
+      });
       setAmount("");
       setQuote(null);
       setReviewing(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Jupiter swap failed.");
+      const message = cause instanceof Error ? cause.message : "Jupiter swap failed.";
+      updateSolanaActivity(activityId, { status: "failed", error: message });
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -154,9 +168,17 @@ export function SolanaSwapPanel() {
         amount={amount}
         tokens={tokens}
         token={source}
-        onAmount={setAmount}
+        onAmount={(value) => {
+          setAmount(value);
+          setQuote(null);
+          setReviewing(false);
+          setError(null);
+        }}
         onToken={(next) => {
           setSource(next);
+          setQuote(null);
+          setReviewing(false);
+          setError(null);
           if (next.mint === destination.mint) {
             setDestination(tokens.find((token) => token.mint !== next.mint) ?? destination);
           }
@@ -168,7 +190,9 @@ export function SolanaSwapPanel() {
         onClick={() => {
           setSource(destination);
           setDestination(source);
+          setQuote(null);
           setReviewing(false);
+          setError(null);
         }}
       >
         ⇅
@@ -180,7 +204,12 @@ export function SolanaSwapPanel() {
         token={destination}
         excludedMint={source.mint}
         readOnly
-        onToken={setDestination}
+        onToken={(next) => {
+          setDestination(next);
+          setQuote(null);
+          setReviewing(false);
+          setError(null);
+        }}
       />
       <dl className="portal-quote-grid">
         <div>

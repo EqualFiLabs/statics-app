@@ -8,7 +8,6 @@ import {
   formatUnits,
   getAddress,
   parseUnits,
-  type Address,
 } from "viem";
 
 import { useSolanaAssets } from "@/hooks/useSolanaAssets";
@@ -174,14 +173,14 @@ export function AcrossBridgePanel() {
 
   useEffect(() => {
     let active = true;
-    setQuote(null);
-    setReviewing(false);
-    setError(null);
     void fetch(`/api/across/tokens?chainId=${originChainId}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await json(response);
         const next = response.ok ? tokenArray(payload) : [];
         if (!active) return;
+        setQuote(null);
+        setReviewing(false);
+        setError(null);
         if (next.length) {
           setTokens(next);
           setTokenAddress((current) =>
@@ -214,6 +213,7 @@ export function AcrossBridgePanel() {
       })
       .catch(() => {
         if (active) {
+          setQuote(null);
           setTokens([]);
           setTokenAddress("");
         }
@@ -271,8 +271,8 @@ export function AcrossBridgePanel() {
       !recipient ||
       (!originIsSolana && !wallet.fundingWalletOnSelectedChain)
     ) {
-      setQuote(null);
-      return;
+      const timeout = window.setTimeout(() => setQuote(null), 0);
+      return () => window.clearTimeout(timeout);
     }
     let active = true;
     const timeout = window.setTimeout(() => {
@@ -462,7 +462,9 @@ export function AcrossBridgePanel() {
             onChange={(event) => {
               const next = Number(event.target.value);
               setOriginChainId(next);
+              setQuote(null);
               setReviewing(false);
+              setError(null);
               if (next !== ACROSS_SOLANA_CHAIN_ID && supportedEvmChains.has(next)) {
                 void wallet.selectFundingNetwork(next);
               }
@@ -493,7 +495,9 @@ export function AcrossBridgePanel() {
             placeholder="0.00"
             onChange={(event) => {
               setAmount(event.target.value);
+              setQuote(null);
               setReviewing(false);
+              setError(null);
             }}
           />
           <select
@@ -501,7 +505,9 @@ export function AcrossBridgePanel() {
             value={selectedToken?.address ?? ""}
             onChange={(event) => {
               setTokenAddress(event.target.value);
+              setQuote(null);
               setReviewing(false);
+              setError(null);
             }}
           >
             {tokens.map((token) => (

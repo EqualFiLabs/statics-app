@@ -94,11 +94,14 @@ export function useSolanaAssets() {
 
   useEffect(() => {
     if (!wallet?.address) {
-      setBalances({});
-      setDetected([]);
-      return;
+      const timeout = window.setTimeout(() => {
+        setBalances({});
+        setDetected([]);
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
-    void refresh();
+    const timeout = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timeout);
   }, [refresh, wallet?.address]);
 
   const tokens = useMemo(() => {
