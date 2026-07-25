@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ETH">
+  <rect width="64" height="64" rx="32" fill="#627eea"/>
+  <path d="M32 8 17 33l15-7 15 7L32 8Z" fill="#fff" fill-opacity=".92"/>
+  <path d="M32 26 17 33l15 9 15-9-15-7Z" fill="#fff" fill-opacity=".72"/>
+  <path d="M17 36 32 56l15-20-15 9-15-9Z" fill="#fff" fill-opacity=".92"/>
+</svg>

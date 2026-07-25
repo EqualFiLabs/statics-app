@@ -14,6 +14,7 @@ export type DollarActivityStatus =
   | "failed";
 export type DollarReplacementReason = "repriced" | "replaced" | "cancelled";
 export type DollarActivityKind =
+  | "send"
   | "approve-swap"
   | "swap"
   | "approve-weth"

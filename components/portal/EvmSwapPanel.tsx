@@ -17,6 +17,7 @@ import {
   uniswapError,
   type EvmSwapToken,
 } from "@/lib/portal/uniswap";
+import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
@@ -68,9 +69,19 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
 
 export function EvmSwapPanel() {
   const wallet = useWalletState();
+  const walletTokens = useWalletTokens(wallet.fundingChainId);
   const tokens = useMemo(
-    () => getDefaultEvmSwapTokens(wallet.fundingChainId),
-    [wallet.fundingChainId]
+    () => [
+      ...getDefaultEvmSwapTokens(wallet.fundingChainId).filter((token) => token.kind === "native"),
+      ...walletTokens.tokens.map((token): EvmSwapToken => ({
+        address: token.address,
+        decimals: token.decimals,
+        kind: "erc20",
+        name: token.name,
+        symbol: token.symbol,
+      })),
+    ],
+    [wallet.fundingChainId, walletTokens.tokens]
   );
   const [sourceAddress, setSourceAddress] = useState<string>(tokens[0]?.address ?? "");
   const [destinationAddress, setDestinationAddress] = useState<string>(tokens[1]?.address ?? "");
