@@ -23,6 +23,13 @@ import {
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
+import {
+  VISIBLE_REWARD_CANDIDATES,
+  formatMaturity,
+  groupByMaturity,
+  loadStakingSnapshot,
+  rankRewardCandidates,
+} from "@/lib/positions/staking";
 import { RewardsPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
@@ -68,6 +75,7 @@ function RewardsRuntime() {
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
   const [selectedAssets, setSelectedAssets] = useState<readonly `0x${string}`[]>([]);
+  const [showAllRewardAssets, setShowAllRewardAssets] = useState(false);
   const [pending, setPending] = useState(false);
   const [claimingBasketKey, setClaimingBasketKey] = useState<string | null>(null);
   const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
@@ -96,6 +104,46 @@ function RewardsRuntime() {
       }
       await verifyDollarDeployment(publicClient, deploymentState.deployment);
       return loadPositionCatalog(publicClient, deploymentState.deployment, wallet);
+    },
+  });
+
+  // Which part of each stake is earning, and when the rest starts. The
+  // position catalog reports only a total, which cannot explain why rewards
+  // look lower than expected right after staking.
+  const stakingSnapshots = useQuery({
+    queryKey: [
+      "staking-snapshots",
+      wallet,
+      (catalog.data?.positions ?? [])
+        .map((position) => `${position.positionId}:${position.rewards.length}`)
+        .join(","),
+    ],
+    enabled:
+      deploymentState.status === "configured" &&
+      Boolean(publicClient) &&
+      Boolean(wallet) &&
+      Boolean(catalog.data),
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      if (!publicClient || !wallet || deploymentState.status !== "configured" || !catalog.data) {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      const entries = await Promise.all(
+        catalog.data.positions.map(
+          async (position) =>
+            [
+              position.positionId.toString(),
+              await loadStakingSnapshot(
+                publicClient,
+                deploymentState.deployment,
+                wallet,
+                position.positionId,
+                position.rewards
+              ),
+            ] as const
+        )
+      );
+      return Object.fromEntries(entries);
     },
   });
 
@@ -554,10 +602,23 @@ function RewardsRuntime() {
             </label>
             <fieldset className="reward-selector" disabled={pending}>
               <legend>
-                Initial reward selections · {selectedAssets.length}/
-                {catalog.data.maximumRewardAssets.toString()}
+                What do you want to earn?{" "}
+                <small>
+                  {selectedAssets.length} of {catalog.data.maximumRewardAssets.toString()} chosen
+                </small>
               </legend>
-              {catalog.data.rewardCandidates.map((candidate) => {
+              <p className="reward-selector-note">
+                You are paid in whichever assets you pick. Each one starts earning about a day after
+                you choose it, and only from that point on — choosing an asset later does not earn
+                you a share of fees collected before then.
+              </p>
+              {(showAllRewardAssets
+                ? rankRewardCandidates(catalog.data.rewardCandidates)
+                : rankRewardCandidates(catalog.data.rewardCandidates).slice(
+                    0,
+                    VISIBLE_REWARD_CANDIDATES
+                  )
+              ).map((candidate) => {
                 const selected = selectedAssets.includes(candidate.token.address);
                 return (
                   <label key={candidate.token.address}>
@@ -579,6 +640,17 @@ function RewardsRuntime() {
                   </label>
                 );
               })}
+              {catalog.data.rewardCandidates.length > VISIBLE_REWARD_CANDIDATES && (
+                <button
+                  className="reward-selector-more"
+                  type="button"
+                  onClick={() => setShowAllRewardAssets((current) => !current)}
+                >
+                  {showAllRewardAssets
+                    ? "Show fewer"
+                    : `Show all ${catalog.data.rewardCandidates.length} assets`}
+                </button>
+              )}
             </fieldset>
           </>
         )}
@@ -631,6 +703,36 @@ function RewardsRuntime() {
                       {catalog.data.stakingToken.symbol} staked
                     </span>
                   </div>
+                  {(() => {
+                    // Lead with the total, then explain what is earning. Framing
+                    // it as "60 of 100 eligible" reads as if funds went missing;
+                    // it is a warm-up, not a shortfall.
+                    const snapshot = stakingSnapshots.data?.[key];
+                    if (!snapshot) return null;
+                    const maturing = groupByMaturity(snapshot.maturing);
+                    if (maturing.length === 0) {
+                      return snapshot.earning.length > 0 ? (
+                        <p className="stake-maturity is-earning">All of your stake is earning.</p>
+                      ) : null;
+                    }
+                    return (
+                      <div className="stake-maturity">
+                        {maturing.map((group) => (
+                          <p key={group.eligibleAt.toString()}>
+                            <strong>
+                              {displayAmount(
+                                group.pendingStake,
+                                catalog.data.stakingToken.decimals
+                              )}{" "}
+                              {catalog.data.stakingToken.symbol}
+                            </strong>{" "}
+                            starts earning {group.tokens.map((token) => token.symbol).join(", ")} at{" "}
+                            {formatMaturity(group.eligibleAt, catalog.data.currentTimestamp)}.
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {position.rewards.length ? (
                     <ul>
                       {position.rewards.map((reward) => (

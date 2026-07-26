@@ -2649,12 +2649,77 @@
   border-radius: var(--radius-lg);
 }
 
+/* Guidance shown before the first pick. Opting in never backfills, so the
+ * consequence has to be stated where the choice is made, not discovered later. */
+.reward-selector-note {
+  margin: 0 0 1rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+/* Up to 64 reward assets exist. The picker shows a ranked few and hides the
+ * rest behind this, so the common case is a short list. */
+.reward-selector-more {
+  margin-top: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reward-selector-more:hover {
+  text-decoration: underline;
+}
+
+/* When new stake starts earning. Never rendered as a shortfall against the
+ * total -- it is money warming up, not money missing. */
+.stake-maturity {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+
+.stake-maturity p {
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.stake-maturity strong {
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stake-maturity.is-earning {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* A question, not a label -- so it is sized and cased as a heading rather than
+ * getting the uppercase 12px eyebrow treatment the other legends use. */
 .reward-selector legend {
   padding: 0 0.5rem;
-  color: var(--accent);
+  color: var(--app-text);
+  font-size: var(--text-base);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.reward-selector legend small {
+  color: var(--app-text-muted);
   font-size: var(--text-caption);
-  text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .reward-selector label {
