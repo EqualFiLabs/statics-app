@@ -54,7 +54,6 @@ describe("PositionNFT catalog discovery", () => {
         if (functionName === "stakePosition") {
           return Promise.resolve({
             stakedBalance: 0n,
-            unstakeAvailableAt: 0n,
             claimAssetCount: 0n,
             optedInAssetCount: 0n,
           });

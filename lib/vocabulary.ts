@@ -114,13 +114,14 @@ export const glossary = {
   staking: {
     label: "Staking",
     plural: "Staking",
-    plain: "Locking a position so it earns a share of protocol fees.",
+    plain: "Depositing Statics so it earns a share of protocol fees. It stays withdrawable.",
     protocol: "Staking",
   },
-  cooldown: {
-    label: "Cooldown",
-    plain: "A waiting period after you unstake, before funds are released.",
-    protocol: "Unstaking cooldown",
+  earningDelay: {
+    label: "Earning delay",
+    plural: "Earning delay",
+    plain: "Newly staked funds start earning a little later. They are never locked up.",
+    protocol: "Reward eligibility delay",
   },
   openToAnyone: {
     label: "Open to anyone",

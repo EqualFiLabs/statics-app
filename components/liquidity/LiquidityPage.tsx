@@ -1322,7 +1322,7 @@ function LiquidityRuntime() {
           {mode !== "borrow" && (
             <p className="dollar-warning">
               Only nonzero, unsubscribed, full-range NFTs qualify. Activation begins on the next
-              block; unstaking has no cooldown.
+              block.
             </p>
           )}
           {error && (

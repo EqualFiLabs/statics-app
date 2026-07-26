@@ -48,7 +48,6 @@ export type PositionRecord = Readonly<{
   initializing: boolean;
   collateral: readonly PositionCollateral[];
   stakedBalance: bigint;
-  unstakeAvailableAt: bigint;
   claimAssetCount: bigint;
   selectedRewardAssets: readonly Address[];
   rewards: readonly PositionReward[];
@@ -180,7 +179,6 @@ async function readOwnedPosition(
     initializing,
     collateral: collateral.filter((item): item is PositionCollateral => item !== null),
     stakedBalance: stake.stakedBalance,
-    unstakeAvailableAt: stake.unstakeAvailableAt,
     claimAssetCount: stake.claimAssetCount,
     selectedRewardAssets,
     rewards: rewardMetadata.map((token, index) => ({
@@ -382,7 +380,6 @@ const positionErrorMessages: Readonly<Record<string, string>> = {
   PositionSharesLocked: "Loan-locked basket collateral cannot be removed.",
   PositionDepositTooRecent: "Basket collateral becomes withdrawable in the next block.",
   InsufficientPositionShares: "The position does not contain that many basket shares.",
-  UnstakeCooldownActive: "The 24-hour unstaking cooldown is still active.",
   InsufficientStake: "The position does not contain that much staked balance.",
   RewardAssetAlreadyOptedIn: "This reward asset is already selected.",
   RewardAssetNotOptedIn: "This reward asset is not selected.",
@@ -438,11 +435,4 @@ export function canClosePosition(
   position: Pick<PositionRecord, "activeLegCount" | "initializing">
 ) {
   return !position.initializing && position.activeLegCount === 0n;
-}
-
-export function isUnstakeAvailable(
-  position: Pick<PositionRecord, "unstakeAvailableAt">,
-  now: bigint
-) {
-  return now >= position.unstakeAvailableAt;
 }

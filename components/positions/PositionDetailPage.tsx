@@ -42,7 +42,6 @@ import {
   canClosePosition,
   claimablePositionRewards,
   describePositionError,
-  isUnstakeAvailable,
   loadPositionCatalog,
   unlockedCollateral,
   validateCustomRewardAsset,
@@ -511,9 +510,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       if (position.stakedBalance < stakeAmount) {
         throw new Error("The position does not contain that much stake.");
       }
-      if (!isUnstakeAvailable(position, catalog.data.currentTimestamp)) {
-        throw new Error("The 24-hour unstaking cooldown is still active.");
-      }
       await sendTransaction({
         kind: "unstake-position",
         label: `Unstake ${token.symbol}`,
@@ -572,7 +568,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     return <PositionDetailPreview positionId={positionId} />;
   }
 
-  const cooldownRemaining = Number(position.unstakeAvailableAt - catalog.data.currentTimestamp);
   const closeReady = canClosePosition(position);
 
   return (
@@ -750,9 +745,8 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             />
           </label>
           <p className="position-cooldown">
-            {cooldownRemaining > 0 && position.stakedBalance > 0n
-              ? `Unstaking available in ${Math.ceil(cooldownRemaining / 3_600)} hours.`
-              : "Unstaking is available. Adding stake or selecting a reward asset restarts the 24-hour cooldown."}
+            Your stake is always withdrawable. New stake and newly selected reward assets start
+            earning once they mature; withdrawals take from stake that is not yet earning first.
           </p>
           <button
             className="dollar-submit"

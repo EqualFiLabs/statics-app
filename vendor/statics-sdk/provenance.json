@@ -1,14 +1,14 @@
 {
-  "protocolCommit": "2e15b88a74da70d7368ce8f934fff05ab3cc5653",
+  "protocolCommit": "5b8dbbda9562eb66cfcebd3e0ade873e4ad99b51",
   "source": "sdk",
   "sdkTreeState": "clean",
   "sourceChecksums": {
-    "src/index.ts": "dd7ef71fd5f997173c1e60c73c696e0e8a13fdf54c1aae14d7fb97d7f6d0c813",
+    "src/index.ts": "ac4560a94f62f60803e3bf570b1115cbed3bf741a52d64797101427a4029c394",
     "package.json": "504dbaff141ddf0d8db5a23c342b2b4cd33d69ffeb8638607f56fd59dab8a022"
   },
   "checksums": {
-    "dist/index.js": "b0531f3721e9ede3fc55e0fd32e2a3f25528f34ca2a30e52a0b4ce48c811e867",
-    "dist/index.d.ts": "138cce4d257207119f99f2fbb90eceebbcdaaa9bece060dc199ddde7626c2401",
+    "dist/index.js": "40e661934251b2bca400d5b6d951168afc7185aa2d245ff030ebe917b2fc70ef",
+    "dist/index.d.ts": "f06f6bc51770bdef5d6326890f72444dcaa040eb5feb3c0976f184e74397af0e",
     "dist/generated/robinhoodChain.js": "ad72f904723c425eadccd1cc80987c78fa4cc44c16d8fc16a1e8a088ea1379d4",
     "dist/generated/robinhoodChain.d.ts": "194be0b182d4dd5a9ae17a787a13daa6a9511ba0a17bca39eedfb6e44b90ce16"
   }

@@ -5,7 +5,6 @@ import {
   canClosePosition,
   claimablePositionRewards,
   describePositionError,
-  isUnstakeAvailable,
   unlockedCollateral,
   validateCustomRewardAsset,
   type PositionCollateral,
@@ -93,11 +92,6 @@ describe("position action guards", () => {
     expect(canClosePosition({ activeLegCount: 0n, initializing: false })).toBe(true);
     expect(canClosePosition({ activeLegCount: 1n, initializing: false })).toBe(false);
     expect(canClosePosition({ activeLegCount: 0n, initializing: true })).toBe(false);
-  });
-
-  it("uses authoritative chain time for the unstaking threshold", () => {
-    expect(isUnstakeAvailable({ unstakeAvailableAt: 1_000n }, 999n)).toBe(false);
-    expect(isUnstakeAvailable({ unstakeAvailableAt: 1_000n }, 1_000n)).toBe(true);
   });
 
   it("keeps protocol error names in actionable messages", () => {

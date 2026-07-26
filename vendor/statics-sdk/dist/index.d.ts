@@ -96,6 +96,19 @@ export type PreparedTransaction = {
     data: Hex;
     value: bigint;
 };
+export type GlobalRewardAsset = {
+    eligibleStake: bigint;
+    pendingStake: bigint;
+    indexRay: bigint;
+    indexedReserve: bigint;
+    totalClaimable: bigint;
+};
+export type GlobalRewardSelection = {
+    selected: boolean;
+    eligibleStake: bigint;
+    pendingStake: bigint;
+    eligibleAt: bigint;
+};
 export type PermitSignature = {
     deadline: bigint;
     v: number;
@@ -883,9 +896,6 @@ export declare const staticsAbi: readonly [{
             readonly name: "stakedBalance";
         }, {
             readonly type: "uint256";
-            readonly name: "unstakeAvailableAt";
-        }, {
-            readonly type: "uint256";
             readonly name: "claimAssetCount";
         }, {
             readonly type: "uint256";
@@ -906,6 +916,9 @@ export declare const staticsAbi: readonly [{
         readonly components: readonly [{
             readonly type: "uint256";
             readonly name: "eligibleStake";
+        }, {
+            readonly type: "uint256";
+            readonly name: "pendingStake";
         }, {
             readonly type: "uint256";
             readonly name: "indexRay";
@@ -945,7 +958,51 @@ export declare const staticsAbi: readonly [{
         readonly type: "bool";
     }];
 }, {
+    readonly name: "rewardSelection";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "bool";
+            readonly name: "selected";
+        }, {
+            readonly type: "uint256";
+            readonly name: "eligibleStake";
+        }, {
+            readonly type: "uint256";
+            readonly name: "pendingStake";
+        }, {
+            readonly type: "uint40";
+            readonly name: "eligibleAt";
+        }];
+        readonly name: "selection";
+    }];
+}, {
     readonly name: "maxRewardAssetsPerPosition";
+    readonly type: "function";
+    readonly stateMutability: "pure";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "rewardEligibilityDelay";
+    readonly type: "function";
+    readonly stateMutability: "pure";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "rewardEligibilityBucketSize";
     readonly type: "function";
     readonly stateMutability: "pure";
     readonly inputs: readonly [];
@@ -3223,7 +3280,70 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
+        readonly name: "pendingStake";
+    }, {
+        readonly type: "uint40";
+        readonly name: "eligibleAt";
+    }];
+}, {
+    readonly name: "RewardStakeScheduled";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "pendingStake";
+    }, {
+        readonly type: "uint40";
+        readonly name: "eligibleAt";
+    }];
+}, {
+    readonly name: "RewardBucketMatured";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint40";
+        readonly name: "eligibleAt";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
         readonly name: "eligibleStake";
+    }, {
+        readonly type: "uint256";
+        readonly name: "indexRay";
+    }];
+}, {
+    readonly name: "PositionRewardEligibilityActivated";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint40";
+        readonly name: "eligibleAt";
+    }, {
+        readonly type: "uint256";
+        readonly name: "activationIndexRay";
     }];
 }, {
     readonly name: "RewardAssetOptedOut";
@@ -3238,7 +3358,10 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "eligibleStake";
+        readonly name: "removedEligibleStake";
+    }, {
+        readonly type: "uint256";
+        readonly name: "removedPendingStake";
     }];
 }, {
     readonly name: "RewardAssetDustRouted";
@@ -5530,9 +5653,9 @@ export declare const permit2AllowanceAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }];
-export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "BorrowedLiquidityStaked" | "BasketRewardAccrued" | "BasketRewardSettled" | "BasketRewardClaimed" | "BasketRewardDustRouted" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
+export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "RewardBucketMatured" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "BorrowedLiquidityStaked" | "BasketRewardAccrued" | "BasketRewardSettled" | "BasketRewardClaimed" | "BasketRewardDustRouted" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
 export type StaticsLiquidityEventArgs<Name extends StaticsLiquidityEventName> = ContractEventArgs<typeof staticsAbi, Name>;
-export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "PositionRewardSettled";
+export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "PositionRewardSettled";
 export type StaticsPositionEventArgs<Name extends StaticsPositionEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsLendingEventName = "LoanOriginated" | "LoanRepaid" | "LoanExtended" | "LoanExtensionFeePaid" | "LoanRecovered" | "RecoveryPenaltyDistributed";
 export type StaticsLendingEventArgs<Name extends StaticsLendingEventName> = ContractEventArgs<typeof staticsAbi, Name>;
@@ -6238,13 +6361,6 @@ export declare const staticsRewardsErrorAbi: readonly [{
         readonly name: "available";
     }];
 }, {
-    readonly name: "UnstakeCooldownActive";
-    readonly type: "error";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "availableAt";
-    }];
-}, {
     readonly name: "IncompatibleStakingToken";
     readonly type: "error";
     readonly inputs: readonly [{
@@ -6334,6 +6450,13 @@ export declare const staticsRewardsErrorAbi: readonly [{
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "positionId";
+    }];
+}, {
+    readonly name: "InvalidMaturitySchedule";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint40";
+        readonly name: "eligibleAt";
     }];
 }];
 export declare const staticsTokenErrorAbi: readonly [{
