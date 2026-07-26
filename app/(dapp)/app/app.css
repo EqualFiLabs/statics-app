@@ -2537,6 +2537,21 @@
   gap: 10px;
 }
 
+/* A panel holding a list rather than a form spans the row. Two columns suit the
+ * two entry forms; leaving a list at half width strands the other half. */
+.rewards-page .position-panel.is-wide {
+  grid-column: 1 / -1;
+}
+
+/* Two across only while the page itself has two columns. Expressed as a
+ * min-width because the max-width blocks in this file appear *before* the base
+ * rules, so a base rule here would override them at every width. */
+@media (min-width: 901px) {
+  .rewards-page .position-panel.is-wide .reward-position-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .position-panel .dollar-tabs {
   margin-top: 1.25rem;
 }

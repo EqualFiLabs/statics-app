@@ -125,24 +125,28 @@ describe("secondary navigation", () => {
     ]);
   });
 
-  it("keeps the sidebar to destinations you go to on purpose", () => {
+  it("keeps every destination a person navigates to in the sidebar", () => {
+    // The sidebar is not the constrained surface -- the tab bar is. Only account
+    // plumbing is withheld from it.
     expect(appPrimaryNavigation.map((item) => item.label)).toEqual([
       "Overview",
       "Earn",
       "Liquidity",
       "Baskets",
       "Dollar",
+      "Positions",
+      "Loans",
       "Wallet",
     ]);
   });
 
-  it("keeps detail destinations out of the header as well as the sidebar", () => {
-    // Four header links would make it a junk drawer; Positions and Loans are
-    // reached from the overview and from the holdings they concern.
-    const detail = appNavigation.filter((item) => item.placement === "detail");
-    expect(detail.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
-    for (const item of detail) {
-      expect(appHeaderNavigation).not.toContain(item);
+  it("withholds only account plumbing from the sidebar", () => {
+    // Anything hidden from the menu has to be reachable another way, and only
+    // Activity and Settings qualify -- the header carries both.
+    const withheld = appNavigation.filter((item) => (item.placement ?? "primary") !== "primary");
+    expect(withheld.map((item) => item.href)).toEqual(["/app/activity", "/app/settings"]);
+    for (const item of withheld) {
+      expect(appHeaderNavigation).toContain(item);
     }
   });
 

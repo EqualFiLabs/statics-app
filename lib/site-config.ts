@@ -136,14 +136,14 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     ],
   },
   {
-    // Positions is the container the other destinations sit inside, and a loan
-    // is an action on something you hold rather than a place. Both are reached
-    // from the overview's portfolio grid and from the holdings they concern, so
-    // neither competes for a primary slot.
+    // These stay in the sidebar. Positions being the container the others sit
+    // inside is an argument about the data model, not about how people navigate:
+    // a position is something you go and look at. The overview's portfolio grid
+    // is an additional route to them, not a replacement for a menu entry.
     label: "Manage",
     items: [
-      { label: "Positions", enabled: true, href: "/app/positions", placement: "detail" },
-      { label: "Loans", enabled: true, href: "/app/loans", placement: "detail" },
+      { label: "Positions", enabled: true, href: "/app/positions" },
+      { label: "Loans", enabled: true, href: "/app/loans" },
     ],
   },
   {

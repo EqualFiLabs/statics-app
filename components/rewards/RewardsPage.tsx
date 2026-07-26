@@ -629,7 +629,7 @@ function RewardsRuntime() {
         </button>
       </section>
 
-      <section className="position-panel">
+      <section className="position-panel is-wide">
         <div className="position-section-heading">
           <div>
             <p className="dapp-section-label">From staking Statics</p>
