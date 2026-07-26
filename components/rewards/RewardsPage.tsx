@@ -23,13 +23,9 @@ import {
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
-import {
-  VISIBLE_REWARD_CANDIDATES,
-  formatMaturity,
-  groupByMaturity,
-  loadStakingSnapshot,
-  rankRewardCandidates,
-} from "@/lib/positions/staking";
+import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
+import { StakeMaturity } from "@/components/rewards/StakeMaturity";
+import { loadStakingSnapshot } from "@/lib/positions/staking";
 import { RewardsPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
@@ -75,7 +71,6 @@ function RewardsRuntime() {
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
   const [selectedAssets, setSelectedAssets] = useState<readonly `0x${string}`[]>([]);
-  const [showAllRewardAssets, setShowAllRewardAssets] = useState(false);
   const [pending, setPending] = useState(false);
   const [claimingBasketKey, setClaimingBasketKey] = useState<string | null>(null);
   const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
@@ -600,58 +595,19 @@ function RewardsRuntime() {
                 {catalog.data.stakingToken.symbol}
               </small>
             </label>
-            <fieldset className="reward-selector" disabled={pending}>
-              <legend>
-                What do you want to earn?{" "}
-                <small>
-                  {selectedAssets.length} of {catalog.data.maximumRewardAssets.toString()} chosen
-                </small>
-              </legend>
-              <p className="reward-selector-note">
-                You are paid in whichever assets you pick. Each one starts earning about a day after
-                you choose it, and only from that point on — choosing an asset later does not earn
-                you a share of fees collected before then.
-              </p>
-              {(showAllRewardAssets
-                ? rankRewardCandidates(catalog.data.rewardCandidates)
-                : rankRewardCandidates(catalog.data.rewardCandidates).slice(
-                    0,
-                    VISIBLE_REWARD_CANDIDATES
-                  )
-              ).map((candidate) => {
-                const selected = selectedAssets.includes(candidate.token.address);
-                return (
-                  <label key={candidate.token.address}>
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() =>
-                        setSelectedAssets((current) =>
-                          selected
-                            ? current.filter((asset) => asset !== candidate.token.address)
-                            : [...current, candidate.token.address]
-                        )
-                      }
-                    />
-                    <span>
-                      <strong>{candidate.token.symbol}</strong>
-                      {candidate.sources.join(" · ")}
-                    </span>
-                  </label>
-                );
-              })}
-              {catalog.data.rewardCandidates.length > VISIBLE_REWARD_CANDIDATES && (
-                <button
-                  className="reward-selector-more"
-                  type="button"
-                  onClick={() => setShowAllRewardAssets((current) => !current)}
-                >
-                  {showAllRewardAssets
-                    ? "Show fewer"
-                    : `Show all ${catalog.data.rewardCandidates.length} assets`}
-                </button>
-              )}
-            </fieldset>
+            <RewardAssetPicker
+              candidates={catalog.data.rewardCandidates}
+              selected={selectedAssets}
+              maximum={catalog.data.maximumRewardAssets}
+              disabled={pending}
+              onToggle={(asset) =>
+                setSelectedAssets((current) =>
+                  current.includes(asset)
+                    ? current.filter((item) => item !== asset)
+                    : [...current, asset]
+                )
+              }
+            />
           </>
         )}
         {actionError && (
@@ -703,36 +659,11 @@ function RewardsRuntime() {
                       {catalog.data.stakingToken.symbol} staked
                     </span>
                   </div>
-                  {(() => {
-                    // Lead with the total, then explain what is earning. Framing
-                    // it as "60 of 100 eligible" reads as if funds went missing;
-                    // it is a warm-up, not a shortfall.
-                    const snapshot = stakingSnapshots.data?.[key];
-                    if (!snapshot) return null;
-                    const maturing = groupByMaturity(snapshot.maturing);
-                    if (maturing.length === 0) {
-                      return snapshot.earning.length > 0 ? (
-                        <p className="stake-maturity is-earning">All of your stake is earning.</p>
-                      ) : null;
-                    }
-                    return (
-                      <div className="stake-maturity">
-                        {maturing.map((group) => (
-                          <p key={group.eligibleAt.toString()}>
-                            <strong>
-                              {displayAmount(
-                                group.pendingStake,
-                                catalog.data.stakingToken.decimals
-                              )}{" "}
-                              {catalog.data.stakingToken.symbol}
-                            </strong>{" "}
-                            starts earning {group.tokens.map((token) => token.symbol).join(", ")} at{" "}
-                            {formatMaturity(group.eligibleAt, catalog.data.currentTimestamp)}.
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  <StakeMaturity
+                    snapshot={stakingSnapshots.data?.[key]}
+                    stakingToken={catalog.data.stakingToken}
+                    now={catalog.data.currentTimestamp}
+                  />
                   {position.rewards.length ? (
                     <ul>
                       {position.rewards.map((reward) => (
