@@ -2710,6 +2710,43 @@
   list-style: none;
 }
 
+/* Claimable amounts per reward asset. A deposited basket earns in the assets
+ * it holds, so this list is the whole point of the panel. */
+.reward-position-list dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.reward-position-list dl > div {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.reward-position-list dt {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reward-position-list dd {
+  margin: 0;
+  color: var(--app-text);
+  font-size: var(--text-lg);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* A deposited basket that has not earned yet still names what it will earn,
+ * so the panel is informative before the first fee lands. */
+.reward-position-idle {
+  margin: 0.75rem 0 0;
+}
+
 .reward-position-list li {
   display: flex;
   justify-content: space-between;

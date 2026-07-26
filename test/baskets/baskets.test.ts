@@ -118,7 +118,7 @@ describe("basket action safety", () => {
     const result = encodeFunctionResult({
       abi: staticsAbi,
       functionName: "mintBasketCollateral",
-      result: [[0n]],
+      result: [0n],
     });
     expect(() => validateBasketCollateralSimulation("mintBasketCollateral", result, 1)).toThrow(
       "invalid constituent amounts"
