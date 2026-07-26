@@ -72,12 +72,20 @@ export type AppNavigationItem = Readonly<{
   enabled: boolean;
   href: string;
   /**
-   * Account plumbing rather than a place you go to do something. Kept out of
-   * the desktop sidebar so the primary destinations stay countable, and shown
-   * in the header instead. The mobile panel still lists them, because it is a
-   * full-height sheet with room to spare and the header there has none.
+   * Where this destination belongs on desktop.
+   *
+   *   primary -- a place you go to do something. Earns a sidebar slot, and a
+   *              tab if we get a tab bar, so this list has to stay countable.
+   *   header  -- account plumbing. Real destinations, but not things you set
+   *              out to visit, so they sit beside the wallet chip.
+   *   detail  -- reached from the thing it concerns rather than from a menu.
+   *              Positions is the container the rest sit inside; a loan is an
+   *              action on a holding. Neither is somewhere you navigate to.
+   *
+   * The mobile panel lists every item regardless: it is a full-height sheet
+   * with room to spare, and the mobile header has none.
    */
-  secondary?: boolean;
+  placement?: "primary" | "header" | "detail";
 }>;
 
 export type AppNavigationGroup = Readonly<{
@@ -119,18 +127,22 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     ],
   },
   {
+    // Positions is the container the other destinations sit inside, and a loan
+    // is an action on something you hold rather than a place. Both are reached
+    // from the overview's portfolio grid and from the holdings they concern, so
+    // neither competes for a primary slot.
     label: "Manage",
     items: [
-      { label: "Positions", enabled: true, href: "/app/positions" },
-      { label: "Loans", enabled: true, href: "/app/loans" },
+      { label: "Positions", enabled: true, href: "/app/positions", placement: "detail" },
+      { label: "Loans", enabled: true, href: "/app/loans", placement: "detail" },
     ],
   },
   {
     label: "Account",
     items: [
       { label: "Wallet", enabled: true, href: "/app/wallet" },
-      { label: "Activity", enabled: true, href: "/app/activity", secondary: true },
-      { label: "Settings", enabled: true, href: "/app/settings", secondary: true },
+      { label: "Activity", enabled: true, href: "/app/activity", placement: "header" },
+      { label: "Settings", enabled: true, href: "/app/settings", placement: "header" },
     ],
   },
 ];
@@ -140,7 +152,12 @@ export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.f
   (group) => group.items
 );
 
-/** Items shown in the header rather than the desktop sidebar. */
+/** Items shown beside the wallet chip on desktop. */
 export const appHeaderNavigation: readonly AppNavigationItem[] = appNavigation.filter(
-  (item) => item.secondary === true
+  (item) => item.placement === "header"
+);
+
+/** Destinations that earn a desktop sidebar slot, and a tab bar slot later. */
+export const appPrimaryNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => (item.placement ?? "primary") === "primary"
 );

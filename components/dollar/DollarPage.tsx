@@ -55,6 +55,7 @@ import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/D
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { deriveSurfaceState } from "@/lib/surface-state";
+import { claimablePositionRewards, loadPositionCatalog } from "@/lib/positions/positions";
 import { readEvesMarketUrl } from "@/lib/site-config";
 
 const deploymentState = readClientDollarDeployment();
@@ -234,6 +235,58 @@ function DollarOverviewConnected({
   );
 }
 
+/**
+ * Where the rest of a portfolio is reached from.
+ *
+ * The preview overview has always shown this grid; the connected one showed
+ * only the Dollar card, so signing in gave you less than the mock. It is also
+ * the precondition for taking Positions and Loans out of the sidebar: a
+ * destination needs somewhere to be reached from before its nav entry goes.
+ */
+function OverviewPortfolio({ wallet }: { wallet: Address }) {
+  const publicClient = usePublicClient();
+  const catalog = useQuery({
+    queryKey: ["overview-portfolio", wallet],
+    enabled: deploymentState.status === "configured" && Boolean(publicClient),
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      if (!publicClient || deploymentState.status !== "configured") {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      return loadPositionCatalog(publicClient, deploymentState.deployment, wallet);
+    },
+  });
+
+  const positions = catalog.data?.positions ?? [];
+  const depositedBaskets = positions.reduce(
+    (total, position) => total + position.collateral.length,
+    0
+  );
+  const claimable = positions.reduce(
+    (total, position) => total + claimablePositionRewards(position.rewards).length,
+    0
+  );
+
+  const tiles: readonly (readonly [string, string, string, string])[] = [
+    ["Positions", positions.length.toString(), "/app/positions", "Review positions"],
+    ["Deposited baskets", depositedBaskets.toString(), "/app/baskets", "Browse baskets"],
+    ["Rewards to claim", claimable.toString(), "/app/rewards", "Review rewards"],
+    ["Loans", "—", "/app/loans", "Review loans"],
+  ];
+
+  return (
+    <section className="preview-overview-grid" aria-label="Portfolio summary">
+      {tiles.map(([label, value, href, action]) => (
+        <article key={label}>
+          <span>{label}</span>
+          <strong>{value}</strong>
+          <Link href={href}>{action} →</Link>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 export function DollarOverview() {
   const wallet = useWalletState();
   if (dappPreviewEnabled) {
@@ -267,10 +320,13 @@ export function DollarOverview() {
     );
   }
   return (
-    <DollarOverviewConnected
-      deployment={deploymentState.deployment}
-      wallet={getAddress(wallet.address)}
-    />
+    <>
+      <DollarOverviewConnected
+        deployment={deploymentState.deployment}
+        wallet={getAddress(wallet.address)}
+      />
+      <OverviewPortfolio wallet={getAddress(wallet.address)} />
+    </>
   );
 }
 

@@ -290,12 +290,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {appNavigationGroups.map((group, groupIndex) => (
               <nav
                 key={group.label ?? "home"}
-                className="dapp-nav-group"
+                // A group whose every item is hidden on desktop would otherwise
+                // leave its heading stranded above nothing.
+                className={`dapp-nav-group${
+                  group.items.every((item) => (item.placement ?? "primary") !== "primary")
+                    ? " is-detail-only"
+                    : ""
+                }`}
                 aria-label={group.label ?? "Overview"}
               >
                 {group.label && <p className="dapp-nav-label">{group.label}</p>}
                 {group.items.map((item, itemIndex) => {
-                  const secondaryClass = item.secondary ? " is-secondary" : "";
+                  // Anything not primary is hidden from the desktop sidebar by
+                  // CSS rather than dropped, so the mobile panel keeps it.
+                  const secondaryClass =
+                    (item.placement ?? "primary") === "primary" ? "" : " is-secondary";
                   const active =
                     item.href === currentPath ||
                     (item.href !== "/app" &&

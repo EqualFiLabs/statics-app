@@ -18,7 +18,15 @@ async function navigateDapp(page: Page, href: string) {
     await sidebarItem.click();
     return;
   }
-  await page.locator(`.dapp-header-link[href="${href}"]`).click();
+  const headerLink = page.locator(`.dapp-header-link[href="${href}"]`);
+  if ((await headerLink.count()) > 0) {
+    await headerLink.click();
+    return;
+  }
+  // Detail destinations have no menu entry on desktop by design. They are
+  // reached from the overview's portfolio grid, so that is the path to assert.
+  await page.goto("/app");
+  await page.locator(`.preview-overview-grid a[href="${href}"]`).click();
 }
 
 test.describe("landing foundation", () => {

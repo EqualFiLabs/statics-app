@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import { appHeaderNavigation, appNavigation, appNavigationGroups } from "@/lib/site-config";
+import {
+  appHeaderNavigation,
+  appNavigation,
+  appNavigationGroups,
+  appPrimaryNavigation,
+} from "@/lib/site-config";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -119,9 +124,25 @@ describe("secondary navigation", () => {
     ]);
   });
 
-  it("counts the primary destinations, which is what a tab bar has to fit", () => {
-    const primary = appNavigation.filter((item) => !item.secondary);
-    expect(primary).toHaveLength(8);
+  it("keeps the primary destinations down to what a tab bar can fit", () => {
+    expect(appPrimaryNavigation.map((item) => item.label)).toEqual([
+      "Overview",
+      "Rewards",
+      "Liquidity",
+      "Baskets",
+      "Dollar",
+      "Wallet",
+    ]);
+  });
+
+  it("keeps detail destinations out of the header as well as the sidebar", () => {
+    // Four header links would make it a junk drawer; Positions and Loans are
+    // reached from the overview and from the holdings they concern.
+    const detail = appNavigation.filter((item) => item.placement === "detail");
+    expect(detail.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
+    for (const item of detail) {
+      expect(appHeaderNavigation).not.toContain(item);
+    }
   });
 
   it("never moves a route to the header without leaving it navigable", () => {

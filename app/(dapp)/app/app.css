@@ -644,6 +644,10 @@
   display: none;
 }
 
+.dapp-nav-group.is-detail-only {
+  display: none;
+}
+
 .dapp-nav-item {
   display: flex;
   gap: 0.75rem;
@@ -2224,6 +2228,10 @@
    * sheet, so the sidebar is where they belong at this width. */
   .dapp-nav-item.is-secondary {
     display: flex;
+  }
+
+  .dapp-nav-group.is-detail-only {
+    display: block;
   }
 
   .dapp-nav-item {
