@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
-import { appNavigationGroups } from "@/lib/site-config";
+import { appHeaderNavigation, appNavigationGroups } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -237,6 +237,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <NetworkIndicator />
         <div className="dapp-header-actions">
+          {appHeaderNavigation.map((item) => (
+            <Link
+              key={item.href}
+              className={`dapp-header-link${currentPath.startsWith(item.href) ? " active" : ""}`}
+              href={item.href}
+              aria-current={currentPath.startsWith(item.href) ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          ))}
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
           </Link>
@@ -285,6 +295,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 {group.label && <p className="dapp-nav-label">{group.label}</p>}
                 {group.items.map((item, itemIndex) => {
+                  const secondaryClass = item.secondary ? " is-secondary" : "";
                   const active =
                     item.href === currentPath ||
                     (item.href !== "/app" &&
@@ -293,7 +304,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <Link
                       ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
                       key={item.label}
-                      className={`dapp-nav-item${active ? " active" : ""}`}
+                      className={`dapp-nav-item${active ? " active" : ""}${secondaryClass}`}
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       onClick={() => closeNavigation()}
@@ -301,7 +312,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </Link>
                   ) : (
-                    <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                    <span
+                      key={item.label}
+                      className={`dapp-nav-item${secondaryClass}`}
+                      aria-disabled="true"
+                    >
                       {item.label}
                       <small>Planned</small>
                     </span>

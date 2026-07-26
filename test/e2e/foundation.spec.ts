@@ -1,12 +1,24 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * Navigates to a destination the way a person would at this viewport.
+ *
+ * Account plumbing sits in the header on desktop and in the sidebar panel on
+ * mobile, so this asserts the destination is reachable rather than that it
+ * lives in one particular place.
+ */
 async function navigateDapp(page: Page, href: string) {
   const toggle = page.locator(".dapp-nav-toggle");
   if (await toggle.isVisible()) {
     await toggle.click();
   }
-  await page.locator(`.dapp-nav-item[href="${href}"]`).click();
+  const sidebarItem = page.locator(`.dapp-nav-item[href="${href}"]`);
+  if (await sidebarItem.isVisible()) {
+    await sidebarItem.click();
+    return;
+  }
+  await page.locator(`.dapp-header-link[href="${href}"]`).click();
 }
 
 test.describe("landing foundation", () => {

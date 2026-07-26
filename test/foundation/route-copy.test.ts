@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import { appNavigation, appNavigationGroups } from "@/lib/site-config";
+import { appHeaderNavigation, appNavigation, appNavigationGroups } from "@/lib/site-config";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -107,6 +107,27 @@ describe("dapp navigation grouping", () => {
       expect(group.label).toBe(group.label.trim());
       // Headings name an intent, not a protocol subsystem.
       expect(group.label.toLowerCase()).not.toMatch(/facet|diamond|nft|protocol/);
+    }
+  });
+});
+
+describe("secondary navigation", () => {
+  it("keeps account plumbing out of the primary destinations", () => {
+    expect(appHeaderNavigation.map((item) => item.href)).toEqual([
+      "/app/activity",
+      "/app/settings",
+    ]);
+  });
+
+  it("counts the primary destinations, which is what a tab bar has to fit", () => {
+    const primary = appNavigation.filter((item) => !item.secondary);
+    expect(primary).toHaveLength(8);
+  });
+
+  it("never moves a route to the header without leaving it navigable", () => {
+    // Header items are still in the groups, so the mobile panel lists them.
+    for (const item of appHeaderNavigation) {
+      expect(appNavigation.some((candidate) => candidate.href === item.href)).toBe(true);
     }
   });
 });

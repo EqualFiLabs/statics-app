@@ -71,6 +71,13 @@ export type AppNavigationItem = Readonly<{
   label: string;
   enabled: boolean;
   href: string;
+  /**
+   * Account plumbing rather than a place you go to do something. Kept out of
+   * the desktop sidebar so the primary destinations stay countable, and shown
+   * in the header instead. The mobile panel still lists them, because it is a
+   * full-height sheet with room to spare and the header there has none.
+   */
+  secondary?: boolean;
 }>;
 
 export type AppNavigationGroup = Readonly<{
@@ -92,7 +99,7 @@ export type AppNavigationGroup = Readonly<{
  * ordinary savings product -- deposit, choose what you are paid in, get paid.
  * Nobody arbitrages a basket by accident, but anyone can understand that.
  */
-export const appNavigationGroups = [
+export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: null,
     items: [{ label: "Overview", enabled: true, href: "/app" }],
@@ -122,15 +129,18 @@ export const appNavigationGroups = [
     label: "Account",
     items: [
       { label: "Wallet", enabled: true, href: "/app/wallet" },
-      { label: "Activity", enabled: true, href: "/app/activity" },
-      { label: "Settings", enabled: true, href: "/app/settings" },
+      { label: "Activity", enabled: true, href: "/app/activity", secondary: true },
+      { label: "Settings", enabled: true, href: "/app/settings", secondary: true },
     ],
   },
-] as const satisfies readonly AppNavigationGroup[];
+];
 
 /** Every navigable item, flattened, for callers that only need the routes. */
 export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.flatMap(
-  // Annotated because `as const` makes each group a distinct tuple type, and
-  // flatMap would otherwise infer the element type from the first group alone.
-  (group): readonly AppNavigationItem[] => group.items
+  (group) => group.items
+);
+
+/** Items shown in the header rather than the desktop sidebar. */
+export const appHeaderNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => item.secondary === true
 );
