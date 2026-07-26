@@ -20,7 +20,9 @@ import {
   staticsAbi,
 } from "@statics-protocol/sdk";
 
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { RewardsPreview } from "@/components/preview/DappPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -153,7 +155,7 @@ function RewardsRuntime() {
         await executeProtocolTransaction({
           ...common,
           kind: "create-and-stake",
-          label: `Create PositionNFT and stake ${token.symbol}`,
+          label: `Create position and stake ${token.symbol}`,
           amount: `${amountInput} ${token.symbol}`,
           to: diamond,
           data: buildCreateAndStakeCall(amount, wallet, selectedAssets),
@@ -189,7 +191,7 @@ function RewardsRuntime() {
     try {
       const refreshed = await catalog.refetch();
       const position = refreshed.data?.positions.find((item) => item.positionId === positionId);
-      if (!position) throw new Error("The selected PositionNFT is no longer owned by this wallet.");
+      if (!position) throw new Error("The selected position is no longer owned by this wallet.");
       const key = positionId.toString();
       const defaultAssets = claimablePositionRewards(position.rewards).map(
         (reward) => reward.token.address
@@ -302,15 +304,18 @@ function RewardsRuntime() {
     }
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    !wallet ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
+  if (deploymentState.status === "unavailable") {
     return <RewardsPreview />;
   }
+
+  const surfaceState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
+    hasData: Boolean(catalog.data),
+  });
 
   let primaryLabel = "Approve or create staking position";
   let primaryAction: (() => void) | null = () => void createAndStake();
@@ -336,7 +341,7 @@ function RewardsRuntime() {
             <p className="dapp-section-label">Atomic position creation</p>
             <h2>Create and stake</h2>
             <p>
-              Select only the fee assets this PositionNFT should earn. New selections begin at the
+              Select only the fee assets this position should earn. New selections begin at the
               current index and cannot capture historical rewards.
             </p>
           </div>
@@ -433,7 +438,7 @@ function RewardsRuntime() {
             Reward data is temporarily unavailable. Showing the last received state.
           </p>
         )}
-        {catalog.data?.positions.length ? (
+        {catalog.data && isSurfaceReady(surfaceState) ? (
           <div className="reward-position-list">
             {catalog.data.positions.map((position) => {
               const key = position.positionId.toString();
@@ -500,10 +505,22 @@ function RewardsRuntime() {
             })}
           </div>
         ) : (
-          <div className="position-empty">
-            <h3>No PositionNFT is owned by this wallet.</h3>
-            <p>Create and stake above to begin.</p>
-          </div>
+          <SurfaceEmptyState
+            state={surfaceState}
+            subject="rewards"
+            onRetry={() => void catalog.refetch()}
+            empty={{
+              title: "Nothing staked yet",
+              description:
+                "Stake a position to start earning a share of protocol fees. You choose which assets to earn in, and you can claim whenever you like.",
+              action: {
+                label: pending ? "Working…" : "Create and stake",
+                onClick: () => void createAndStake(),
+                disabled: pending,
+              },
+              secondary: { label: "View your positions", href: "/app/positions" },
+            }}
+          />
         )}
       </section>
     </div>

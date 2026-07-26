@@ -32,6 +32,7 @@ import {
 } from "@/lib/dollar/activity";
 import {
   deriveDollarActionAvailability,
+  dollarQuoteQueryKey,
   type DollarActionMode,
   type DollarCollateralChoice,
   type DollarQuoteState,
@@ -51,7 +52,9 @@ import {
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/DappPreview";
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { deriveSurfaceState } from "@/lib/surface-state";
 import { readEvesMarketUrl } from "@/lib/site-config";
 
 const deploymentState = readClientDollarDeployment();
@@ -239,8 +242,29 @@ export function DollarOverview() {
   if (deploymentState.status === "unavailable") {
     return <DollarOverviewPreview />;
   }
+  // The overview is the app's front door. Six cards of em dashes told a
+  // first-time visitor nothing about why they were empty or what to do.
   if (wallet.status !== "ready" || !wallet.address || !wallet.isTargetChain) {
-    return <DollarOverviewPreview />;
+    return (
+      <SurfaceEmptyState
+        state={deriveSurfaceState({
+          walletStatus: wallet.status,
+          isTargetChain: wallet.isTargetChain,
+          isLoading: false,
+          isError: false,
+          isEmpty: true,
+          hasData: false,
+        })}
+        subject="portfolio"
+        empty={{
+          title: "Your portfolio is empty",
+          description:
+            "Add funds and get Statics Dollar to begin. Everything you hold will show up here.",
+          action: { label: "Get Statics Dollar", href: "/app/dollar" },
+          secondary: { label: "Add funds", href: "/app/portal" },
+        }}
+      />
+    );
   }
   return (
     <DollarOverviewConnected
@@ -275,13 +299,12 @@ function DollarActionPanel({
   }, [amountInput]);
 
   const quote = useQuery({
-    queryKey: [
-      "dollar-quote",
-      deployment.chainId,
+    queryKey: dollarQuoteQueryKey({
+      chainId: deployment.chainId,
       mode,
-      amount.toString(),
-      snapshot.data?.seriesId,
-    ],
+      amount,
+      seriesId: snapshot.data?.seriesId,
+    }),
     enabled: amount > 0n && Boolean(publicClient) && Boolean(snapshot.data),
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -750,7 +773,7 @@ function DollarActionPanel({
               </dd>
             </div>
             <div>
-              <dt>Oracle</dt>
+              <dt>Price feed</dt>
               <dd>${displayAmount(state.priceWad)}</dd>
             </div>
             <div>
@@ -762,7 +785,7 @@ function DollarActionPanel({
               <dd>{displayAmount(state.profile.seniorOutstanding)} Dollar</dd>
             </div>
             <div>
-              <dt>Debt ceiling</dt>
+              <dt>Borrow limit</dt>
               <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
             </div>
             <div>
@@ -778,7 +801,7 @@ function DollarActionPanel({
               <dd>{state.pausedOperations.toString()}</dd>
             </div>
             <div>
-              <dt>Exit state</dt>
+              <dt>Status</dt>
               <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
             </div>
             <div>

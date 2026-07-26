@@ -8,8 +8,10 @@ import { useState } from "react";
 
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionListPreview } from "@/components/preview/DappPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
@@ -78,8 +80,8 @@ function PositionListRuntime() {
         wallet,
         chainId: deploymentState.deployment.chainId,
         kind: "create-position",
-        label: "Create PositionNFT",
-        amount: "1 PositionNFT",
+        label: "Create position",
+        amount: "1 position",
         to: deploymentState.deployment.contracts.diamond,
         data,
         sendTransaction: ({ to, data: transactionData, value }) =>
@@ -109,16 +111,23 @@ function PositionListRuntime() {
     }
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    (!wallet && !catalog.data) ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
+  // Only a missing deployment falls back to the sample preview now. Signed
+  // out, loading and failed each get their own message, because rendering the
+  // em-dash preview for all three told a first-time visitor nothing.
+  if (deploymentState.status === "unavailable") {
     return <PositionListPreview />;
   }
 
-  let primaryLabel = "Create PositionNFT";
+  const surfaceState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
+    hasData: Boolean(catalog.data),
+  });
+
+  let primaryLabel = "Create position";
   let primaryAction: (() => void) | null = () => void createPosition();
   if (walletState.status === "signed-out" || walletState.status === "error") {
     primaryLabel = "Sign in to continue";
@@ -138,11 +147,11 @@ function PositionListRuntime() {
     <section className="position-catalog" aria-labelledby="position-catalog-title">
       <div className="position-section-heading">
         <div>
-          <p className="dapp-section-label">Event-discovered · ownership-reconciled</p>
-          <h2 id="position-catalog-title">Your PositionNFTs</h2>
+          <p className="dapp-section-label">Positions</p>
+          <h2 id="position-catalog-title">Your positions</h2>
           <p>
-            Each NFT carries every attached collateral, staking, reward, loan, and liquidity leg
-            when transferred.
+            A position holds your collateral, staking, rewards, loans, and liquidity together. Move
+            the position and everything inside it moves with it.
           </p>
         </div>
         <button
@@ -161,16 +170,28 @@ function PositionListRuntime() {
         </p>
       )}
 
-      {catalog.isError && (
+      {catalog.isError && catalog.data && (
         <p className="dollar-warning" role="status">
           Position data is temporarily unavailable. Showing the last received state.
         </p>
       )}
-      {!catalog.data || catalog.data.positions.length === 0 ? (
-        <div className="position-empty">
-          <h3>No PositionNFT is owned by this wallet.</h3>
-          <p>Create an empty position, or create one atomically from collateral or staking.</p>
-        </div>
+      {!catalog.data || !isSurfaceReady(surfaceState) ? (
+        <SurfaceEmptyState
+          state={surfaceState}
+          subject="positions"
+          onRetry={() => void catalog.refetch()}
+          empty={{
+            title: "You do not have any positions yet",
+            description:
+              "A position is where your baskets, loans, and Dollar live together. Create an empty one to start, or one will be created for you the first time you deposit.",
+            action: {
+              label: pending ? "Creating…" : "Create position",
+              onClick: () => void createPosition(),
+              disabled: pending,
+            },
+            secondary: { label: "Browse baskets", href: "/app/baskets" },
+          }}
+        />
       ) : (
         <div className="position-grid">
           {catalog.data.positions.map((position) => (

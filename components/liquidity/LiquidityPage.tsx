@@ -34,7 +34,9 @@ import {
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { LiquidityPreview } from "@/components/preview/RemainingSurfacesPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -60,14 +62,15 @@ export function lpStakeEligibility(
   position: LpPositionRecord,
   pool: CanonicalPoolRecord | undefined
 ): string | null {
-  if (!pool || position.poolId !== pool.poolId) return "Select this LP NFT's canonical pool.";
+  if (!pool || position.poolId !== pool.poolId)
+    return "Select the pool for this liquidity position.";
   if (pool.status !== 2 || pool.decommissioned || !pool.managerSynced)
-    return "The canonical pool must be active, available, and manager-synced.";
+    return "The pool must be active, available, and manager-synced.";
   const [lower, upper] = canonicalFullRange(pool.key.tickSpacing);
-  if (position.hasSubscriber) return "Subscribed LP NFTs cannot be staked.";
+  if (position.hasSubscriber) return "Subscribed liquidity positions cannot be staked.";
   if (position.tickLower !== lower || position.tickUpper !== upper)
-    return "Only full-range LP NFTs can be staked.";
-  if (position.liquidity === 0n) return "The LP NFT has no liquidity.";
+    return "Only full-range liquidity positions can be staked.";
+  if (position.liquidity === 0n) return "This liquidity position is empty.";
   return null;
 }
 
@@ -214,7 +217,7 @@ function LiquidityRuntime() {
     )
       return;
     if (selectedPool.status !== 2 || selectedPool.decommissioned || !selectedPool.managerSynced)
-      throw new Error("The canonical pool must be active, available, and manager-synced.");
+      throw new Error("The pool must be active, available, and manager-synced.");
     const maximums = [
       parseUnits(amount0, tokens[0].decimals),
       parseUnits(amount1, tokens[1].decimals),
@@ -314,7 +317,7 @@ function LiquidityRuntime() {
     });
     await send(
       "create-lp-nft",
-      `Create ${selectedPool.basketSymbol}/${selectedPool.asset.symbol} LP NFT`,
+      `Create ${selectedPool.basketSymbol}/${selectedPool.asset.symbol} liquidity position`,
       `${liquidity} liquidity`,
       contracts.positionManager,
       buildMintV4PositionCall({
@@ -404,7 +407,7 @@ function LiquidityRuntime() {
     const selectedPosition = fresh.positionRecords.find(
       (item) => item.positionId.toString() === selectedPositionId
     );
-    if (!basket || !selectedPosition) throw new Error("Select a basket and PositionNFT.");
+    if (!basket || !selectedPosition) throw new Error("Select a basket and position.");
     if (basket.status !== BasketStatus.Active)
       throw new Error("The selected basket is not active.");
     const sharesIn = parseUnits(borrowShares, basket.token.decimals);
@@ -413,14 +416,14 @@ function LiquidityRuntime() {
       (item) => item.basket.basketId === basket.basketId
     );
     if (!collateral || unlockedCollateral(collateral) < sharesIn) {
-      throw new Error(`PositionNFT #${selectedPosition.positionId} lacks unlocked collateral.`);
+      throw new Error(`Position #${selectedPosition.positionId} lacks unlocked collateral.`);
     }
     const basketPools = basket.constituents.map((constituent) => {
       const matching = fresh.pools.find(
         (item) =>
           item.basketId === basket.basketId && item.asset.address === constituent.token.address
       );
-      if (!matching) throw new Error(`No canonical pool exists for ${constituent.token.symbol}.`);
+      if (!matching) throw new Error(`No pool exists for ${constituent.token.symbol}.`);
       if (
         matching.status !== 2 ||
         matching.decommissioned ||
@@ -483,7 +486,9 @@ function LiquidityRuntime() {
             data: result,
           });
           if (simulated[1].length !== basketPools.length)
-            throw new Error("The simulation did not create one LP NFT per constituent.");
+            throw new Error(
+              "The simulation did not create one liquidity position per constituent."
+            );
           simulatedLoanId = simulated[0];
           simulatedTokenIds = simulated[1];
         },
@@ -590,7 +595,9 @@ function LiquidityRuntime() {
                 item.liquidity !== quote.pools[index]?.liquidity
             )
           ) {
-            throw new Error("The confirmed loan and LP NFTs do not match the reviewed quote.");
+            throw new Error(
+              "The confirmed loan and liquidity positions do not match the reviewed quote."
+            );
           }
         },
       }
@@ -610,12 +617,12 @@ function LiquidityRuntime() {
     const diamond = deploymentState.deployment.contracts.diamond;
     const positionManager = deploymentState.deployment.liquidity.contracts.positionManager;
     if (mode === "stake") {
-      if (position.staked) throw new Error("The selected LP NFT is already staked.");
+      if (position.staked) throw new Error("The selected liquidity position is already staked.");
       const selectedPool = catalog.data?.pools.find((item) => item.poolId === position.poolId);
       const eligibility = lpStakeEligibility(position, selectedPool);
       if (eligibility) throw new Error(eligibility);
       if (getAddress(position.owner) !== wallet)
-        throw new Error("The selected LP NFT is not owned by this wallet.");
+        throw new Error("The selected liquidity position is not owned by this wallet.");
       const approved = await publicClient.readContract({
         address: positionManager,
         abi: v4PositionManagerReadAbi,
@@ -625,8 +632,8 @@ function LiquidityRuntime() {
       if (getAddress(approved) !== diamond) {
         await send(
           "approve-lp-nft",
-          `Approve LP NFT #${position.tokenId}`,
-          `LP NFT #${position.tokenId}`,
+          `Approve Liquidity position #${position.tokenId}`,
+          `Liquidity position #${position.tokenId}`,
           positionManager,
           buildApproveV4PositionCall(diamond, position.tokenId),
           {
@@ -638,7 +645,7 @@ function LiquidityRuntime() {
                 args: [position.tokenId],
               });
               if (getAddress(confirmed) !== diamond)
-                throw new Error("The LP NFT approval was not confirmed.");
+                throw new Error("The liquidity position approval was not confirmed.");
             },
           }
         );
@@ -646,8 +653,8 @@ function LiquidityRuntime() {
       }
       await send(
         "stake-lp-nft",
-        `Stake LP NFT #${position.tokenId}`,
-        `PositionNFT #${positionNft}`,
+        `Stake Liquidity position #${position.tokenId}`,
+        `Position #${positionNft}`,
         diamond,
         buildStakeLiquidityPositionCall(positionNft, position.tokenId),
         {
@@ -691,12 +698,12 @@ function LiquidityRuntime() {
       );
     } else if (mode === "activate") {
       if (!position.staked || position.pendingLiquidity === 0n)
-        throw new Error("The selected LP NFT has no pending liquidity.");
+        throw new Error("This liquidity position has nothing pending.");
       if ((catalog.data?.currentBlock ?? 0n) < position.eligibleAtBlock)
         throw new Error(`Activation becomes available at block ${position.eligibleAtBlock}.`);
       await send(
         "activate-lp-nft",
-        `Activate LP NFT #${position.tokenId}`,
+        `Activate Liquidity position #${position.tokenId}`,
         `${position.pendingLiquidity} pending liquidity`,
         diamond,
         buildActivateLiquidityPositionCall(position.tokenId),
@@ -732,7 +739,7 @@ function LiquidityRuntime() {
       );
     } else if (mode === "claim") {
       if (!position.staked && position.positionId === 0n)
-        throw new Error("The selected LP NFT has no reward record.");
+        throw new Error("The selected liquidity position has no reward record.");
       const reward = await publicClient.readContract({
         account: wallet,
         address: diamond,
@@ -757,7 +764,7 @@ function LiquidityRuntime() {
       ]);
       await send(
         "claim-lp-rewards",
-        `Claim LP NFT #${position.tokenId} rewards`,
+        `Claim Liquidity position #${position.tokenId} rewards`,
         `${reward[1]} + ${reward[3]}`,
         diamond,
         buildClaimLiquidityRewardsCall(
@@ -837,12 +844,12 @@ function LiquidityRuntime() {
         }
       );
     } else if (mode === "increase") {
-      if (!position.staked) throw new Error("Stake the LP NFT before increasing its liquidity.");
-      if (!pool || !tokens) throw new Error("Select the canonical pool for this LP NFT.");
+      if (!position.staked) throw new Error("Stake this liquidity position before adding to it.");
+      if (!pool || !tokens) throw new Error("Select the pool for this liquidity position.");
       if (position.poolId !== pool.poolId)
-        throw new Error("The selected LP NFT does not belong to the selected canonical pool.");
+        throw new Error("The selected liquidity position does not belong to the selected pool.");
       if (pool.status !== 2 || pool.decommissioned || !pool.managerSynced)
-        throw new Error("The canonical pool is not available for an increase.");
+        throw new Error("The pool is not available for an increase.");
       const maximums = [
         parseUnits(amount0, tokens[0].decimals),
         parseUnits(amount1, tokens[1].decimals),
@@ -904,7 +911,7 @@ function LiquidityRuntime() {
       });
       await send(
         "increase-lp-nft",
-        `Increase LP NFT #${position.tokenId}`,
+        `Increase Liquidity position #${position.tokenId}`,
         `${delta} liquidity`,
         diamond,
         buildIncreaseStakedLiquidityCall(
@@ -965,17 +972,17 @@ function LiquidityRuntime() {
               !state.staked ||
               state.eligibleLiquidity + state.pendingLiquidity !== liquidityAfter
             ) {
-              throw new Error("The confirmed LP NFT liquidity does not match the review.");
+              throw new Error("The confirmed liquidity does not match the review.");
             }
           },
         }
       );
     } else if (mode === "unstake") {
-      if (!position.staked) throw new Error("The selected LP NFT is not staked.");
+      if (!position.staked) throw new Error("The selected liquidity position is not staked.");
       await send(
         "unstake-lp-nft",
-        `Unstake LP NFT #${position.tokenId}`,
-        `LP NFT #${position.tokenId}`,
+        `Unstake Liquidity position #${position.tokenId}`,
+        `Liquidity position #${position.tokenId}`,
         diamond,
         buildUnstakeLiquidityPositionCall(position.positionId, position.tokenId, wallet),
         {
@@ -1006,7 +1013,7 @@ function LiquidityRuntime() {
               }),
             ]);
             if (!event || getAddress(owner) !== wallet || state.staked) {
-              throw new Error("The confirmed LP NFT was not returned to the wallet.");
+              throw new Error("The confirmed liquidity position was not returned to the wallet.");
             }
           },
         }
@@ -1019,7 +1026,7 @@ function LiquidityRuntime() {
     setError(null);
     try {
       if (mode === "create") {
-        if (!pool) throw new Error("No canonical pool is selected.");
+        if (!pool) throw new Error("No pool is selected.");
         await create(pool);
       } else if (mode === "borrow") {
         await borrowIntoLiquidity();
@@ -1035,13 +1042,18 @@ function LiquidityRuntime() {
   if (
     walletState.status === "unconfigured" ||
     deploymentState.status === "unavailable" ||
-    !deploymentState.deployment.liquidity ||
-    !wallet ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
+    !deploymentState.deployment.liquidity
   )
     return <LiquidityPreview />;
+
+  const surfaceState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
+    hasData: Boolean(catalog.data),
+  });
 
   let actionLabel = `${mode} reviewed liquidity action`;
   let action: (() => void) | null = () => void run();
@@ -1063,25 +1075,26 @@ function LiquidityRuntime() {
     <>
       <section className="remaining-hero">
         <div>
-          <p className="dapp-section-label">Chain-reconciled canonical v4 state</p>
-          <h2>Pools, POL, and user LP NFTs</h2>
+          <p className="dapp-section-label">Liquidity</p>
+          <h2>Pools and your liquidity</h2>
           <p>
-            Native LP fees, bilateral hook fees, permanent liquidity, and user NFTs remain separate.
+            Liquidity the protocol owns permanently is kept separate from yours. Your share and the
+            fees it earns are always tracked to you.
           </p>
         </div>
         <dl>
           <div>
-            <dt>Canonical pools</dt>
+            <dt>Pools</dt>
             <dd>{catalog.data?.pools.length ?? 0}</dd>
           </div>
           <div>
-            <dt>User LP NFTs</dt>
+            <dt>Your liquidity</dt>
             <dd>{catalog.data?.positions.length ?? 0}</dd>
           </div>
         </dl>
       </section>
       <section className="pool-catalog">
-        <h3>Canonical pool health</h3>
+        <h3>Pool health</h3>
         <div className="pool-grid">
           {catalog.data?.pools.map((item) => (
             <button type="button" key={item.poolId} onClick={() => setPoolId(item.poolId)}>
@@ -1098,11 +1111,11 @@ function LiquidityRuntime() {
               </h4>
               <dl>
                 <div>
-                  <dt>Native v4 LP fee</dt>
+                  <dt>Pool fee</dt>
                   <dd>{Number(item.lpFee) / 10_000}%</dd>
                 </div>
                 <div>
-                  <dt>Bilateral hook fees</dt>
+                  <dt>Trading fees</dt>
                   <dd>
                     {Number(item.hookFees.inputFeeBps) / 100}% in ·{" "}
                     {Number(item.hookFees.outputFeeBps) / 100}% out
@@ -1117,13 +1130,13 @@ function LiquidityRuntime() {
                   <dd>{item.managerSynced ? "Synced" : "Not synced"}</dd>
                 </div>
                 <div>
-                  <dt>Pending POL</dt>
+                  <dt>Pending protocol liquidity</dt>
                   <dd>
                     {item.pending0.toString()} / {item.pending1.toString()}
                   </dd>
                 </div>
                 <div>
-                  <dt>Locked POL</dt>
+                  <dt>Locked protocol liquidity</dt>
                   <dd>{item.lockedLiquidity.toString()}</dd>
                 </div>
               </dl>
@@ -1133,7 +1146,20 @@ function LiquidityRuntime() {
       </section>
       <div className="remaining-layout liquidity-layout">
         <section className="remaining-list">
-          <h3>User-owned PositionManager NFTs</h3>
+          <h3>Your liquidity positions</h3>
+          {!isSurfaceReady(surfaceState) && (
+            <SurfaceEmptyState
+              state={surfaceState}
+              subject="liquidity"
+              onRetry={() => void catalog.refetch()}
+              empty={{
+                title: "You are not providing liquidity yet",
+                description:
+                  "Supply a pair of assets to a pool so other people can trade, and earn a share of the trading fees.",
+                action: { label: "Browse pools", href: "/app/baskets" },
+              }}
+            />
+          )}
           {catalog.data?.positions.map((item) => (
             <button
               type="button"
@@ -1141,7 +1167,7 @@ function LiquidityRuntime() {
               className="lp-position"
               onClick={() => setTokenId(item.tokenId.toString())}
             >
-              <strong>LP NFT #{item.tokenId.toString()}</strong>
+              <strong>Liquidity position #{item.tokenId.toString()}</strong>
               <small>
                 {item.staked ? "Staked" : "Wallet-owned"} · {item.liquidity.toString()} liquidity
               </small>
@@ -1166,7 +1192,7 @@ function LiquidityRuntime() {
           {mode === "create" ? (
             <>
               <label className="basket-field">
-                <span>Canonical pool</span>
+                <span>Pool</span>
                 <select
                   value={pool?.poolId ?? ""}
                   onChange={(event) => setPoolId(event.target.value)}
@@ -1194,10 +1220,11 @@ function LiquidityRuntime() {
             <>
               <p className="dollar-warning">
                 Advanced flow: locks existing basket collateral, originates a loan, mints basket
-                liquidity, and creates one wallet-owned LP NFT per constituent atomically.
+                liquidity, and creates one wallet-owned liquidity position per constituent
+                atomically.
               </p>
               <label className="basket-field">
-                <span>Collateral PositionNFT</span>
+                <span>Collateral position</span>
                 <select
                   value={positionNft?.toString() ?? ""}
                   onChange={(event) => setPositionId(event.target.value)}
@@ -1249,7 +1276,7 @@ function LiquidityRuntime() {
           ) : (
             <>
               <label className="basket-field">
-                <span>LP NFT</span>
+                <span>liquidity position</span>
                 <select
                   value={position?.tokenId.toString() ?? ""}
                   onChange={(event) => setTokenId(event.target.value)}
@@ -1263,7 +1290,7 @@ function LiquidityRuntime() {
               </label>
               {mode === "stake" && (
                 <label className="basket-field">
-                  <span>PositionNFT</span>
+                  <span>Position</span>
                   <select
                     value={positionNft?.toString() ?? ""}
                     onChange={(event) => setPositionId(event.target.value)}
@@ -1319,10 +1346,10 @@ function LiquidityRuntime() {
         </section>
       </div>
       <section className="pol-boundary">
-        <h3>Permanent liquidity is not a user LP position</h3>
+        <h3>Protocol liquidity is separate from yours</h3>
         <p>
-          Hook-owned POL remains locked under protocol lifecycle rules. User PositionManager NFTs
-          remain separately managed.
+          Liquidity the protocol owns stays locked under its own rules. Your liquidity is managed
+          separately and always belongs to you.
         </p>
       </section>
     </>

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Connection } from "@solana/web3.js";
 import { getAddress, isAddress } from "viem";
 
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { ActivityPreview } from "@/components/preview/DappPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   readProtocolActivityAcrossChains,
@@ -252,14 +254,36 @@ export function ActivityPage() {
 
   if (dappPreviewEnabled) return <ActivityPreview />;
 
+  // Activity is assembled from local records rather than a single query, so
+  // there is no read to be loading or failing -- only "who are you" and
+  // "have you done anything yet".
+  const activityState = deriveSurfaceState({
+    walletStatus: wallet.status,
+    isTargetChain: wallet.isTargetChain,
+    isLoading: false,
+    isError: false,
+    isEmpty: activity.length === 0,
+    hasData: true,
+  });
+
   return (
     <section className="activity-panel" aria-labelledby="activity-title">
       <div>
         <p className="dapp-section-label">{"// Activity"}</p>
         <h2 id="activity-title">Transactions</h2>
       </div>
-      {activity.length === 0 ? (
-        <p className="activity-empty">No activity yet.</p>
+      {!isSurfaceReady(activityState) ? (
+        <SurfaceEmptyState
+          state={activityState}
+          subject="activity"
+          empty={{
+            title: "No activity yet",
+            description:
+              "Everything you do in Statics shows up here, from the moment you confirm it to the moment it settles.",
+            action: { label: "Get Statics Dollar", href: "/app/dollar" },
+            secondary: { label: "Add funds", href: "/app/portal" },
+          }}
+        />
       ) : (
         <ol>
           {activity.map((item) => (

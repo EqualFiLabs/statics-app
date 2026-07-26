@@ -1,18 +1,25 @@
 import { expect, type Page, test } from "@playwright/test";
 
-const routes = [
-  ["/app", "Track your Statics portfolio."],
-  ["/app/dollar", "Issue and redeem Statics Dollar."],
-  ["/app/baskets", "Inspect, mint, and redeem static baskets."],
-  ["/app/baskets/0", "Inspect, mint, and redeem static baskets."],
-  ["/app/create", "Configure a new static basket."],
-  ["/app/positions", "Manage each wallet-owned PositionNFT."],
-  ["/app/loans", "Review independent loan tranches."],
-  ["/app/rewards", "Create stake positions with selected rewards."],
-  ["/app/liquidity", "Manage canonical v4 liquidity."],
-  ["/app/activity", "Review protocol activity."],
-  ["/app/settings", "Manage your Statics wallet."],
-] as const;
+/**
+ * The heading each route actually renders, read from the components rather
+ * than from route metadata: only the overview renders the route title from
+ * lib/dapp-navigation.ts, because the shared summary is scoped to it. The two
+ * regexes cover headings built from live data (a balance, a basket name),
+ * which have no fixed string to match.
+ */
+const routes: readonly (readonly [string, string | RegExp])[] = [
+  ["/app", "Your portfolio"],
+  ["/app/dollar", /Dollar$/],
+  ["/app/baskets", "Statics baskets"],
+  ["/app/baskets/0", /\S/],
+  ["/app/create", "Create a static basket"],
+  ["/app/positions", "Your positions"],
+  ["/app/loans", "Your loans"],
+  ["/app/rewards", "Create and stake"],
+  ["/app/liquidity", "Pools and your liquidity"],
+  ["/app/activity", "Transactions"],
+  ["/app/settings", "Wallet settings"],
+];
 
 function monitorBrowserFailures(page: Page): () => void {
   const failures: string[] = [];
@@ -27,8 +34,10 @@ test("renders every connected route without sample fallback", async ({ page }) =
   const expectNoBrowserFailures = monitorBrowserFailures(page);
   for (const [route, heading] of routes) {
     await page.goto(route);
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-    await expect(page.getByText("Protocol DApp", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+    // The header's centre slot now reports the live network instead of a
+    // static "Protocol DApp" label.
+    await expect(page.locator(".dapp-network")).toBeVisible();
     await expect(page.getByText("Local verified", { exact: true })).toBeVisible();
     await expect(page.locator("[data-dapp-preview]")).toHaveCount(0);
     await expect(page.getByText("Design preview", { exact: true })).toHaveCount(0);
@@ -48,7 +57,7 @@ test("keeps the landing route outside wallet runtime", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: /static assets.*own your position/i })
   ).toBeVisible();
-  await expect(page.getByText("Protocol DApp", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".dapp-network")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(0);
   await expect(page.locator("[data-dapp-preview]")).toHaveCount(0);
   expectNoBrowserFailures();

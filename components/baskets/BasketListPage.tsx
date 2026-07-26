@@ -6,7 +6,9 @@ import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { BasketListPreview } from "@/components/preview/DappPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
@@ -52,41 +54,55 @@ function BasketListRuntime() {
     },
   });
 
-  if (
-    deploymentState.status === "unavailable" ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
+  if (deploymentState.status === "unavailable") {
     return <BasketListPreview />;
   }
+
+  // The basket catalog is deployment-wide rather than wallet-scoped, so it
+  // loads without a wallet. Only the read's own states apply here.
+  const surfaceState = deriveSurfaceState({
+    walletStatus: "ready",
+    isTargetChain: true,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: (catalog.data?.baskets.length ?? 0) === 0,
+    hasData: Boolean(catalog.data),
+  });
 
   return (
     <section className="basket-catalog" aria-labelledby="basket-catalog-title">
       <div className="basket-section-heading">
         <div>
-          <p className="dapp-section-label">Event-discovered · chain-reconciled</p>
+          <p className="dapp-section-label">Baskets</p>
           <h2 id="basket-catalog-title">Statics baskets</h2>
         </div>
         <div className="basket-section-actions">
-          <span>{catalog.data.baskets.length} discovered</span>
+          <span>{catalog.data?.baskets.length ?? 0} discovered</span>
           <Link href="/app/create">Create basket →</Link>
         </div>
       </div>
-      {catalog.data.warning && (
+      {catalog.data?.warning && (
         <p className="dollar-warning" role="status">
           {catalog.data.warning}
         </p>
       )}
-      {catalog.isError && (
+      {catalog.isError && catalog.data && (
         <p className="dollar-warning" role="status">
           Basket data is temporarily unavailable. Showing the last received state.
         </p>
       )}
-      {catalog.data.baskets.length === 0 ? (
-        <div className="basket-empty">
-          <h3>No baskets have been created on this deployment.</h3>
-          <p>Run the local protocol deployment command to seed the reviewed fixture.</p>
-        </div>
+      {!catalog.data || !isSurfaceReady(surfaceState) ? (
+        <SurfaceEmptyState
+          state={surfaceState}
+          subject="baskets"
+          onRetry={() => void catalog.refetch()}
+          empty={{
+            title: "No baskets yet",
+            description:
+              "A basket is a fixed bundle of assets you can buy or sell as one unit. Nobody has created one on this deployment yet -- you can be first.",
+            action: { label: "Create a basket", href: "/app/create" },
+          }}
+        />
       ) : (
         <div className="basket-grid">
           {catalog.data.baskets.map((basket) => (
