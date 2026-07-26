@@ -6,6 +6,7 @@ import {
   maximumWithSlippage,
   minimumWithSlippage,
   parseSlippageBps,
+  validateBasketCollateralSimulation,
   validateBasketSimulation,
 } from "@/lib/baskets/baskets";
 import { BasketStatus, staticsAbi } from "@statics-protocol/sdk";
@@ -84,6 +85,42 @@ describe("basket action safety", () => {
       result: [0n],
     });
     expect(() => validateBasketSimulation("redeem", result, 1)).toThrow(
+      "invalid constituent amounts"
+    );
+  });
+
+  it("accepts an auto-deposited mint that creates its own position", () => {
+    const result = encodeFunctionResult({
+      abi: staticsAbi,
+      functionName: "createAndMintBasketCollateral",
+      result: [7n, [100n, 200n]],
+    });
+    expect(validateBasketCollateralSimulation("createAndMintBasketCollateral", result, 2)).toEqual([
+      100n,
+      200n,
+    ]);
+  });
+
+  it("rejects an auto-deposited mint that returns no position", () => {
+    // A zero position id would mean the shares were minted with nowhere to
+    // accrue rewards, which is the whole point of depositing them.
+    const result = encodeFunctionResult({
+      abi: staticsAbi,
+      functionName: "createAndMintBasketCollateral",
+      result: [0n, [100n]],
+    });
+    expect(() =>
+      validateBasketCollateralSimulation("createAndMintBasketCollateral", result, 1)
+    ).toThrow("invalid position");
+  });
+
+  it("holds a deposit into an existing position to the same bar as a plain mint", () => {
+    const result = encodeFunctionResult({
+      abi: staticsAbi,
+      functionName: "mintBasketCollateral",
+      result: [[0n]],
+    });
+    expect(() => validateBasketCollateralSimulation("mintBasketCollateral", result, 1)).toThrow(
       "invalid constituent amounts"
     );
   });

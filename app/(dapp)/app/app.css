@@ -3000,6 +3000,46 @@
   margin-bottom: 1.5rem;
 }
 
+/* Auto-deposit toggle. Sits with the amount and slippage fields because it
+ * changes what the transaction does, not merely a preference. */
+.basket-toggle {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  cursor: pointer;
+}
+
+.basket-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.basket-toggle span {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.basket-toggle strong {
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.basket-toggle small {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
 .basket-field {
   display: grid;
   gap: 0.55rem;

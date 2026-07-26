@@ -654,7 +654,7 @@ function LoansRuntime() {
     isTargetChain: walletState.isTargetChain,
     isLoading: catalog.isPending,
     isError: catalog.isError,
-    // Same set as displayLoans below, which is declared after this point.
+    // Owned loans plus any that are publicly recoverable.
     isEmpty:
       (catalog.data?.ownedLoans.length ?? 0) +
         (catalog.data?.publicRecoverableLoans.length ?? 0) ===
@@ -678,11 +678,6 @@ function LoansRuntime() {
     primaryLabel = "Wallet loading…";
     primaryAction = null;
   }
-
-  const displayLoans = [
-    ...(catalog.data?.ownedLoans ?? []),
-    ...(catalog.data?.publicRecoverableLoans ?? []),
-  ];
 
   return (
     <>
