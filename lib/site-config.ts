@@ -86,6 +86,15 @@ export type AppNavigationItem = Readonly<{
    * with room to spare, and the mobile header has none.
    */
   placement?: "primary" | "header" | "detail";
+  /**
+   * Short label for the mobile tab bar, and the opt-in to appearing there.
+   *
+   * A tab bar is hard-limited by thumb width -- five is the practical maximum
+   * at 390px -- so it carries a curated subset rather than every primary
+   * destination. The sidebar has no such limit and still shows them all, and
+   * the panel still reaches everything, so nothing here removes a route.
+   */
+  tabLabel?: string;
 }>;
 
 export type AppNavigationGroup = Readonly<{
@@ -110,20 +119,20 @@ export type AppNavigationGroup = Readonly<{
 export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: null,
-    items: [{ label: "Overview", enabled: true, href: "/app" }],
+    items: [{ label: "Overview", enabled: true, href: "/app", tabLabel: "Home" }],
   },
   {
     label: "Earn",
     items: [
-      { label: "Rewards", enabled: true, href: "/app/rewards" },
+      { label: "Earn", enabled: true, href: "/app/rewards", tabLabel: "Earn" },
       { label: "Liquidity", enabled: true, href: "/app/liquidity" },
     ],
   },
   {
     label: "Assets",
     items: [
-      { label: "Baskets", enabled: true, href: "/app/baskets" },
-      { label: "Dollar", enabled: true, href: "/app/dollar" },
+      { label: "Baskets", enabled: true, href: "/app/baskets", tabLabel: "Baskets" },
+      { label: "Dollar", enabled: true, href: "/app/dollar", tabLabel: "Dollar" },
     ],
   },
   {
@@ -140,7 +149,7 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: "Account",
     items: [
-      { label: "Wallet", enabled: true, href: "/app/wallet" },
+      { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
       { label: "Activity", enabled: true, href: "/app/activity", placement: "header" },
       { label: "Settings", enabled: true, href: "/app/settings", placement: "header" },
     ],
@@ -160,4 +169,9 @@ export const appHeaderNavigation: readonly AppNavigationItem[] = appNavigation.f
 /** Destinations that earn a desktop sidebar slot, and a tab bar slot later. */
 export const appPrimaryNavigation: readonly AppNavigationItem[] = appNavigation.filter(
   (item) => (item.placement ?? "primary") === "primary"
+);
+
+/** The mobile tab bar, in order. Capped at five by thumb width. */
+export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => typeof item.tabLabel === "string"
 );

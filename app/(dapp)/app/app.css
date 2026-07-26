@@ -580,6 +580,31 @@
   color: var(--warning);
 }
 
+/* Mobile tab bar. Desktop has a persistent sidebar and needs none, so this is
+ * hidden until the sidebar collapses. Additive: the panel still reaches every
+ * destination, and these five are only the ones worth a permanent thumb slot. */
+.dapp-tabbar {
+  display: none;
+}
+
+.dapp-tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  /* Full-height target rather than text-sized, so the whole cell is tappable. */
+  min-height: var(--control-height);
+  padding: 0 0.25rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-align: center;
+}
+
+.dapp-tab.active {
+  color: var(--accent);
+}
+
 /* ---- Layout + sidebar ---------------------------------------------- */
 
 .dapp-layout {
@@ -2234,6 +2259,37 @@
     display: block;
   }
 
+  /* The panel already lists these at this width, and the mobile header has to
+   * hold the brand, the network state and the wallet control. */
+  .dapp-header-link {
+    display: none;
+  }
+
+  .dapp-tabbar {
+    position: fixed;
+    z-index: 45;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    border-top: 1px solid var(--app-border);
+    background: color-mix(in srgb, var(--app-bg) 94%, transparent);
+    backdrop-filter: blur(12px);
+    /* Clears the iOS home indicator without adding space on other devices. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* The bar is fixed, so content needs room or its last row sits underneath.
+   * Held in a variable because the narrow breakpoint below sets `padding` as a
+   * shorthand, which silently reset a bare padding-bottom declared here. */
+  .dapp-shell {
+    --tabbar-clearance: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .dapp-content {
+    padding-bottom: var(--tabbar-clearance);
+  }
+
   .dapp-nav-item {
     min-height: 48px;
     padding: 0 1rem;
@@ -2331,7 +2387,7 @@
   }
 
   .dapp-content {
-    padding: 1.5rem 1rem 2.5rem;
+    padding: 1.5rem 1rem var(--tabbar-clearance);
   }
 
   .dapp-intro h1 {

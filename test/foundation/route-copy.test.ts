@@ -6,6 +6,7 @@ import {
   appNavigation,
   appNavigationGroups,
   appPrimaryNavigation,
+  appTabNavigation,
 } from "@/lib/site-config";
 
 /**
@@ -124,10 +125,10 @@ describe("secondary navigation", () => {
     ]);
   });
 
-  it("keeps the primary destinations down to what a tab bar can fit", () => {
+  it("keeps the sidebar to destinations you go to on purpose", () => {
     expect(appPrimaryNavigation.map((item) => item.label)).toEqual([
       "Overview",
-      "Rewards",
+      "Earn",
       "Liquidity",
       "Baskets",
       "Dollar",
@@ -150,5 +151,33 @@ describe("secondary navigation", () => {
     for (const item of appHeaderNavigation) {
       expect(appNavigation.some((candidate) => candidate.href === item.href)).toBe(true);
     }
+  });
+});
+
+describe("mobile tab bar", () => {
+  it("fits five tabs, which is the practical maximum at 390px", () => {
+    expect(appTabNavigation).toHaveLength(5);
+  });
+
+  it("uses short labels, because a tab is about a thumb wide", () => {
+    for (const item of appTabNavigation) {
+      expect(item.tabLabel, item.href).toBeTruthy();
+      expect(item.tabLabel!.length, `${item.tabLabel} is too long for a tab`).toBeLessThanOrEqual(
+        8
+      );
+    }
+  });
+
+  it("only ever promotes a destination that earns a sidebar slot too", () => {
+    // A tab for something not in the sidebar would be the only way to reach it,
+    // which is exactly the trap the panel exists to avoid.
+    for (const item of appTabNavigation) {
+      expect(appPrimaryNavigation).toContain(item);
+    }
+  });
+
+  it("leads with home and ends with the wallet", () => {
+    expect(appTabNavigation[0].href).toBe("/app");
+    expect(appTabNavigation.at(-1)!.href).toBe("/app/wallet");
   });
 });

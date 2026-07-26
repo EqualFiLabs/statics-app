@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
-import { appHeaderNavigation, appNavigationGroups } from "@/lib/site-config";
+import { appHeaderNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -370,6 +370,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      <nav className="dapp-tabbar" aria-label="Primary">
+        {appTabNavigation.map((item) => {
+          const active =
+            item.href === currentPath ||
+            (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
+          return (
+            <Link
+              key={item.href}
+              className={`dapp-tab${active ? " active" : ""}`}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+            >
+              {item.tabLabel}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
