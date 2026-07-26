@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
-import { appNavigation } from "@/lib/site-config";
+import { appNavigationGroups } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -275,32 +275,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Close ×
               </button>
             </div>
-            <p className="dapp-nav-label">Navigation</p>
-            <nav aria-label="Application routes">
-              {appNavigation.map((item, index) => {
-                const active =
-                  item.href === currentPath ||
-                  (item.href !== "/app" &&
-                    Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
-                return item.enabled && item.href ? (
-                  <Link
-                    ref={index === 0 ? firstNavigationLinkRef : undefined}
-                    key={item.label}
-                    className={`dapp-nav-item${active ? " active" : ""}`}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => closeNavigation()}
-                  >
-                    {item.label}
-                  </Link>
-                ) : (
-                  <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                    {item.label}
-                    <small>Planned</small>
-                  </span>
-                );
-              })}
-            </nav>
+            {/* One <nav> per group, each labelled, so the grouping is structure
+                rather than styling and assistive tech can jump between them. */}
+            {appNavigationGroups.map((group, groupIndex) => (
+              <nav
+                key={group.label ?? "home"}
+                className="dapp-nav-group"
+                aria-label={group.label ?? "Overview"}
+              >
+                {group.label && <p className="dapp-nav-label">{group.label}</p>}
+                {group.items.map((item, itemIndex) => {
+                  const active =
+                    item.href === currentPath ||
+                    (item.href !== "/app" &&
+                      Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
+                  return item.enabled && item.href ? (
+                    <Link
+                      ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
+                      key={item.label}
+                      className={`dapp-nav-item${active ? " active" : ""}`}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => closeNavigation()}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                      {item.label}
+                      <small>Planned</small>
+                    </span>
+                  );
+                })}
+              </nav>
+            ))}
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
               Return to site <span aria-hidden="true">↗</span>
             </Link>

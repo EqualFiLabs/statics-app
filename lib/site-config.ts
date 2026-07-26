@@ -67,15 +67,70 @@ export const protocolStatus = {
   audit: "Not published",
 } as const;
 
-export const appNavigation = [
-  { label: "Overview", enabled: true, href: "/app" },
-  { label: "Wallet", enabled: true, href: "/app/wallet" },
-  { label: "Dollar", enabled: true, href: "/app/dollar" },
-  { label: "Baskets", enabled: true, href: "/app/baskets" },
-  { label: "Positions", enabled: true, href: "/app/positions" },
-  { label: "Loans", enabled: true, href: "/app/loans" },
-  { label: "Rewards", enabled: true, href: "/app/rewards" },
-  { label: "Liquidity", enabled: true, href: "/app/liquidity" },
-  { label: "Activity", enabled: true, href: "/app/activity" },
-  { label: "Settings", enabled: true, href: "/app/settings" },
-] as const;
+export type AppNavigationItem = Readonly<{
+  label: string;
+  enabled: boolean;
+  href: string;
+}>;
+
+export type AppNavigationGroup = Readonly<{
+  /** Null for the first group, which needs no heading above the home link. */
+  label: string | null;
+  items: readonly AppNavigationItem[];
+}>;
+
+/**
+ * Application navigation, grouped by what someone is trying to do.
+ *
+ * Ten flat peers described the protocol's facets rather than any intent, and
+ * gave no clue that Positions is the container the others sit inside. Grouping
+ * is deliberately the first step and changes no routes: it buys most of the
+ * apparent simplification, and it can be reverted or re-cut without touching a
+ * single page.
+ *
+ * Earn leads because staking is the one part of this protocol that reads as an
+ * ordinary savings product -- deposit, choose what you are paid in, get paid.
+ * Nobody arbitrages a basket by accident, but anyone can understand that.
+ */
+export const appNavigationGroups = [
+  {
+    label: null,
+    items: [{ label: "Overview", enabled: true, href: "/app" }],
+  },
+  {
+    label: "Earn",
+    items: [
+      { label: "Rewards", enabled: true, href: "/app/rewards" },
+      { label: "Liquidity", enabled: true, href: "/app/liquidity" },
+    ],
+  },
+  {
+    label: "Assets",
+    items: [
+      { label: "Baskets", enabled: true, href: "/app/baskets" },
+      { label: "Dollar", enabled: true, href: "/app/dollar" },
+    ],
+  },
+  {
+    label: "Manage",
+    items: [
+      { label: "Positions", enabled: true, href: "/app/positions" },
+      { label: "Loans", enabled: true, href: "/app/loans" },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { label: "Wallet", enabled: true, href: "/app/wallet" },
+      { label: "Activity", enabled: true, href: "/app/activity" },
+      { label: "Settings", enabled: true, href: "/app/settings" },
+    ],
+  },
+] as const satisfies readonly AppNavigationGroup[];
+
+/** Every navigable item, flattened, for callers that only need the routes. */
+export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.flatMap(
+  // Annotated because `as const` makes each group a distinct tuple type, and
+  // flatMap would otherwise infer the element type from the first group alone.
+  (group): readonly AppNavigationItem[] => group.items
+);

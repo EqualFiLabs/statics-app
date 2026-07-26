@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import { appNavigation } from "@/lib/site-config";
+import { appNavigation, appNavigationGroups } from "@/lib/site-config";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -68,6 +68,45 @@ describe("dapp route copy", () => {
       expect(description.length, `${href} description is too long to scan`).toBeLessThanOrEqual(
         180
       );
+    }
+  });
+});
+
+describe("dapp navigation grouping", () => {
+  it("groups every route under a heading, except the home link", () => {
+    const [first, ...rest] = appNavigationGroups;
+    expect(first.label).toBeNull();
+    expect(first.items.map((item) => item.href)).toEqual(["/app"]);
+    for (const group of rest) {
+      expect(group.label, JSON.stringify(group.items)).toBeTruthy();
+      expect(group.items.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("leads with Earn, because staking is the part that reads as a savings product", () => {
+    expect(appNavigationGroups[1].label).toBe("Earn");
+  });
+
+  it("keeps every route exactly once across the groups", () => {
+    // Regrouping must not silently drop or duplicate a destination.
+    const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs).toHaveLength(10);
+  });
+
+  it("keeps the flattened list in step with the groups", () => {
+    // appNavigation is derived, and other callers depend on it.
+    expect(appNavigation.map((item) => item.href)).toEqual(
+      appNavigationGroups.flatMap((group) => group.items.map((item) => item.href))
+    );
+  });
+
+  it("uses group labels a person would recognise", () => {
+    for (const group of appNavigationGroups) {
+      if (!group.label) continue;
+      expect(group.label).toBe(group.label.trim());
+      // Headings name an intent, not a protocol subsystem.
+      expect(group.label.toLowerCase()).not.toMatch(/facet|diamond|nft|protocol/);
     }
   });
 });

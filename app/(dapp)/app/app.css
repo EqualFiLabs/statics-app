@@ -610,6 +610,12 @@
   gap: 0.125rem;
 }
 
+/* Groups carry the information architecture, so they need real separation --
+ * without it the labels read as decoration rather than structure. */
+.dapp-nav-group + .dapp-nav-group {
+  margin-top: 1.5rem;
+}
+
 .dapp-nav-item {
   display: flex;
   gap: 0.75rem;
@@ -2078,10 +2084,6 @@
     border-bottom: 1px solid var(--app-border);
   }
 
-  .dapp-nav-label {
-    display: none;
-  }
-
   .dapp-mobile-navigation {
     display: block;
     padding: 0.75rem clamp(1rem, 3vw, 2.5rem);
@@ -2183,8 +2185,11 @@
   .dapp-sidebar nav {
     display: grid;
     gap: 0.125rem;
-    margin-top: 1rem;
     overflow: visible;
+  }
+
+  .dapp-nav-group:first-child {
+    margin-top: 1rem;
   }
 
   .dapp-nav-item {
