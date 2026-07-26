@@ -23,6 +23,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "lint:css": "stylelint \"app/**/*.css\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "sdk:sync": "node scripts/vendor-statics-sdk.mjs",
@@ -32,7 +33,7 @@
     "test:e2e": "npm run build:preview && playwright test",
     "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
-    "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
+    "verify": "npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@privy-io/react-auth": "3.35.1",
@@ -63,6 +64,8 @@
     "eslint-config-next": "16.2.11",
     "jsdom": "29.1.1",
     "prettier": "3.9.6",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   },

@@ -69,23 +69,78 @@ function WalletHeaderControls() {
 
   return (
     <div className="dapp-wallet-actions">
-      {!wallet.isTargetChain && (
-        <button
-          className="dapp-wallet-link is-warning"
-          type="button"
-          onClick={() => void wallet.switchNetwork()}
-          disabled={wallet.busyAction !== null}
-        >
-          {wallet.busyAction === "switch" ? "Switching…" : "Switch network"}
-        </button>
-      )}
       <button
-        className="dapp-wallet-button"
+        className="dapp-wallet-button is-connected"
         type="button"
         onClick={() => void wallet.copyAddress()}
         title="Copy wallet address"
       >
         {wallet.address ? formatAddress(wallet.address) : "Wallet ready"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Which network you are on, in the header, on every route.
+ *
+ * `networkName` is the *target* chain's name, so it only describes reality
+ * when isTargetChain is true. Anything else has to be reported as a mismatch
+ * rather than by name, because the context does not carry the name of the
+ * chain the wallet actually sits on -- only its id.
+ */
+function NetworkIndicator() {
+  const wallet = useWalletState();
+
+  if (wallet.status !== "ready") {
+    return (
+      <div className="dapp-network">
+        <span className="dapp-network-dot" aria-hidden="true" />
+        {wallet.networkName}
+      </div>
+    );
+  }
+
+  if (!wallet.isTargetChain) {
+    return (
+      <div className="dapp-network is-wrong">
+        <span className="dapp-network-dot" aria-hidden="true" />
+        {wallet.chainId === null ? "Network unknown" : `Chain ${wallet.chainId}`}
+      </div>
+    );
+  }
+
+  return (
+    <div className="dapp-network is-ready">
+      <span className="dapp-network-dot" aria-hidden="true" />
+      {wallet.networkName}
+    </div>
+  );
+}
+
+/**
+ * A wrong network means every number on the page reads as unavailable, so the
+ * fix has to be impossible to miss and reachable at any width -- not a link in
+ * the header, which is hidden under 560px.
+ */
+function WrongNetworkBar() {
+  const wallet = useWalletState();
+  if (wallet.status !== "ready" || wallet.isTargetChain) return null;
+
+  return (
+    <div className="dapp-network-bar" role="status">
+      <p>
+        <strong>You are on the wrong network.</strong> Statics data will not load until you switch
+        to {wallet.networkName}
+        {wallet.targetChainId ? ` (chain ${wallet.targetChainId})` : ""}.
+      </p>
+      <button
+        className="dapp-network-bar-action"
+        type="button"
+        onClick={() => void wallet.switchNetwork()}
+        disabled={wallet.busyAction !== null}
+      >
+        {wallet.busyAction === "switch" ? "Switching…" : `Switch network`}
       </button>
     </div>
   );
@@ -180,10 +235,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             priority
           />
         </Link>
-        <div className="dapp-phase">
-          <span className="dapp-pulse" aria-hidden="true" />
-          Protocol DApp
-        </div>
+        <NetworkIndicator />
         <div className="dapp-header-actions">
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
@@ -216,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="dapp-nav-panel" id="dapp-navigation-panel">
             <div className="dapp-nav-panel-heading">
               <div>
-                <span>{"// Statics DApp"}</span>
+                <span>Statics DApp</span>
                 <strong>Application navigation</strong>
               </div>
               <button type="button" onClick={() => closeNavigation()}>
@@ -239,12 +291,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     aria-current={active ? "page" : undefined}
                     onClick={() => closeNavigation()}
                   >
-                    <span>{String(index + 1).padStart(2, "0")}</span>
                     {item.label}
                   </Link>
                 ) : (
                   <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                    <span>{String(index + 1).padStart(2, "0")}</span>
                     {item.label}
                     <small>Planned</small>
                   </span>
@@ -258,9 +308,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <main id="dapp-content" className="dapp-content">
+          <WrongNetworkBar />
+
           {showOverviewSummary && (
             <section className="dapp-intro">
-              <p className="dapp-eyebrow">{"// Statics application"}</p>
+              <p className="dapp-eyebrow">Statics application</p>
               <h1>{routeCopy.title}</h1>
               <p>{routeCopy.description}</p>
             </section>

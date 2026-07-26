@@ -1,33 +1,30 @@
+/* ===================================================================
+ * STATICS DAPP — foundation
+ *
+ * This file is being migrated from the original terminal styling to a
+ * consumer-app system. The migration is complete: every rule draws from
+ * the design tokens in globals.css, and no raw rem font-size, legacy
+ * colour token or hardcoded hex survives.
+ *
+ * House rules for anything written here:
+ *   - font-size comes from the --text-* scale. Never a raw rem value.
+ *   - --font-mono is for machine data only (addresses, hashes, calldata).
+ *   - green means "primary action" or "value went up". Nothing else.
+ *   - depth comes from --app-surface steps + --shadow-*, not hairlines.
+ *   - anything tappable is at least --control-height-sm tall.
+ * =================================================================== */
+
+/* ---- Shell base --------------------------------------------------- */
+
 .dapp-shell {
   min-height: 100vh;
   overflow-x: hidden;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    radial-gradient(circle at 78% 14%, rgba(117, 241, 45, 0.05), transparent 26rem), var(--bg);
-  background-size:
-    48px 48px,
-    48px 48px,
-    auto,
-    auto;
-  color: var(--text);
-  font-family: var(--font-mono);
-}
-
-.dapp-shell::before {
-  position: fixed;
-  z-index: 30;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-  opacity: 0.14;
-  background-image:
-    repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(255, 255, 255, 0.018) 4px),
-    radial-gradient(rgba(255, 255, 255, 0.16) 0.45px, transparent 0.55px);
-  background-size:
-    100% 4px,
-    5px 5px;
-  mix-blend-mode: screen;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
 }
 
 .dapp-shell *,
@@ -41,9 +38,41 @@
   text-decoration: none;
 }
 
-.dapp-shell a:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 4px;
+.dapp-shell :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* The UA scales <small> by 0.83em, which compounds once it nests and lands
+ * under the 12px floor. Pin it to the scale; page rules still override. */
+.dapp-shell small {
+  font-size: var(--text-caption);
+}
+
+/* Headings no page rule claims land on the scale rather than the UA's
+ * em-relative defaults (h3 would otherwise render at 18.72px). */
+.dapp-shell h3 {
+  font-size: var(--text-lg);
+}
+
+.dapp-shell h4 {
+  font-size: var(--text-base);
+}
+
+/* Monospace is opt-in, and only for data a human reads character by
+ * character. Anything tagged with this gets tabular alignment too. */
+.dapp-shell .is-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Numerals in a sans face, aligned in columns. This is what balances
+ * and amounts should use — mono numerals read as debug output. */
+.dapp-shell .is-numeric {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .dapp-skip-link {
@@ -53,137 +82,495 @@
   left: 0.75rem;
   padding: 0.75rem 1rem;
   transform: translateY(-150%);
-  background: var(--green);
-  color: var(--bg) !important;
-  font-weight: 700;
-  text-transform: uppercase;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-ink) !important;
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .dapp-skip-link:focus {
   transform: translateY(0);
 }
 
-.dapp-header {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: 220px 1fr minmax(0, auto);
-  gap: 2rem;
-  align-items: center;
-  min-height: 88px;
-  padding: 14px clamp(22px, 3vw, 44px);
-  border-bottom: 1px solid var(--line);
-  background: rgba(5, 6, 5, 0.92);
-}
+/* ---- Primitives ---------------------------------------------------
+ * The original stylesheet had no shared components: every route grew
+ * its own card, button and field. These are the replacements. Migrate
+ * bespoke rules onto them rather than adding new one-offs.
+ * ------------------------------------------------------------------ */
 
-.dapp-brand img {
-  display: block;
-  width: 190px;
-  height: auto;
-}
+/* Buttons */
 
-.dapp-phase {
-  display: flex;
+.ui-button {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  color: var(--muted);
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  gap: 0.5rem;
+  min-height: var(--control-height);
+  padding: 0 1.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.dapp-pulse {
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--green);
-  background: rgba(117, 241, 45, 0.25);
+.ui-button:hover:not(:disabled) {
+  background: var(--app-overlay);
 }
 
-.dapp-return {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--line-bright);
-  color: var(--text);
-  font-size: 0.7rem;
+.ui-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-button--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.ui-button--primary:active:not(:disabled) {
+  background: var(--accent-press);
+}
+
+.ui-button--secondary {
+  border-color: var(--app-border-strong);
+  background: transparent;
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+  border-color: var(--app-text-muted);
+  background: var(--app-raised);
+}
+
+.ui-button--ghost {
+  background: transparent;
+  color: var(--app-text-secondary);
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+  background: var(--app-raised);
+  color: var(--app-text);
+}
+
+.ui-button--sm {
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  font-size: var(--text-xs);
+}
+
+.ui-button--block {
+  width: 100%;
+}
+
+/* Cards */
+
+.ui-card {
+  padding: 1.5rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-card--raised {
+  background: var(--app-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-card--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Section headings */
+
+.ui-section-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  letter-spacing: -0.01em;
+}
+
+.ui-section-subtitle {
+  margin: 0.375rem 0 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* Labels. Uppercase survives here and nowhere else — a 12px label with
+ * wide tracking still reads fine, and it keeps a trace of the original
+ * character without costing legibility on anything people actually read. */
+.ui-label {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.dapp-return:hover {
-  border-color: var(--green);
+/* Stat block */
+
+.ui-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ui-stat__label {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.ui-stat__value {
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.ui-stat__delta {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-stat__delta.is-positive {
+  color: var(--positive);
+}
+
+.ui-stat__delta.is-negative {
+  color: var(--negative);
+}
+
+/* Status pill */
+
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ui-pill.is-ready {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.ui-pill.is-warning {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.ui-pill.is-error {
+  background: var(--negative-wash);
+  color: var(--negative);
+}
+
+.ui-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+/* Glossary term. A dotted underline is the long-standing convention for
+ * "there is a definition here" -- discoverable without shouting, and it does
+ * not compete with real links. */
+/* Empty state. One implementation, replacing .basket-empty, .position-empty
+ * and .activity-empty, which had drifted into three near-identical blocks. */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 2.5rem 2rem;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.ui-empty.is-error {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--negative-wash);
+}
+
+.ui-empty-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ui-empty.is-error .ui-empty-title {
+  color: var(--negative);
+}
+
+.ui-empty-description {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.ui-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+}
+
+.ui-term {
+  text-decoration: underline dotted var(--app-text-muted);
+  text-underline-offset: 0.25em;
+  cursor: help;
+}
+
+.ui-term-protocol {
+  color: var(--app-text-muted);
+}
+
+/* ---- Header -------------------------------------------------------- */
+
+.dapp-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: 200px 1fr minmax(0, auto);
+  gap: 1.5rem;
+  align-items: center;
+  min-height: 72px;
+  padding: 0.75rem clamp(1rem, 3vw, 2.5rem);
+  border-bottom: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.dapp-brand img {
+  display: block;
+  width: 150px;
+  height: auto;
+}
+
+/* Which network you are on. Occupies the header's centre slot, which
+ * previously held a static "Protocol DApp" label that told nobody anything. */
+.dapp-network {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  justify-self: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dapp-network-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-text-muted);
+}
+
+.dapp-network.is-ready .dapp-network-dot {
+  background: var(--accent);
+}
+
+.dapp-network.is-wrong {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.dapp-network.is-wrong .dapp-network-dot {
+  background: var(--warning);
+}
+
+/* The wrong network makes every figure on the page read as unavailable, so
+ * this sits in the content column where it cannot be missed or clipped. */
+.dapp-network-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.dapp-network-bar p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.dapp-network-bar strong {
+  font-weight: 650;
+}
+
+.dapp-network-bar-action {
+  min-height: var(--control-height-sm);
+  padding: 0 1rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--warning);
+  color: var(--app-bg);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dapp-network-bar-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .dapp-header-actions,
 .dapp-wallet-actions {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.5rem;
   align-items: center;
 }
 
+.dapp-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  border-radius: var(--radius-md);
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.dapp-return:hover {
+  background: var(--app-raised);
+  color: var(--app-text);
+}
+
+/* The wallet control is the primary action in the header until someone
+ * is signed in, so it gets the accent. Once connected it drops back to
+ * a neutral chip — a connected wallet is a status, not a call to act. */
 .dapp-wallet-button,
 .dapp-wallet-link,
 .dapp-settings button,
 .dapp-settings-actions a {
-  min-height: 42px;
-  padding: 0.72rem 1rem;
-  border: 1px solid var(--green-soft);
-  background: rgba(117, 241, 45, 0.08);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.65rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--control-height-sm);
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .dapp-wallet-button:hover:not(:disabled),
-.dapp-wallet-link:hover:not(:disabled),
 .dapp-settings button:hover:not(:disabled),
 .dapp-settings-actions a:hover {
-  border-color: var(--green);
-  color: var(--green);
-}
-
-.dapp-wallet-button:focus-visible,
-.dapp-wallet-link:focus-visible,
-.dapp-settings button:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 4px;
+  background: var(--accent-hover);
 }
 
 .dapp-wallet-button:disabled,
 .dapp-wallet-link:disabled,
 .dapp-settings button:disabled {
-  border-color: var(--line);
-  background: transparent;
-  color: #656a65;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+.dapp-wallet-button.is-connected {
+  border-color: var(--app-border-strong);
+  background: var(--app-raised);
+  color: var(--app-text);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.dapp-wallet-button.is-connected:hover:not(:disabled) {
+  background: var(--app-overlay);
+}
+
 .dapp-wallet-link {
-  border-color: var(--line-bright);
+  border-color: var(--app-border-strong);
   background: transparent;
+  color: var(--app-text-secondary);
+  font-weight: 500;
+}
+
+.dapp-wallet-link:hover:not(:disabled) {
+  background: var(--app-raised);
+  color: var(--app-text);
 }
 
 .dapp-wallet-link.is-warning {
-  border-color: #9d8141;
-  color: #d1b46e;
+  border-color: transparent;
+  background: var(--warning-wash);
+  color: var(--warning);
 }
+
+/* ---- Layout + sidebar ---------------------------------------------- */
 
 .dapp-layout {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   min-width: 0;
-  min-height: calc(100vh - 88px);
+  min-height: calc(100vh - 72px);
 }
 
 .dapp-sidebar {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  padding: 2rem 1rem 1.5rem;
-  border-right: 1px solid var(--line);
-  background: rgba(7, 8, 7, 0.68);
+  padding: 1.5rem 0.75rem;
+  border-right: 1px solid var(--app-border);
 }
 
 .dapp-nav-panel {
@@ -199,156 +586,179 @@
   display: none;
 }
 
-.dapp-nav-label,
 .dapp-section-label,
 .dapp-eyebrow {
-  margin: 0;
-  color: var(--green);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
+  margin: 0 0 0.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dapp-nav-label {
+  margin: 0 0 0.5rem 0.75rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .dapp-sidebar nav {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 1.25rem;
+  gap: 0.125rem;
 }
 
 .dapp-nav-item {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 0.65rem;
+  display: flex;
+  gap: 0.75rem;
   align-items: center;
-  min-height: 42px;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid transparent;
-  color: #777d77;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.dapp-nav-item > span {
-  color: #545954;
-  font-size: 0.58rem;
+  min-height: var(--control-height);
+  padding: 0 0.75rem;
+  border-radius: var(--radius-md);
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .dapp-nav-item small {
-  color: #4f544f;
-  font-size: 0.48rem;
+  margin-left: auto;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.dapp-nav-item[aria-disabled="true"] {
+  opacity: 0.5;
 }
 
 .dapp-nav-item.active {
-  border-color: var(--green-soft);
-  background: rgba(117, 241, 45, 0.055);
-  color: var(--text);
-}
-
-.dapp-nav-item.active > span {
-  color: var(--green);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .dapp-nav-item:not(.active)[href]:hover {
-  border-color: var(--line-bright);
-  color: var(--text);
-}
-
-.dapp-nav-toggle:focus-visible,
-.dapp-nav-panel-heading button:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 4px;
+  background: var(--app-raised);
+  color: var(--app-text);
 }
 
 .dapp-sidebar-note {
   margin-top: auto;
   padding: 1rem;
-  border: 1px solid var(--line);
-  color: #737873;
-  font-size: 0.62rem;
-  line-height: 1.65;
-  text-transform: none;
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
 }
 
 .dapp-sidebar-note span {
   display: block;
-  margin-bottom: 0.5rem;
-  color: var(--green-soft);
+  margin-bottom: 0.375rem;
+  color: var(--app-text-secondary);
+  font-weight: 600;
 }
+
+/* ---- Content ------------------------------------------------------- */
 
 .dapp-content {
   width: min(1180px, 100%);
   min-width: 0;
-  padding: clamp(2rem, 5vw, 5rem);
+  padding: clamp(1.5rem, 4vw, 3rem);
 }
 
 .dapp-intro {
-  max-width: 820px;
+  max-width: 680px;
 }
 
 .dapp-intro h1 {
-  margin: 1rem 0 1.25rem;
-  font-size: clamp(2rem, 5vw, 4.6rem);
-  font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  margin: 0 0 0.5rem;
+  font-size: var(--text-3xl);
+  font-weight: 650;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
 .dapp-intro > p:last-child {
-  max-width: 720px;
+  max-width: 620px;
   margin: 0;
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.75;
+  color: var(--app-text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   overflow-wrap: anywhere;
 }
 
 .dapp-inline-error {
+  display: flex;
+  gap: 0.625rem;
   margin: 1.5rem 0 0;
-  padding: 0.9rem 1rem;
-  border: 1px solid #8f493f;
-  background: rgba(143, 73, 63, 0.1);
-  color: #e5a79d;
-  font-size: 0.72rem;
-  line-height: 1.6;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--negative-wash);
+  color: var(--negative);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
 }
 
 .dapp-status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 3rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 2rem;
 }
 
 .dapp-status-card {
-  min-height: 128px;
-  padding: 1.2rem;
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .dapp-status-card span {
   display: block;
-  color: #747974;
-  font-size: 0.6rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
 .dapp-status-card strong {
   display: block;
-  margin-top: 2rem;
-  color: #a5aaa5;
-  font-size: 0.76rem;
-  font-weight: 500;
-  text-transform: uppercase;
+  color: var(--app-text);
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .dapp-status-card strong.is-ready {
-  color: var(--green);
+  color: var(--accent);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .dapp-shell *,
+  .dapp-shell *::before,
+  .dapp-shell *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ===================================================================
+ * PAGE STYLES — per-route rules, swept onto the tokens above.
+ *
+ * These are still largely bespoke per page: the routes predate the
+ * primitives and have not been re-pointed at .ui-* yet. That is the
+ * next consolidation, and it is a markup change, not a CSS one.
+ * =================================================================== */
 
 .dapp-next-phase {
   display: grid;
@@ -356,22 +766,22 @@
   gap: clamp(1.5rem, 4vw, 4rem);
   margin-top: 10px;
   padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .dapp-next-phase h2 {
   margin: 0.8rem 0 0;
-  font-size: clamp(1rem, 2vw, 1.4rem);
+  font-size: var(--text-xl);
   font-weight: 500;
   line-height: 1.4;
-  text-transform: uppercase;
 }
 
 .dapp-next-phase > p,
 .dapp-next-phase li {
-  color: var(--muted);
-  font-size: 0.76rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-base);
   line-height: 1.7;
 }
 
@@ -389,15 +799,16 @@
 
 .dapp-next-phase li::before {
   margin-right: 0.6rem;
-  color: var(--green-soft);
+  color: var(--accent);
   content: ">";
 }
 
 .dapp-settings {
   margin-top: 10px;
   padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .dapp-settings-heading {
@@ -408,18 +819,16 @@
 .dapp-export-warning h3 {
   margin: 0.8rem 0;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .dapp-settings-heading h2 {
-  font-size: clamp(1.2rem, 3vw, 2rem);
+  font-size: var(--text-2xl);
 }
 
 .dapp-settings-heading > p:last-child,
 .dapp-export-warning p {
-  color: var(--muted);
-  font-size: 0.76rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-base);
   line-height: 1.7;
 }
 
@@ -428,27 +837,31 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   margin: 2rem 0 0;
-  background: var(--line);
-  border: 1px solid var(--line);
+  background: var(--app-border);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .dapp-wallet-details > div {
   min-width: 0;
   padding: 1rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .dapp-wallet-details dt {
-  color: #747974;
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dapp-wallet-details dd {
   margin: 1rem 0 0;
-  color: var(--text);
-  font-size: 0.72rem;
+  color: var(--app-text);
+  font-size: var(--text-base);
   text-transform: capitalize;
   overflow-wrap: anywhere;
 }
@@ -468,27 +881,29 @@
   max-width: 720px;
   margin-top: 2rem;
   padding: 1.25rem;
-  border: 1px solid #9d8141;
-  background: rgba(157, 129, 65, 0.07);
+  border: 1px solid var(--warning);
+  background: var(--warning-wash);
+  border-radius: var(--radius-lg);
 }
 
 .dapp-export-warning h3 {
-  color: #d1b46e;
-  font-size: 0.88rem;
+  color: var(--warning);
+  font-size: var(--text-base);
 }
 
 .dapp-logout {
   margin-top: 2rem;
-  border-color: #8f493f !important;
-  background: rgba(143, 73, 63, 0.08) !important;
-  color: #e5a79d !important;
+  border-color: var(--negative) !important;
+  background: var(--negative-wash) !important;
+  color: var(--negative) !important;
 }
 
 .wallet-surface,
 .portal-workspace {
   margin-top: 10px;
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.82);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-md);
 }
 
 .wallet-network-row {
@@ -497,7 +912,7 @@
   align-items: end;
   justify-content: space-between;
   padding: 1.25rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .wallet-network-row label,
@@ -505,10 +920,11 @@
   display: grid;
   gap: 0.55rem;
   min-width: min(100%, 250px);
-  color: #777d77;
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .wallet-network-row select,
@@ -522,10 +938,10 @@
 .portal-primary-action,
 .wallet-quick-actions button {
   min-height: 44px;
-  border: 1px solid var(--line-bright);
+  border: 1px solid var(--app-border-strong);
   border-radius: 0;
-  background: #080a08;
-  color: var(--text);
+  background: var(--app-surface);
+  color: var(--app-text);
   font: inherit;
 }
 
@@ -544,12 +960,11 @@
 .wallet-quick-actions button {
   padding: 0.75rem 1rem;
   cursor: pointer;
-  text-transform: uppercase;
 }
 
 .wallet-network-row button:disabled,
 .portal-primary-action:disabled {
-  color: #656a65;
+  color: var(--app-text-muted);
   cursor: not-allowed;
 }
 
@@ -559,22 +974,23 @@
   justify-items: center;
   padding: clamp(2rem, 7vw, 5.5rem) 1.5rem;
   background:
-    radial-gradient(circle, rgba(117, 241, 45, 0.07), transparent 55%),
-    linear-gradient(135deg, rgba(117, 241, 45, 0.025), transparent);
+    radial-gradient(circle, var(--accent-wash), transparent 55%),
+    linear-gradient(135deg, var(--accent-wash), transparent);
 }
 
 .wallet-balance-hero span,
 .wallet-balance-hero small,
 .portal-runtime-state {
-  color: var(--muted);
-  font-size: 0.62rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .wallet-balance-hero strong {
-  color: var(--text);
-  font-size: clamp(2.5rem, 8vw, 6rem);
+  color: var(--app-text);
+  font-size: var(--text-4xl);
   font-weight: 400;
   line-height: 1;
 }
@@ -582,15 +998,16 @@
 .wallet-quick-actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .wallet-quick-actions button {
   min-height: 76px;
   border: 0;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--app-border);
   background: transparent;
+  border-radius: var(--radius-md);
 }
 
 .wallet-quick-actions button:last-child {
@@ -601,13 +1018,13 @@
 .portal-mode-tabs button:hover,
 .portal-direction-tabs button:hover,
 .portal-chain-tabs button:hover {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .wallet-quick-actions span {
   display: inline-block;
   margin-right: 0.65rem;
-  color: var(--green);
+  color: var(--accent);
 }
 
 .wallet-assets {
@@ -622,21 +1039,21 @@
 }
 
 .wallet-section-heading span {
-  color: var(--green);
-  font-size: 0.58rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
 }
 
 .wallet-section-heading h2 {
   margin: 0.5rem 0 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .wallet-section-heading a {
-  color: var(--muted);
-  font-size: 0.62rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .wallet-asset-actions {
@@ -650,16 +1067,18 @@
 .wallet-remove-token {
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--app-text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 0.62rem;
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius-md);
 }
 
 .wallet-asset-actions button:hover,
 .wallet-inline-action:hover {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .wallet-token-rows {
@@ -673,22 +1092,23 @@
   gap: 1rem;
   align-items: center;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .wallet-token-logo {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--green-soft);
+  border: 1px solid var(--accent);
   border-radius: 50%;
-  background: #0c100c;
+  background: var(--app-surface);
   object-fit: cover;
 }
 
 .wallet-token-logo-fallback {
-  color: var(--green);
-  font-size: 0.62rem;
+  color: var(--accent);
+  font-size: var(--text-sm);
 }
 
 .wallet-asset-row > div {
@@ -701,17 +1121,17 @@
 }
 
 .wallet-asset-row strong {
-  font-size: 0.76rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
 .wallet-asset-row span {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .wallet-remove-token {
-  color: #e5a79d;
+  color: var(--negative);
 }
 
 .portal-workspace {
@@ -721,6 +1141,7 @@
 .portal-workspace.is-compact {
   margin: 0;
   border: 0;
+  border-radius: var(--radius-md);
 }
 
 .portal-mode-tabs,
@@ -729,13 +1150,14 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   padding: 0.6rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .portal-direction-tabs {
   grid-template-columns: repeat(2, 1fr);
   padding: 0;
   border: 0;
+  border-radius: var(--radius-md);
 }
 
 .portal-chain-tabs {
@@ -749,15 +1171,15 @@
 .portal-chain-tabs button {
   border-color: transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .portal-mode-tabs button[aria-selected="true"],
 .portal-direction-tabs button[aria-pressed="true"],
 .portal-chain-tabs button[aria-pressed="true"] {
-  border-color: var(--green-soft);
-  background: rgba(117, 241, 45, 0.07);
-  color: var(--green);
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
 }
 
 .portal-panel {
@@ -772,8 +1194,9 @@
 
 .portal-asset-field {
   padding: 1rem;
-  border: 1px solid var(--line);
-  background: #070907;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .portal-asset-field > div {
@@ -784,34 +1207,36 @@
 .portal-asset-field input {
   min-width: 0;
   border-right: 0;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .portal-asset-field select {
   min-width: 90px;
-  border: 1px solid var(--line-bright);
-  background: #080a08;
-  color: var(--text);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
   font: inherit;
   text-align: center;
+  border-radius: var(--radius-md);
 }
 
 .portal-asset-field small {
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .portal-switch-assets {
   width: 44px;
-  min-height: 38px;
+  min-height: var(--control-height);
   margin: -0.45rem auto;
-  border: 1px solid var(--green-soft);
-  background: #080a08;
-  color: var(--green);
+  border: 1px solid var(--accent);
+  background: var(--app-surface);
+  color: var(--accent);
   cursor: pointer;
+  border-radius: var(--radius-md);
 }
 
 .portal-switch-assets:disabled {
-  color: var(--muted);
+  color: var(--app-text-muted);
   cursor: not-allowed;
 }
 
@@ -820,7 +1245,8 @@
   grid-template-columns: 1fr auto;
   gap: 0.5rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .portal-bridge-networks {
@@ -839,37 +1265,39 @@
   gap: 0.8rem;
   align-items: center;
   padding: 0.8rem;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.62rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .portal-bridge-status strong {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .portal-bridge-status button {
   border: 0;
   background: transparent;
-  color: var(--text);
+  color: var(--app-text);
   cursor: pointer;
   font: inherit;
-  text-transform: uppercase;
+  border-radius: var(--radius-md);
 }
 
 .portal-destination span,
 .portal-destination small {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .portal-destination strong {
   grid-row: 2;
-  font-size: 0.78rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .portal-destination small {
@@ -881,48 +1309,54 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   margin: 0;
-  background: var(--line);
-  border: 1px solid var(--line);
+  background: var(--app-border);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .portal-quote-grid > div {
   min-width: 0;
   padding: 0.9rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .portal-quote-grid dt {
-  color: var(--muted);
-  font-size: 0.54rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .portal-quote-grid dd {
   margin: 0.65rem 0 0;
-  font-size: 0.68rem;
+  font-size: var(--text-sm);
 }
 
 .portal-primary-action {
   width: 100%;
-  border-color: var(--green-soft);
-  background: rgba(117, 241, 45, 0.08);
+  border-color: var(--accent);
+  background: var(--accent-wash);
 }
 
 .portal-error {
   margin: 0;
   padding: 0.8rem 1rem;
-  border: 1px solid rgba(229, 167, 157, 0.35);
-  color: #e5a79d;
-  font-size: 0.68rem;
+  border: 1px solid var(--negative);
+  color: var(--negative);
+  font-size: var(--text-sm);
   line-height: 1.5;
+  border-radius: var(--radius-lg);
 }
 
 .portal-review {
   display: grid;
   gap: 1rem;
   padding: 1rem;
-  border: 1px solid var(--green-soft);
-  background: rgba(117, 241, 45, 0.035);
+  border: 1px solid var(--accent);
+  background: var(--accent-wash);
+  border-radius: var(--radius-lg);
 }
 
 .portal-review > div {
@@ -930,7 +1364,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
-  font-size: 0.72rem;
+  font-size: var(--text-base);
 }
 
 .portal-review > div span:last-child {
@@ -938,7 +1372,7 @@
 }
 
 .portal-review strong {
-  color: var(--green);
+  color: var(--accent);
   font-weight: 400;
 }
 
@@ -955,7 +1389,7 @@
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .wallet-dialog {
@@ -963,8 +1397,9 @@
   width: min(480px, 100%);
   max-height: calc(100vh - 2rem);
   overflow: auto;
-  border: 1px solid var(--line-bright);
-  background: #070907;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  border-radius: var(--radius-md);
 }
 
 .wallet-dialog.is-wide {
@@ -978,10 +1413,11 @@
   right: 0.65rem;
   width: 36px;
   height: 36px;
-  border: 1px solid var(--line-bright);
-  background: #070907;
-  color: var(--text);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
   cursor: pointer;
+  border-radius: var(--radius-md);
 }
 
 .wallet-dialog-content {
@@ -991,22 +1427,22 @@
 }
 
 .wallet-dialog-content > span {
-  color: var(--green);
-  font-size: 0.58rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
 }
 
 .wallet-dialog-content h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: var(--text-xl);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .wallet-dialog-content code {
   padding: 1rem;
-  border: 1px solid var(--line);
-  color: var(--muted);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
   overflow-wrap: anywhere;
+  border-radius: var(--radius-lg);
 }
 
 .wallet-dialog-content input,
@@ -1014,10 +1450,10 @@
 .wallet-token-browser > input {
   min-height: 44px;
   padding: 0.75rem;
-  border: 1px solid var(--line-bright);
+  border: 1px solid var(--app-border-strong);
   border-radius: 0;
-  background: #080a08;
-  color: var(--text);
+  background: var(--app-surface);
+  color: var(--app-text);
   font: inherit;
 }
 
@@ -1028,13 +1464,14 @@
 
 .wallet-inline-action {
   justify-self: start;
-  color: var(--green);
+  color: var(--accent);
 }
 
 .wallet-catalog-list {
   min-height: 0;
   overflow: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
 }
 
 .wallet-catalog-list > button {
@@ -1045,15 +1482,16 @@
   align-items: center;
   padding: 0.8rem;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
   background: transparent;
-  color: var(--text);
+  color: var(--app-text);
   cursor: pointer;
   text-align: left;
+  border-radius: var(--radius-lg);
 }
 
 .wallet-catalog-list > button:hover {
-  background: rgba(117, 241, 45, 0.05);
+  background: var(--accent-wash);
 }
 
 .wallet-catalog-list > button > span {
@@ -1063,8 +1501,8 @@
 
 .wallet-catalog-list small,
 .wallet-catalog-list code {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .wallet-token-metadata {
@@ -1072,13 +1510,15 @@
   grid-template-columns: 1fr auto;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .wallet-token-metadata span {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 @media (max-width: 720px) {
@@ -1089,7 +1529,7 @@
 
   .wallet-quick-actions button {
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--app-border);
   }
 
   .wallet-network-row {
@@ -1122,8 +1562,9 @@
 .activity-panel {
   margin-top: 10px;
   padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .preview-banner {
@@ -1133,9 +1574,9 @@
   align-items: center;
   margin-top: 10px;
   padding: 1rem clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid #9d8141;
-  background:
-    linear-gradient(90deg, rgba(157, 129, 65, 0.12), transparent 56%), rgba(8, 10, 8, 0.9);
+  border: 1px solid var(--warning);
+  background: linear-gradient(90deg, var(--warning-wash), transparent 56%), var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .preview-banner > div {
@@ -1145,31 +1586,33 @@
 
 .preview-banner span,
 .preview-banner p {
-  color: #d1b46e;
-  font-size: 0.58rem;
+  color: var(--warning);
+  font-size: var(--text-caption);
   line-height: 1.6;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .preview-banner strong {
-  color: var(--text);
-  font-size: 0.75rem;
+  color: var(--app-text);
+  font-size: var(--text-base);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .preview-banner p {
   margin: 0;
-  color: var(--muted);
+  color: var(--app-text-muted);
   text-transform: none;
 }
 
 .preview-data-tag {
   padding: 0.2rem 0.35rem;
-  border: 1px solid #9d8141;
-  color: #d1b46e;
-  font-size: 0.48rem;
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .preview-overview-grid {
@@ -1183,46 +1626,48 @@
   display: grid;
   min-width: 0;
   padding: 1.25rem;
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .preview-overview-grid span,
 .preview-overview-grid small {
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .preview-overview-grid strong {
   margin: 0.85rem 0 0.35rem;
-  color: var(--text);
-  font-size: 1.15rem;
+  color: var(--app-text);
+  font-size: var(--text-lg);
   font-weight: 500;
 }
 
 .preview-overview-grid a {
   margin-top: 1rem;
-  color: var(--green);
-  font-size: 0.58rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dollar-unavailable h2,
 .dollar-overview-card h2,
 .activity-panel h2 {
   margin: 0.8rem 0;
-  font-size: clamp(1.1rem, 2.5vw, 2rem);
+  font-size: var(--text-2xl);
   font-weight: 500;
   line-height: 1.35;
-  text-transform: uppercase;
 }
 
 .dollar-unavailable p:last-child,
 .dollar-overview-card p,
 .activity-panel > div > p:last-child {
-  color: var(--muted);
-  font-size: 0.74rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-base);
   line-height: 1.7;
 }
 
@@ -1237,19 +1682,20 @@
   display: grid;
   gap: 0.35rem;
   padding-left: 1.5rem;
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--app-border);
 }
 
 .dollar-overview-health span,
 .dollar-overview-health small {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dollar-overview-health strong {
-  color: var(--green);
-  font-size: 1.1rem;
+  color: var(--accent);
+  font-size: var(--text-lg);
 }
 
 .dollar-primary-link,
@@ -1260,20 +1706,22 @@
   justify-content: center;
   min-height: 44px;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--green);
-  color: var(--green) !important;
-  font-size: 0.65rem;
+  border: 1px solid var(--accent);
+  color: var(--accent) !important;
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .dollar-disabled-link {
-  border-color: var(--line);
-  color: #5d625d !important;
+  border-color: var(--app-border);
+  color: var(--app-text-muted) !important;
 }
 
 .dollar-loading {
-  color: var(--muted);
-  font-size: 0.76rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-base);
 }
 
 .dollar-metrics {
@@ -1281,28 +1729,32 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   margin-top: 10px;
-  border: 1px solid var(--line);
-  background: var(--line);
+  border: 1px solid var(--app-border);
+  background: var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .dollar-metrics article {
   min-width: 0;
   padding: 1rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .dollar-metrics span {
   display: block;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dollar-metrics strong {
   display: block;
   margin-top: 0.9rem;
-  color: var(--text);
-  font-size: 1rem;
+  color: var(--app-text);
+  font-size: var(--text-lg);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -1317,8 +1769,9 @@
 .dollar-action-card,
 .dollar-protocol-card {
   padding: clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .dollar-tabs,
@@ -1327,8 +1780,10 @@
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   padding: 0;
-  border: 1px solid var(--line);
-  background: var(--line);
+  border: 1px solid var(--app-border);
+  background: var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .dollar-tabs button,
@@ -1336,20 +1791,22 @@
 .dollar-field button,
 .dollar-submit,
 .dollar-protocol-card button {
-  min-height: 42px;
+  min-height: var(--control-height);
   border: 0;
-  background: #080a08;
-  color: var(--muted);
+  background: var(--app-surface);
+  color: var(--app-text-muted);
   font: inherit;
-  font-size: 0.65rem;
+  font-size: var(--text-caption);
   text-transform: uppercase;
   cursor: pointer;
+  font-weight: 600;
+  border-radius: var(--radius-md);
 }
 
 .dollar-tabs button.active,
 .dollar-asset-choice button.active {
-  background: rgba(117, 241, 45, 0.08);
-  color: var(--green);
+  background: var(--accent-wash);
+  color: var(--accent);
 }
 
 .preview-four-tabs {
@@ -1364,15 +1821,17 @@
 .dollar-asset-choice legend {
   display: block;
   margin-bottom: 0.65rem;
-  color: var(--muted);
-  font-size: 0.6rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dollar-field > div {
   display: grid;
   grid-template-columns: 1fr auto;
-  border: 1px solid var(--line-bright);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
 }
 
 .dollar-field input {
@@ -1380,24 +1839,25 @@
   padding: 1rem;
   border: 0;
   outline: 0;
-  background: #080a08;
-  color: var(--text);
+  background: var(--app-surface);
+  color: var(--app-text);
   font: inherit;
-  font-size: clamp(1.3rem, 3vw, 2rem);
+  font-size: var(--text-3xl);
+  border-radius: var(--radius-md);
 }
 
 .dollar-field button {
   padding: 0 1rem;
-  border-left: 1px solid var(--line);
-  color: var(--green);
+  border-left: 1px solid var(--app-border);
+  color: var(--accent);
 }
 
 .dollar-field small,
 .dollar-quote small {
   display: block;
   margin-top: 0.55rem;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .dollar-asset-choice {
@@ -1414,53 +1874,59 @@
   gap: 0.45rem;
   margin-top: 1.5rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .dollar-quote span {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .dollar-quote strong {
-  color: var(--text);
-  font-size: 0.8rem;
+  color: var(--app-text);
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
 .dollar-warning {
   padding: 0.9rem;
-  border: 1px solid #9d8141;
-  color: #d1b46e;
-  font-size: 0.65rem;
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  font-size: var(--text-sm);
   line-height: 1.6;
+  border-radius: var(--radius-lg);
 }
 
 .dollar-action-reason {
   margin: 1rem 0 0;
   padding: 0.9rem;
-  border: 1px solid var(--line-bright);
-  color: var(--muted);
-  font-size: 0.65rem;
+  border: 1px solid var(--app-border-strong);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.6;
+  border-radius: var(--radius-lg);
 }
 
 .dollar-submit {
   width: 100%;
   margin-top: 1rem;
-  border: 1px solid var(--green);
-  background: var(--green);
+  border: 1px solid var(--accent);
+  background: var(--accent);
   color: var(--bg);
   font-weight: 700;
+  border-radius: var(--radius-md);
 }
 
 .dollar-submit:disabled,
 .dollar-protocol-card button:disabled {
-  border-color: var(--line);
-  background: #111311;
-  color: #626762;
+  border-color: var(--app-border);
+  background: var(--app-raised);
+  color: var(--app-text-muted);
   cursor: not-allowed;
+  border-radius: var(--radius-md);
 }
 
 .dollar-protocol-card {
@@ -1477,33 +1943,36 @@
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .dollar-protocol-card dt,
 .dollar-protocol-card dd {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: var(--text-sm);
 }
 
 .dollar-protocol-card dt {
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .dollar-protocol-card dd {
-  color: var(--text);
+  color: var(--app-text);
   text-align: right;
   overflow-wrap: anywhere;
 }
 
 .dollar-protocol-card button {
-  border: 1px solid #9d8141;
-  color: #d1b46e;
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  border-radius: var(--radius-md);
 }
 
-.dollar-protocol-card > p:last-of-type {
-  color: var(--muted);
-  font-size: 0.62rem;
+/* Trailing description paragraph. Excludes the section label, which is the
+ * card's only <p> when no description is present and so matches :last-of-type. */
+.dollar-protocol-card > p:last-of-type:not(.dapp-section-label) {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.65;
 }
 
@@ -1512,8 +1981,10 @@
   gap: 1px;
   padding: 0;
   margin: 2rem 0 0;
-  background: var(--line);
+  background: var(--app-border);
   list-style: none;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .activity-panel li {
@@ -1521,7 +1992,8 @@
   grid-template-columns: 1fr auto;
   gap: 0.75rem 2rem;
   padding: 1rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .activity-panel li > div {
@@ -1539,44 +2011,44 @@
 .activity-panel code,
 .activity-panel li p,
 .activity-empty {
-  font-size: 0.62rem;
+  font-size: var(--text-sm);
 }
 
 .activity-panel li span,
 .activity-panel time,
 .activity-empty {
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .activity-status.is-confirmed,
 .activity-status.is-confirmed-unverified {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .activity-status.is-rejected,
 .activity-status.is-reverted,
 .activity-status.is-failed,
 .activity-status.is-replaced {
-  color: #e5a79d;
+  color: var(--negative);
 }
 
 .activity-status.is-simulating,
 .activity-status.is-signing,
 .activity-status.is-submitted {
-  color: #d1b46e;
+  color: var(--warning);
 }
 
 .activity-panel code,
 .activity-hash,
 .activity-panel li p {
   grid-column: 1 / -1;
-  color: var(--muted);
+  color: var(--app-text-muted);
   overflow-wrap: anywhere;
 }
 
 .activity-hash {
   font-family: monospace;
-  font-size: 0.62rem;
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 900px) {
@@ -1584,7 +2056,10 @@
     grid-template-columns: 1fr auto;
   }
 
-  .dapp-phase {
+  /* The header drops to two columns here, so the indicator would have nowhere
+   * to sit. Losing it costs nothing: the wrong-network bar is in the content
+   * column and stays visible at every width. */
+  .dapp-network {
     display: none;
   }
 
@@ -1600,8 +2075,7 @@
     overflow: visible;
     padding: 0;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
-    background: rgba(5, 6, 5, 0.96);
+    border-bottom: 1px solid var(--app-border);
   }
 
   .dapp-nav-label {
@@ -1610,54 +2084,56 @@
 
   .dapp-mobile-navigation {
     display: block;
-    padding: 0.65rem 1rem;
+    padding: 0.75rem clamp(1rem, 3vw, 2.5rem);
   }
 
   .dapp-nav-toggle {
     display: grid;
     width: 100%;
-    min-height: 48px;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.75rem;
+    min-height: var(--control-height);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 0.75rem;
     align-items: center;
-    padding: 0.7rem 0.85rem;
-    border: 1px solid var(--line);
-    background: rgba(8, 10, 8, 0.92);
-    color: var(--muted);
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--app-border);
+    border-radius: var(--radius-md);
+    background: var(--app-surface);
+    color: var(--app-text);
     font: inherit;
     text-align: left;
-    text-transform: uppercase;
     cursor: pointer;
   }
 
-  .dapp-nav-toggle span {
-    font-size: 0.52rem;
-    letter-spacing: 0.08em;
+  .dapp-nav-toggle span:first-child {
+    grid-column: 1;
+    color: var(--app-text-muted);
+    font-size: var(--text-caption);
   }
 
   .dapp-nav-toggle strong {
-    color: var(--text);
-    font-size: 0.68rem;
-    font-weight: 500;
+    grid-column: 1;
+    color: var(--app-text);
+    font-size: var(--text-sm);
+    font-weight: 600;
   }
 
   .dapp-nav-toggle span:last-child {
-    color: var(--green);
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
     text-align: right;
   }
 
   .dapp-nav-panel {
     position: fixed;
     z-index: 50;
-    inset: 88px 0 0;
+    inset: 72px 0 0;
     display: none;
-    padding: 1rem;
+    padding: 1rem clamp(1rem, 3vw, 2.5rem) 2rem;
     overflow-y: auto;
-    border-top: 1px solid var(--line);
-    background:
-      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px), #050605;
-    background-size: 48px 48px;
+    background: var(--app-bg);
   }
 
   .dapp-sidebar.is-open .dapp-nav-panel {
@@ -1670,52 +2146,51 @@
     gap: 1rem;
     align-items: center;
     padding: 0.5rem 0 1rem;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--app-border);
   }
 
   .dapp-nav-panel-heading > div {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.125rem;
   }
 
   .dapp-nav-panel-heading span {
-    color: var(--green);
-    font-size: 0.52rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    color: var(--app-text-muted);
+    font-size: var(--text-caption);
+    font-weight: 600;
   }
 
   .dapp-nav-panel-heading strong {
-    color: var(--text);
-    font-size: 0.78rem;
-    font-weight: 500;
-    text-transform: uppercase;
+    color: var(--app-text);
+    font-size: var(--text-lg);
+    font-weight: 650;
+    letter-spacing: -0.01em;
   }
 
   .dapp-nav-panel-heading button {
-    min-height: 40px;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--line-bright);
+    min-height: var(--control-height-sm);
+    padding: 0 0.875rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: var(--radius-md);
     background: transparent;
-    color: var(--muted);
+    color: var(--app-text-secondary);
     font: inherit;
-    font-size: 0.58rem;
-    text-transform: uppercase;
+    font-size: var(--text-sm);
+    font-weight: 500;
     cursor: pointer;
   }
 
   .dapp-sidebar nav {
     display: grid;
-    gap: 0.45rem;
+    gap: 0.125rem;
     margin-top: 1rem;
     overflow: visible;
   }
 
   .dapp-nav-item {
-    min-height: 50px;
-    padding: 0.75rem 1rem;
-    border-color: var(--line);
-    background: rgba(8, 10, 8, 0.78);
+    min-height: 48px;
+    padding: 0 1rem;
+    font-size: var(--text-base);
   }
 
   .dapp-sidebar-note {
@@ -1724,16 +2199,17 @@
 
   .dapp-mobile-site-link {
     display: inline-flex;
-    min-height: 44px;
+    min-height: var(--control-height);
     justify-content: space-between;
     gap: 1rem;
     align-items: center;
     margin-top: 0.75rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--line-bright);
-    color: var(--text);
-    font-size: 0.62rem;
-    text-transform: uppercase;
+    padding: 0 1rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: var(--radius-md);
+    color: var(--app-text);
+    font-size: var(--text-sm);
+    font-weight: 500;
   }
 
   .dapp-status-grid {
@@ -1767,12 +2243,12 @@
   .dapp-header {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.65rem;
-    min-height: 74px;
-    padding: 12px 18px;
+    min-height: 64px;
+    padding: 0.5rem 1rem;
   }
 
   .dapp-brand img {
-    width: min(142px, 100%);
+    width: min(132px, 100%);
   }
 
   .dapp-return {
@@ -1789,30 +2265,34 @@
   }
 
   .dapp-wallet-button {
-    max-width: 160px;
-    min-height: 38px;
-    padding: 0.55rem 0.7rem;
-    font-size: 0.55rem;
-    line-height: 1.25;
-    white-space: normal;
+    max-width: 168px;
+    padding: 0 0.75rem;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: var(--control-height-sm);
   }
 
   .dapp-nav-panel {
-    inset: 74px 0 0;
+    inset: 64px 0 0;
+  }
+
+  .dapp-mobile-navigation {
+    padding: 0.75rem 1rem;
   }
 
   .dapp-content {
-    padding: 1.75rem 1rem 2.5rem;
+    padding: 1.5rem 1rem 2.5rem;
   }
 
   .dapp-intro h1 {
-    margin: 0.8rem 0 1rem;
-    font-size: 1.9rem;
-    line-height: 1.08;
+    font-size: var(--text-2xl);
   }
 
   .dapp-intro > p:last-child {
-    font-size: 0.76rem;
+    font-size: var(--text-base);
     line-height: 1.6;
   }
 
@@ -1829,7 +2309,7 @@
 
   .dapp-status-card strong {
     margin-top: 0.85rem;
-    font-size: 0.66rem;
+    font-size: var(--text-sm);
   }
 
   .dapp-wallet-details {
@@ -1865,12 +2345,12 @@
   flex-wrap: wrap;
   gap: 0.45rem;
   align-items: center;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .protocol-address strong {
-  color: var(--text);
+  color: var(--app-text);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -1880,13 +2360,14 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--green);
+  color: var(--accent);
   font: inherit;
   cursor: pointer;
+  border-radius: var(--radius-md);
 }
 
 .protocol-address button:focus-visible {
-  outline: 2px solid var(--green);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -1896,8 +2377,9 @@
 .position-close {
   margin-top: 10px;
   padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .position-section-heading,
@@ -1917,23 +2399,23 @@
 .position-close h3 {
   margin: 0.75rem 0;
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .position-section-heading p:last-child,
 .position-panel > p,
 .position-close p {
   max-width: 690px;
-  color: var(--muted);
-  font-size: 0.7rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
 .position-section-heading > span {
-  color: var(--green);
-  font-size: 0.62rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-align: right;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .position-section-heading > .dollar-submit {
@@ -1952,24 +2434,25 @@
 .position-card {
   min-width: 0;
   padding: 1.25rem;
-  border: 1px solid var(--line);
-  background: #080a08;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .position-card:hover {
-  border-color: var(--line-bright);
+  border-color: var(--app-border-strong);
 }
 
 .position-card > div:first-child a {
-  color: var(--text);
-  font-size: 0.78rem;
-  text-transform: uppercase;
+  color: var(--app-text);
+  font-size: var(--text-base);
 }
 
 .position-card > div:first-child span {
-  color: var(--green);
-  font-size: 0.58rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .position-card .protocol-address {
@@ -1983,8 +2466,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   margin: 1.25rem 0;
-  background: var(--line);
-  border: 1px solid var(--line);
+  background: var(--app-border);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .position-card dl > div,
@@ -1992,48 +2477,32 @@
 .position-metrics > div {
   min-width: 0;
   padding: 0.8rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .position-card dt,
 .position-hero dt,
 .position-metrics dt {
-  color: var(--muted);
-  font-size: 0.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .position-card dd,
 .position-hero dd,
 .position-metrics dd {
   margin: 0.45rem 0 0;
-  font-size: 0.67rem;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
 .position-card-link {
-  color: var(--green) !important;
-  font-size: 0.61rem;
+  color: var(--accent) !important;
+  font-size: var(--text-caption);
   text-transform: uppercase;
-}
-
-.position-empty {
-  margin-top: 1.5rem;
-  padding: 2rem;
-  border: 1px dashed var(--line-bright);
-}
-
-.position-empty h3 {
-  margin: 0 0 0.75rem;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-}
-
-.position-empty p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.68rem;
-  line-height: 1.6;
+  font-weight: 600;
 }
 
 .position-hero {
@@ -2043,7 +2512,6 @@
 .position-hero h2 {
   margin: 0.8rem 0;
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .position-hero dl {
@@ -2070,10 +2538,11 @@
 .position-panel select {
   min-height: 48px;
   padding: 0 0.85rem;
-  border: 1px solid var(--line);
-  background: #050605;
-  color: var(--text);
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  color: var(--app-text);
   font: inherit;
+  border-radius: var(--radius-md);
 }
 
 .position-metrics {
@@ -2083,7 +2552,7 @@
 .position-cooldown {
   min-height: 3.6rem;
   padding: 0.8rem;
-  border-left: 2px solid var(--green-soft);
+  border-left: 2px solid var(--accent);
 }
 
 .position-rewards {
@@ -2100,13 +2569,14 @@
 .reward-grid article {
   min-width: 0;
   padding: 1rem;
-  border: 1px solid var(--line);
-  background: #080a08;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .reward-grid article.is-selected {
-  border-color: var(--green-soft);
-  background: rgba(117, 241, 45, 0.045);
+  border-color: var(--accent);
+  background: var(--accent-wash);
 }
 
 .reward-grid article > div {
@@ -2116,8 +2586,8 @@
 
 .reward-grid article > div span,
 .reward-grid article p {
-  color: var(--muted);
-  font-size: 0.57rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   line-height: 1.5;
 }
 
@@ -2127,21 +2597,23 @@
 
 .reward-grid button,
 .position-close button {
-  min-height: 38px;
+  min-height: var(--control-height);
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--green-soft);
+  border: 1px solid var(--accent);
   background: transparent;
-  color: var(--green);
+  color: var(--accent);
   font: inherit;
-  font-size: 0.57rem;
+  font-size: var(--text-caption);
   text-transform: uppercase;
   cursor: pointer;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .reward-grid button:disabled,
 .position-close button:disabled {
-  border-color: var(--line);
-  color: #5d625d;
+  border-color: var(--app-border);
+  color: var(--app-text-muted);
   cursor: not-allowed;
 }
 
@@ -2159,12 +2631,12 @@
 
 .position-close {
   align-items: center;
-  border-color: #5a352f;
+  border-color: var(--negative);
 }
 
 .position-close button:not(:disabled) {
-  border-color: #8f493f;
-  color: #e5a79d;
+  border-color: var(--negative);
+  color: var(--negative);
 }
 
 .reward-selector {
@@ -2173,14 +2645,16 @@
   gap: 8px;
   margin: 1.25rem 0 0;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .reward-selector legend {
   padding: 0 0.5rem;
-  color: var(--green);
-  font-size: 0.58rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .reward-selector label {
@@ -2189,20 +2663,21 @@
   gap: 0.65rem;
   align-items: start;
   padding: 0.75rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
   cursor: pointer;
+  border-radius: var(--radius-lg);
 }
 
 .reward-selector label > span {
   display: grid;
   gap: 0.35rem;
-  color: var(--muted);
-  font-size: 0.54rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   line-height: 1.4;
 }
 
 .reward-selector strong {
-  color: var(--text);
+  color: var(--app-text);
 }
 
 .reward-position-list {
@@ -2213,20 +2688,20 @@
 
 .reward-position-list article {
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .reward-position-list h3 {
   margin: 0;
-  font-size: 0.74rem;
-  text-transform: uppercase;
+  font-size: var(--text-base);
 }
 
 .reward-position-list article > div:first-child span,
 .reward-position-list p,
 .reward-position-list li {
-  color: var(--muted);
-  font-size: 0.6rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .reward-position-list ul {
@@ -2240,13 +2715,14 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .reward-position-list a {
-  color: var(--green);
-  font-size: 0.6rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {
@@ -2314,8 +2790,9 @@
 .basket-action-card,
 .basket-parameters {
   margin-top: 10px;
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.76);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-md);
 }
 
 .basket-catalog,
@@ -2340,36 +2817,37 @@
 .basket-action-card h3 {
   margin: 0.45rem 0 0;
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .basket-section-heading > span,
 .basket-status,
 .basket-card > div > span:last-child {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .basket-status {
   padding: 0.35rem 0.5rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .basket-status.is-0 {
-  border-color: rgba(117, 241, 45, 0.45);
-  color: var(--green);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .basket-status.is-1 {
-  border-color: #9d8141;
-  color: #d1b46e;
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .basket-status.is-2 {
-  border-color: #8f493f;
-  color: #e5a79d;
+  border-color: var(--negative);
+  color: var(--negative);
 }
 
 .basket-grid {
@@ -2383,16 +2861,17 @@
   display: block;
   min-width: 0;
   padding: 1.35rem;
-  border: 1px solid var(--line);
-  background: #080a08;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
   transition:
     border-color 150ms ease,
     transform 150ms ease;
+  border-radius: var(--radius-lg);
 }
 
 .basket-card:hover {
   transform: translateY(-2px);
-  border-color: var(--green);
+  border-color: var(--accent);
 }
 
 .basket-card > div:first-child {
@@ -2403,16 +2882,15 @@
 
 .basket-card h3 {
   margin: 1.5rem 0 0.35rem;
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .basket-card > p,
 .basket-hero > div > p:last-child,
 .basket-back {
-  color: var(--muted);
-  font-size: 0.68rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
 }
 
 .basket-card dl,
@@ -2421,7 +2899,9 @@
   display: grid;
   gap: 1px;
   margin: 1.3rem 0;
-  background: var(--line);
+  background: var(--app-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .basket-card dl {
@@ -2433,56 +2913,41 @@
 .basket-parameters dl > div {
   min-width: 0;
   padding: 0.75rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .basket-card dt,
 .basket-hero dt,
 .basket-parameters dt {
-  color: var(--muted);
-  font-size: 0.52rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .basket-card dd,
 .basket-hero dd,
 .basket-parameters dd {
   margin: 0.4rem 0 0;
-  font-size: 0.68rem;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
 .basket-card-link {
-  color: var(--green);
-  font-size: 0.62rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
-}
-
-.basket-empty {
-  margin-top: 1.5rem;
-  padding: 2rem;
-  border: 1px dashed var(--line-bright);
-}
-
-.basket-empty h3 {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-}
-
-.basket-empty p {
-  color: var(--muted);
-  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .basket-back {
   display: inline-block;
   margin-top: 10px;
-  text-transform: uppercase;
 }
 
 .basket-back:hover {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .basket-hero dl {
@@ -2500,7 +2965,7 @@
   padding: 0;
   margin: 1.5rem 0;
   list-style: none;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--app-border);
 }
 
 .basket-composition li {
@@ -2509,13 +2974,13 @@
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .basket-composition li > span,
 .basket-composition small {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .basket-composition li > div {
@@ -2528,7 +2993,7 @@
 }
 
 .basket-composition .is-warning {
-  color: #d1b46e;
+  color: var(--warning);
 }
 
 .basket-action-card .dollar-tabs {
@@ -2539,41 +3004,45 @@
   display: grid;
   gap: 0.55rem;
   margin-top: 1.25rem;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .basket-field > div {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  border: 1px solid var(--line);
-  background: #050605;
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  border-radius: var(--radius-md);
 }
 
 .basket-field input {
   width: 100%;
   min-height: 48px;
   padding: 0 0.85rem;
-  border: 1px solid var(--line);
-  background: #050605;
-  color: var(--text);
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  color: var(--app-text);
   font: inherit;
+  border-radius: var(--radius-md);
 }
 
 .basket-field > div input {
   border: 0;
+  border-radius: var(--radius-md);
 }
 
 .basket-field > div strong {
   padding: 0 0.85rem;
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .basket-field small {
-  color: var(--muted);
-  font-size: 0.54rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   line-height: 1.5;
   text-transform: none;
 }
@@ -2581,13 +3050,14 @@
 .basket-quote {
   margin-top: 1.25rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .basket-quote > span,
 .basket-quote > small {
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .basket-quote ul {
@@ -2601,14 +3071,14 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.45rem 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.68rem;
+  border-bottom: 1px solid var(--app-border);
+  font-size: var(--text-sm);
 }
 
 .basket-quote > strong {
   display: block;
   margin: 0.8rem 0;
-  font-size: 0.72rem;
+  font-size: var(--text-base);
 }
 
 .basket-action-card .dollar-submit {
@@ -2657,33 +3127,36 @@
   display: grid;
   gap: 0.65rem;
   justify-items: end;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .basket-section-actions a {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .basket-section-actions button,
 .creation-assets button,
 .creation-footer > button {
-  min-height: 40px;
+  min-height: var(--control-height);
   padding: 0.65rem 0.85rem;
-  border: 1px solid var(--line-bright);
+  border: 1px solid var(--app-border-strong);
   background: transparent;
-  color: var(--text);
+  color: var(--app-text);
   font: inherit;
-  font-size: 0.58rem;
+  font-size: var(--text-caption);
   text-transform: uppercase;
   cursor: pointer;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .basket-section-actions button:disabled,
 .creation-assets button:disabled,
 .creation-footer > button:disabled {
-  color: #5d625d;
+  color: var(--app-text-muted);
   cursor: not-allowed;
 }
 
@@ -2695,8 +3168,9 @@
 .fee-allocation,
 .pol-boundary,
 .position-attached-grid article {
-  border: 1px solid var(--line);
-  background: rgba(8, 10, 8, 0.76);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-md);
 }
 
 .remaining-hero {
@@ -2717,7 +3191,6 @@
 .position-attached-grid h3 {
   margin: 0.45rem 0 0;
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .remaining-hero > div > p:last-child,
@@ -2726,8 +3199,8 @@
 .pol-boundary p,
 .position-attached-grid p {
   max-width: 760px;
-  color: var(--muted);
-  font-size: 0.68rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -2737,7 +3210,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
-  background: var(--line);
+  background: var(--app-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .remaining-hero dl > div,
@@ -2745,16 +3220,18 @@
 .fee-allocation dl > div {
   min-width: 0;
   padding: 0.9rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .remaining-hero dt,
 .remaining-quote dt,
 .fee-allocation dt,
 .pool-grid dt {
-  color: var(--muted);
-  font-size: 0.52rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .remaining-hero dd,
@@ -2762,7 +3239,7 @@
 .fee-allocation dd,
 .pool-grid dd {
   margin: 0.45rem 0 0;
-  font-size: 0.67rem;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
@@ -2792,9 +3269,10 @@
 .remaining-section-heading > span,
 .loan-tranche > .loan-time,
 .lp-position > span:last-child {
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .loan-tranche,
@@ -2804,62 +3282,65 @@
   gap: 0.55rem;
   margin-top: 0.75rem;
   padding: 1rem;
-  border: 1px solid var(--line);
-  background: #070907;
-  color: var(--text);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius-lg);
 }
 
 .loan-tranche:hover,
 .loan-tranche.is-selected,
 .lp-position:hover,
 .lp-position.is-selected {
-  border-color: var(--green);
-  background: rgba(117, 241, 45, 0.045);
+  border-color: var(--accent);
+  background: var(--accent-wash);
 }
 
 .loan-tranche strong,
 .lp-position strong {
-  font-size: 0.69rem;
+  font-size: var(--text-caption);
   font-weight: 500;
   text-transform: uppercase;
 }
 
 .loan-tranche small,
 .lp-position small {
-  color: var(--muted);
-  font-size: 0.55rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .remaining-status {
   width: max-content;
   padding: 0.32rem 0.48rem;
-  border: 1px solid var(--line-bright);
-  color: var(--muted);
-  font-size: 0.52rem;
+  border: 1px solid var(--app-border-strong);
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .remaining-status.is-active,
 .remaining-status.is-wallet-owned {
-  border-color: rgba(117, 241, 45, 0.45);
-  color: var(--green);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .remaining-status.is-grace,
 .remaining-status.is-warmup,
 .remaining-status.is-activation-pending {
-  border-color: #9d8141;
-  color: #d1b46e;
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .remaining-status.is-recoverable,
 .remaining-status.is-exit-only {
-  border-color: #8f493f;
-  color: #e5a79d;
+  border-color: var(--negative);
+  color: var(--negative);
 }
 
 .remaining-workspace .dollar-tabs {
@@ -2886,10 +3367,10 @@
   width: 100%;
   min-height: 48px;
   padding: 0 0.85rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
   border-radius: 0;
-  background: #050605;
-  color: var(--text);
+  background: var(--app-bg);
+  color: var(--app-text);
   font: inherit;
 }
 
@@ -2898,7 +3379,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 1rem 0;
-  background: var(--line);
+  background: var(--app-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .loan-detail-meta {
@@ -2908,23 +3391,25 @@
 
 .loan-detail-meta p {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.6rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .principal-vector {
   margin: 1rem 0;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .principal-vector > div {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .principal-vector ul {
@@ -2938,12 +3423,12 @@
   grid-template-columns: minmax(75px, 0.5fr) minmax(90px, 0.75fr) minmax(120px, 1fr);
   gap: 1rem;
   padding: 0.6rem 0;
-  border-top: 1px solid var(--line);
-  font-size: 0.64rem;
+  border-top: 1px solid var(--app-border);
+  font-size: var(--text-sm);
 }
 
 .principal-vector li small {
-  color: var(--muted);
+  color: var(--app-text-muted);
   text-align: right;
 }
 
@@ -2953,8 +3438,10 @@
   gap: 1px;
   padding: 0;
   margin: 10px 0 0;
-  background: var(--line);
+  background: var(--app-border);
   list-style: none;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .creation-steps button {
@@ -2965,25 +3452,27 @@
   align-items: center;
   padding: 0.8rem 1rem;
   border: 0;
-  background: #080a08;
-  color: var(--muted);
+  background: var(--app-surface);
+  color: var(--app-text-muted);
   font: inherit;
-  font-size: 0.62rem;
+  font-size: var(--text-caption);
   text-transform: uppercase;
   cursor: pointer;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 .creation-steps button span {
-  color: #7a807a;
+  color: var(--app-text-secondary);
 }
 
 .creation-steps .is-current button {
-  background: rgba(117, 241, 45, 0.07);
-  color: var(--text);
+  background: var(--accent-wash);
+  color: var(--app-text);
 }
 
 .creation-steps .is-current button span {
-  color: var(--green);
+  color: var(--accent);
 }
 
 .creation-assets {
@@ -2996,13 +3485,13 @@
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--app-border);
 }
 
 .creation-assets article > span,
 .creation-assets code {
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .creation-assets article > div {
@@ -3013,24 +3502,27 @@
 .creation-assets article label {
   display: grid;
   gap: 0.35rem;
-  color: var(--muted);
-  font-size: 0.52rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .creation-assets article input {
-  min-height: 42px;
+  min-height: var(--control-height);
   padding: 0 0.65rem;
-  border: 1px solid var(--line);
-  background: #050605;
-  color: var(--text);
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  color: var(--app-text);
   font: inherit;
+  border-radius: var(--radius-md);
 }
 
 .creation-economics > section,
 .creation-review > section {
   padding: 1.2rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .creation-tier-grid {
@@ -3041,31 +3533,32 @@
 
 .creation-tier-grid article {
   padding: 0.85rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .creation-tier-grid article > strong,
 .creation-tier-grid p {
-  font-size: 0.6rem;
+  font-size: var(--text-caption);
 }
 
 .creation-tier-grid p {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  color: var(--muted);
+  color: var(--app-text-muted);
 }
 
 .creation-review ul {
   padding-left: 1rem;
-  color: var(--muted);
-  font-size: 0.62rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.8;
 }
 
 .creation-review section > p:not(.dapp-section-label) {
-  color: var(--muted);
-  font-size: 0.64rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -3076,12 +3569,12 @@
   align-items: center;
   margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--app-border);
 }
 
 .creation-footer .creation-next {
-  border-color: var(--green);
-  color: var(--green);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .pool-catalog,
@@ -3099,7 +3592,8 @@
 
 .pool-grid article {
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
 }
 
 .pool-grid article > div:first-child {
@@ -3109,20 +3603,19 @@
 }
 
 .pool-grid code {
-  color: var(--muted);
-  font-size: 0.54rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .pool-grid h4 {
   margin: 1rem 0 0.35rem;
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  text-transform: uppercase;
 }
 
 .pool-grid article > p {
-  color: var(--muted);
-  font-size: 0.58rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .pool-grid dl {
@@ -3130,12 +3623,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 1rem 0 0;
-  background: var(--line);
+  background: var(--app-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .pool-grid dl > div {
   padding: 0.75rem;
-  background: #080a08;
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
 }
 
 .fee-allocation {
@@ -3150,7 +3646,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
-  background: var(--line);
+  background: var(--app-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .liquidity-tabs {
@@ -3176,9 +3674,10 @@
 }
 
 .position-attached-grid a {
-  color: var(--green);
-  font-size: 0.6rem;
+  color: var(--accent);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .claim-selector {
@@ -3186,14 +3685,16 @@
   gap: 0;
   padding: 0;
   margin: 1rem 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
 }
 
 .claim-selector legend {
   padding: 0 0.5rem;
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .claim-selector label {
@@ -3202,7 +3703,7 @@
   gap: 0.8rem;
   align-items: center;
   padding: 0.85rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--app-border);
   cursor: pointer;
 }
 
@@ -3213,17 +3714,17 @@
 .claim-selector label > span {
   display: grid;
   gap: 0.25rem;
-  color: var(--muted);
-  font-size: 0.56rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 .claim-selector label > span strong {
-  color: var(--text);
+  color: var(--app-text);
 }
 
 .claim-selector label > small {
-  color: var(--muted);
-  font-size: 0.52rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
 }
 
 @media (max-width: 1100px) {
@@ -3282,7 +3783,7 @@
     min-height: 62px;
     justify-items: center;
     padding: 0.65rem 0.35rem;
-    font-size: 0.52rem;
+    font-size: var(--text-caption);
   }
 
   .creation-assets article {
@@ -3319,4 +3820,27 @@
   .claim-selector label > small {
     grid-column: 2;
   }
+}
+
+/* Hairline-divider containers clip their own corners, so their cells must
+ * stay square -- a rounded cell lets the divider colour bleed through as a
+ * notch. Class is doubled to outrank the per-page cell rules. */
+.dapp-wallet-details.dapp-wallet-details > *,
+.portal-quote-grid.portal-quote-grid > *,
+.dollar-metrics.dollar-metrics > *,
+.dollar-tabs.dollar-tabs > *,
+.dollar-asset-choice.dollar-asset-choice > *,
+.activity-panel.activity-panel ol > *,
+.position-card.position-card dl > *,
+.position-hero.position-hero dl > *,
+.position-metrics.position-metrics > *,
+.basket-card.basket-card dl > *,
+.basket-hero.basket-hero dl > *,
+.basket-parameters.basket-parameters dl > *,
+.remaining-hero.remaining-hero dl > *,
+.remaining-quote.remaining-quote > *,
+.creation-steps.creation-steps > *,
+.pool-grid.pool-grid dl > *,
+.fee-allocation.fee-allocation dl > * {
+  border-radius: 0;
 }

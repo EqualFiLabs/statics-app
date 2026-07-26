@@ -1,0 +1,44 @@
+{
+  "ignoreFiles": [
+    ".next/**",
+    ".local/**",
+    "coverage/**",
+    "node_modules/**",
+    "playwright-report/**",
+    "test-results/**",
+    "vendor/**"
+  ],
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      {
+        "font-size": ["/^[0-9.]+(rem|px|em)$/", "/^clamp\\(/"],
+        "border-radius": ["/^[0-9.]+(rem|px)$/"]
+      },
+      {
+        "message": "Use a design token: font-size from --text-*, border-radius from --radius-* (defined in app/globals.css)."
+      }
+    ],
+    "color-no-hex": [
+      true,
+      {
+        "message": "Use a colour token from app/globals.css rather than a raw hex value."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/globals.css"],
+      "rules": {
+        "color-no-hex": null,
+        "declaration-property-value-disallowed-list": null
+      }
+    },
+    {
+      "files": ["**/landing.css"],
+      "rules": {
+        "color-no-hex": null,
+        "declaration-property-value-disallowed-list": null
+      }
+    }
+  ]
+}

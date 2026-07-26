@@ -7,9 +7,11 @@ export default defineConfig([
   ...nextTypeScript,
   globalIgnores([
     ".next/**",
+    ".local/**",
     "coverage/**",
     "node_modules/**",
     "playwright-report/**",
     "test-results/**",
+    "vendor/**",
   ]),
 ]);

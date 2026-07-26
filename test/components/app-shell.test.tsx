@@ -70,6 +70,53 @@ describe("DApp wallet shell", () => {
     expect(copyAddress).toHaveBeenCalledOnce();
     expect(switchNetwork).toHaveBeenCalledOnce();
   });
+
+  it("explains the mismatch and names the chain the wallet is actually on", () => {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      chainId: 1,
+      targetChainId: 31_337,
+      networkName: "Anvil",
+      isTargetChain: false,
+    });
+
+    expect(screen.getByText(/wrong network/i)).toBeInTheDocument();
+    expect(screen.getByText(/switch to Anvil/i)).toBeInTheDocument();
+    expect(screen.getByText(/chain 31337/i)).toBeInTheDocument();
+    // The indicator reports the id, because the context carries no name for
+    // whichever chain the wallet actually sits on.
+    expect(screen.getByText("Chain 1")).toBeInTheDocument();
+  });
+
+  it("names the network and offers no switch once the wallet is on target", () => {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      chainId: 31_337,
+      targetChainId: 31_337,
+      networkName: "Anvil",
+      isTargetChain: true,
+    });
+
+    // Scoped to the indicator: the Overview status card also names the network.
+    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.queryByRole("button", { name: "Switch network" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the target network before a wallet is connected", () => {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "signed-out",
+      networkName: "Anvil",
+      targetChainId: 31_337,
+    });
+
+    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
+  });
 });
 
 describe("wallet settings", () => {
