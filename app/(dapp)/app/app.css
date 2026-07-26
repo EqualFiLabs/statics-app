@@ -3055,7 +3055,10 @@
 }
 
 .basket-back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  /* Standalone navigation control, not inline text, so it gets a real target. */
+  min-height: var(--control-height);
   margin-top: 10px;
 }
 
@@ -3247,6 +3250,11 @@
   .basket-grid,
   .basket-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Stacked, the action comes before the reference material it acts on. */
+  .basket-detail-grid .basket-action-card {
+    order: -1;
   }
 
   .basket-parameters dl {
