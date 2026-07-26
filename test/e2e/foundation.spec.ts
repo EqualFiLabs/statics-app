@@ -41,9 +41,10 @@ test.describe("landing foundation", () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
-    await expect(
-      page.getByRole("heading", { name: "Track your Statics portfolio." })
-    ).toBeVisible();
+    // Matches the overview title from lib/dapp-navigation.ts. Its exact wording
+    // is guarded by test/foundation/route-copy.test.ts; this only asserts that
+    // the destination rendered.
+    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
   });
 
   test("supports keyboard entry and responsive navigation", async ({ page }, testInfo) => {

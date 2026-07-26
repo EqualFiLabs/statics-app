@@ -65,11 +65,11 @@ export function DollarOverviewPreview() {
       </section>
       <section className="preview-overview-grid" aria-label="Portfolio summary">
         {[
-          ["PositionNFTs", "/app/positions", "Review positions"],
+          ["Positions", "/app/positions", "Review positions"],
           ["Basket collateral", "/app/baskets", "Review baskets"],
           ["Pending rewards", "/app/rewards", "Review rewards"],
-          ["Loan tranches", "/app/loans", "Review loans"],
-          ["Canonical LP NFTs", "/app/liquidity", "Review liquidity"],
+          ["Loans", "/app/loans", "Review loans"],
+          ["Your liquidity positions", "/app/liquidity", "Review liquidity"],
         ].map(([label, href, action]) => (
           <article key={label}>
             <span>{label}</span>
@@ -150,7 +150,7 @@ export function DollarPagePreview() {
         <aside className="dollar-protocol-card">
           <p className="dapp-section-label">Protocol state</p>
           <dl>
-            {["Profile", "Global health", "Debt ceiling", "Exit state"].map((label) => (
+            {["Profile", "Global health", "Borrow limit", "Status"].map((label) => (
               <div key={label}>
                 <dt>{label}</dt>
                 <dd>{unavailable}</dd>
@@ -294,14 +294,14 @@ export function BasketDetailPreview({ basketId }: { basketId: bigint }) {
 export function PositionListPreview() {
   return (
     <>
-      <PreviewBanner surface="PositionNFT portfolio" />
+      <PreviewBanner surface="Your positions" />
       <section className="position-catalog" aria-labelledby="preview-position-title">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">PositionNFT portfolio</p>
-            <h2 id="preview-position-title">Your PositionNFTs</h2>
+            <p className="dapp-section-label">Your positions</p>
+            <h2 id="preview-position-title">Your positions</h2>
           </div>
-          <PreviewAction>Create PositionNFT</PreviewAction>
+          <PreviewAction>Create position</PreviewAction>
         </div>
         <div className="position-grid">
           {placeholderRouteIds.map((routeId) => (
@@ -335,13 +335,13 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
   const [stakeMode, setStakeMode] = useState("stake");
   return (
     <>
-      <PreviewBanner surface="PositionNFT" />
+      <PreviewBanner surface="Position" />
       <Link className="basket-back" href="/app/positions">
         ← All positions
       </Link>
       <section className="position-hero">
         <div>
-          <p className="dapp-section-label">PositionNFT</p>
+          <p className="dapp-section-label">Position</p>
           <h2>Position #{positionId.toString()}</h2>
           <PreviewAddress label="Owner" />
         </div>
@@ -458,10 +458,10 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
       <section className="position-close">
         <div>
           <p className="dapp-section-label">Terminal action</p>
-          <h3>Close PositionNFT</h3>
+          <h3>Close position</h3>
         </div>
         <button type="button" disabled>
-          Close PositionNFT
+          Close position
         </button>
       </section>
     </>

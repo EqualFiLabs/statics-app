@@ -11,18 +11,18 @@ describe("DApp route presentation", () => {
   });
 
   it.each([
-    ["/app", "Overview", "Track your Statics portfolio."],
-    ["/app/wallet", "Wallet", "Fund and manage your wallet."],
-    ["/app/portal", "Portal", "Move assets into Statics."],
-    ["/app/dollar", "Dollar", "Issue and redeem Statics Dollar."],
-    ["/app/baskets", "Baskets", "Inspect, mint, and redeem static baskets."],
-    ["/app/create", "Create basket", "Configure a new static basket."],
-    ["/app/positions", "Positions", "Manage each wallet-owned PositionNFT."],
-    ["/app/loans", "Loans", "Review independent loan tranches."],
-    ["/app/rewards", "Rewards", "Create stake positions with selected rewards."],
-    ["/app/liquidity", "Liquidity", "Manage canonical v4 liquidity."],
-    ["/app/activity", "Activity", "Review protocol activity."],
-    ["/app/settings", "Settings", "Manage your Statics wallet."],
+    ["/app", "Overview", "Your portfolio"],
+    ["/app/wallet", "Wallet", "Your wallet"],
+    ["/app/portal", "Add funds", "Add funds to Statics"],
+    ["/app/dollar", "Dollar", "Get Statics Dollar"],
+    ["/app/baskets", "Baskets", "Baskets"],
+    ["/app/create", "Create basket", "Create a basket"],
+    ["/app/positions", "Positions", "Your positions"],
+    ["/app/loans", "Loans", "Your loans"],
+    ["/app/rewards", "Rewards", "Your rewards"],
+    ["/app/liquidity", "Liquidity", "Provide liquidity"],
+    ["/app/activity", "Activity", "Your activity"],
+    ["/app/settings", "Settings", "Settings"],
   ])("selects %s presentation", (pathname, label, title) => {
     expect(getDappRoutePresentation(pathname)).toMatchObject({ label, title });
   });
