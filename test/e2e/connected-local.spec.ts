@@ -69,7 +69,9 @@ test("exposes a real Privy entry point without claiming identity proof", async (
   const signIn = page.getByRole("button", { name: "Sign in" });
   await expect(signIn).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
-  await expect(page.getByText("Signed out", { exact: true })).toBeVisible();
+  // Signed-out state is shown by the controls themselves and by the overview's
+  // empty state, rather than by a status card.
+  await expect(page.getByText("Sign in to see your portfolio")).toBeVisible();
   await signIn.click();
   await expect(page.getByText("Log in or sign up", { exact: true })).toBeVisible();
   await expect(page.getByText("Continue with a wallet", { exact: true })).toBeVisible();

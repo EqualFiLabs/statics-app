@@ -48,7 +48,6 @@ describe("DApp wallet shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
     expect(login).toHaveBeenCalledOnce();
     expect(connectWallet).toHaveBeenCalledOnce();
-    expect(screen.getByText("Signed out")).toBeInTheDocument();
   });
 
   it("shows the active address and requires a network switch when mismatched", () => {
@@ -101,7 +100,7 @@ describe("DApp wallet shell", () => {
       isTargetChain: true,
     });
 
-    // Scoped to the indicator: the Overview status card also names the network.
+    // Scoped to the indicator so this cannot pass on some other mention.
     expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
     expect(screen.queryByRole("button", { name: "Switch network" })).not.toBeInTheDocument();
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();

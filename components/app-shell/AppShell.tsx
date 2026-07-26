@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { appHeaderNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -146,20 +145,10 @@ function WrongNetworkBar() {
   );
 }
 
-function walletStatusLabel(status: ReturnType<typeof useWalletState>["status"]): string {
-  if (status === "unconfigured") return "Not configured";
-  if (status === "loading") return "Loading";
-  if (status === "signed-out") return "Signed out";
-  if (status === "wallet-missing") return "Wallet needed";
-  if (status === "error") return "Unavailable";
-  return "Connected";
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
-  const dollarDeployment = readClientDollarDeployment();
   const [openNavigationPath, setOpenNavigationPath] = useState<string | null>(null);
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
@@ -195,29 +184,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [navigationOpen]);
-
-  const statusCards = [
-    {
-      label: "DApp",
-      value: routeCopy.status,
-      ready: true,
-    },
-    {
-      label: "Wallet",
-      value: walletStatusLabel(wallet.status),
-      ready: wallet.status === "ready",
-    },
-    {
-      label: "Network",
-      value: wallet.status === "ready" && wallet.isTargetChain ? wallet.networkName : "--",
-      ready: wallet.status === "ready" && wallet.isTargetChain,
-    },
-    {
-      label: "Deployment",
-      value: dollarDeployment.status === "configured" ? "Local Anvil" : "--",
-      ready: dollarDeployment.status === "configured",
-    },
-  ] as const;
 
   return (
     <div className="dapp-shell">
@@ -338,17 +304,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="dapp-inline-error" role="alert">
               {wallet.error}
             </p>
-          )}
-
-          {showOverviewSummary && (
-            <section className="dapp-status-grid" aria-label="Application readiness">
-              {statusCards.map((card) => (
-                <article key={card.label} className="dapp-status-card">
-                  <span>{card.label}</span>
-                  <strong className={card.ready ? "is-ready" : undefined}>{card.value}</strong>
-                </article>
-              ))}
-            </section>
           )}
 
           {children}

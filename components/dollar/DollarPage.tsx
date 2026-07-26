@@ -52,10 +52,12 @@ import {
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/DappPreview";
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { deriveSurfaceState } from "@/lib/surface-state";
-import { claimablePositionRewards, loadPositionCatalog } from "@/lib/positions/positions";
+import { claimablePositionRewards } from "@/lib/positions/positions";
+import { loadLoanCatalog } from "@/lib/loans/loans";
+import { loadBasketRewardSummary, totalRewardsByAsset } from "@/lib/baskets/rewards";
 import { readEvesMarketUrl } from "@/lib/site-config";
 
 const deploymentState = readClientDollarDeployment();
@@ -243,8 +245,20 @@ function DollarOverviewConnected({
  * the precondition for taking Positions and Loans out of the sidebar: a
  * destination needs somewhere to be reached from before its nav entry goes.
  */
+/**
+ * The rest of a portfolio, and what it has earned.
+ *
+ * This is where a new user lands, so it has to answer three things without a
+ * click: what do I hold, what has it earned, and what do I do if the answer to
+ * both is nothing. The earned figure is the whole pitch made concrete -- a
+ * deposited basket accumulates more of the assets it holds -- so it leads, in
+ * those assets, rather than being a count of claims buried in a tile.
+ */
 function OverviewPortfolio({ wallet }: { wallet: Address }) {
   const publicClient = usePublicClient();
+
+  // loadLoanCatalog loads the position catalog internally, so one read covers
+  // positions, deposited baskets and loans.
   const catalog = useQuery({
     queryKey: ["overview-portfolio", wallet],
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
@@ -253,37 +267,92 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
       }
-      return loadPositionCatalog(publicClient, deploymentState.deployment, wallet);
+      return loadLoanCatalog(publicClient, deploymentState.deployment, wallet);
     },
   });
 
   const positions = catalog.data?.positions ?? [];
+
+  const basketRewards = useQuery({
+    queryKey: [
+      "overview-basket-rewards",
+      wallet,
+      positions.map((position) => `${position.positionId}:${position.collateral.length}`).join(","),
+    ],
+    enabled:
+      deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      if (!publicClient || deploymentState.status !== "configured") {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      return loadBasketRewardSummary(publicClient, deploymentState.deployment, positions);
+    },
+  });
+
   const depositedBaskets = positions.reduce(
     (total, position) => total + position.collateral.length,
     0
   );
-  const claimable = positions.reduce(
+  const loans = catalog.data?.ownedLoans.length ?? 0;
+  const stakingClaims = positions.reduce(
     (total, position) => total + claimablePositionRewards(position.rewards).length,
     0
   );
+  const earned = basketRewards.data ? totalRewardsByAsset(basketRewards.data.entries) : [];
+  const hasNothing =
+    Boolean(catalog.data) && positions.length === 0 && depositedBaskets === 0 && loans === 0;
 
-  const tiles: readonly (readonly [string, string, string, string])[] = [
-    ["Positions", positions.length.toString(), "/app/positions", "Review positions"],
-    ["Deposited baskets", depositedBaskets.toString(), "/app/baskets", "Browse baskets"],
-    ["Rewards to claim", claimable.toString(), "/app/rewards", "Review rewards"],
-    ["Loans", "—", "/app/loans", "Review loans"],
-  ];
+  if (hasNothing) {
+    return (
+      <EmptyState
+        title="Nothing here yet"
+        description="Buy a basket and it starts earning more of the assets it holds. Or get Statics Dollar and stake it to earn in whichever assets you choose."
+        action={{ label: "Browse baskets", href: "/app/baskets" }}
+        secondary={{ label: "Get Statics Dollar", href: "/app/dollar" }}
+      />
+    );
+  }
 
   return (
-    <section className="preview-overview-grid" aria-label="Portfolio summary">
-      {tiles.map(([label, value, href, action]) => (
-        <article key={label}>
-          <span>{label}</span>
-          <strong>{value}</strong>
-          <Link href={href}>{action} →</Link>
-        </article>
-      ))}
-    </section>
+    <>
+      {earned.length > 0 && (
+        <section className="overview-earned" aria-labelledby="overview-earned-title">
+          <div>
+            <p className="dapp-section-label">Earned by your baskets</p>
+            <h2 id="overview-earned-title">
+              {earned
+                .map(
+                  (item) =>
+                    `${displayAmount(item.amount, item.token.decimals)} ${item.token.symbol}`
+                )
+                .join(" + ")}
+            </h2>
+            <p>Paid in the assets your baskets hold. Claim it whenever you like.</p>
+          </div>
+          <Link className="dollar-primary-link" href="/app/rewards">
+            Claim
+          </Link>
+        </section>
+      )}
+
+      <section className="preview-overview-grid" aria-label="Portfolio summary">
+        {(
+          [
+            ["Positions", positions.length.toString(), "/app/positions", "Review positions"],
+            ["Deposited baskets", depositedBaskets.toString(), "/app/baskets", "Browse baskets"],
+            ["Loans", loans.toString(), "/app/loans", "Review loans"],
+            ["Rewards to claim", stakingClaims.toString(), "/app/rewards", "Review rewards"],
+          ] as const
+        ).map(([label, value, href, action]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <Link href={href}>{action} →</Link>
+          </article>
+        ))}
+      </section>
+    </>
   );
 }
 
