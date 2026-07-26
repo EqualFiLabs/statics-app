@@ -119,7 +119,7 @@ export type AppNavigationGroup = Readonly<{
 export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: null,
-    items: [{ label: "Overview", enabled: true, href: "/app", tabLabel: "Home" }],
+    items: [{ label: "Overview", enabled: true, href: "/app" }],
   },
   {
     label: "Earn",

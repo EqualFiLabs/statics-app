@@ -155,8 +155,16 @@ describe("secondary navigation", () => {
 });
 
 describe("mobile tab bar", () => {
-  it("fits five tabs, which is the practical maximum at 390px", () => {
-    expect(appTabNavigation).toHaveLength(5);
+  it("leaves room for the menu inside the five-slot limit", () => {
+    // The bar holds five slots at 390px. The menu takes the last one, so four
+    // destinations are promoted and everything else lives behind it.
+    expect(appTabNavigation).toHaveLength(4);
+    expect(appTabNavigation.map((item) => item.tabLabel)).toEqual([
+      "Earn",
+      "Baskets",
+      "Dollar",
+      "Wallet",
+    ]);
   });
 
   it("uses short labels, because a tab is about a thumb wide", () => {
@@ -176,8 +184,10 @@ describe("mobile tab bar", () => {
     }
   });
 
-  it("leads with home and ends with the wallet", () => {
-    expect(appTabNavigation[0].href).toBe("/app");
+  it("does not promote the overview, which the menu reaches", () => {
+    // Home is one tap away through the menu, and the slot buys a destination
+    // you cannot otherwise reach in one tap.
+    expect(appTabNavigation.some((item) => item.href === "/app")).toBe(false);
     expect(appTabNavigation.at(-1)!.href).toBe("/app/wallet");
   });
 });

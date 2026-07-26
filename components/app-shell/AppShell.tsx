@@ -259,22 +259,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className={`dapp-sidebar${navigationOpen ? " is-open" : ""}`}
           aria-label="DApp navigation"
         >
-          <div className="dapp-mobile-navigation">
-            <button
-              ref={navigationToggleRef}
-              className="dapp-nav-toggle"
-              type="button"
-              aria-label={`Application menu. Current route: ${routeCopy.label}`}
-              aria-expanded={navigationOpen}
-              aria-controls="dapp-navigation-panel"
-              onClick={navigationOpen ? () => closeNavigation() : openNavigation}
-            >
-              <span>Current route</span>
-              <strong>{routeCopy.label}</strong>
-              <span aria-hidden="true">{navigationOpen ? "Close ×" : "Menu +"}</span>
-            </button>
-          </div>
-
           <div className="dapp-nav-panel" id="dapp-navigation-panel">
             <div className="dapp-nav-panel-heading">
               <div>
@@ -387,6 +371,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        <button
+          ref={navigationToggleRef}
+          className="dapp-tab dapp-nav-toggle"
+          type="button"
+          aria-label={`Application menu. Current route: ${routeCopy.label}`}
+          aria-expanded={navigationOpen}
+          aria-controls="dapp-navigation-panel"
+          onClick={navigationOpen ? () => closeNavigation() : openNavigation}
+        >
+          {/* Glyph only. The accessible name comes from aria-label above, so
+              this carries no text of its own. */}
+          <span aria-hidden="true">{navigationOpen ? "✕" : "☰"}</span>
+        </button>
       </nav>
     </div>
   );
