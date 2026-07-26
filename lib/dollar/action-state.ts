@@ -47,6 +47,20 @@ export type DeriveDollarActionInput = Readonly<{
   quotedDollarAmount?: bigint;
 }>;
 
+export function dollarQuoteQueryKey({
+  chainId,
+  mode,
+  amount,
+  seriesId,
+}: {
+  chainId: number;
+  mode: DollarActionMode;
+  amount: bigint;
+  seriesId?: bigint;
+}) {
+  return ["dollar-quote", chainId, mode, amount.toString(), seriesId?.toString()] as const;
+}
+
 function unavailable(label: string, reason: string): DollarActionAvailability {
   return { kind: "blocked", label, reason, executable: false };
 }
