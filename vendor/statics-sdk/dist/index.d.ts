@@ -4,6 +4,7 @@ export declare const BPS = 10000n;
 export declare const SHARE_SCALE: bigint;
 export declare const MAX_LTV_BPS = 9500n;
 export declare const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
+export declare const RECOVERY_CALLER_SHARE_BPS = 2000n;
 export declare const Q96: bigint;
 export declare const Q128: bigint;
 export declare const MAX_UINT256: bigint;
@@ -30,7 +31,8 @@ export type SwapFeeConfiguration = {
     outputFeeBps: bigint;
     polShareBps: bigint;
     liquidityProviderShareBps: bigint;
-    stakerShareBps: bigint;
+    basketStakerShareBps: bigint;
+    staticsStakerShareBps: bigint;
     treasuryShareBps: bigint;
 };
 export type PoolFeeConfiguration = SwapFeeConfiguration & {
@@ -39,7 +41,8 @@ export type PoolFeeConfiguration = SwapFeeConfiguration & {
 export type SwapFeeSplit = {
     polAmount: bigint;
     liquidityProviderAmount: bigint;
-    stakerAmount: bigint;
+    basketStakerAmount: bigint;
+    staticsStakerAmount: bigint;
     treasuryAmount: bigint;
 };
 export type ConstituentSnapshot = {
@@ -57,6 +60,7 @@ export type BasketSnapshot = {
     originationFeeBps: bigint;
     extensionFeeBps: bigint;
     ltvBps: bigint;
+    recoveryPenaltyBps: bigint;
     constituents: readonly ConstituentSnapshot[];
 };
 export type BasketConfiguration = {
@@ -71,6 +75,7 @@ export type BasketConfiguration = {
     originationFeeBps: number;
     extensionFeeBps: number;
     ltvBps: number;
+    recoveryPenaltyBps: number;
     loanDuration: number;
 };
 export type CreateBasketParams = {
@@ -84,6 +89,7 @@ export type CreateBasketParams = {
     originationFeeBps: number;
     extensionFeeBps: number;
     ltvBps: number;
+    recoveryPenaltyBps: number;
     loanDuration: number;
 };
 export type PreparedTransaction = {
@@ -95,6 +101,18 @@ export type PermitSignature = {
     v: number;
     r: Hex;
     s: Hex;
+};
+export type PeggedMintAndRecombineQuote = {
+    eligible: boolean;
+    exitStatus: number;
+    peggedCollateralToken: Address;
+    volatileCollateralToken: Address;
+    staticsDollarAmount: bigint;
+    peggedCollateralPrincipal: bigint;
+    peggedMintFee: bigint;
+    totalPeggedCollateralIn: bigint;
+    volatileCollateralOut: bigint;
+    volatileRecombinationFee: bigint;
 };
 export type MintQuoteLeg = {
     asset: Address;
@@ -111,6 +129,8 @@ export type RedeemQuoteLeg = {
 export type BorrowQuote = {
     feeShares: bigint;
     collateralShares: bigint;
+    debtShares: bigint;
+    penaltyShares: bigint;
     principals: readonly {
         asset: Address;
         amount: bigint;
@@ -121,9 +141,19 @@ export type LoanSnapshot = {
     basketId: bigint;
     collateralShares: bigint;
     feeShares: bigint;
+    debtShares: bigint;
+    penaltyShares: bigint;
     maturity: bigint;
     assets: readonly Address[];
     principals: readonly bigint[];
+};
+export type RecoveryQuote = {
+    recoverableAt: bigint;
+    burnShares: bigint;
+    unlockedShares: bigint;
+    assets: readonly Address[];
+    callerAmounts: readonly bigint[];
+    protocolAmounts: readonly bigint[];
 };
 export type EffectiveCanonicalFees = {
     lpFeePips: bigint;
@@ -191,7 +221,7 @@ export type CombinedLiquidityQuote = {
 export declare function mulDivDown(value: bigint, multiplier: bigint, denominator: bigint): bigint;
 export declare function mulDivUp(value: bigint, multiplier: bigint, denominator: bigint): bigint;
 export declare function quoteHookFee(realizedAmount: bigint, hookFeeBps: bigint): bigint;
-export declare function splitSwapFee(chargedAmount: bigint, configuration: SwapFeeConfiguration, liquidityProvidersEligible: boolean, stakersEligible: boolean): SwapFeeSplit;
+export declare function splitSwapFee(chargedAmount: bigint, configuration: SwapFeeConfiguration, liquidityProvidersEligible: boolean, basketStakersEligible: boolean, staticsStakersEligible: boolean): SwapFeeSplit;
 export declare function effectiveCanonicalFees(lpFeePips: bigint, inputFeeBps: bigint, outputFeeBps: bigint): EffectiveCanonicalFees;
 export declare function getSqrtPriceAtTick(tick: number): bigint;
 export declare function quoteRangeAmounts(sqrtPriceX96: bigint, tickLower: number, tickUpper: number, liquidity: bigint): {
@@ -214,6 +244,7 @@ export declare function selectFeeShares(tiers: readonly FeeTier[], actionShares:
 export declare function quoteMint(snapshot: BasketSnapshot, shares: bigint): readonly MintQuoteLeg[];
 export declare function quoteRedeem(snapshot: BasketSnapshot, shares: bigint): readonly RedeemQuoteLeg[];
 export declare function quoteBorrow(snapshot: BasketSnapshot, sharesIn: bigint): BorrowQuote;
+export declare function quoteRecovery(snapshot: BasketSnapshot, loan: LoanSnapshot): RecoveryQuote;
 export declare function quoteBorrowAndProvideLiquidity(snapshot: BasketSnapshot, sharesIn: bigint, poolInputs: readonly CanonicalLiquidityInput[], maxInputSlippageBps?: bigint): CombinedLiquidityQuote;
 export declare function quoteExtension(snapshot: BasketSnapshot, principals: readonly {
     asset: Address;
@@ -273,6 +304,9 @@ export declare const staticsAbi: readonly [{
         }, {
             readonly type: "uint16";
             readonly name: "ltvBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "recoveryPenaltyBps";
         }, {
             readonly type: "uint40";
             readonly name: "loanDuration";
@@ -415,6 +449,9 @@ export declare const staticsAbi: readonly [{
         }, {
             readonly type: "uint16";
             readonly name: "ltvBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "recoveryPenaltyBps";
         }, {
             readonly type: "uint40";
             readonly name: "loanDuration";
@@ -631,6 +668,88 @@ export declare const staticsAbi: readonly [{
             readonly name: "withdrawableAfterBlock";
         }];
         readonly name: "position";
+    }];
+}, {
+    readonly name: "getBasketRewardAssets";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "basketId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address[]";
+        readonly name: "assets";
+    }];
+}, {
+    readonly name: "getBasketRewards";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address[]";
+        readonly name: "assets";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "amounts";
+    }];
+}, {
+    readonly name: "claimBasketRewards";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address[]";
+        readonly name: "assets";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "amounts";
+    }];
+}, {
+    readonly name: "basketRewardState";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "basketId";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "totalEligibleShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "indexRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "indexedReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "crystallizedReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "totalClaimable";
+        }];
+        readonly name: "state";
     }];
 }, {
     readonly name: "createAndStake";
@@ -929,17 +1048,58 @@ export declare const staticsAbi: readonly [{
         readonly name: "sharesIn";
     }];
     readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "feeShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "debtShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "penaltyShares";
+        }, {
+            readonly type: "address[]";
+            readonly name: "assets";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "principals";
+        }];
+        readonly name: "result";
+    }];
+}, {
+    readonly name: "quoteRecovery";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
         readonly type: "uint256";
-        readonly name: "feeShares";
-    }, {
-        readonly type: "uint256";
-        readonly name: "collateralShares";
-    }, {
-        readonly type: "address[]";
-        readonly name: "assets";
-    }, {
-        readonly type: "uint256[]";
-        readonly name: "principals";
+        readonly name: "loanId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "recoverableAt";
+        }, {
+            readonly type: "uint256";
+            readonly name: "burnShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "unlockedShares";
+        }, {
+            readonly type: "address[]";
+            readonly name: "assets";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "callerAmounts";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "protocolAmounts";
+        }];
+        readonly name: "result";
     }];
 }, {
     readonly name: "quoteExtension";
@@ -979,6 +1139,12 @@ export declare const staticsAbi: readonly [{
             readonly type: "uint256";
             readonly name: "feeShares";
         }, {
+            readonly type: "uint256";
+            readonly name: "debtShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "penaltyShares";
+        }, {
             readonly type: "uint40";
             readonly name: "maturity";
         }, {
@@ -992,20 +1158,6 @@ export declare const staticsAbi: readonly [{
     }];
 }, {
     readonly name: "outstandingPrincipal";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "basketId";
-    }, {
-        readonly type: "address";
-        readonly name: "asset";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-    }];
-}, {
-    readonly name: "recoverySurplus";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -1509,6 +1661,183 @@ export declare const staticsAbi: readonly [{
         readonly name: "collateralIn";
     }];
 }, {
+    readonly name: "mintPeggedWithPermit";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "profileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "maximumCollateralIn";
+    }, {
+        readonly type: "address";
+        readonly name: "staticsDollarReceiver";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "deadline";
+        }, {
+            readonly type: "uint8";
+            readonly name: "v";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "r";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "s";
+        }];
+        readonly name: "permitSignature";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "collateralIn";
+    }];
+}, {
+    readonly name: "quoteMintPeggedAndRecombine";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "peggedProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskAmount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "bool";
+            readonly name: "eligible";
+        }, {
+            readonly type: "uint8";
+            readonly name: "exitStatus";
+        }, {
+            readonly type: "address";
+            readonly name: "peggedCollateralToken";
+        }, {
+            readonly type: "address";
+            readonly name: "volatileCollateralToken";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsDollarAmount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "peggedCollateralPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "peggedMintFee";
+        }, {
+            readonly type: "uint256";
+            readonly name: "totalPeggedCollateralIn";
+        }, {
+            readonly type: "uint256";
+            readonly name: "volatileCollateralOut";
+        }, {
+            readonly type: "uint256";
+            readonly name: "volatileRecombinationFee";
+        }];
+        readonly name: "quote";
+    }];
+}, {
+    readonly name: "mintPeggedAndRecombine";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "peggedProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "maximumPeggedCollateralIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minimumVolatileCollateralOut";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "peggedCollateralIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileCollateralOut";
+    }];
+}, {
+    readonly name: "mintPeggedAndRecombineWithPermit";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "peggedProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "maximumPeggedCollateralIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minimumVolatileCollateralOut";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "deadline";
+        }, {
+            readonly type: "uint8";
+            readonly name: "v";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "r";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "s";
+        }];
+        readonly name: "permitSignature";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "peggedCollateralIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileCollateralOut";
+    }];
+}, {
     readonly name: "previewPeggedRedemption";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -1830,7 +2159,10 @@ export declare const staticsAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -1859,7 +2191,10 @@ export declare const staticsAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -1892,7 +2227,10 @@ export declare const staticsAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -1939,7 +2277,10 @@ export declare const staticsAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -2029,6 +2370,52 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "address";
         readonly name: "lpRecipient";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "loanId";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "v4TokenIds";
+    }];
+}, {
+    readonly name: "borrowAndStakeLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "sharesIn";
+    }, {
+        readonly type: "tuple[]";
+        readonly components: readonly [{
+            readonly type: "address";
+            readonly name: "asset";
+        }, {
+            readonly type: "int24";
+            readonly name: "tickLower";
+        }, {
+            readonly type: "int24";
+            readonly name: "tickUpper";
+        }, {
+            readonly type: "uint256";
+            readonly name: "liquidity";
+        }, {
+            readonly type: "uint256";
+            readonly name: "amount0Max";
+        }, {
+            readonly type: "uint256";
+            readonly name: "amount1Max";
+        }, {
+            readonly type: "uint256";
+            readonly name: "deadline";
+        }];
+        readonly name: "pools";
     }];
     readonly outputs: readonly [{
         readonly type: "uint256";
@@ -2274,6 +2661,17 @@ export declare const staticsAbi: readonly [{
         readonly type: "bool";
     }];
 }, {
+    readonly name: "canAccrueBasketRewards";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "bytes32";
+        readonly name: "poolId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
     readonly name: "treasury";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -2289,6 +2687,68 @@ export declare const staticsAbi: readonly [{
     readonly outputs: readonly [{
         readonly type: "uint256";
         readonly name: "amount";
+    }];
+}, {
+    readonly name: "PeggedMintedAndRecombined";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "caller";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "peggedProfileId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskSharesBurned";
+    }, {
+        readonly type: "uint256";
+        readonly name: "peggedCollateralIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarMintedAndBurned";
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileCollateralOut";
+    }];
+}, {
+    readonly name: "PeggedMintAndRecombineDeferred";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "caller";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "peggedProfileId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "volatileProfileId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "unhealthyProfileBitmap";
     }];
 }, {
     readonly name: "BasketCreated";
@@ -2337,6 +2797,9 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "uint16";
         readonly name: "ltvBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "recoveryPenaltyBps";
     }, {
         readonly type: "uint40";
         readonly name: "loanDuration";
@@ -2545,6 +3008,12 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256";
         readonly name: "collateralShares";
     }, {
+        readonly type: "uint256";
+        readonly name: "debtShares";
+    }, {
+        readonly type: "uint256";
+        readonly name: "penaltyShares";
+    }, {
         readonly type: "uint40";
         readonly name: "maturity";
     }];
@@ -2610,7 +3079,31 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "collateralShares";
+        readonly name: "burnedShares";
+    }, {
+        readonly type: "uint256";
+        readonly name: "unlockedShares";
+    }];
+}, {
+    readonly name: "RecoveryPenaltyDistributed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "loanId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "callerAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "callerReceived";
+    }, {
+        readonly type: "uint256";
+        readonly name: "protocolAmount";
     }];
 }, {
     readonly name: "StakingPositionCreated";
@@ -2900,7 +3393,10 @@ export declare const staticsAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -2936,7 +3432,10 @@ export declare const staticsAbi: readonly [{
         readonly name: "liquidityProviderShareBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "basketStakerShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "staticsStakerShareBps";
     }, {
         readonly type: "uint16";
         readonly name: "treasuryShareBps";
@@ -3065,6 +3564,111 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "uint256[]";
         readonly name: "v4TokenIds";
+    }];
+}, {
+    readonly name: "BorrowedLiquidityStaked";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "loanId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "operator";
+    }, {
+        readonly type: "address";
+        readonly name: "beneficiary";
+    }, {
+        readonly type: "uint256";
+        readonly name: "sharesIn";
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketSharesMinted";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "v4TokenIds";
+    }];
+}, {
+    readonly name: "BasketRewardAccrued";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "basketId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "indexRay";
+    }];
+}, {
+    readonly name: "BasketRewardSettled";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "BasketRewardClaimed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "basketId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "BasketRewardDustRouted";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "basketId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
     }];
 }, {
     readonly name: "LiquidityPositionStaked";
@@ -3257,7 +3861,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -3282,7 +3889,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "liquidityProviderShareBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "basketStakerShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "staticsStakerShareBps";
     }, {
         readonly type: "uint16";
         readonly name: "treasuryShareBps";
@@ -3311,7 +3921,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -3352,7 +3965,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
             readonly name: "liquidityProviderShareBps";
         }, {
             readonly type: "uint16";
-            readonly name: "stakerShareBps";
+            readonly name: "basketStakerShareBps";
+        }, {
+            readonly type: "uint16";
+            readonly name: "staticsStakerShareBps";
         }, {
             readonly type: "uint16";
             readonly name: "treasuryShareBps";
@@ -3684,7 +4300,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "liquidityProviderAmount";
     }, {
         readonly type: "uint256";
-        readonly name: "stakerAmount";
+        readonly name: "basketStakerAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsStakerAmount";
     }, {
         readonly type: "uint256";
         readonly name: "treasuryAmount";
@@ -3776,7 +4395,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "liquidityProviderShareBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "basketStakerShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "staticsStakerShareBps";
     }, {
         readonly type: "uint16";
         readonly name: "treasuryShareBps";
@@ -3802,7 +4424,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "liquidityProviderShareBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "basketStakerShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "staticsStakerShareBps";
     }, {
         readonly type: "uint16";
         readonly name: "treasuryShareBps";
@@ -4905,11 +5530,11 @@ export declare const permit2AllowanceAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }];
-export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
+export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "BorrowedLiquidityStaked" | "BasketRewardAccrued" | "BasketRewardSettled" | "BasketRewardClaimed" | "BasketRewardDustRouted" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
 export type StaticsLiquidityEventArgs<Name extends StaticsLiquidityEventName> = ContractEventArgs<typeof staticsAbi, Name>;
-export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "PositionRewardSettled";
+export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardAssetOptedOut" | "PositionRewardSettled";
 export type StaticsPositionEventArgs<Name extends StaticsPositionEventName> = ContractEventArgs<typeof staticsAbi, Name>;
-export type StaticsLendingEventName = "LoanOriginated" | "LoanRepaid" | "LoanExtended" | "LoanExtensionFeePaid" | "LoanRecovered";
+export type StaticsLendingEventName = "LoanOriginated" | "LoanRepaid" | "LoanExtended" | "LoanExtensionFeePaid" | "LoanRecovered" | "RecoveryPenaltyDistributed";
 export type StaticsLendingEventArgs<Name extends StaticsLendingEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsHookEventName = "PoolRegistered" | "SwapLegFeeAccrued" | "PermanentLiquidityAdded" | "PermanentLiquidityFeesCollected" | "PermanentLiquidityReleased" | "PoolDecommissioned" | "FeeConfigurationSet" | "PoolFeeConfigurationSet" | "PoolFeeConfigurationCleared" | "TickObservationRecorded";
 export type StaticsHookEventArgs<Name extends StaticsHookEventName> = ContractEventArgs<typeof staticsSwapFeeHookAbi, Name>;
@@ -6331,6 +6956,19 @@ export declare const staticsDollarErrorAbi: readonly [{
         readonly name: "seriesId";
     }];
 }, {
+    readonly name: "InvalidProfileKind";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "profileId";
+    }, {
+        readonly type: "uint8";
+        readonly name: "expected";
+    }, {
+        readonly type: "uint8";
+        readonly name: "actual";
+    }];
+}, {
     readonly name: "InvalidProfileMode";
     readonly type: "error";
     readonly inputs: readonly [{
@@ -6465,6 +7103,29 @@ export declare const staticsDollarErrorAbi: readonly [{
         readonly name: "received";
     }];
 }, {
+    readonly name: "UnexpectedOutputAmount";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "expected";
+    }, {
+        readonly type: "uint256";
+        readonly name: "observed";
+    }];
+}, {
+    readonly name: "SeriesUnavailableForOrdinaryRecombination";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint8";
+        readonly name: "status";
+    }];
+}, {
     readonly name: "UnexpectedExitStatus";
     readonly type: "error";
     readonly inputs: readonly [{
@@ -6499,6 +7160,7 @@ export declare function buildCreateAndMintBasketCollateralCall(basketId: bigint,
 export declare function buildMintBasketCollateralCall(positionId: bigint, basketId: bigint, shares: bigint, maxAmountsIn: readonly bigint[]): Hex;
 export declare function buildRedeemBasketCollateralCall(positionId: bigint, basketId: bigint, shares: bigint, receiver: Address, minAmountsOut: readonly bigint[]): Hex;
 export declare function buildClaimRewardsCall(positionId: bigint, assets: readonly Address[], receiver: Address, minAmountsOut: readonly bigint[]): Hex;
+export declare function buildClaimBasketRewardsCall(positionId: bigint, basketId: bigint, receiver: Address): Hex;
 export declare function buildCreateAndStakeCall(amount: bigint, receiver: Address, rewardAssets: readonly Address[]): Hex;
 export declare function buildOptInRewardAssetsCall(positionId: bigint, assets: readonly Address[]): Hex;
 export declare function buildOptOutRewardAssetsCall(positionId: bigint, assets: readonly Address[]): Hex;
@@ -6523,6 +7185,7 @@ export declare function buildSetCanonicalPoolFeeConfigurationCall(basketId: bigi
 export declare function buildClearCanonicalPoolFeeConfigurationCall(basketId: bigint, asset: Address): Hex;
 export declare function buildUnwindBasketLiquidityCall(basketId: bigint, asset: Address): Hex;
 export declare function buildBorrowAndProvideLiquidityCall(positionId: bigint, basketId: bigint, sharesIn: bigint, pools: readonly LiquidityParams[], lpRecipient: Address): Hex;
+export declare function buildBorrowAndStakeLiquidityCall(positionId: bigint, basketId: bigint, sharesIn: bigint, pools: readonly LiquidityParams[]): Hex;
 export declare function buildStakeLiquidityPositionCall(positionId: bigint, tokenId: bigint): Hex;
 export declare function buildActivateLiquidityPositionCall(tokenId: bigint): Hex;
 export declare function buildIncreaseStakedLiquidityCall(positionId: bigint, tokenId: bigint, request: StakedLiquidityIncreaseRequest, refundReceiver: Address): Hex;
@@ -6535,6 +7198,9 @@ export declare function buildRecombineToWETHWithPermitCall(seriesId: bigint, sta
 export declare function buildRecombineToETHCall(seriesId: bigint, staticsDollarAmount: bigint, maxSharesIn: bigint, receiver: Address, minETHOut: bigint): Hex;
 export declare function buildRecombineToETHWithPermitCall(seriesId: bigint, staticsDollarAmount: bigint, maxSharesIn: bigint, receiver: Address, minETHOut: bigint, permitSignature: PermitSignature): Hex;
 export declare function buildMintPeggedCall(profileId: bigint, staticsDollarAmount: bigint, maximumCollateralIn: bigint, staticsDollarReceiver: Address): Hex;
+export declare function buildQuoteMintPeggedAndRecombineCall(peggedProfileId: bigint, volatileProfileId: bigint, seriesId: bigint, riskAmount: bigint): Hex;
+export declare function buildMintPeggedAndRecombineCall(peggedProfileId: bigint, volatileProfileId: bigint, seriesId: bigint, riskAmount: bigint, maximumPeggedCollateralIn: bigint, minimumVolatileCollateralOut: bigint, receiver: Address): Hex;
+export declare function buildMintPeggedAndRecombineWithPermitCall(peggedProfileId: bigint, volatileProfileId: bigint, seriesId: bigint, riskAmount: bigint, maximumPeggedCollateralIn: bigint, minimumVolatileCollateralOut: bigint, receiver: Address, permitSignature: PermitSignature): Hex;
 export declare function buildRedeemPeggedCall(profileId: bigint, staticsDollarAmount: bigint, minimumCollateralOut: bigint, receiver: Address): Hex;
 export declare function buildClaimPeggedProtocolRevenueCall(profileId: bigint, amount: bigint, receiver: Address): Hex;
 export type SwapExecution = {

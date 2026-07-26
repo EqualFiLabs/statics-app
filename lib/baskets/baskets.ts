@@ -58,6 +58,8 @@ export type BasketRecord = Readonly<{
   extensionFeeBps: number;
   ltvBps: number;
   loanDuration: number;
+  /** Creator-set penalty charged only when a loan is recovered after expiry. */
+  recoveryPenaltyBps: number;
 }>;
 
 export type BasketCatalog = Readonly<{
@@ -186,6 +188,7 @@ async function loadBasket(
     extensionFeeBps: Number(configured.extensionFeeBps),
     ltvBps: Number(configured.ltvBps),
     loanDuration: Number(configured.loanDuration),
+    recoveryPenaltyBps: Number(configured.recoveryPenaltyBps),
   };
 }
 

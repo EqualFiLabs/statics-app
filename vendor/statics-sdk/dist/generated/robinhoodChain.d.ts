@@ -15,9 +15,10 @@ export declare const robinhoodChain: {
         readonly poolWarmupSeconds: 3600;
         readonly referenceWindowSeconds: 1800;
         readonly maximumDeviationBps: 100;
-        readonly polShareBps: 5000;
+        readonly polShareBps: 4000;
         readonly liquidityProviderShareBps: 1000;
-        readonly stakerShareBps: 3000;
+        readonly basketStakerShareBps: 2000;
+        readonly staticsStakerShareBps: 2000;
         readonly treasuryShareBps: 1000;
         readonly hookPermissions: readonly ["afterInitialize", "beforeSwap", "beforeSwapReturnDelta", "afterSwap", "afterSwapReturnDelta"];
     };

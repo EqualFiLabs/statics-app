@@ -86,6 +86,7 @@ describe("canonical liquidity identifiers", () => {
       originationFeeBps: 100,
       extensionFeeBps: 25,
       ltvBps: 7_500,
+      recoveryPenaltyBps: 500,
       constituents: [
         {
           token: { address: "0x0000000000000000000000000000000000000002" },
@@ -100,6 +101,7 @@ describe("canonical liquidity identifiers", () => {
       originationFeeBps: 100n,
       extensionFeeBps: 25n,
       ltvBps: 7_500n,
+      recoveryPenaltyBps: 500n,
       constituents: [
         {
           asset: "0x0000000000000000000000000000000000000002",

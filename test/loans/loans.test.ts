@@ -66,6 +66,7 @@ const basket = {
   extensionFeeBps: 25,
   ltvBps: 9_000,
   loanDuration: 86_400,
+  recoveryPenaltyBps: 500,
 } satisfies BasketRecord;
 
 const deployment = {
@@ -112,6 +113,8 @@ describe("loan lifecycle state", () => {
       sharesIn: 10n,
       feeShares: 1n,
       collateralShares: 9n,
+      debtShares: 8n,
+      penaltyShares: 1n,
       assets: [asset],
       principals: [7n],
     };

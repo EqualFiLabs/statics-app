@@ -110,6 +110,7 @@ export function basketLiquiditySnapshot(basket: BasketRecord): BasketSnapshot {
     redemptionFeeTiers: basket.redemptionFeeTiers,
     originationFeeBps: BigInt(basket.originationFeeBps),
     extensionFeeBps: BigInt(basket.extensionFeeBps),
+    recoveryPenaltyBps: BigInt(basket.recoveryPenaltyBps),
     ltvBps: BigInt(basket.ltvBps),
     constituents: basket.constituents.map((item) => ({
       asset: item.token.address,
@@ -233,7 +234,10 @@ async function loadPool(
       outputFeeBps: BigInt(effective.outputFeeBps),
       polShareBps: BigInt(effective.polShareBps),
       liquidityProviderShareBps: BigInt(effective.liquidityProviderShareBps),
-      stakerShareBps: BigInt(effective.stakerShareBps),
+      // The single staker share split into basket and Statics stakers when
+      // the hook moved to five-way routing (protocol 4c3fa06).
+      basketStakerShareBps: BigInt(effective.basketStakerShareBps),
+      staticsStakerShareBps: BigInt(effective.staticsStakerShareBps),
       treasuryShareBps: BigInt(effective.treasuryShareBps),
       overridden: effective.overridden,
     },
