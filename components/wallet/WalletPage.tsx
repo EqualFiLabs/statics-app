@@ -20,6 +20,8 @@ import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
 import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
+import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
+import { readNftCollection } from "@/lib/wallet/nft-contracts";
 import {
   erc721TransferAbi,
   validateRecipient,
@@ -70,7 +72,7 @@ const erc20Abi = [
 
 const deploymentState = readClientDollarDeployment();
 
-type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | "nft" | null;
+type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | "nft" | "add-nft" | null;
 /** Tokens and NFTs are both holdings; activity is a route, linked rather than duplicated. */
 type WalletTab = "tokens" | "nfts";
 type AssetBalance = bigint | null;
@@ -258,6 +260,8 @@ export function WalletPage() {
 
           {tab === "nfts" ? (
             <WalletNftPanel
+              fundingChainId={wallet.fundingChainId}
+              onAddCollection={() => setModal("add-nft")}
               onTransfer={(nft) => {
                 setTransferNft(nft);
                 setModal("nft");
@@ -315,6 +319,11 @@ export function WalletPage() {
         </div>
       </section>
 
+      {modal === "add-nft" && (
+        <WalletDialog label="Add an NFT collection" onClose={() => setModal(null)}>
+          <AddNftCollectionForm chainId={wallet.fundingChainId} onDone={() => setModal(null)} />
+        </WalletDialog>
+      )}
       {modal === "nft" && transferNft && (
         <WalletDialog
           label={`Send ${transferNft.name}`}
@@ -889,6 +898,79 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
         disabled={pending || problem !== null}
       >
         {pending ? "Sending…" : problem ? problem : `Send ${nft.name}`}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Adds an ERC-721 collection by contract address.
+ *
+ * There is no call that lists the NFTs a wallet holds, so a collection has to
+ * be named before it can be shown. This mirrors adding a custom ERC-20, which
+ * is the pattern someone has already met one tab over.
+ *
+ * The address is checked against the chain before it is stored: a contract must
+ * exist and answer as an ERC-721. Skipping that would let an ERC-20 in, and it
+ * would then report a balance in wei and offer to transfer token id
+ * 1000000000000000000.
+ */
+function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: () => void }) {
+  const publicClient = usePublicClient({ chainId });
+  const { addCollection } = useWalletNftCollections(chainId);
+  const [address, setAddress] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!publicClient) {
+      setError("No client is available for this network.");
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      addCollection(await readNftCollection(publicClient, address.trim()));
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That collection could not be added.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="wallet-nft-transfer">
+      <p className="wallet-add-nft-note">
+        Paste an NFT contract address. Statics positions and liquidity positions are listed
+        automatically; anything else has to be added, because no network call can list every NFT a
+        wallet holds.
+      </p>
+      <label className="basket-field">
+        <span>Contract address</span>
+        <input
+          value={address}
+          onChange={(event) => {
+            setAddress(event.target.value);
+            setError(null);
+          }}
+          placeholder="0x…"
+          spellCheck={false}
+          disabled={pending}
+        />
+      </label>
+      {error && (
+        <p className="dapp-inline-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        className="dollar-submit"
+        type="button"
+        onClick={() => void submit()}
+        disabled={pending || address.trim().length === 0}
+      >
+        {pending ? "Checking…" : "Add collection"}
       </button>
     </div>
   );

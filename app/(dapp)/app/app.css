@@ -1014,37 +1014,137 @@
   color: var(--app-text);
 }
 
+/* Added collections and the way to add more. Statics NFTs need no chip: they
+ * are always listed, so only user-added collections are removable here. */
+.wallet-nft-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.wallet-nft-collections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.wallet-nft-chip {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.25rem 0.5rem 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.wallet-nft-chip button {
+  border: 0;
+  background: none;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wallet-nft-chip button:hover {
+  color: var(--negative);
+}
+
+.wallet-nft-add {
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-nft-add:hover {
+  background: var(--app-raised);
+}
+
+.wallet-add-nft-note {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* One column by default, three where there is room. Declared mobile-first so
+ * the stacked case needs no rule and cannot be overridden by anything later.
+ *
+ * Rows are equal height so a card carrying a transfer warning does not tower
+ * over one that carries nothing. Cards differ a lot in how much they have to
+ * say, and a ragged grid reads as broken rather than as varied. */
 .wallet-nft-rows {
   display: grid;
+  grid-auto-rows: 1fr;
   gap: 0.625rem;
 }
 
+/* A card rather than a row, so the same shape works at a third of the width
+ * and at full width. Send sits at the foot, aligned across cards of uneven
+ * height. */
 .wallet-nft-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.875rem;
-  align-items: start;
+  display: flex;
+  /* Floor for the sparsest card -- an entry with only a name and a summary
+   * still occupies a card rather than a strip. */
+  min-height: 150px;
+  flex-direction: column;
+  gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--app-border);
   border-radius: var(--radius-lg);
   background: var(--app-surface);
 }
 
-.wallet-nft-icon {
+/* Artwork sits top-right of the card. Statics positions carry no tokenURI, so
+ * the placeholder is the ordinary state and reads as a typed mark rather than
+ * as a failed image. */
+.wallet-nft-top {
   display: flex;
-  width: 36px;
-  height: 36px;
+  gap: 0.875rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  /* Absorbs the card's spare height so the button below lands on the bottom
+   * edge, level across every card in the row. */
+  flex: 1;
+}
+
+.wallet-nft-art {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--app-raised);
+}
+
+.wallet-nft-art.is-placeholder {
+  display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--app-raised);
-  color: var(--app-text-secondary);
+  color: var(--app-text-muted);
 }
 
 .wallet-nft-detail {
   display: grid;
   gap: 0.125rem;
   min-width: 0;
+  /* Takes the slack so Send lands on the card's bottom edge regardless of how
+   * much the entry has to say. */
+  flex: 1;
 }
 
 .wallet-nft-detail strong {
@@ -1077,6 +1177,11 @@
   display: inline-flex;
   gap: 0.375rem;
   align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  /* Belt and braces with the flex above: pinned to the foot whatever the card
+   * has to say above it. */
+  margin-top: auto;
   min-height: var(--control-height-sm);
   padding: 0 0.875rem;
   border: 1px solid var(--app-border-strong);
@@ -3953,6 +4058,10 @@
 }
 
 @media (min-width: 901px) {
+  .wallet-nft-rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .rewards-page .position-panel.is-wide .reward-position-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
