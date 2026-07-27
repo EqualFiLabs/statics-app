@@ -15,7 +15,7 @@ import {
   type Address,
 } from "viem";
 
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
@@ -824,11 +824,10 @@ function SendDialog({
  */
 function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }) {
   const wallet = useWalletState();
-  const publicClient = usePublicClient(
-    deploymentState.status === "configured"
-      ? { chainId: deploymentState.deployment.chainId }
-      : undefined
-  );
+  const chainId =
+    deploymentState.status === "configured" ? deploymentState.deployment.chainId : undefined;
+  const publicClient = usePublicClient(chainId ? { chainId } : undefined);
+  const walletClient = useWalletClient(chainId ? { chainId } : undefined);
   const [recipient, setRecipient] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -837,26 +836,38 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
   const problem = sender ? validateRecipient(recipient, sender) : "Connect a wallet to continue.";
 
   const submit = async () => {
-    if (!sender || !publicClient || problem || deploymentState.status !== "configured") return;
+    if (!sender || !publicClient || !walletClient.data || problem || !chainId) return;
     setPending(true);
     setError(null);
     try {
       const to = getAddress(recipient.trim());
-      const walletClient = createWalletClient({
-        account: sender,
-        chain: undefined,
-        transport: custom((window as unknown as { ethereum: never }).ethereum),
+      await executeProtocolTransaction({
+        publicClient,
+        wallet: sender,
+        chainId,
+        kind: "transfer-nft",
+        label: `Send ${nft.name}`,
+        amount: nft.name,
+        to: nft.contract,
+        data: encodeFunctionData({
+          abi: erc721TransferAbi,
+          functionName: "safeTransferFrom",
+          args: [sender, to, nft.tokenId],
+        }),
+        sendTransaction: ({ to: target, data, value }) =>
+          walletClient.data!.sendTransaction({
+            account: sender,
+            chain: walletClient.data!.chain,
+            to: target,
+            data,
+            value,
+          }),
+        describeError: (cause) =>
+          cause instanceof Error ? cause.message : "The transfer did not complete.",
+        // Confirms the chain actually reassigned the token, rather than
+        // trusting a successful transaction.
+        verifyConfirmation: () => verifyNftTransfer(publicClient, nft, to),
       });
-      const hash = await walletClient.writeContract({
-        address: nft.contract,
-        abi: erc721TransferAbi,
-        functionName: "safeTransferFrom",
-        args: [sender, to, nft.tokenId],
-        chain: null,
-        account: sender,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-      await verifyNftTransfer(publicClient, nft, to);
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The transfer did not complete.");

@@ -48,6 +48,7 @@ export type DollarActivityKind =
   | "opt-out-reward-assets"
   | "claim-rewards"
   | "claim-basket-rewards"
+  | "transfer-nft"
   | "create-basket"
   | "approve-lp-token"
   | "approve-permit2"
