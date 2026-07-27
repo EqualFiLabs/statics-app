@@ -998,6 +998,153 @@
   cursor: not-allowed;
 }
 
+/* Holdings tabs. Activity links out to its own route rather than being
+ * duplicated inside this page. */
+.wallet-tabs {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.wallet-tabs-list {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.wallet-tabs button {
+  min-height: var(--control-height);
+  padding: 0 0.875rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.wallet-tabs-activity {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 0.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.wallet-tabs-activity:hover {
+  color: var(--app-text);
+}
+
+.wallet-nft-rows {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.wallet-nft-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.875rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+
+.wallet-nft-icon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+}
+
+.wallet-nft-detail {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.wallet-nft-detail strong {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.wallet-nft-detail span {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* What leaves with the token. Warning-toned because transferring a position
+ * hands over its collateral, staking and rewards, and that is not obvious. */
+.wallet-nft-carries {
+  margin: 0.375rem 0 0;
+  color: var(--warning);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.wallet-nft-blocked {
+  margin: 0.375rem 0 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.wallet-nft-send {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-nft-send:hover:not(:disabled) {
+  background: var(--app-raised);
+}
+
+.wallet-nft-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wallet-nft-transfer {
+  display: grid;
+  gap: 1rem;
+}
+
+.wallet-nft-transfer-warning {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
 .wallet-balance-hero {
   display: grid;
   gap: 0.5rem;
@@ -1025,23 +1172,28 @@
   line-height: 1;
 }
 
+/* Three stacked cards rather than a divided strip, matching the market app's
+ * wallet so the two read as one product. */
 .wallet-quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--app-border);
-  border-bottom: 1px solid var(--app-border);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.625rem;
+  padding: 1.25rem 0 0;
 }
 
 .wallet-quick-actions button {
-  min-height: 76px;
+  display: flex;
+  min-height: 72px;
+  flex-direction: column;
+  gap: 0.375rem;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-right: 1px solid var(--app-border);
-  background: transparent;
-  border-radius: var(--radius-md);
-}
-
-.wallet-quick-actions button:last-child {
-  border-right: 0;
+  border-radius: var(--radius-lg);
+  background: var(--app-raised);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .wallet-quick-actions button:hover,
