@@ -97,7 +97,7 @@ describe("Dollar activity page", () => {
     expect(screen.getByText(/Original transaction 0x11111111/)).toBeInTheDocument();
   });
 
-  it("keeps local Anvil hashes inert", () => {
+  it("offers a local Anvil hash for copying rather than linking it", () => {
     writeDollarActivity({
       id: "local",
       wallet,
@@ -111,8 +111,14 @@ describe("Dollar activity page", () => {
     });
 
     renderActivity(31_337);
-    expect(screen.getByTitle(originalHash).tagName).toBe("CODE");
+    // Anvil has no block explorer, so this must never become a link -- that is
+    // the part of the original assertion worth keeping.
     expect(screen.queryByRole("link", { name: /0x11111111/i })).not.toBeInTheDocument();
+    // But an unlinkable hash was previously unreachable: the full value existed
+    // only in a tooltip, so there was no way to get it out of the page.
+    expect(
+      screen.getByRole("button", { name: `Copy transaction ${originalHash}` })
+    ).toBeInTheDocument();
   });
 
   it("shows confirmed transactions whose resulting state still needs verification", () => {

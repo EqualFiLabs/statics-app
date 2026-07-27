@@ -2266,6 +2266,30 @@
   overflow-wrap: anywhere;
 }
 
+/* No explorer for this chain, so the hash is a copy control rather than a
+ * link. Sized and coloured like the link it replaces so the row does not
+ * change shape depending on which chain the activity happened on. */
+.activity-hash.is-copy {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.activity-hash.is-copy span {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.activity-hash.is-copy:hover span {
+  color: var(--accent);
+}
+
 .activity-hash {
   font-family: monospace;
   font-size: var(--text-sm);
