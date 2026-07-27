@@ -10,9 +10,11 @@ import {
   formatUnits,
   getAddress,
   isAddress,
+  parseAbi,
   parseUnits,
   zeroAddress,
   type Address,
+  type Hex,
 } from "viem";
 
 import { usePublicClient, useWalletClient } from "wagmi";
@@ -198,6 +200,7 @@ export function WalletPage() {
       decimals: share.decimals,
       balance: share.balance,
       isDefault: true,
+      tokenId: share.seriesId,
       // Risk shares carry no logo, and the token row expects the key to exist.
       logoURI: undefined as string | undefined,
     })),
@@ -420,14 +423,7 @@ export function WalletPage() {
         />
       )}
       {modal === "send" && (
-        <SendDialog
-          // Risk shares are ERC-1155 and need safeTransferFrom with an id and
-          // an amount, which this dialog does not do. Offering them here would
-          // produce a transfer that cannot succeed.
-          assets={assets.filter((asset) => asset.kind !== "erc1155")}
-          onConfirmed={refreshBalances}
-          onClose={() => setModal(null)}
-        />
+        <SendDialog assets={assets} onConfirmed={refreshBalances} onClose={() => setModal(null)} />
       )}
     </>
   );
@@ -662,14 +658,25 @@ function CustomTokenDialog({
 
 type TransferAsset = {
   id: string;
-  kind: "native" | "erc20";
+  kind: "native" | "erc20" | "erc1155";
   name: string;
   symbol: string;
   decimals: number;
   balance: AssetBalance;
   address?: Address;
   logoURI?: string;
+  /** ERC-1155 only: the id the balance is held under. */
+  tokenId?: bigint;
 };
+
+/**
+ * ERC-1155 transfer. Omitted from the vendored SDK's risk-share ABI even
+ * though the contract is OpenZeppelin's ERC1155 and has always had it, the
+ * same gap as the diamond's ERC-721 transferFrom.
+ */
+const erc1155TransferAbi = parseAbi([
+  "function safeTransferFrom(address from, address to, uint256 id, uint256 value, bytes data)",
+]);
 
 function SendDialog({
   assets,
@@ -717,19 +724,27 @@ function SendDialog({
         transport: custom(provider),
       });
       const to = asset.kind === "native" ? getAddress(recipient) : asset.address!;
-      const data =
-        asset.kind === "native"
-          ? "0x"
-          : encodeFunctionData({
-              abi: erc20Abi,
-              functionName: "transfer",
-              args: [getAddress(recipient), amountRaw],
-            });
+      let data: Hex = "0x";
+      if (asset.kind === "erc20") {
+        data = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "transfer",
+          args: [getAddress(recipient), amountRaw],
+        });
+      } else if (asset.kind === "erc1155") {
+        // Takes the id as well as the amount, and the empty bytes argument is
+        // required: a receiving contract is handed it in onERC1155Received.
+        data = encodeFunctionData({
+          abi: erc1155TransferAbi,
+          functionName: "safeTransferFrom",
+          args: [account, getAddress(recipient), asset.tokenId ?? 0n, amountRaw, "0x"],
+        });
+      }
       await executeProtocolTransaction({
         publicClient,
         wallet: account,
         chainId: wallet.fundingChainId,
-        kind: "send",
+        kind: asset.kind === "erc1155" ? "transfer-nft" : "send",
         label: `Send ${asset.symbol}`,
         amount: `${amount} ${asset.symbol}`,
         to,
