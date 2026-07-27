@@ -274,7 +274,7 @@ export async function loadPositionCatalog(
   for (const basket of basketCatalog.baskets) {
     addCandidate(candidateSources, basket.token.address, `Basket ${basket.symbol}`);
     for (const constituent of basket.constituents) {
-      addCandidate(candidateSources, constituent.token.address, `${basket.symbol} constituent`);
+      addCandidate(candidateSources, constituent.token.address, `${basket.symbol} underlying`);
     }
   }
   for (const log of rewardLogs) addCandidate(candidateSources, log.args.asset, "Fee history");
@@ -386,8 +386,8 @@ const positionErrorMessages: Readonly<Record<string, string>> = {
   RewardAssetLimitExceeded: "This position already selected the maximum 64 reward assets.",
   ERC20InsufficientBalance: "The wallet does not have enough of the required token.",
   ERC20InsufficientAllowance: "The current token approval is below the required amount.",
-  MaximumInputExceeded: "A constituent input moved above the selected slippage limit.",
-  MinimumOutputNotMet: "A constituent output moved below the selected slippage limit.",
+  MaximumInputExceeded: "An underlying input moved above the selected slippage limit.",
+  MinimumOutputNotMet: "An underlying output moved below the selected slippage limit.",
 };
 
 function findHexData(error: unknown): Hex | null {

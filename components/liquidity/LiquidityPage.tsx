@@ -486,9 +486,7 @@ function LiquidityRuntime() {
             data: result,
           });
           if (simulated[1].length !== basketPools.length)
-            throw new Error(
-              "The simulation did not create one liquidity position per constituent."
-            );
+            throw new Error("The simulation did not create one liquidity position per underlying.");
           simulatedLoanId = simulated[0];
           simulatedTokenIds = simulated[1];
         },
@@ -1220,7 +1218,7 @@ function LiquidityRuntime() {
             <>
               <p className="dollar-warning">
                 Advanced flow: locks existing basket collateral, originates a loan, mints basket
-                liquidity, and creates one wallet-owned liquidity position per constituent
+                liquidity, and creates one wallet-owned liquidity position per underlying
                 atomically.
               </p>
               <label className="basket-field">

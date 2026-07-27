@@ -121,7 +121,7 @@ function BasketListRuntime() {
               <p>{basket.symbol}</p>
               <dl>
                 <div>
-                  <dt>Constituents</dt>
+                  <dt>Underlyings</dt>
                   <dd>{basket.constituents.length}</dd>
                 </div>
                 <div>

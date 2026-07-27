@@ -90,7 +90,7 @@ describe("reward candidate ranking", () => {
     // The picker hides everything past the first few, so what surfaces has to
     // be justified. Proven payers are the strongest evidence available.
     const ranked = rankRewardCandidates([
-      candidate("AAA", ["MAJ constituent"]),
+      candidate("AAA", ["MAJ underlying"]),
       candidate("BBB", ["Fee history"]),
       candidate("CCC", ["Statics deployment"]),
     ]);
@@ -98,10 +98,10 @@ describe("reward candidate ranking", () => {
     expect(ranked.map((item) => item.symbol)).toEqual(["BBB", "CCC", "AAA"]);
   });
 
-  it("ranks a payer above a core asset even when it is also a constituent", () => {
+  it("ranks a payer above a core asset even when it is also an underlying", () => {
     const ranked = rankRewardCandidates([
       candidate("CORE", ["Statics deployment"]),
-      candidate("PAID", ["MAJ constituent", "Fee history"]),
+      candidate("PAID", ["MAJ underlying", "Fee history"]),
     ]);
 
     expect(ranked[0].symbol).toBe("PAID");
@@ -109,9 +109,9 @@ describe("reward candidate ranking", () => {
 
   it("preserves the catalog's alphabetical order inside a tier", () => {
     const ranked = rankRewardCandidates([
-      candidate("AAA", ["MAJ constituent"]),
-      candidate("BBB", ["MAJ constituent"]),
-      candidate("CCC", ["MAJ constituent"]),
+      candidate("AAA", ["MAJ underlying"]),
+      candidate("BBB", ["MAJ underlying"]),
+      candidate("CCC", ["MAJ underlying"]),
     ]);
 
     expect(ranked.map((item) => item.symbol)).toEqual(["AAA", "BBB", "CCC"]);

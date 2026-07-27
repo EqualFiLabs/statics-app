@@ -44,6 +44,12 @@ export const glossary = {
     plain: "A fixed bundle of assets you can buy or sell as a single unit.",
     protocol: "Static basket",
   },
+  underlying: {
+    label: "Underlying",
+    plural: "Underlyings",
+    plain: "One of the assets a basket holds. A basket is worth what its underlyings are worth.",
+    protocol: "Basket constituent",
+  },
   dollar: {
     label: "Dollar",
     plain: "Statics' own dollar, backed by assets you deposit.",
