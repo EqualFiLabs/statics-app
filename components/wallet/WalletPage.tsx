@@ -15,7 +15,18 @@ import {
   type Address,
 } from "viem";
 
+import { usePublicClient } from "wagmi";
+import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
+
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
+import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
+import {
+  erc721TransferAbi,
+  validateRecipient,
+  verifyNftTransfer,
+  type WalletNft,
+} from "@/lib/wallet/nfts";
+import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
@@ -57,7 +68,11 @@ const erc20Abi = [
   },
 ] as const;
 
-type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | null;
+const deploymentState = readClientDollarDeployment();
+
+type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | "nft" | null;
+/** Tokens and NFTs are both holdings; activity is a route, linked rather than duplicated. */
+type WalletTab = "tokens" | "nfts";
 type AssetBalance = bigint | null;
 
 function displayBalance(value: AssetBalance, decimals: number) {
@@ -75,6 +90,9 @@ export function WalletPage() {
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
   const [modal, setModal] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
+  const [tab, setTab] = useState<WalletTab>("tokens");
+  const [transferNft, setTransferNft] = useState<WalletNft | null>(null);
+
   const [nativeBalance, setNativeBalance] = useState<AssetBalance>(null);
   const [tokenBalances, setTokenBalances] = useState<Record<string, AssetBalance>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -190,69 +208,130 @@ export function WalletPage() {
           <small>{nativeSymbol}</small>
         </div>
 
+        {/* Same three actions, same order and same stacked icon treatment as the
+            market app, so the two wallets read as one product. */}
         <div className="wallet-quick-actions">
+          <button type="button" onClick={() => setModal("portal")}>
+            <ArrowDownUp size={16} aria-hidden="true" />
+            Portal
+          </button>
           <button type="button" onClick={() => setModal("send")}>
-            <span>↑</span>Send
+            <Send size={16} aria-hidden="true" />
+            Send
           </button>
           <button type="button" onClick={() => setModal("receive")}>
-            <span>↓</span>Receive
-          </button>
-          <button type="button" onClick={() => setModal("portal")}>
-            <span>⇄</span>Portal
+            <Download size={16} aria-hidden="true" />
+            Receive
           </button>
         </div>
 
         <div className="wallet-assets">
-          <div className="wallet-section-heading">
-            <div>
-              <span>{"// Assets"}</span>
-              <h2>Tokens</h2>
+          {/* Tabs over the holdings, with activity linking to its own route
+              rather than duplicating that page inside this one. */}
+          <div className="wallet-tabs">
+            {/* Only the tabs carry tablist semantics. The activity link leaves
+                the page, so including it would make the tablist invalid and
+                announce a destination as though it were a panel. */}
+            <div className="wallet-tabs-list" role="tablist" aria-label="Wallet holdings">
+              {(
+                [
+                  ["tokens", "Tokens"],
+                  ["nfts", "NFTs"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === value}
+                  className={tab === value ? "active" : undefined}
+                  onClick={() => setTab(value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            <div className="wallet-asset-actions">
-              <button type="button" onClick={() => setModal("browse")}>
-                Browse
-              </button>
-              <button type="button" onClick={() => setModal("custom")}>
-                Add token
-              </button>
-              <Link href="/app/activity">Activity →</Link>
-            </div>
+            <Link className="wallet-tabs-activity" href="/app/activity">
+              Activity <ArrowUpRight size={13} aria-hidden="true" />
+            </Link>
           </div>
-          <div className="wallet-token-rows">
-            {assets.map((asset) => (
-              <div className="wallet-asset-row" key={asset.id}>
-                <TokenLogo
-                  token={{
-                    address: asset.id,
-                    symbol: asset.symbol,
-                    logoURI: asset.logoURI,
-                  }}
-                />
+
+          {tab === "nfts" ? (
+            <WalletNftPanel
+              onTransfer={(nft) => {
+                setTransferNft(nft);
+                setModal("nft");
+              }}
+            />
+          ) : (
+            <>
+              <div className="wallet-section-heading">
                 <div>
-                  <strong>{asset.symbol}</strong>
-                  <span>{asset.name}</span>
+                  <h2>Tokens</h2>
                 </div>
-                <div>
-                  <strong>{displayBalance(asset.balance, asset.decimals)}</strong>
-                  {asset.kind === "erc20" && !asset.isDefault ? (
-                    <button
-                      className="wallet-remove-token"
-                      type="button"
-                      aria-label={`Remove ${asset.symbol}`}
-                      onClick={() => removeToken(asset.address)}
-                    >
-                      Remove
-                    </button>
-                  ) : (
-                    <span>{asset.kind === "native" ? "Native" : "Token"}</span>
-                  )}
+                <div className="wallet-asset-actions">
+                  <button type="button" onClick={() => setModal("browse")}>
+                    Browse
+                  </button>
+                  <button type="button" onClick={() => setModal("custom")}>
+                    Add token
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="wallet-token-rows">
+                {assets.map((asset) => (
+                  <div className="wallet-asset-row" key={asset.id}>
+                    <TokenLogo
+                      token={{
+                        address: asset.id,
+                        symbol: asset.symbol,
+                        logoURI: asset.logoURI,
+                      }}
+                    />
+                    <div>
+                      <strong>{asset.symbol}</strong>
+                      <span>{asset.name}</span>
+                    </div>
+                    <div>
+                      <strong>{displayBalance(asset.balance, asset.decimals)}</strong>
+                      {asset.kind === "erc20" && !asset.isDefault ? (
+                        <button
+                          className="wallet-remove-token"
+                          type="button"
+                          aria-label={`Remove ${asset.symbol}`}
+                          onClick={() => removeToken(asset.address)}
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <span>{asset.kind === "native" ? "Native" : "Token"}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
+      {modal === "nft" && transferNft && (
+        <WalletDialog
+          label={`Send ${transferNft.name}`}
+          onClose={() => {
+            setModal(null);
+            setTransferNft(null);
+          }}
+        >
+          <NftTransferForm
+            nft={transferNft}
+            onDone={() => {
+              setModal(null);
+              setTransferNft(null);
+            }}
+          />
+        </WalletDialog>
+      )}
       {modal === "portal" && (
         <WalletDialog label="Funding Portal" wide onClose={() => setModal(null)}>
           <PortalWorkspace compact />
@@ -719,5 +798,98 @@ function SendDialog({
         )}
       </div>
     </WalletDialog>
+  );
+}
+
+/**
+ * Moves a position or liquidity NFT to another address.
+ *
+ * Transferring a position hands over everything attached to it, so the
+ * consequence is restated here even though the list already showed it: this is
+ * the last screen before a signature, and it is the only irreversible action in
+ * the wallet.
+ *
+ * Ownership is re-read after confirmation rather than trusting the receipt. A
+ * transfer that appeared to succeed but left the token in place would leave
+ * someone believing they had handed over a position they still hold.
+ */
+function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }) {
+  const wallet = useWalletState();
+  const publicClient = usePublicClient(
+    deploymentState.status === "configured"
+      ? { chainId: deploymentState.deployment.chainId }
+      : undefined
+  );
+  const [recipient, setRecipient] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sender = wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
+  const problem = sender ? validateRecipient(recipient, sender) : "Connect a wallet to continue.";
+
+  const submit = async () => {
+    if (!sender || !publicClient || problem || deploymentState.status !== "configured") return;
+    setPending(true);
+    setError(null);
+    try {
+      const to = getAddress(recipient.trim());
+      const walletClient = createWalletClient({
+        account: sender,
+        chain: undefined,
+        transport: custom((window as unknown as { ethereum: never }).ethereum),
+      });
+      const hash = await walletClient.writeContract({
+        address: nft.contract,
+        abi: erc721TransferAbi,
+        functionName: "safeTransferFrom",
+        args: [sender, to, nft.tokenId],
+        chain: null,
+        account: sender,
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      await verifyNftTransfer(publicClient, nft, to);
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The transfer did not complete.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="wallet-nft-transfer">
+      {nft.carries.length > 0 && (
+        <p className="wallet-nft-transfer-warning">
+          <strong>This moves more than the NFT.</strong> {nft.carries.join(", ")} will belong to the
+          recipient. This cannot be undone.
+        </p>
+      )}
+      <label className="basket-field">
+        <span>Send to</span>
+        <input
+          value={recipient}
+          onChange={(event) => {
+            setRecipient(event.target.value);
+            setError(null);
+          }}
+          placeholder="0x…"
+          spellCheck={false}
+          disabled={pending}
+        />
+      </label>
+      {error && (
+        <p className="dapp-inline-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        className="dollar-submit"
+        type="button"
+        onClick={() => void submit()}
+        disabled={pending || problem !== null}
+      >
+        {pending ? "Sending…" : problem ? problem : `Send ${nft.name}`}
+      </button>
+    </div>
   );
 }
