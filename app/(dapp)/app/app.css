@@ -2367,8 +2367,11 @@
 }
 
 /* Guidance shown before the first pick. Opting in never backfills, so the
- * consequence has to be stated where the choice is made, not discovered later. */
+ * consequence has to be stated where the choice is made, not discovered later.
+ * The selector is a two-column grid, so prose has to be told to span it or it
+ * renders as a narrow cell beside the first option. */
 .reward-selector-note {
+  grid-column: 1 / -1;
   margin: 0 0 1rem;
   color: var(--app-text-muted);
   font-size: var(--text-caption);
@@ -2376,8 +2379,11 @@
 }
 
 /* Up to 64 reward assets exist. The picker shows a ranked few and hides the
- * rest behind this, so the common case is a short list. */
+ * rest behind this, so the common case is a short list. Spans the grid so it
+ * reads as an action on the whole list rather than one more option in it. */
 .reward-selector-more {
+  grid-column: 1 / -1;
+  justify-self: start;
   margin-top: 0.75rem;
   padding: 0;
   border: 0;
@@ -2425,6 +2431,7 @@
 /* A question, not a label -- so it is sized and cased as a heading rather than
  * getting the uppercase 12px eyebrow treatment the other legends use. */
 .reward-selector legend {
+  grid-column: 1 / -1;
   padding: 0 0.5rem;
   color: var(--app-text);
   font-size: var(--text-base);

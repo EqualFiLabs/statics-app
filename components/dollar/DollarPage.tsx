@@ -59,6 +59,7 @@ import { claimablePositionRewards } from "@/lib/positions/positions";
 import { loadLoanCatalog } from "@/lib/loans/loans";
 import { loadBasketRewardSummary, totalRewardsByAsset } from "@/lib/baskets/rewards";
 import { readEvesMarketUrl } from "@/lib/site-config";
+import { overviewTiles } from "@/lib/overview";
 
 const deploymentState = readClientDollarDeployment();
 const evesMarketUrl = readEvesMarketUrl(process.env.NEXT_PUBLIC_EVES_MARKET_URL);
@@ -337,20 +338,21 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
       )}
 
       <section className="preview-overview-grid" aria-label="Portfolio summary">
-        {(
-          [
-            ["Positions", positions.length.toString(), "/app/positions", "Review positions"],
-            ["Deposited baskets", depositedBaskets.toString(), "/app/baskets", "Browse baskets"],
-            ["Loans", loans.toString(), "/app/loans", "Review loans"],
-            ["Rewards to claim", stakingClaims.toString(), "/app/rewards", "Review rewards"],
-          ] as const
-        ).map(([label, value, href, action]) => (
-          <article key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-            <Link href={href}>{action} →</Link>
-          </article>
-        ))}
+        {overviewTiles.map((tile) => {
+          const values = {
+            positions: positions.length,
+            baskets: depositedBaskets,
+            loans,
+            rewards: stakingClaims,
+          };
+          return (
+            <article key={tile.id}>
+              <span>{tile.label}</span>
+              <strong>{values[tile.id].toString()}</strong>
+              <Link href={tile.href}>{tile.action} →</Link>
+            </article>
+          );
+        })}
       </section>
     </>
   );
