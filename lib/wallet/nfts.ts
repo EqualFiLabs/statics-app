@@ -30,7 +30,7 @@ export const erc721TransferAbi = parseAbi([
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 ]);
 
-export type WalletNftKind = "position" | "liquidity";
+export type WalletNftKind = "position" | "liquidity" | "collection";
 
 export type WalletNft = Readonly<{
   kind: WalletNftKind;
@@ -192,3 +192,62 @@ export type NftTransferRequest = Readonly<{
   to: Address;
   data?: Hex;
 }>;
+
+/**
+ * Turns an added collection's holdings into wallet entries.
+ *
+ * A collection that cannot enumerate yields one summary entry rather than
+ * nothing, because the balance is real information even when the individual
+ * token ids are not reachable. That entry cannot be transferred: without an id
+ * there is nothing to send.
+ */
+export function describeCollectionNfts(
+  holdings: import("@/lib/wallet/nft-contracts").NftCollectionHoldings
+): readonly WalletNft[] {
+  const { collection, balance, tokenIds, enumerable } = holdings;
+  if (balance === 0n) return [];
+
+  if (!enumerable || tokenIds.length === 0) {
+    return [
+      {
+        kind: "collection",
+        tokenId: 0n,
+        contract: collection.address,
+        name: collection.name,
+        summary: `${balance.toString()} owned`,
+        carries: [],
+        blockedReason:
+          "This collection cannot list which tokens you own, so they cannot be sent from here.",
+      },
+    ];
+  }
+
+  const shown = tokenIds.map((tokenId) => ({
+    kind: "collection" as const,
+    tokenId,
+    contract: collection.address,
+    name: `${collection.name} #${tokenId.toString()}`,
+    summary: collection.symbol,
+    carries: [] as readonly string[],
+    blockedReason: null,
+  }));
+
+  // The reader caps enumeration, so say when more are held than are listed
+  // rather than quietly showing a partial list as if it were complete.
+  if (BigInt(tokenIds.length) < balance) {
+    return [
+      ...shown,
+      {
+        kind: "collection",
+        tokenId: 0n,
+        contract: collection.address,
+        name: collection.name,
+        summary: `${(balance - BigInt(tokenIds.length)).toString()} more not shown`,
+        carries: [],
+        blockedReason: "Only the first 50 tokens in a collection are listed.",
+      },
+    ];
+  }
+
+  return shown;
+}

@@ -1,6 +1,8 @@
 "use client";
 
-import { ArrowUpRight, Boxes, Droplets } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+
+import { NftArtwork } from "@/components/wallet/NftArtwork";
 
 import type { WalletNft } from "@/lib/wallet/nfts";
 
@@ -18,9 +20,11 @@ import type { WalletNft } from "@/lib/wallet/nfts";
  */
 export function WalletNftList({
   nfts,
+  chainId,
   onTransfer,
 }: Readonly<{
   nfts: readonly WalletNft[];
+  chainId: number;
   onTransfer: (nft: WalletNft) => void;
 }>) {
   if (nfts.length === 0) {
@@ -37,13 +41,9 @@ export function WalletNftList({
 
   return (
     <div className="wallet-nft-rows">
-      {nfts.map((nft) => {
-        const Icon = nft.kind === "position" ? Boxes : Droplets;
-        return (
-          <article className="wallet-nft-row" key={`${nft.kind}:${nft.tokenId}`}>
-            <span className="wallet-nft-icon" aria-hidden="true">
-              <Icon size={18} />
-            </span>
+      {nfts.map((nft) => (
+        <article className="wallet-nft-row" key={`${nft.kind}:${nft.tokenId}`}>
+          <div className="wallet-nft-top">
             <div className="wallet-nft-detail">
               <strong>{nft.name}</strong>
               <span>{nft.summary}</span>
@@ -52,18 +52,19 @@ export function WalletNftList({
               )}
               {nft.blockedReason && <p className="wallet-nft-blocked">{nft.blockedReason}</p>}
             </div>
-            <button
-              className="wallet-nft-send"
-              type="button"
-              onClick={() => onTransfer(nft)}
-              disabled={nft.blockedReason !== null}
-            >
-              <ArrowUpRight size={14} aria-hidden="true" />
-              Send
-            </button>
-          </article>
-        );
-      })}
+            <NftArtwork nft={nft} chainId={chainId} />
+          </div>
+          <button
+            className="wallet-nft-send"
+            type="button"
+            onClick={() => onTransfer(nft)}
+            disabled={nft.blockedReason !== null}
+          >
+            <ArrowUpRight size={14} aria-hidden="true" />
+            Send
+          </button>
+        </article>
+      ))}
     </div>
   );
 }

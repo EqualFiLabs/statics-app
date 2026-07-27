@@ -10,7 +10,9 @@ import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { loadLiquidityCatalog } from "@/lib/liquidity/liquidity";
 import { loadPositionCatalog } from "@/lib/positions/positions";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { collectWalletNfts, type WalletNft } from "@/lib/wallet/nfts";
+import { collectWalletNfts, describeCollectionNfts, type WalletNft } from "@/lib/wallet/nfts";
+import { readCollectionHoldings } from "@/lib/wallet/nft-contracts";
+import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -26,7 +28,15 @@ const deploymentState = readClientDollarDeployment();
  * balances are showing, so the reads are addressed to the deployment's chain
  * regardless of the selector at the top of the page.
  */
-export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) => void }) {
+export function WalletNftPanel({
+  onTransfer,
+  fundingChainId,
+  onAddCollection,
+}: {
+  onTransfer: (nft: WalletNft) => void;
+  fundingChainId: number;
+  onAddCollection: () => void;
+}) {
   const wallet = useWalletState();
   const publicClient = usePublicClient(
     deploymentState.status === "configured"
@@ -36,9 +46,10 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
 
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
+  const { collections, removeCollection } = useWalletNftCollections(fundingChainId);
 
   const catalog = useQuery({
-    queryKey: ["wallet-nfts", walletAddress],
+    queryKey: ["wallet-nfts", walletAddress, collections.map((c) => c.address).join(",")],
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -66,6 +77,17 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
       // Positions are the load-bearing half. Only their failure is fatal.
       if (positions.status === "rejected") throw positions.reason;
 
+      // Added collections are read independently of the Statics catalogs, so a
+      // collection that misbehaves cannot take the positions down with it.
+      const collectionResults = await Promise.allSettled(
+        collections.map((collection) =>
+          readCollectionHoldings(publicClient, collection, walletAddress)
+        )
+      );
+      const collectionNfts = collectionResults.flatMap((result) =>
+        result.status === "fulfilled" ? describeCollectionNfts(result.value) : []
+      );
+
       return {
         nfts: collectWalletNfts({
           positions: positions.value.positions,
@@ -73,7 +95,7 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
             liquidity.status === "fulfilled" ? (liquidity.value?.positions ?? []) : [],
           deployment,
           wallet: walletAddress,
-        }),
+        }).concat(collectionNfts),
         liquidityUnavailable: liquidity.status === "rejected",
       };
     },
@@ -88,30 +110,64 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
     hasData: Boolean(catalog.data),
   });
 
+  const header = (
+    <div className="wallet-nft-heading">
+      <div className="wallet-nft-collections">
+        {collections.map((collection) => (
+          <span key={collection.address} className="wallet-nft-chip">
+            {collection.symbol}
+            <button
+              type="button"
+              aria-label={`Remove ${collection.name}`}
+              onClick={() => removeCollection(collection.address)}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <button type="button" className="wallet-nft-add" onClick={onAddCollection}>
+        Add collection
+      </button>
+    </div>
+  );
+
   if (!catalog.data || !isSurfaceReady(state)) {
     return (
-      <SurfaceEmptyState
-        state={state}
-        subject="NFTs"
-        onRetry={() => void catalog.refetch()}
-        empty={{
-          title: "No NFTs yet",
-          description:
-            "Positions and liquidity positions appear here. Buy a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
-          action: { label: "Browse baskets", href: "/app/baskets" },
-        }}
-      />
+      <>
+        {header}
+        <SurfaceEmptyState
+          state={state}
+          subject="NFTs"
+          onRetry={() => void catalog.refetch()}
+          empty={{
+            title: "No NFTs yet",
+            description:
+              "Positions and liquidity positions appear here. Buy a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
+            action: { label: "Browse baskets", href: "/app/baskets" },
+          }}
+        />
+      </>
     );
   }
 
   return (
     <>
+      {header}
       {catalog.data.liquidityUnavailable && (
         <p className="dollar-warning" role="status">
           Liquidity positions could not be read on this network, so only positions are listed.
         </p>
       )}
-      <WalletNftList nfts={catalog.data.nfts} onTransfer={onTransfer} />
+      <WalletNftList
+        nfts={catalog.data.nfts}
+        chainId={
+          deploymentState.status === "configured"
+            ? deploymentState.deployment.chainId
+            : fundingChainId
+        }
+        onTransfer={onTransfer}
+      />
     </>
   );
 }
