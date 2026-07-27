@@ -22,6 +22,7 @@ import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
 import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
 import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { readNftCollection } from "@/lib/wallet/nft-contracts";
+import { loadRiskShareBalances, type RiskShareBalance } from "@/lib/wallet/risk-shares";
 import {
   erc721TransferAbi,
   validateRecipient,
@@ -98,6 +99,7 @@ export function WalletPage() {
   const [nativeBalance, setNativeBalance] = useState<AssetBalance>(null);
   const [tokenBalances, setTokenBalances] = useState<Record<string, AssetBalance>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [riskShares, setRiskShares] = useState<readonly RiskShareBalance[]>([]);
   const refreshId = useRef(0);
   const tokenAddresses = useMemo(() => tokens.map((token) => token.address).join(","), [tokens]);
 
@@ -126,6 +128,23 @@ export function WalletPage() {
       ]);
       if (currentRefresh !== refreshId.current) return;
       if (nativeResult.status === "fulfilled") setNativeBalance(nativeResult.value);
+
+      // Risk shares only exist on the Statics chain, so they are read only
+      // while that chain is the one being viewed. Listing a Statics balance
+      // under a Base heading would misstate where the money is.
+      if (
+        deploymentState.status === "configured" &&
+        deploymentState.deployment.chainId === wallet.fundingChainId
+      ) {
+        const shares = await loadRiskShareBalances(
+          publicClient,
+          deploymentState.deployment,
+          account
+        ).catch(() => []);
+        if (currentRefresh === refreshId.current) setRiskShares(shares);
+      } else {
+        setRiskShares([]);
+      }
       setTokenBalances((current) => {
         const next = { ...current };
         tokenResults.forEach((result, index) => {
@@ -169,6 +188,18 @@ export function WalletPage() {
       kind: "erc20" as const,
       ...token,
       balance: tokenBalances[token.address.toLowerCase()] ?? null,
+    })),
+    ...riskShares.map((share) => ({
+      id: `${share.address}:${share.seriesId}`,
+      kind: "erc1155" as const,
+      address: share.address,
+      symbol: share.symbol,
+      name: share.name,
+      decimals: share.decimals,
+      balance: share.balance,
+      isDefault: true,
+      // Risk shares carry no logo, and the token row expects the key to exist.
+      logoURI: undefined as string | undefined,
     })),
   ];
 
@@ -308,7 +339,13 @@ export function WalletPage() {
                           Remove
                         </button>
                       ) : (
-                        <span>{asset.kind === "native" ? "Native" : "Token"}</span>
+                        <span>
+                          {asset.kind === "native"
+                            ? "Native"
+                            : asset.kind === "erc1155"
+                              ? "Risk shares"
+                              : "Token"}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -383,7 +420,14 @@ export function WalletPage() {
         />
       )}
       {modal === "send" && (
-        <SendDialog assets={assets} onConfirmed={refreshBalances} onClose={() => setModal(null)} />
+        <SendDialog
+          // Risk shares are ERC-1155 and need safeTransferFrom with an id and
+          // an amount, which this dialog does not do. Offering them here would
+          // produce a transfer that cannot succeed.
+          assets={assets.filter((asset) => asset.kind !== "erc1155")}
+          onConfirmed={refreshBalances}
+          onClose={() => setModal(null)}
+        />
       )}
     </>
   );
@@ -930,6 +974,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
   const publicClient = usePublicClient({ chainId });
   const { addCollection } = useWalletNftCollections(chainId);
   const [address, setAddress] = useState("");
+  const [tokenId, setTokenId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -941,7 +986,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
     setPending(true);
     setError(null);
     try {
-      addCollection(await readNftCollection(publicClient, address.trim()));
+      addCollection(await readNftCollection(publicClient, address.trim(), tokenId.trim()));
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That collection could not be added.");
@@ -955,7 +1000,8 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
       <p className="wallet-add-nft-note">
         Paste an NFT contract address. Statics positions and liquidity positions are listed
         automatically; anything else has to be added, because no network call can list every NFT a
-        wallet holds.
+        wallet holds. ERC-1155 collections also need a token id, since balances there are held per
+        id and the standard cannot say which ids you own.
       </p>
       <label className="basket-field">
         <span>Contract address</span>
@@ -967,6 +1013,19 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
           }}
           placeholder="0x…"
           spellCheck={false}
+          disabled={pending}
+        />
+      </label>
+      <label className="basket-field">
+        <span>Token id (ERC-1155 only)</span>
+        <input
+          value={tokenId}
+          onChange={(event) => {
+            setTokenId(event.target.value);
+            setError(null);
+          }}
+          placeholder="Leave blank for ERC-721"
+          inputMode="numeric"
           disabled={pending}
         />
       </label>
