@@ -782,15 +782,6 @@
   line-height: var(--leading-normal);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dapp-shell *,
-  .dapp-shell *::before,
-  .dapp-shell *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-  }
-}
-
 /* ===================================================================
  * PAGE STYLES — per-route rules, swept onto the tokens above.
  *
@@ -1560,41 +1551,6 @@
   font-weight: 600;
 }
 
-@media (max-width: 720px) {
-  .wallet-quick-actions,
-  .portal-quote-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .wallet-quick-actions button {
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
-  }
-
-  .wallet-network-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .wallet-section-heading {
-    align-items: start;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .wallet-asset-actions {
-    flex-wrap: wrap;
-  }
-
-  .portal-bridge-networks {
-    grid-template-columns: 1fr;
-  }
-
-  .portal-mode-tabs {
-    grid-template-columns: 1fr;
-  }
-}
-
 .dollar-unavailable,
 .dollar-overview-card,
 .dollar-loading,
@@ -2090,266 +2046,6 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 900px) {
-  .dapp-header {
-    grid-template-columns: 1fr auto;
-  }
-
-  /* The header drops to two columns here, so the indicator would have nowhere
-   * to sit. Losing it costs nothing: the wrong-network bar is in the content
-   * column and stays visible at every width. */
-  .dapp-network {
-    display: none;
-  }
-
-  .dapp-layout {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .dapp-sidebar {
-    position: relative;
-    z-index: 40;
-    min-width: 0;
-    overflow: visible;
-    padding: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
-  }
-
-  .dapp-nav-panel {
-    position: fixed;
-    z-index: 50;
-    inset: 72px 0 0;
-    display: none;
-    padding: 1rem clamp(1rem, 3vw, 2.5rem) var(--tabbar-clearance);
-    overflow-y: auto;
-    background: var(--app-bg);
-  }
-
-  .dapp-sidebar.is-open .dapp-nav-panel {
-    display: flex;
-  }
-
-  .dapp-nav-panel-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    padding: 0.5rem 0 1rem;
-    border-bottom: 1px solid var(--app-border);
-  }
-
-  .dapp-nav-panel-heading > div {
-    display: grid;
-    gap: 0.125rem;
-  }
-
-  .dapp-nav-panel-heading span {
-    color: var(--app-text-muted);
-    font-size: var(--text-caption);
-    font-weight: 600;
-  }
-
-  .dapp-nav-panel-heading strong {
-    color: var(--app-text);
-    font-size: var(--text-lg);
-    font-weight: 650;
-    letter-spacing: -0.01em;
-  }
-
-  .dapp-nav-panel-heading button {
-    min-height: var(--control-height-sm);
-    padding: 0 0.875rem;
-    border: 1px solid var(--app-border-strong);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--app-text-secondary);
-    font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .dapp-sidebar nav {
-    display: grid;
-    gap: 0.125rem;
-    overflow: visible;
-  }
-
-  .dapp-nav-group:first-child {
-    margin-top: 1rem;
-  }
-
-  /* The mobile header cannot hold these, and this panel is a full-height
-   * sheet, so the sidebar is where they belong at this width. */
-  .dapp-nav-item.is-secondary {
-    display: flex;
-  }
-
-  .dapp-nav-group.is-detail-only {
-    display: block;
-  }
-
-  /* The panel already lists these at this width, and the mobile header has to
-   * hold the brand, the network state and the wallet control. */
-  .dapp-header-link {
-    display: none;
-  }
-
-  .dapp-tabbar {
-    position: fixed;
-    z-index: 55;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    border-top: 1px solid var(--app-border);
-    background: color-mix(in srgb, var(--app-bg) 94%, transparent);
-    backdrop-filter: blur(12px);
-    /* Clears the iOS home indicator without adding space on other devices. */
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* The bar is fixed, so content needs room or its last row sits underneath.
-   * Held in a variable because the narrow breakpoint below sets `padding` as a
-   * shorthand, which silently reset a bare padding-bottom declared here. */
-  .dapp-shell {
-    --tabbar-clearance: calc(4.5rem + env(safe-area-inset-bottom));
-  }
-
-  .dapp-content {
-    padding-bottom: var(--tabbar-clearance);
-  }
-
-  .dapp-nav-item {
-    min-height: 48px;
-    padding: 0 1rem;
-    font-size: var(--text-base);
-  }
-
-  .dapp-sidebar-note {
-    margin-top: 1.5rem;
-  }
-
-  .dapp-mobile-site-link {
-    display: inline-flex;
-    min-height: var(--control-height);
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    margin-top: 0.75rem;
-    padding: 0 1rem;
-    border: 1px solid var(--app-border-strong);
-    border-radius: var(--radius-md);
-    color: var(--app-text);
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
-  .dapp-next-phase {
-    grid-template-columns: 1fr;
-  }
-
-  .dapp-wallet-details {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .dollar-overview-card,
-  .dollar-workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .dollar-overview-health {
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .dollar-metrics {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-  .dapp-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.65rem;
-    min-height: 64px;
-    padding: 0.5rem 1rem;
-  }
-
-  .dapp-brand img {
-    width: min(132px, 100%);
-  }
-
-  .dapp-return {
-    display: none;
-  }
-
-  .dapp-header-actions,
-  .dapp-wallet-actions {
-    gap: 0.4rem;
-  }
-
-  .dapp-wallet-link {
-    display: none;
-  }
-
-  .dapp-wallet-button {
-    max-width: 168px;
-    padding: 0 0.75rem;
-    font-size: var(--text-sm);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-    line-height: var(--control-height-sm);
-  }
-
-  .dapp-nav-panel {
-    inset: 64px 0 0;
-  }
-
-  .dapp-content {
-    padding: 1.5rem 1rem var(--tabbar-clearance);
-  }
-
-  .dapp-intro h1 {
-    font-size: var(--text-2xl);
-  }
-
-  .dapp-intro > p:last-child {
-    font-size: var(--text-base);
-    line-height: 1.6;
-  }
-
-  .dapp-wallet-details {
-    grid-template-columns: 1fr;
-  }
-
-  .dapp-settings-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .dollar-metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-banner {
-    gap: 0.65rem;
-    padding: 0.85rem;
-  }
-
-  .activity-panel li {
-    grid-template-columns: 1fr;
-  }
-
-  .activity-panel li > div:nth-child(2) {
-    text-align: left;
-  }
-}
-
 .protocol-address {
   display: flex;
   min-width: 0;
@@ -2546,11 +2242,6 @@
 /* Two across only while the page itself has two columns. Expressed as a
  * min-width because the max-width blocks in this file appear *before* the base
  * rules, so a base rule here would override them at every width. */
-@media (min-width: 901px) {
-  .rewards-page .position-panel.is-wide .reward-position-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 
 .position-panel .dollar-tabs {
   margin-top: 1.25rem;
@@ -2851,65 +2542,6 @@
   font-size: var(--text-caption);
   text-transform: uppercase;
   font-weight: 600;
-}
-
-@media (max-width: 900px) {
-  .preview-overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .position-grid,
-  .position-detail-grid,
-  .rewards-page {
-    grid-template-columns: 1fr;
-  }
-
-  .reward-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .preview-banner {
-    grid-template-columns: 1fr;
-  }
-
-  .position-section-heading,
-  .position-hero,
-  .position-close,
-  .custom-reward {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .position-card dl,
-  .position-hero dl,
-  .position-metrics,
-  .reward-grid,
-  .reward-selector {
-    grid-template-columns: 1fr;
-  }
-
-  .position-section-heading > span {
-    text-align: left;
-  }
-
-  .position-section-heading > .dollar-submit {
-    width: 100%;
-  }
-
-  .preview-four-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dapp-shell *,
-  .dapp-shell *::before,
-  .dapp-shell *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
 }
 
 .basket-catalog,
@@ -3259,44 +2891,6 @@
 
 .basket-parameters dl {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-@media (max-width: 900px) {
-  .basket-grid,
-  .basket-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* Stacked, the action comes before the reference material it acts on. */
-  .basket-detail-grid .basket-action-card {
-    order: -1;
-  }
-
-  .basket-parameters dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .basket-section-heading,
-  .basket-hero {
-    display: grid;
-  }
-
-  .basket-card dl,
-  .basket-hero dl,
-  .basket-parameters dl {
-    grid-template-columns: 1fr;
-  }
-
-  .basket-composition li {
-    grid-template-columns: 24px minmax(0, 1fr);
-  }
-
-  .basket-composition li > div:last-child {
-    grid-column: 2;
-    text-align: left;
-  }
 }
 
 .basket-section-actions {
@@ -3903,6 +3497,447 @@
   font-size: var(--text-caption);
 }
 
+/* Hairline-divider containers clip their own corners, so their cells must
+ * stay square -- a rounded cell lets the divider colour bleed through as a
+ * notch. Class is doubled to outrank the per-page cell rules. */
+.dapp-wallet-details.dapp-wallet-details > *,
+.portal-quote-grid.portal-quote-grid > *,
+.dollar-metrics.dollar-metrics > *,
+.dollar-tabs.dollar-tabs > *,
+.dollar-asset-choice.dollar-asset-choice > *,
+.activity-panel.activity-panel ol > *,
+.position-card.position-card dl > *,
+.position-hero.position-hero dl > *,
+.position-metrics.position-metrics > *,
+.basket-card.basket-card dl > *,
+.basket-hero.basket-hero dl > *,
+.basket-parameters.basket-parameters dl > *,
+.remaining-hero.remaining-hero dl > *,
+.remaining-quote.remaining-quote > *,
+.creation-steps.creation-steps > *,
+.pool-grid.pool-grid dl > *,
+.fee-allocation.fee-allocation dl > * {
+  border-radius: 0;
+}
+
+/* ===================================================================
+ * RESPONSIVE OVERRIDES
+ *
+ * Every @media block lives here, after all base rules, and in its
+ * original order. They used to be interleaved, which meant a base rule
+ * written below one silently beat it at every width -- equal specificity,
+ * later wins. That produced a tab bar overlapping content and a card grid
+ * that stayed two-across on a phone, both of which looked correct in the
+ * diff. Keep new breakpoints in this section.
+ * =================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .dapp-shell *,
+  .dapp-shell *::before,
+  .dapp-shell *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .wallet-quick-actions,
+  .portal-quote-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wallet-quick-actions button {
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .wallet-network-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wallet-section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .wallet-asset-actions {
+    flex-wrap: wrap;
+  }
+
+  .portal-bridge-networks {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-mode-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .dapp-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  /* The header drops to two columns here, so the indicator would have nowhere
+   * to sit. Losing it costs nothing: the wrong-network bar is in the content
+   * column and stays visible at every width. */
+  .dapp-network {
+    display: none;
+  }
+
+  .dapp-layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .dapp-sidebar {
+    position: relative;
+    z-index: 40;
+    min-width: 0;
+    overflow: visible;
+    padding: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .dapp-nav-panel {
+    position: fixed;
+    z-index: 50;
+    inset: 72px 0 0;
+    display: none;
+    padding: 1rem clamp(1rem, 3vw, 2.5rem) var(--tabbar-clearance);
+    overflow-y: auto;
+    background: var(--app-bg);
+  }
+
+  .dapp-sidebar.is-open .dapp-nav-panel {
+    display: flex;
+  }
+
+  .dapp-nav-panel-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.5rem 0 1rem;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .dapp-nav-panel-heading > div {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .dapp-nav-panel-heading span {
+    color: var(--app-text-muted);
+    font-size: var(--text-caption);
+    font-weight: 600;
+  }
+
+  .dapp-nav-panel-heading strong {
+    color: var(--app-text);
+    font-size: var(--text-lg);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .dapp-nav-panel-heading button {
+    min-height: var(--control-height-sm);
+    padding: 0 0.875rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--app-text-secondary);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .dapp-sidebar nav {
+    display: grid;
+    gap: 0.125rem;
+    overflow: visible;
+  }
+
+  .dapp-nav-group:first-child {
+    margin-top: 1rem;
+  }
+
+  /* The mobile header cannot hold these, and this panel is a full-height
+   * sheet, so the sidebar is where they belong at this width. */
+  .dapp-nav-item.is-secondary {
+    display: flex;
+  }
+
+  .dapp-nav-group.is-detail-only {
+    display: block;
+  }
+
+  /* The panel already lists these at this width, and the mobile header has to
+   * hold the brand, the network state and the wallet control. */
+  .dapp-header-link {
+    display: none;
+  }
+
+  .dapp-tabbar {
+    position: fixed;
+    z-index: 55;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    border-top: 1px solid var(--app-border);
+    background: color-mix(in srgb, var(--app-bg) 94%, transparent);
+    backdrop-filter: blur(12px);
+    /* Clears the iOS home indicator without adding space on other devices. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* The bar is fixed, so content needs room or its last row sits underneath.
+   * Held in a variable because the narrow breakpoint below sets `padding` as a
+   * shorthand, which silently reset a bare padding-bottom declared here. */
+  .dapp-shell {
+    --tabbar-clearance: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .dapp-content {
+    padding-bottom: var(--tabbar-clearance);
+  }
+
+  .dapp-nav-item {
+    min-height: 48px;
+    padding: 0 1rem;
+    font-size: var(--text-base);
+  }
+
+  .dapp-sidebar-note {
+    margin-top: 1.5rem;
+  }
+
+  .dapp-mobile-site-link {
+    display: inline-flex;
+    min-height: var(--control-height);
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding: 0 1rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: var(--radius-md);
+    color: var(--app-text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .dapp-next-phase {
+    grid-template-columns: 1fr;
+  }
+
+  .dapp-wallet-details {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dollar-overview-card,
+  .dollar-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .dollar-overview-health {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .dollar-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .dapp-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    min-height: 64px;
+    padding: 0.5rem 1rem;
+  }
+
+  .dapp-brand img {
+    width: min(132px, 100%);
+  }
+
+  .dapp-return {
+    display: none;
+  }
+
+  .dapp-header-actions,
+  .dapp-wallet-actions {
+    gap: 0.4rem;
+  }
+
+  .dapp-wallet-link {
+    display: none;
+  }
+
+  .dapp-wallet-button {
+    max-width: 168px;
+    padding: 0 0.75rem;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: var(--control-height-sm);
+  }
+
+  .dapp-nav-panel {
+    inset: 64px 0 0;
+  }
+
+  .dapp-content {
+    padding: 1.5rem 1rem var(--tabbar-clearance);
+  }
+
+  .dapp-intro h1 {
+    font-size: var(--text-2xl);
+  }
+
+  .dapp-intro > p:last-child {
+    font-size: var(--text-base);
+    line-height: 1.6;
+  }
+
+  .dapp-wallet-details {
+    grid-template-columns: 1fr;
+  }
+
+  .dapp-settings-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dollar-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-banner {
+    gap: 0.65rem;
+    padding: 0.85rem;
+  }
+
+  .activity-panel li {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-panel li > div:nth-child(2) {
+    text-align: left;
+  }
+}
+
+@media (min-width: 901px) {
+  .rewards-page .position-panel.is-wide .reward-position-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .preview-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .position-grid,
+  .position-detail-grid,
+  .rewards-page {
+    grid-template-columns: 1fr;
+  }
+
+  .reward-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .preview-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .position-section-heading,
+  .position-hero,
+  .position-close,
+  .custom-reward {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .position-card dl,
+  .position-hero dl,
+  .position-metrics,
+  .reward-grid,
+  .reward-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .position-section-heading > span {
+    text-align: left;
+  }
+
+  .position-section-heading > .dollar-submit {
+    width: 100%;
+  }
+
+  .preview-four-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dapp-shell *,
+  .dapp-shell *::before,
+  .dapp-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .basket-grid,
+  .basket-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stacked, the action comes before the reference material it acts on. */
+  .basket-detail-grid .basket-action-card {
+    order: -1;
+  }
+
+  .basket-parameters dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .basket-section-heading,
+  .basket-hero {
+    display: grid;
+  }
+
+  .basket-card dl,
+  .basket-hero dl,
+  .basket-parameters dl {
+    grid-template-columns: 1fr;
+  }
+
+  .basket-composition li {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .basket-composition li > div:last-child {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
 @media (max-width: 1100px) {
   .remaining-hero {
     display: grid;
@@ -3996,27 +4031,4 @@
   .claim-selector label > small {
     grid-column: 2;
   }
-}
-
-/* Hairline-divider containers clip their own corners, so their cells must
- * stay square -- a rounded cell lets the divider colour bleed through as a
- * notch. Class is doubled to outrank the per-page cell rules. */
-.dapp-wallet-details.dapp-wallet-details > *,
-.portal-quote-grid.portal-quote-grid > *,
-.dollar-metrics.dollar-metrics > *,
-.dollar-tabs.dollar-tabs > *,
-.dollar-asset-choice.dollar-asset-choice > *,
-.activity-panel.activity-panel ol > *,
-.position-card.position-card dl > *,
-.position-hero.position-hero dl > *,
-.position-metrics.position-metrics > *,
-.basket-card.basket-card dl > *,
-.basket-hero.basket-hero dl > *,
-.basket-parameters.basket-parameters dl > *,
-.remaining-hero.remaining-hero dl > *,
-.remaining-quote.remaining-quote > *,
-.creation-steps.creation-steps > *,
-.pool-grid.pool-grid dl > *,
-.fee-allocation.fee-allocation dl > * {
-  border-radius: 0;
 }
