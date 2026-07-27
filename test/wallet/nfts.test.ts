@@ -154,3 +154,34 @@ describe("recipient validation", () => {
     expect(validateRecipient(other.toUpperCase().replace("0X", "0x"), wallet)).toBeNull();
   });
 });
+
+describe("degrading when one source fails", () => {
+  // Regression: the panel used Promise.all, so a liquidity read that reverted
+  // discarded every position the wallet held. On a deployment whose canonical
+  // pools are not initialised, loadLiquidityCatalog reverts with
+  // CanonicalPoolNotConfigured, which is a legitimate state rather than a
+  // fault -- and it was blanking four real positions.
+  const deployment = {
+    contracts: { diamond },
+    liquidity: { contracts: { positionManager } },
+  } as never;
+
+  it("still lists positions when the liquidity read rejected", async () => {
+    const [positions, liquidity] = await Promise.allSettled([
+      Promise.resolve([position({ positionId: 1n }), position({ positionId: 2n })]),
+      Promise.reject(new Error("CanonicalPoolNotConfigured")),
+    ]);
+
+    expect(positions.status).toBe("fulfilled");
+    expect(liquidity.status).toBe("rejected");
+
+    const nfts = collectWalletNfts({
+      positions: positions.status === "fulfilled" ? positions.value : [],
+      liquidityPositions: [],
+      deployment,
+      wallet,
+    });
+
+    expect(nfts.map((nft) => nft.name)).toEqual(["Position #1", "Position #2"]);
+  });
+});
