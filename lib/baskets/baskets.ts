@@ -321,7 +321,7 @@ export function deriveBasketActionAvailability(input: {
     return {
       kind: "blocked",
       label: `${input.mode === "mint" ? "Mint" : "Redeem"} unavailable`,
-      reason: "The current quote contains a zero-value constituent.",
+      reason: "The current quote contains a zero-value underlying.",
       executable: false,
     };
   }
@@ -333,14 +333,14 @@ export function deriveBasketActionAvailability(input: {
         return {
           kind: "blocked",
           label: "Mint unavailable",
-          reason: "This wallet does not have enough of every constituent.",
+          reason: "This wallet does not have enough of every underlying.",
           executable: false,
         };
       }
       if (constituent.allowance < maximum) {
         return {
           kind: "approve",
-          label: `Approve constituent ${index + 1}`,
+          label: `Approve underlying ${index + 1}`,
           reason: null,
           approvalIndex: index,
           executable: true,
@@ -359,11 +359,11 @@ export function deriveBasketActionAvailability(input: {
 const basketErrorMessages: Readonly<Record<string, string>> = {
   BasketNotFound: "This basket no longer exists.",
   InvalidShares: "Enter a valid BasketToken amount.",
-  MaximumInputExceeded: "A constituent input moved above your selected slippage limit.",
-  MinimumOutputNotMet: "A constituent output moved below your selected slippage limit.",
+  MaximumInputExceeded: "An underlying input moved above your selected slippage limit.",
+  MinimumOutputNotMet: "An underlying output moved below your selected slippage limit.",
   ActionPaused: "This basket operation is currently paused.",
   InsufficientVaultBalance: "The basket vault cannot satisfy the requested redemption.",
-  InsufficientTransferReceived: "A constituent transferred less than the protocol required.",
+  InsufficientTransferReceived: "An underlying transferred less than the protocol required.",
   BasketNotActive: "This basket cannot currently increase exposure.",
 };
 
@@ -423,7 +423,7 @@ export function validateBasketCollateralSimulation(
     }
   }
   if (amounts.length !== expectedLegs || amounts.some((amount) => amount <= 0n)) {
-    throw new Error(`The ${functionName} simulation returned invalid constituent amounts.`);
+    throw new Error(`The ${functionName} simulation returned invalid underlying amounts.`);
   }
   return amounts;
 }
@@ -436,7 +436,7 @@ export function validateBasketSimulation(
   if (!result) throw new Error(`The basket ${functionName} simulation returned no result.`);
   const amounts = decodeFunctionResult({ abi: staticsAbi, functionName, data: result });
   if (amounts.length !== expectedLegs || amounts.some((amount) => amount <= 0n)) {
-    throw new Error(`The basket ${functionName} simulation returned invalid constituent amounts.`);
+    throw new Error(`The basket ${functionName} simulation returned invalid underlying amounts.`);
   }
   return amounts;
 }

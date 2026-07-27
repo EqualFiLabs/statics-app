@@ -26,6 +26,7 @@ const implementationVocabulary = [
   "atomic",
   "wallet-scoped",
   "onchain",
+  "constituent",
 ];
 
 const routes: readonly string[] = [

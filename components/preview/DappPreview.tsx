@@ -197,7 +197,7 @@ export function BasketListPreview() {
               <h3>{unavailable}</h3>
               <p>{unavailable}</p>
               <dl>
-                {["Constituents", "Total supply", "Your balance"].map((label) => (
+                {["Underlyings", "Total supply", "Your balance"].map((label) => (
                   <div key={label}>
                     <dt>{label}</dt>
                     <dd>{unavailable}</dd>

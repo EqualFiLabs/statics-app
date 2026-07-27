@@ -361,7 +361,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
         const constituent = basket.constituents[approvalIndex];
         const maximum = maximums[approvalIndex];
         if (!constituent || maximum === undefined) {
-          throw new Error("The constituent quote is incomplete.");
+          throw new Error("The underlying quote is incomplete.");
         }
         if (constituent.walletBalance < maximum) {
           throw new Error(`The wallet does not hold enough ${constituent.token.symbol}.`);
@@ -689,7 +689,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                   ? "Approve or mint into collateral"
                   : collateralMode === "withdraw"
                     ? "Withdraw BasketToken"
-                    : "Redeem collateral to constituents"}
+                    : "Redeem collateral to underlyings"}
           </button>
         </section>
 

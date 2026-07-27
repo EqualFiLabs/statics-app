@@ -331,7 +331,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
                 constituent.allowance < (bounds[index] ?? 0n)
             )
           ) {
-            throw new Error("The fresh quote requires another bounded constituent approval.");
+            throw new Error("The fresh quote requires another bounded underlying approval.");
           }
         }
         // A minted basket held in the wallet earns nothing: rewards accrue
@@ -455,7 +455,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
           <div className="basket-section-heading">
             <div>
               <p className="dapp-section-label">Static composition</p>
-              <h3 id="basket-composition-title">{basket.constituents.length} constituents</h3>
+              <h3 id="basket-composition-title">{basket.constituents.length} underlyings</h3>
             </div>
           </div>
           <ol>
@@ -483,7 +483,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
             ))}
           </ol>
           <p className="dollar-warning">
-            Constituents may implement transfer fees, rebasing, unusual approvals, or other
+            Underlyings may implement transfer fees, rebasing, unusual approvals, or other
             nonstandard behavior. Review every token address. Holding {basket.symbol} does not earn
             basket-specific fees.
           </p>

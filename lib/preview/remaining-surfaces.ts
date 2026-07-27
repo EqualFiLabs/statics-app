@@ -235,15 +235,15 @@ export function validatePreviewBasketDraft(draft: PreviewBasketDraft): readonly 
   const issues: string[] = [];
   if (!draft.name.trim() || !draft.symbol.trim()) issues.push("Name and symbol are required.");
   if (draft.assets.length < 1 || draft.assets.length > 16) {
-    issues.push("A basket must contain between 1 and 16 constituents.");
+    issues.push("A basket must contain between 1 and 16 underlyings.");
   }
   if (
     new Set(draft.assets.map((asset) => asset.address.toLowerCase())).size !== draft.assets.length
   ) {
-    issues.push("Constituent addresses must be unique.");
+    issues.push("Underlying addresses must be unique.");
   }
   if (draft.assets.some((asset) => !asset.amount || Number(asset.amount) <= 0)) {
-    issues.push("Every constituent requires a positive bundle amount.");
+    issues.push("Every underlying requires a positive bundle amount.");
   }
   if (draft.loanDurationDays <= 0) issues.push("Loan duration must be positive.");
   if (draft.ltvBps < 0 || draft.ltvBps > 9_500) issues.push("LTV cannot exceed 95%.");
