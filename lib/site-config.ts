@@ -72,21 +72,6 @@ export type AppNavigationItem = Readonly<{
   enabled: boolean;
   href: string;
   /**
-   * Where this destination belongs on desktop.
-   *
-   *   primary -- a place you go to do something. Earns a sidebar slot, and a
-   *              tab if we get a tab bar, so this list has to stay countable.
-   *   header  -- account plumbing. Real destinations, but not things you set
-   *              out to visit, so they sit beside the wallet chip.
-   *   detail  -- reached from the thing it concerns rather than from a menu.
-   *              Positions is the container the rest sit inside; a loan is an
-   *              action on a holding. Neither is somewhere you navigate to.
-   *
-   * The mobile panel lists every item regardless: it is a full-height sheet
-   * with room to spare, and the mobile header has none.
-   */
-  placement?: "primary" | "header" | "detail";
-  /**
    * Short label for the mobile tab bar, and the opt-in to appearing there.
    *
    * A tab bar is hard-limited by thumb width -- five is the practical maximum
@@ -150,8 +135,8 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     label: "Account",
     items: [
       { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
-      { label: "Activity", enabled: true, href: "/app/activity", placement: "header" },
-      { label: "Settings", enabled: true, href: "/app/settings", placement: "header" },
+      { label: "Activity", enabled: true, href: "/app/activity" },
+      { label: "Settings", enabled: true, href: "/app/settings" },
     ],
   },
 ];
@@ -159,16 +144,6 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
 /** Every navigable item, flattened, for callers that only need the routes. */
 export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.flatMap(
   (group) => group.items
-);
-
-/** Items shown beside the wallet chip on desktop. */
-export const appHeaderNavigation: readonly AppNavigationItem[] = appNavigation.filter(
-  (item) => item.placement === "header"
-);
-
-/** Destinations that earn a desktop sidebar slot, and a tab bar slot later. */
-export const appPrimaryNavigation: readonly AppNavigationItem[] = appNavigation.filter(
-  (item) => (item.placement ?? "primary") === "primary"
 );
 
 /** The mobile tab bar, in order. Capped at five by thumb width. */
