@@ -51,18 +51,31 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
         throw new Error("No verified Statics deployment is configured.");
       }
       const deployment = deploymentState.deployment;
-      const [positions, liquidity] = await Promise.all([
+
+      // Settled rather than all: the two sources are independent, and a
+      // deployment whose canonical pools are not initialised makes the
+      // liquidity read revert. Failing the whole query for that discarded
+      // every position the wallet actually held.
+      const [positions, liquidity] = await Promise.allSettled([
         loadPositionCatalog(publicClient, deployment, walletAddress),
         deployment.liquidity
           ? loadLiquidityCatalog(publicClient, deployment, walletAddress)
           : Promise.resolve(null),
       ]);
-      return collectWalletNfts({
-        positions: positions.positions,
-        liquidityPositions: liquidity?.positions ?? [],
-        deployment,
-        wallet: walletAddress,
-      });
+
+      // Positions are the load-bearing half. Only their failure is fatal.
+      if (positions.status === "rejected") throw positions.reason;
+
+      return {
+        nfts: collectWalletNfts({
+          positions: positions.value.positions,
+          liquidityPositions:
+            liquidity.status === "fulfilled" ? (liquidity.value?.positions ?? []) : [],
+          deployment,
+          wallet: walletAddress,
+        }),
+        liquidityUnavailable: liquidity.status === "rejected",
+      };
     },
   });
 
@@ -71,7 +84,7 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
     isTargetChain: wallet.isTargetChain,
     isLoading: catalog.isPending,
     isError: catalog.isError,
-    isEmpty: (catalog.data?.length ?? 0) === 0,
+    isEmpty: (catalog.data?.nfts.length ?? 0) === 0,
     hasData: Boolean(catalog.data),
   });
 
@@ -91,5 +104,14 @@ export function WalletNftPanel({ onTransfer }: { onTransfer: (nft: WalletNft) =>
     );
   }
 
-  return <WalletNftList nfts={catalog.data} onTransfer={onTransfer} />;
+  return (
+    <>
+      {catalog.data.liquidityUnavailable && (
+        <p className="dollar-warning" role="status">
+          Liquidity positions could not be read on this network, so only positions are listed.
+        </p>
+      )}
+      <WalletNftList nfts={catalog.data.nfts} onTransfer={onTransfer} />
+    </>
+  );
 }
