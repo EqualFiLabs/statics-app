@@ -20,7 +20,7 @@ import {
   zora,
 } from "wagmi/chains";
 
-import { robinhoodMainnet } from "@/lib/wallet-config";
+import { anvil, robinhoodMainnet, readWalletEnvironment } from "@/lib/wallet-config";
 
 export type FundingNetwork = Readonly<{
   chain: Chain;
@@ -29,7 +29,25 @@ export type FundingNetwork = Readonly<{
   supportsUniswap: boolean;
 }>;
 
+/**
+ * Local Anvil, offered only in development.
+ *
+ * Without it the wallet cannot be pointed at the chain the local stack runs on,
+ * so balances, NFTs and transfers are untestable against the deployment that
+ * actually has fixtures in it. Gated because a public build offering a
+ * localhost RPC would be nonsense.
+ *
+ * Uniswap support is false: the routing APIs the swap panel calls are public
+ * services that know nothing about a local chain, so offering swaps here would
+ * fail in a way that looks like a bug in the app.
+ */
+const developmentFundingNetworks: readonly FundingNetwork[] =
+  readWalletEnvironment().appEnvironment === "development"
+    ? [{ key: "anvil", label: "Local Anvil", chain: anvil, supportsUniswap: false }]
+    : [];
+
 export const fundingNetworks: readonly FundingNetwork[] = [
+  ...developmentFundingNetworks,
   { key: "ethereum", label: "Ethereum", chain: mainnet, supportsUniswap: true },
   { key: "optimism", label: "OP Mainnet", chain: optimism, supportsUniswap: true },
   { key: "bnb", label: "BNB Smart Chain", chain: bsc, supportsUniswap: true },
