@@ -29,14 +29,34 @@ export const erc721CollectionAbi = parseAbi([
   "function supportsInterface(bytes4 interfaceId) view returns (bool)",
 ]);
 
+/**
+ * ERC-1155 balances are per token id, and the standard offers no way to list
+ * the ids an address holds -- not even the partial enumeration ERC-721 has. So
+ * a 1155 has to be added with the id, and this reads only that.
+ */
+export const erc1155CollectionAbi = parseAbi([
+  "function balanceOf(address account, uint256 id) view returns (uint256)",
+  "function uri(uint256 id) view returns (string)",
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+]);
+
 /** ERC-165 identifiers. Enumerable is optional and most collections omit it. */
 const ERC721_INTERFACE_ID = "0x80ac58cd";
 const ERC721_ENUMERABLE_INTERFACE_ID = "0x780e9d63";
+const ERC1155_INTERFACE_ID = "0xd9b67a26";
+
+export type NftStandard = "erc721" | "erc1155";
 
 export type NftCollection = Readonly<{
   address: Address;
   name: string;
   symbol: string;
+  standard: NftStandard;
+  /**
+   * Required for ERC-1155 and absent for ERC-721. A 1155 balance is meaningless
+   * without an id, and no call exists to discover which ids an address holds.
+   */
+  tokenId?: string;
 }>;
 
 export type NftCollectionHoldings = Readonly<{
@@ -97,7 +117,8 @@ export function subscribeNftCollections(listener: () => void): () => void {
  */
 export async function readNftCollection(
   publicClient: PublicClient,
-  address: string
+  address: string,
+  tokenId?: string
 ): Promise<NftCollection> {
   if (!isAddress(address)) throw new Error("That is not a valid contract address.");
   const contract = getAddress(address);
@@ -105,18 +126,41 @@ export async function readNftCollection(
   const code = await publicClient.getCode({ address: contract });
   if (!code || code === "0x") throw new Error("No contract is deployed at that address.");
 
-  let isErc721 = false;
-  try {
-    isErc721 = await publicClient.readContract({
-      address: contract,
-      abi: erc721CollectionAbi,
-      functionName: "supportsInterface",
-      args: [ERC721_INTERFACE_ID],
-    });
-  } catch {
-    throw new Error("That contract does not answer as an NFT collection.");
+  const supports = async (interfaceId: `0x${string}`) =>
+    publicClient
+      .readContract({
+        address: contract,
+        abi: erc721CollectionAbi,
+        functionName: "supportsInterface",
+        args: [interfaceId],
+      })
+      .catch(() => false);
+
+  const [isErc721, isErc1155] = await Promise.all([
+    supports(ERC721_INTERFACE_ID),
+    supports(ERC1155_INTERFACE_ID),
+  ]);
+
+  if (!isErc721 && !isErc1155) {
+    throw new Error("That contract is not an ERC-721 or ERC-1155 collection.");
   }
-  if (!isErc721) throw new Error("That contract is not an ERC-721 collection.");
+
+  if (isErc1155 && !isErc721) {
+    // Without an id there is nothing to read: balanceOf takes one, and the
+    // standard cannot tell us which ids an address holds.
+    if (!tokenId || !/^\d+$/.test(tokenId.trim())) {
+      throw new Error("This is an ERC-1155. Enter the token id you hold as well.");
+    }
+    const [name, symbol] = await Promise.all([
+      publicClient
+        .readContract({ address: contract, abi: erc721CollectionAbi, functionName: "name" })
+        .catch(() => "Unnamed collection"),
+      publicClient
+        .readContract({ address: contract, abi: erc721CollectionAbi, functionName: "symbol" })
+        .catch(() => "NFT"),
+    ]);
+    return { address: contract, name, symbol, standard: "erc1155", tokenId: tokenId.trim() };
+  }
 
   const [name, symbol] = await Promise.all([
     publicClient
@@ -127,7 +171,7 @@ export async function readNftCollection(
       .catch(() => "NFT"),
   ]);
 
-  return { address: contract, name, symbol };
+  return { address: contract, name, symbol, standard: "erc721" };
 }
 
 /**
@@ -142,6 +186,18 @@ export async function readCollectionHoldings(
   collection: NftCollection,
   owner: Address
 ): Promise<NftCollectionHoldings> {
+  if (collection.standard === "erc1155") {
+    const id = BigInt(collection.tokenId ?? "0");
+    const balance = await publicClient.readContract({
+      address: collection.address,
+      abi: erc1155CollectionAbi,
+      functionName: "balanceOf",
+      args: [owner, id],
+    });
+    // The id is known because it was supplied, so this enumerates exactly one.
+    return { collection, balance, tokenIds: balance > 0n ? [id] : [], enumerable: true };
+  }
+
   const balance = await publicClient.readContract({
     address: collection.address,
     abi: erc721CollectionAbi,

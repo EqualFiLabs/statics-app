@@ -227,14 +227,24 @@ export function describeCollectionNfts(
     tokenId,
     contract: collection.address,
     name: `${collection.name} #${tokenId.toString()}`,
-    summary: collection.symbol,
+    summary:
+      collection.standard === "erc1155"
+        ? `${balance.toString()} held · ${collection.symbol}`
+        : collection.symbol,
     carries: [] as readonly string[],
-    blockedReason: null,
+    // ERC-1155 transfer takes an amount as well as an id, which the send
+    // dialog does not ask for. Offering it would build a call that cannot be
+    // completed honestly.
+    blockedReason:
+      collection.standard === "erc1155"
+        ? "Sending ERC-1155 balances is not supported here yet."
+        : null,
   }));
 
-  // The reader caps enumeration, so say when more are held than are listed
-  // rather than quietly showing a partial list as if it were complete.
-  if (BigInt(tokenIds.length) < balance) {
+  // Only meaningful for ERC-721, where balance counts distinct tokens and the
+  // reader caps enumeration. For ERC-1155 the balance is the quantity of a
+  // single id, so "4 more not shown" would be nonsense.
+  if (collection.standard !== "erc1155" && BigInt(tokenIds.length) < balance) {
     return [
       ...shown,
       {
