@@ -27,6 +27,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "sdk:sync": "node scripts/vendor-statics-sdk.mjs",
+    "deployment:manifest": "node scripts/generate-deployment-manifest.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",

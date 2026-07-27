@@ -116,20 +116,27 @@ describe("Dollar deployment configuration", () => {
   });
 
   it("rejects environment-generated public deployments", () => {
-    expect(() =>
-      readDollarDeployment({
-        ...localDeploymentEnvironment(),
-        NEXT_PUBLIC_STATICS_CHAIN_ID: "46630",
-      })
-    ).toThrow("restricted to local Anvil");
+    // Same guarantee as before, reported differently: a public chain is now
+    // unconfigured rather than a thrown error, because a chain with no reviewed
+    // manifest is a chain the app is not set up for, not a broken build. The
+    // protection is that a full set of environment addresses cannot configure
+    // it.
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      NEXT_PUBLIC_STATICS_CHAIN_ID: "46630",
+    });
+
+    expect(state.status).toBe("unavailable");
+    expect(state.status === "unavailable" && state.reason).toMatch(/manifest/);
   });
 
   it("requires a checked-in manifest outside development", () => {
-    expect(() =>
-      readDollarDeployment({
-        ...localDeploymentEnvironment(),
-        NEXT_PUBLIC_APP_ENV: "production",
-      })
-    ).toThrow("checked-in verified manifest");
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      NEXT_PUBLIC_APP_ENV: "production",
+    });
+
+    expect(state.status).toBe("unavailable");
+    expect(state.status === "unavailable" && state.reason).toMatch(/manifest/);
   });
 });
