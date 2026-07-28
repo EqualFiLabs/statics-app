@@ -154,6 +154,29 @@ export const writeProtocolActivity = writeDollarActivity;
 export const updateProtocolActivity = updateDollarActivity;
 export const subscribeProtocolActivity = subscribeDollarActivity;
 
+/**
+ * Every chain this wallet has a stored record on.
+ *
+ * Activity is written per chain, so reading it back needs a list of chains to
+ * look in. Deriving that list from the wallet's configured networks means a
+ * record written on a network that was later removed -- or one the person is
+ * simply not connected to right now -- silently disappears. The keys already
+ * name the chain, so the honest source of that list is storage itself.
+ */
+export function readActivityChainIds(wallet: Address): number[] {
+  if (typeof window === "undefined") return [];
+  const owner = wallet.toLowerCase();
+  const found = new Set<number>();
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key || !key.endsWith(`:${owner}`)) continue;
+    const match = /^statics:(?:protocol|dollar):activity:(\d+):/.exec(key);
+    const chainId = match ? Number(match[1]) : Number.NaN;
+    if (Number.isSafeInteger(chainId)) found.add(chainId);
+  }
+  return [...found];
+}
+
 export function readProtocolActivityAcrossChains(
   wallet: Address,
   chainIds: readonly number[]

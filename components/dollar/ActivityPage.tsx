@@ -10,6 +10,7 @@ import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   readProtocolActivityAcrossChains,
+  readActivityChainIds,
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
@@ -215,7 +216,12 @@ export function ActivityPage() {
   const protocolActivity = useSyncExternalStore(
     subscribeProtocolActivity,
     () =>
-      evmAddress ? readProtocolActivityAcrossChains(evmAddress, chainIds) : emptyProtocolActivity,
+      evmAddress
+        ? readProtocolActivityAcrossChains(evmAddress, [
+            ...chainIds,
+            ...readActivityChainIds(evmAddress),
+          ])
+        : emptyProtocolActivity,
     () => emptyProtocolActivity
   );
   const allBridgeActivity = useSyncExternalStore(
@@ -302,7 +308,10 @@ export function ActivityPage() {
   // "have you done anything yet".
   const activityState = deriveSurfaceState({
     walletStatus: wallet.status,
-    isTargetChain: wallet.isTargetChain,
+    // Not network-scoped. Every row already names the chain it happened on, and
+    // the point of this page is seeing a bridge that started somewhere else --
+    // gating it on the connected network hides exactly what it exists to show.
+    isTargetChain: true,
     isLoading: false,
     isError: false,
     isEmpty: activity.length === 0,
