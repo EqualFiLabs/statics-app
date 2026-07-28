@@ -38,8 +38,9 @@ describe("supplying Risk shares as redemption liquidity", () => {
   // wallet, so a top-up only needs the shortfall.
   it("reuses principal already sitting in the leg", () => {
     const partial = state({ walletShares: 60n, stakedAvailable: 40n });
-    expect(deriveSupplyStep(100n, partial, true).step).toBe("stake");
-    expect(deriveSupplyStep(40n, partial, true).step).toBe("opt-in");
+    // Only the 60 shortfall is pulled from the wallet, not the full 100.
+    expect(deriveSupplyStep(100n, partial, true)).toMatchObject({ step: "stake", moves: 60n });
+    expect(deriveSupplyStep(40n, partial, true)).toMatchObject({ step: "opt-in", moves: 40n });
   });
 
   it("refuses more than the wallet and leg hold together", () => {
@@ -58,11 +59,13 @@ describe("supplying Risk shares as redemption liquidity", () => {
 });
 
 describe("withdrawing supplied Risk shares", () => {
-  // withdrawLeg cannot see opted-in principal, so taking it back out of the
-  // book has to happen first or the withdrawal reverts.
-  it("opts out before withdrawing when the shares are still supplied", () => {
+  // optOut ends in safeTransferFrom(this -> receiver), so it IS the withdrawal
+  // when nothing is idle in the leg -- not a first hop feeding a second.
+  it("opts out directly to the wallet when nothing is idle in the leg", () => {
     const supplied = state({ optedIn: 100n, stakedAvailable: 0n });
-    expect(deriveWithdrawStep(100n, supplied).step).toBe("opt-out");
+    const next = deriveWithdrawStep(100n, supplied);
+    expect(next.step).toBe("opt-out");
+    expect(next.moves).toBe(100n);
   });
 
   it("withdraws directly when the principal is no longer supplied", () => {
@@ -70,10 +73,23 @@ describe("withdrawing supplied Risk shares", () => {
     expect(deriveWithdrawStep(100n, idle).step).toBe("withdraw");
   });
 
-  it("only opts out of the shortfall, leaving the rest earning", () => {
+  // Idle principal earns nothing, so it goes first and the book keeps working
+  // for as long as possible.
+  it("drains the idle leg before touching the book", () => {
     const mixed = state({ optedIn: 60n, stakedAvailable: 40n });
-    expect(deriveWithdrawStep(40n, mixed).step).toBe("withdraw");
-    expect(deriveWithdrawStep(100n, mixed).step).toBe("opt-out");
+    expect(deriveWithdrawStep(40n, mixed)).toMatchObject({ step: "withdraw", moves: 40n });
+    // Asking for 100 moves the 40 idle first; the 60 still supplied follows.
+    expect(deriveWithdrawStep(100n, mixed)).toMatchObject({ step: "withdraw", moves: 40n });
+    const afterLegDrained = state({ optedIn: 60n, stakedAvailable: 0n });
+    expect(deriveWithdrawStep(60n, afterLegDrained)).toMatchObject({ step: "opt-out", moves: 60n });
+  });
+
+  // The bug this replaces: withdrawLeg was called with the full amount after an
+  // opt-out that had already delivered part of it, reverting InsufficientPrincipal.
+  it("never asks a step to move more than its source holds", () => {
+    const mixed = state({ optedIn: 60n, stakedAvailable: 40n });
+    const next = deriveWithdrawStep(100n, mixed);
+    expect(next.moves).toBeLessThanOrEqual(mixed.stakedAvailable);
   });
 
   it("refuses more than was supplied", () => {
