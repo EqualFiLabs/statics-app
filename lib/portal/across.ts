@@ -97,6 +97,44 @@ export function normalizeAcrossTransaction(
   };
 }
 
+/**
+ * Coerces an Across amount into a bigint, or null when it is not one.
+ *
+ * Across does not return a single shape for these. Some amounts arrive as
+ * decimal strings, others as objects carrying the value alongside its USD
+ * equivalent -- `fees.total` is an object today even though the quote's own
+ * `outputAmount` is a string. Reading either one with a bare `BigInt()` throws
+ * during render, which takes the whole panel down through the error boundary
+ * rather than showing a dash next to a number it could not read.
+ *
+ * So this accepts every shape that carries a whole-number amount, and returns
+ * null for everything else instead of throwing.
+ */
+export function parseAcrossAmount(value: unknown, depth = 0): bigint | null {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^[0-9]+$/.test(trimmed)) return BigInt(trimmed);
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return BigInt(trimmed);
+    return null;
+  }
+  // One level only: the wrappers nest a scalar, never another wrapper, and
+  // recursing without a bound would follow a cycle in a malformed payload.
+  if (value && typeof value === "object" && depth === 0) {
+    for (const key of ["amount", "total", "value", "raw"]) {
+      const inner = (value as Record<string, unknown>)[key];
+      if (inner !== undefined) {
+        const parsed = parseAcrossAmount(inner, depth + 1);
+        if (parsed !== null) return parsed;
+      }
+    }
+  }
+  return null;
+}
+
 export function acrossError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== "object") return fallback;
   const record = payload as Record<string, unknown>;
