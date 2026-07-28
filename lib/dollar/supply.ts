@@ -165,19 +165,20 @@ export function deriveSupplyStep(
   amount: bigint,
   state: DollarSupplyState,
   seriesActive: boolean
-): { step: DollarSupplyStep; label: string; reason: string | null } {
+): { step: DollarSupplyStep; label: string; reason: string | null; moves: bigint } {
   if (amount <= 0n) {
-    return { step: "needs-input", label: "Enter Risk share amount", reason: null };
+    return { step: "needs-input", label: "Enter Risk share amount", reason: null, moves: 0n };
   }
   if (!seriesActive) {
     return {
       step: "blocked",
       label: "Supply unavailable",
       reason: "The Risk series is not currently active.",
+      moves: 0n,
     };
   }
   if (state.stakedAvailable >= amount) {
-    return { step: "opt-in", label: "Supply Risk shares", reason: null };
+    return { step: "opt-in", label: "Supply Risk shares", reason: null, moves: amount };
   }
 
   const toStake = amount - state.stakedAvailable;
@@ -186,27 +187,45 @@ export function deriveSupplyStep(
       step: "blocked",
       label: "Supply unavailable",
       reason: "This wallet does not have enough Risk shares for this series.",
+      moves: 0n,
     };
   }
   if (!state.riskApprovedForPeriphery) {
-    return { step: "approve-risk-periphery", label: "Approve Risk shares", reason: null };
+    return {
+      step: "approve-risk-periphery",
+      label: "Approve Risk shares",
+      reason: null,
+      moves: 0n,
+    };
   }
-  return { step: "stake", label: "Stake Risk shares", reason: null };
+  return { step: "stake", label: "Stake Risk shares", reason: null, moves: toStake };
 }
 
-/** The next transaction for taking `amount` back out of the book and wallet-ward. */
+/**
+ * The next transaction for returning `amount` of Risk shares to the wallet.
+ *
+ * Both sources deliver straight to the wallet -- `optOut` ends in
+ * `safeTransferFrom(address(this), receiver, ...)` just as `withdrawLeg` does,
+ * so it is not a first hop that feeds a second. They are two independent
+ * withdrawals that happen to need doing in sequence when one alone is short.
+ *
+ * The idle leg is drained first: principal sitting there is not earning opt-in
+ * rewards, so taking it before touching the book leaves as much supplied as
+ * possible for as long as possible.
+ */
 export function deriveWithdrawStep(
   amount: bigint,
   state: DollarSupplyState
-): { step: DollarSupplyStep; label: string; reason: string | null } {
+): { step: DollarSupplyStep; label: string; reason: string | null; moves: bigint } {
   if (amount <= 0n) {
-    return { step: "needs-input", label: "Enter Risk share amount", reason: null };
+    return { step: "needs-input", label: "Enter Risk share amount", reason: null, moves: 0n };
   }
   if (state.positionId === null) {
     return {
       step: "blocked",
       label: "Nothing supplied",
       reason: "This wallet has not supplied Risk shares to this series.",
+      moves: 0n,
     };
   }
   if (amount > state.stakedAvailable + state.optedIn) {
@@ -214,19 +233,21 @@ export function deriveWithdrawStep(
       step: "blocked",
       label: "Withdraw unavailable",
       reason: "This is more than you have supplied to this series.",
+      moves: 0n,
     };
   }
-  // withdrawLeg cannot see opted-in principal, so anything short has to come
-  // out of the book first.
-  if (state.stakedAvailable < amount) {
-    return { step: "opt-out", label: "Stop supplying", reason: null };
+  const fromLeg = amount < state.stakedAvailable ? amount : state.stakedAvailable;
+  if (fromLeg > 0n) {
+    return { step: "withdraw", label: "Withdraw Risk shares", reason: null, moves: fromLeg };
   }
-  return { step: "withdraw", label: "Withdraw Risk shares", reason: null };
+  return { step: "opt-out", label: "Stop supplying", reason: null, moves: amount };
 }
 
 /**
  * The supply steps in the shape the Dollar page's single action button uses,
  * so supplying reads as one more mode rather than a second control scheme.
+ * `moves` is the amount to send -- it is not always the amount typed, because a
+ * step may only be able to move part of it.
  */
 export function supplyActionAvailability(
   mode: "supply" | "unsupply",
@@ -238,15 +259,18 @@ export function supplyActionAvailability(
   label: string;
   reason: string | null;
   executable: boolean;
+  moves: bigint;
 } {
   const next =
     mode === "supply"
       ? deriveSupplyStep(amount, state, seriesActive)
       : deriveWithdrawStep(amount, state);
   return {
-    ...next,
-    executable: next.step !== "needs-input" && next.step !== "blocked",
     kind: next.step,
+    label: next.label,
+    reason: next.reason,
+    moves: next.moves,
+    executable: next.step !== "needs-input" && next.step !== "blocked",
   };
 }
 

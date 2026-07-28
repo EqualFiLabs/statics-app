@@ -79,6 +79,12 @@ import { overviewTiles } from "@/lib/overview";
 
 const deploymentState = readClientDollarDeployment();
 
+/** What is left to move after a step that could only take part of the amount. */
+function remainderAfter(amount: bigint, moved: bigint): string {
+  const left = amount > moved ? amount - moved : 0n;
+  return left === 0n ? "" : formatUnits(left, 18);
+}
+
 const modeLabels: Record<DollarActionMode, string> = {
   deposit: "Deposit",
   recombine: "Recombine",
@@ -497,7 +503,10 @@ function DollarActionPanel({
       amount,
       seriesId: snapshot.data?.seriesId,
     }),
-    enabled: amount > 0n && Boolean(publicClient) && Boolean(snapshot.data),
+    // Supply and withdraw move Risk shares and have no Dollar quote. Without
+    // this guard the query fell through to previewRecombine with a share
+    // amount, and the failed result made currentQuote permanently null.
+    enabled: amount > 0n && Boolean(publicClient) && Boolean(snapshot.data) && !isSupplyMode(mode),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !snapshot.data) throw new Error("Dollar state is not ready.");
@@ -658,11 +667,20 @@ function DollarActionPanel({
     setActionError(null);
     try {
       if (!snapshot.data || amount <= 0n) throw new Error("Enter a valid amount.");
-      if (!currentQuote || !actionAvailability.executable) {
-        throw new Error(actionAvailability.reason || "Wait for a fresh protocol preview.");
+      if (!actionAvailability.executable) {
+        throw new Error(actionAvailability.reason || "This action is not available.");
+      }
+      // Only the Dollar routes quote. Requiring a quote here is what made the
+      // supply modes unreachable.
+      if (!isSupplyMode(mode) && !currentQuote) {
+        throw new Error("Wait for a fresh protocol preview.");
       }
 
       if (isSupplyMode(mode)) {
+        const moves: bigint =
+          "moves" in actionAvailability && typeof actionAvailability.moves === "bigint"
+            ? actionAvailability.moves
+            : amount;
         const periphery = state.periphery;
         if (periphery === zeroAddress) {
           throw new Error("This deployment has no periphery, so Risk shares cannot be supplied.");
@@ -675,14 +693,11 @@ function DollarActionPanel({
             data: buildApproveRiskForPeripheryCall(periphery),
           });
         } else if (actionAvailability.kind === "stake") {
-          // Only the shortfall is staked. Principal already sitting in the leg
-          // is reused rather than pulling more from the wallet than needed.
-          const toStake = amount - supply.stakedAvailable;
           await recordAndSend({
             kind: "stake-position",
             label: supply.positionId === null ? "Create position and stake Risk" : "Stake Risk",
             to: periphery,
-            data: buildStakeRiskCall(supply.positionId, state.seriesId, toStake, wallet),
+            data: buildStakeRiskCall(supply.positionId, state.seriesId, moves, wallet),
           });
         } else if (actionAvailability.kind === "opt-in") {
           if (supply.positionId === null)
@@ -691,21 +706,21 @@ function DollarActionPanel({
             kind: "opt-in-risk",
             label: "Supply Risk shares for redemption",
             to: periphery,
-            data: buildOptInCall(supply.positionId, state.seriesId, amount),
+            data: buildOptInCall(supply.positionId, state.seriesId, moves),
           });
           setAmountInput("");
         } else if (actionAvailability.kind === "opt-out") {
           if (supply.positionId === null)
             throw new Error("No position holds this Risk series yet.");
-          // Take back only what withdrawing is short of, so the rest keeps
-          // earning while it is still supplied.
-          const toOptOut = amount - supply.stakedAvailable;
+          // optOut ends in safeTransferFrom(this -> receiver), so this completes
+          // the withdrawal rather than feeding a second call.
           await recordAndSend({
             kind: "opt-out-risk",
             label: "Stop supplying Risk shares",
             to: periphery,
-            data: buildOptOutCall(supply.positionId, state.seriesId, toOptOut, wallet),
+            data: buildOptOutCall(supply.positionId, state.seriesId, moves, wallet),
           });
+          setAmountInput(remainderAfter(amount, moves));
         } else if (actionAvailability.kind === "withdraw") {
           if (supply.positionId === null)
             throw new Error("No position holds this Risk series yet.");
@@ -713,9 +728,11 @@ function DollarActionPanel({
             kind: "withdraw-risk",
             label: "Withdraw Risk shares",
             to: periphery,
-            data: buildWithdrawLegCall(supply.positionId, state.seriesId, amount, wallet),
+            data: buildWithdrawLegCall(supply.positionId, state.seriesId, moves, wallet),
           });
-          setAmountInput("");
+          // A step moves only what its source holds; the rest stays in the
+          // field for the next step instead of being silently dropped.
+          setAmountInput(remainderAfter(amount, moves));
         }
         await supplyState.refetch();
       } else if (actionAvailability.kind === "approve-weth") {
@@ -754,7 +771,7 @@ function DollarActionPanel({
             args: [snapshot.data.periphery, amount],
           }),
         });
-      } else if (actionAvailability.kind === "execute" && currentQuote.mode === "redeem") {
+      } else if (actionAvailability.kind === "execute" && currentQuote?.mode === "redeem") {
         const preview = await quote.refetch();
         if (
           !preview.data ||
@@ -803,7 +820,7 @@ function DollarActionPanel({
             args: [deployment.contracts.gateway, true],
           }),
         });
-      } else if (actionAvailability.kind === "execute" && currentQuote.mode === "deposit") {
+      } else if (actionAvailability.kind === "execute" && currentQuote?.mode === "deposit") {
         const preview = await quote.refetch();
         if (
           !preview.data ||
