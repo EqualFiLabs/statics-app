@@ -48,7 +48,7 @@ export function SiteHeader() {
       </nav>
 
       <Link className="button button-outline header-cta" href="/app">
-        Launch dapp <span aria-hidden="true">→</span>
+        Launch app <span aria-hidden="true">→</span>
       </Link>
     </header>
   );

@@ -36,7 +36,7 @@ test.describe("landing foundation", () => {
 
   test("preserves truthful pre-launch state without horizontal overflow", async ({ page }) => {
     await expect(
-      page.getByRole("heading", { name: /static assets.*own your position/i })
+      page.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeVisible();
     await expect(page.getByText("Pre-launch").first()).toBeVisible();
     await expect(page.getByText("19,482,731")).toHaveCount(0);
@@ -57,7 +57,7 @@ test.describe("landing foundation", () => {
     await expect(page.getByRole("link", { name: "GitHub" })).toHaveCount(0);
 
     await page
-      .getByRole("link", { name: /launch dapp/i })
+      .getByRole("link", { name: /launch app/i })
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
