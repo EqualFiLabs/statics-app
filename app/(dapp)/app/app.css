@@ -1456,12 +1456,12 @@
 
 .portal-asset-field > div {
   display: grid;
+  gap: 0.6rem;
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .portal-asset-field input {
   min-width: 0;
-  border-right: 0;
   font-size: var(--text-lg);
 }
 
@@ -3774,6 +3774,170 @@
 .pool-grid.pool-grid dl > *,
 .fee-allocation.fee-allocation dl > * {
   border-radius: 0;
+}
+
+/* Mode tabs and the settings gear share a row, so the gear stays reachable
+ * whichever panel is open rather than being repeated inside each one. */
+.portal-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.portal-header .portal-mode-tabs {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.portal-settings-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  margin-right: 0.35rem;
+  color: var(--app-text-muted);
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.portal-settings-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.portal-settings-button:hover {
+  color: var(--app-text);
+  border-color: var(--app-border-strong);
+  background: var(--app-raised);
+}
+
+.portal-slippage-dialog {
+  width: min(400px, 100%);
+}
+
+.portal-slippage-help {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.portal-slippage-presets button {
+  height: var(--control-height);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-raised);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.portal-slippage-presets button[aria-pressed="true"] {
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.portal-slippage-custom {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.portal-slippage-custom input {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-slippage-custom span {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-warning {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.portal-slippage-actions button {
+  min-width: 96px;
+  height: var(--control-height);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-raised);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* Sits on the field's own label row, right-aligned. Deliberately unboxed: it
+ * is a readout you can edit, not another control competing with the amount. */
+.portal-asset-field-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.portal-slippage-inline {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+}
+
+.portal-quote-edit {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.portal-quote-edit:hover {
+  color: var(--app-text);
+}
+
+.portal-quote-edit svg {
+  width: 13px;
+  height: 13px;
+  color: var(--app-text-muted);
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.portal-quote-edit:hover svg {
+  color: var(--app-text);
 }
 
 /* ===================================================================

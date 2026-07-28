@@ -10,9 +10,15 @@ import {
   parseUnits,
 } from "viem";
 
+import {
+  SlippageInlineControl,
+  SlippageSettingsDialog,
+} from "@/components/portal/SlippageSettingsDialog";
+import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { useSolanaAssets } from "@/hooks/useSolanaAssets";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
+import { writePortalSlippage } from "@/lib/portal/slippage";
 import {
   ACROSS_SOLANA_CHAIN_ID,
   acrossError,
@@ -94,7 +100,10 @@ function tokenArray(payload: unknown): AcrossToken[] {
 export function AcrossBridgePanel() {
   const wallet = useWalletState();
   const solana = useSolanaAssets();
-  const destination = readAcrossDestination();
+  const slippage = usePortalSlippage();
+  // The Statics deployment is where most people are heading, so it opens as the
+  // destination -- but it is now a default rather than the only option.
+  const staticsDestination = readAcrossDestination();
   const walletTokens = useWalletTokens(wallet.fundingChainId);
   const supportedEvmChains = useMemo(
     () => new Set(wallet.fundingNetworks.map((network) => network.chainId)),
@@ -112,18 +121,31 @@ export function AcrossBridgePanel() {
   );
   const [chains, setChains] = useState<AcrossChain[]>(fallbackChains);
   const [originChainId, setOriginChainId] = useState(wallet.fundingChainId);
+  const [destinationChainId, setDestinationChainId] = useState(staticsDestination.chainId);
   const [tokens, setTokens] = useState<AcrossToken[]>([]);
   const [tokenAddress, setTokenAddress] = useState("");
+  const [destinationTokens, setDestinationTokens] = useState<AcrossToken[]>([]);
+  const [destinationTokenAddress, setDestinationTokenAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<QuotePayload | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const originIsSolana = originChainId === ACROSS_SOLANA_CHAIN_ID;
+  const destinationIsSolana = destinationChainId === ACROSS_SOLANA_CHAIN_ID;
   const depositor = originIsSolana ? solana.wallet?.address : wallet.address;
-  const recipient = wallet.address;
+  // Funds land on the destination chain, so the recipient has to be an address
+  // that chain can actually hold -- an EVM address is unusable on Solana.
+  const recipient = destinationIsSolana ? solana.wallet?.address : wallet.address;
   const selectedToken = tokens.find((token) => token.address === tokenAddress) ?? tokens[0];
+  const selectedDestinationToken =
+    destinationTokens.find((token) => token.address === destinationTokenAddress) ??
+    destinationTokens[0];
+  const destinationChainName =
+    chains.find((chain) => chain.chainId === destinationChainId)?.name ??
+    staticsDestination.chainName;
   const recentBridgeActivity = useSyncExternalStore(
     subscribeBridgeActivity,
     () => readBridgeActivity(depositor ?? undefined)[0] ?? null,
@@ -147,11 +169,10 @@ export function AcrossBridgePanel() {
           if (!item || typeof item !== "object") return [];
           const chain = item as Record<string, unknown>;
           const chainId = Number(chain.chainId);
-          if (
-            !Number.isSafeInteger(chainId) ||
-            (chainId !== ACROSS_SOLANA_CHAIN_ID && !supportedEvmChains.has(chainId)) ||
-            typeof chain.name !== "string"
-          ) {
+          // Every Across chain is kept here. Origin is narrowed separately,
+          // because sending requires a wallet on that chain while receiving
+          // does not.
+          if (!Number.isSafeInteger(chainId) || typeof chain.name !== "string") {
             return [];
           }
           return [
@@ -169,7 +190,54 @@ export function AcrossBridgePanel() {
     return () => {
       active = false;
     };
-  }, [supportedEvmChains]);
+  }, []);
+
+  // Sending needs a signable wallet on the chain, so origins stay limited to
+  // configured EVM networks plus Solana. Destinations do not.
+  const originChains = useMemo(
+    () =>
+      chains.filter(
+        (chain) => chain.chainId === ACROSS_SOLANA_CHAIN_ID || supportedEvmChains.has(chain.chainId)
+      ),
+    [chains, supportedEvmChains]
+  );
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/across/tokens?chainId=${destinationChainId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await json(response);
+        const next = response.ok ? tokenArray(payload) : [];
+        if (!active) return;
+        setQuote(null);
+        setReviewing(false);
+        setDestinationTokens(next);
+        setDestinationTokenAddress((current) => {
+          if (next.some((token) => token.address === current)) return current;
+          // The Statics collateral is the point of the default destination, so
+          // prefer it, then a dollar, then whatever exists.
+          const preferred =
+            (destinationChainId === staticsDestination.chainId &&
+            staticsDestination.status === "configured"
+              ? next.find(
+                  (token) => token.address.toLowerCase() === staticsDestination.token.toLowerCase()
+                )
+              : undefined) ?? next.find((token) => token.symbol.toUpperCase() === "USDC");
+          return preferred?.address ?? next[0]?.address ?? "";
+        });
+      })
+      .catch(() => {
+        if (active) {
+          setDestinationTokens([]);
+          setDestinationTokenAddress("");
+        }
+      });
+    return () => {
+      active = false;
+    };
+    // staticsDestination is derived from module-level config and is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destinationChainId]);
 
   useEffect(() => {
     let active = true;
@@ -236,8 +304,8 @@ export function AcrossBridgePanel() {
 
   const requestQuote = async () => {
     if (
-      destination.status !== "configured" ||
       !selectedToken ||
+      !selectedDestinationToken ||
       rawAmount <= 0n ||
       !depositor ||
       !recipient
@@ -249,10 +317,13 @@ export function AcrossBridgePanel() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         originChainId,
+        destinationChainId,
         inputToken: selectedToken.address,
+        outputToken: selectedDestinationToken.address,
         amount: rawAmount.toString(),
         depositor,
         recipient,
+        slippage,
       }),
     });
     const payload = (await json(response)) as QuotePayload;
@@ -264,8 +335,8 @@ export function AcrossBridgePanel() {
 
   useEffect(() => {
     if (
-      destination.status !== "configured" ||
       !selectedToken ||
+      !selectedDestinationToken ||
       rawAmount <= 0n ||
       !depositor ||
       !recipient ||
@@ -296,13 +367,15 @@ export function AcrossBridgePanel() {
     // Quote dependencies are represented by the primitive route inputs below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    destination.status,
     originChainId,
     originIsSolana,
+    destinationChainId,
     selectedToken?.address,
+    selectedDestinationToken?.address,
     rawAmount,
     depositor,
     recipient,
+    slippage,
     wallet.fundingWalletOnSelectedChain,
   ]);
 
@@ -399,7 +472,7 @@ export function AcrossBridgePanel() {
         depositTxnRef = await sendEvmTransaction(
           fresh.quote.swapTx,
           "bridge",
-          `Bridge ${selectedToken.symbol} to Robinhood`
+          `Bridge ${selectedToken.symbol} to ${destinationChainName}`
         );
       }
       const activity = {
@@ -448,9 +521,14 @@ export function AcrossBridgePanel() {
           : loadingQuote
             ? "Finding route…"
             : "Review bridge";
-  const actionReady =
-    destination.status === "configured" &&
-    Boolean(selectedToken && rawAmount > 0n && quote?.quote && depositor && recipient);
+  const actionReady = Boolean(
+    selectedToken &&
+    selectedDestinationToken &&
+    rawAmount > 0n &&
+    quote?.quote &&
+    depositor &&
+    recipient
+  );
 
   return (
     <div className="portal-panel" role="tabpanel">
@@ -470,8 +548,8 @@ export function AcrossBridgePanel() {
               }
             }}
           >
-            {chains
-              .filter((chain) => chain.chainId !== destination.chainId)
+            {originChains
+              .filter((chain) => chain.chainId !== destinationChainId)
               .map((chain) => (
                 <option key={chain.chainId} value={chain.chainId}>
                   {chain.name}
@@ -479,19 +557,40 @@ export function AcrossBridgePanel() {
               ))}
           </select>
         </label>
-        <div className="portal-destination">
+        <label className="portal-field">
           <span>To</span>
-          <strong>{destination.chainName}</strong>
-          <small>{destination.symbol}</small>
-        </div>
+          <select
+            value={destinationChainId}
+            onChange={(event) => {
+              setDestinationChainId(Number(event.target.value));
+              setQuote(null);
+              setReviewing(false);
+              setError(null);
+            }}
+          >
+            {chains
+              .filter((chain) => chain.chainId !== originChainId)
+              .map((chain) => (
+                <option key={chain.chainId} value={chain.chainId}>
+                  {chain.name}
+                </option>
+              ))}
+          </select>
+        </label>
       </div>
 
-      <label className="portal-field portal-asset-field">
-        <span>You send</span>
+      {/* A div rather than a label, because the slippage control lives in this
+          card and a button inside a label would also activate the amount input. */}
+      <div className="portal-field portal-asset-field">
+        <div className="portal-asset-field-head">
+          <span>You send</span>
+          <SlippageInlineControl value={slippage} onEdit={() => setSettingsOpen(true)} />
+        </div>
         <div>
           <input
             inputMode="decimal"
             value={amount}
+            aria-label="You send amount"
             placeholder="0.00"
             onChange={(event) => {
               setAmount(event.target.value);
@@ -518,10 +617,31 @@ export function AcrossBridgePanel() {
           </select>
         </div>
         <small>--</small>
+      </div>
+
+      <label className="portal-field">
+        <span>You receive on {destinationChainName}</span>
+        <select
+          aria-label="Destination asset"
+          value={selectedDestinationToken?.address ?? ""}
+          onChange={(event) => {
+            setDestinationTokenAddress(event.target.value);
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+          }}
+        >
+          {destinationTokens.map((token) => (
+            <option key={token.address} value={token.address}>
+              {token.symbol}
+            </option>
+          ))}
+        </select>
       </label>
+
       <dl className="portal-quote-grid">
         <div>
-          <dt>Expected on Robinhood</dt>
+          <dt>Expected on {destinationChainName}</dt>
           <dd>{output}</dd>
         </div>
         <div>
@@ -533,6 +653,14 @@ export function AcrossBridgePanel() {
           <dd>{quote?.quote?.expectedFillTime ? `${quote.quote.expectedFillTime}s` : "--"}</dd>
         </div>
       </dl>
+
+      {settingsOpen && (
+        <SlippageSettingsDialog
+          value={slippage}
+          onApply={writePortalSlippage}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {reviewing && quote?.quote && (
         <div className="portal-review">
           <div>

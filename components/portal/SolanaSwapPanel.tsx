@@ -3,9 +3,16 @@
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 
+import {
+  SlippageInlineControl,
+  SlippageSettingsDialog,
+} from "@/components/portal/SlippageSettingsDialog";
+import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { useSolanaTokens } from "@/hooks/useSolanaTokens";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { decodeJupiterTransaction, encodeJupiterTransaction } from "@/lib/portal/solana";
 import { updateSolanaActivity, writeSolanaActivity } from "@/lib/portal/solana-activity";
+import { writePortalSlippage } from "@/lib/portal/slippage";
 import type { SolanaToken } from "@/lib/solana-tokens";
 import { useSolanaWalletState } from "@/providers/solana-context";
 
@@ -32,6 +39,8 @@ async function json(response: Response): Promise<JupiterOrder> {
 
 export function SolanaSwapPanel() {
   const runtime = useSolanaWalletState();
+  const slippage = usePortalSlippage();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const managedTokens = useSolanaTokens();
   const tokens = managedTokens.tokens;
   const wallet = runtime.wallets[0];
@@ -58,7 +67,7 @@ export function SolanaSwapPanel() {
         inputMint: source.mint,
         outputMint: destination.mint,
         amount: rawAmount.toString(),
-        slippageBps: 50,
+        slippageBps: slippagePercentToBps(slippage),
         ...(build && wallet ? { taker: wallet.address } : {}),
       }),
     });
@@ -158,6 +167,13 @@ export function SolanaSwapPanel() {
 
   return (
     <div className="portal-panel" role="tabpanel">
+      {settingsOpen && (
+        <SlippageSettingsDialog
+          value={slippage}
+          onApply={writePortalSlippage}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       <div className="portal-destination">
         <span>Network</span>
         <strong>Solana</strong>
@@ -165,6 +181,8 @@ export function SolanaSwapPanel() {
       </div>
       <SolanaField
         label="You pay"
+        slippage={slippage}
+        onEditSlippage={() => setSettingsOpen(true)}
         amount={amount}
         tokens={tokens}
         token={source}
@@ -271,6 +289,8 @@ function SolanaField({
   readOnly = false,
   onAmount,
   onToken,
+  slippage,
+  onEditSlippage,
 }: {
   label: string;
   amount: string;
@@ -280,15 +300,25 @@ function SolanaField({
   readOnly?: boolean;
   onAmount?: (value: string) => void;
   onToken?: (token: SolanaToken) => void;
+  slippage?: number;
+  onEditSlippage?: () => void;
 }) {
   return (
-    <label className="portal-field portal-asset-field">
-      <span>{label}</span>
+    // A div rather than a label, because the slippage control lives in this
+    // card and a button inside a label would also activate the amount input.
+    <div className="portal-field portal-asset-field">
+      <div className="portal-asset-field-head">
+        <span>{label}</span>
+        {slippage !== undefined && onEditSlippage && (
+          <SlippageInlineControl value={slippage} onEdit={onEditSlippage} />
+        )}
+      </div>
       <div>
         <input
           inputMode="decimal"
           value={amount}
           readOnly={readOnly}
+          aria-label={`${label} amount`}
           placeholder="0.00"
           onChange={(event) => onAmount?.(event.target.value)}
         />
@@ -310,6 +340,6 @@ function SolanaField({
         </select>
       </div>
       <small>--</small>
-    </label>
+    </div>
   );
 }

@@ -20,6 +20,12 @@ import {
 import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import {
+  SlippageInlineControl,
+  SlippageSettingsDialog,
+} from "@/components/portal/SlippageSettingsDialog";
+import { usePortalSlippage } from "@/hooks/usePortalSlippage";
+import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
 
 const erc20BalanceAbi = [
@@ -69,6 +75,8 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
 
 export function EvmSwapPanel() {
   const wallet = useWalletState();
+  const slippage = usePortalSlippage();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const walletTokens = useWalletTokens(wallet.fundingChainId);
   const tokens = useMemo(
     () => [
@@ -178,7 +186,7 @@ export function EvmSwapPanel() {
         tokenOut: destination.address,
         amount: parsedAmount.toString(),
         swapper: wallet.address,
-        slippageTolerance: 0.5,
+        slippageTolerance: slippage,
       }),
     });
     const payload = (await readJson(response)) as QuotePayload;
@@ -362,6 +370,13 @@ export function EvmSwapPanel() {
 
   return (
     <div className="portal-panel" role="tabpanel">
+      {settingsOpen && (
+        <SlippageSettingsDialog
+          value={slippage}
+          onApply={writePortalSlippage}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       <label className="portal-field">
         <span>Funding network</span>
         <select
@@ -382,6 +397,8 @@ export function EvmSwapPanel() {
       </label>
       <SwapAssetField
         label="You pay"
+        slippage={slippage}
+        onEditSlippage={() => setSettingsOpen(true)}
         tokens={tokens}
         selected={source}
         excluded={destination?.address}
@@ -505,6 +522,8 @@ function SwapAssetField({
   readOnly = false,
   onAmount,
   onToken,
+  slippage,
+  onEditSlippage,
 }: {
   label: string;
   tokens: EvmSwapToken[];
@@ -515,15 +534,25 @@ function SwapAssetField({
   readOnly?: boolean;
   onAmount?: (value: string) => void;
   onToken: (address: string) => void;
+  slippage?: number;
+  onEditSlippage?: () => void;
 }) {
   return (
-    <label className="portal-field portal-asset-field">
-      <span>{label}</span>
+    // A div rather than a label, because the slippage control lives in this
+    // card and a button inside a label would also activate the amount input.
+    <div className="portal-field portal-asset-field">
+      <div className="portal-asset-field-head">
+        <span>{label}</span>
+        {slippage !== undefined && onEditSlippage && (
+          <SlippageInlineControl value={slippage} onEdit={onEditSlippage} />
+        )}
+      </div>
       <div>
         <input
           inputMode="decimal"
           value={amount}
           readOnly={readOnly}
+          aria-label={`${label} amount`}
           placeholder="0.00"
           onChange={(event) => onAmount?.(event.target.value)}
         />
@@ -543,7 +572,7 @@ function SwapAssetField({
         </select>
       </div>
       <small>{readOnly ? "--" : `Balance ${balance}`}</small>
-    </label>
+    </div>
   );
 }
 
