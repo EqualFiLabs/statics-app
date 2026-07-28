@@ -98,6 +98,29 @@ function tokenArray(payload: unknown): AcrossToken[] {
   });
 }
 
+/**
+ * Picks which asset the bridge should arrive as, before anyone chooses.
+ *
+ * Matching the sent symbol comes first, because sending ETH and receiving WETH
+ * is a swap nobody asked for. Across lists both on most chains -- native under
+ * the zero address, wrapped under the real one -- so "first in the list" is a
+ * coin flip between them, and on Robinhood that flip lands on WETH.
+ *
+ * Only if nothing matches does it fall back to a dollar, and USDG by symbol as
+ * well as address so the preference survives a deployment that is not pointed
+ * at Robinhood.
+ */
+export function defaultDestinationToken(
+  tokens: readonly AcrossToken[],
+  sentSymbol: string | undefined
+): string {
+  const bySymbol = (symbol: string) =>
+    tokens.find((token) => token.symbol.toUpperCase() === symbol.toUpperCase());
+  const preferred =
+    (sentSymbol ? bySymbol(sentSymbol) : undefined) ?? bySymbol("USDG") ?? bySymbol("USDC");
+  return preferred?.address ?? tokens[0]?.address ?? "";
+}
+
 export function AcrossBridgePanel() {
   const wallet = useWalletState();
   const solana = useSolanaAssets();
@@ -127,6 +150,7 @@ export function AcrossBridgePanel() {
   const [tokenAddress, setTokenAddress] = useState("");
   const [destinationTokens, setDestinationTokens] = useState<AcrossToken[]>([]);
   const [destinationTokenAddress, setDestinationTokenAddress] = useState("");
+  const [destinationTokenTouched, setDestinationTokenTouched] = useState(false);
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<QuotePayload | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
@@ -213,19 +237,15 @@ export function AcrossBridgePanel() {
         setQuote(null);
         setReviewing(false);
         setDestinationTokens(next);
-        setDestinationTokenAddress((current) => {
-          if (next.some((token) => token.address === current)) return current;
-          // The Statics collateral is the point of the default destination, so
-          // prefer it, then a dollar, then whatever exists.
-          const preferred =
-            (destinationChainId === staticsDestination.chainId &&
-            staticsDestination.status === "configured"
-              ? next.find(
-                  (token) => token.address.toLowerCase() === staticsDestination.token.toLowerCase()
-                )
-              : undefined) ?? next.find((token) => token.symbol.toUpperCase() === "USDC");
-          return preferred?.address ?? next[0]?.address ?? "";
-        });
+        // An explicit choice is never overridden. Everything below only picks
+        // the opening value.
+        if (destinationTokenTouched) {
+          setDestinationTokenAddress((current) =>
+            next.some((token) => token.address === current) ? current : (next[0]?.address ?? "")
+          );
+          return;
+        }
+        setDestinationTokenAddress(defaultDestinationToken(next, selectedToken?.symbol));
       })
       .catch(() => {
         if (active) {
@@ -236,9 +256,7 @@ export function AcrossBridgePanel() {
     return () => {
       active = false;
     };
-    // staticsDestination is derived from module-level config and is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destinationChainId]);
+  }, [destinationChainId, selectedToken?.symbol, destinationTokenTouched]);
 
   useEffect(() => {
     let active = true;
@@ -628,6 +646,7 @@ export function AcrossBridgePanel() {
           value={selectedDestinationToken?.address ?? ""}
           onChange={(event) => {
             setDestinationTokenAddress(event.target.value);
+            setDestinationTokenTouched(true);
             setQuote(null);
             setReviewing(false);
             setError(null);
