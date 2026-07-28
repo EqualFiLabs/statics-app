@@ -10,20 +10,44 @@ describe("landing page", () => {
     render(<LandingPage />);
 
     expect(
-      screen.getByRole("heading", { name: /static assets.*own your position/i })
+      screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/system status:/i)).toHaveTextContent("Pre-launch");
     expect(screen.getByText(/Deployment: Not deployed/i)).toBeInTheDocument();
     expect(screen.getByText("Not deployed", { selector: "dd" })).toBeInTheDocument();
-    expect(screen.getAllByText("—")).toHaveLength(5);
     expect(screen.queryByText("19,482,731")).not.toBeInTheDocument();
     expect(screen.queryByText("Online")).not.toBeInTheDocument();
+  });
+
+  // The panel states protocol properties, which are true before any deployment
+  // exists. Metrics would have to read "--" five times over, which says nothing
+  // and reads as a dead page.
+  it("states fixed protocol properties rather than empty metrics", () => {
+    render(<LandingPage />);
+
+    expect(screen.getByRole("heading", { name: /what's fixed/i })).toBeInTheDocument();
+    expect(screen.getByText("In kind")).toBeInTheDocument();
+    expect(screen.getByText("Never")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByText(/total value locked/i)).not.toBeInTheDocument();
+  });
+
+  // Both were on the page and neither was true: an owner still holds
+  // setFeeConfiguration and quarantineBasket, and governance is unbuilt. These
+  // are checkable in a block explorer, so they cannot go back without the claim
+  // becoming true first.
+  it("makes no trustlessness claim the deployed contracts do not support", () => {
+    render(<LandingPage />);
+
+    const page = document.body.textContent ?? "";
+    expect(page).not.toMatch(/no centralized admins/i);
+    expect(page).not.toMatch(/timelocked/i);
   });
 
   it("routes launch controls to the app and keeps future destinations visible but inert", () => {
     render(<LandingPage />);
 
-    const launchLinks = screen.getAllByRole("link", { name: /launch dapp/i });
+    const launchLinks = screen.getAllByRole("link", { name: /launch app/i });
     expect(launchLinks).toHaveLength(2);
     for (const link of launchLinks) expect(link).toHaveAttribute("href", "/app");
 
