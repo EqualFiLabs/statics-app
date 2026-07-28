@@ -34,7 +34,7 @@ import {
   type DollarReplacementReason,
 } from "@/lib/dollar/activity";
 import {
-  DOLLAR_OPT_IN_FILL_PAUSE,
+  DOLLAR_PAIRING_FILL_PAUSE,
   deriveDollarActionAvailability,
   dollarQuoteQueryKey,
   type DollarActionMode,
@@ -43,10 +43,10 @@ import {
 } from "@/lib/dollar/action-state";
 import {
   buildApproveRiskForPeripheryCall,
-  buildOptInCall,
-  buildOptOutCall,
+  buildClaimRiskProceedsCall,
   buildStakeRiskCall,
-  buildWithdrawLegCall,
+  buildUnstakeRiskCall,
+  hasClaimableProceeds,
   emptyDollarSupplyState,
   loadDollarSupplyState,
   supplyActionAvailability,
@@ -78,12 +78,6 @@ import { readEvesMarketUrl } from "@/lib/site-config";
 import { overviewTiles } from "@/lib/overview";
 
 const deploymentState = readClientDollarDeployment();
-
-/** What is left to move after a step that could only take part of the amount. */
-function remainderAfter(amount: bigint, moved: bigint): string {
-  const left = amount > moved ? amount - moved : 0n;
-  return left === 0n ? "" : formatUnits(left, 18);
-}
 
 const modeLabels: Record<DollarActionMode, string> = {
   deposit: "Deposit",
@@ -485,7 +479,7 @@ function DollarActionPanel({
   const [mode, setMode] = useState<DollarActionMode>("deposit");
   const [asset, setAsset] = useState<DollarCollateralChoice>("ETH");
   const [amountInput, setAmountInput] = useState("");
-  const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const amount = useMemo(() => {
@@ -662,6 +656,25 @@ function DollarActionPanel({
     }
   };
 
+  const claimProceeds = async () => {
+    if (supply.positionId === null || state.periphery === zeroAddress) return;
+    setPendingAction("claim");
+    setActionError(null);
+    try {
+      await recordAndSend({
+        kind: "claim-risk-proceeds",
+        label: "Claim Risk supply proceeds",
+        to: state.periphery,
+        data: buildClaimRiskProceedsCall(supply.positionId, state.seriesId, wallet),
+      });
+      await supplyState.refetch();
+    } catch (error) {
+      setActionError(describeDollarError(error));
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
   const executeNextAction = async () => {
     setPendingAction("primary");
     setActionError(null);
@@ -693,46 +706,25 @@ function DollarActionPanel({
             data: buildApproveRiskForPeripheryCall(periphery),
           });
         } else if (actionAvailability.kind === "stake") {
+          // Staking is supplying -- the shares are consumable the moment this
+          // confirms, so there is no follow-up step.
           await recordAndSend({
-            kind: "stake-position",
-            label: supply.positionId === null ? "Create position and stake Risk" : "Stake Risk",
+            kind: "supply-risk",
+            label: supply.positionId === null ? "Create position and supply Risk" : "Supply Risk",
             to: periphery,
             data: buildStakeRiskCall(supply.positionId, state.seriesId, moves, wallet),
           });
-        } else if (actionAvailability.kind === "opt-in") {
-          if (supply.positionId === null)
-            throw new Error("No position holds this Risk series yet.");
-          await recordAndSend({
-            kind: "opt-in-risk",
-            label: "Supply Risk shares for redemption",
-            to: periphery,
-            data: buildOptInCall(supply.positionId, state.seriesId, moves),
-          });
           setAmountInput("");
-        } else if (actionAvailability.kind === "opt-out") {
-          if (supply.positionId === null)
-            throw new Error("No position holds this Risk series yet.");
-          // optOut ends in safeTransferFrom(this -> receiver), so this completes
-          // the withdrawal rather than feeding a second call.
-          await recordAndSend({
-            kind: "opt-out-risk",
-            label: "Stop supplying Risk shares",
-            to: periphery,
-            data: buildOptOutCall(supply.positionId, state.seriesId, moves, wallet),
-          });
-          setAmountInput(remainderAfter(amount, moves));
-        } else if (actionAvailability.kind === "withdraw") {
+        } else if (actionAvailability.kind === "unstake") {
           if (supply.positionId === null)
             throw new Error("No position holds this Risk series yet.");
           await recordAndSend({
             kind: "withdraw-risk",
             label: "Withdraw Risk shares",
             to: periphery,
-            data: buildWithdrawLegCall(supply.positionId, state.seriesId, moves, wallet),
+            data: buildUnstakeRiskCall(supply.positionId, state.seriesId, moves, wallet),
           });
-          // A step moves only what its source holds; the rest stays in the
-          // field for the next step instead of being silently dropped.
-          setAmountInput(remainderAfter(amount, moves));
+          setAmountInput("");
         }
         await supplyState.refetch();
       } else if (actionAvailability.kind === "approve-weth") {
@@ -984,7 +976,7 @@ function DollarActionPanel({
           riskApproved: state.riskApproved,
           peripheryDollarAllowance: state.peripheryDollarAllowance,
           redeemableLiquidity: state.redeemableLiquidity,
-          optInFillsPaused: (state.pausedOperations & DOLLAR_OPT_IN_FILL_PAUSE) !== 0n,
+          pairingFillsPaused: (state.pausedOperations & DOLLAR_PAIRING_FILL_PAUSE) !== 0n,
         },
       });
   const balance =
@@ -993,10 +985,10 @@ function DollarActionPanel({
         ? state.nativeBalance
         : state.wethBalance
       : mode === "supply"
-        ? // Everything supplyable: loose shares plus principal already staked.
-          supply.walletShares + supply.stakedAvailable
+        ? supply.walletShares
         : mode === "unsupply"
-          ? supply.stakedAvailable + supply.optedIn
+          ? // Only unconsumed shares can come back; the rest became proceeds.
+            supply.effectiveShares
           : state.dollarBalance;
   const amountUnit = mode === "deposit" ? asset : isSupplyMode(mode) ? "Risk shares" : "Dollar";
   const preview = quote.data?.preview;
@@ -1014,9 +1006,7 @@ function DollarActionPanel({
   // Supplying has no quote of its own -- it moves a fixed number of shares --
   // so the preview slot shows position instead of price.
   const supplyOutput = isSupplyMode(mode)
-    ? mode === "supply"
-      ? `${displayAmount(supply.optedIn)} supplied now, ${displayAmount(supply.stakedAvailable)} staked and ready`
-      : `${displayAmount(supply.optedIn)} supplied, ${displayAmount(supply.stakedAvailable)} withdrawable now`
+    ? `${displayAmount(supply.effectiveShares)} supplied and redeemable against`
     : null;
 
   // A redemption is capped to whatever is opted in, so asking for more than the
@@ -1104,7 +1094,8 @@ function DollarActionPanel({
               Available {displayAmount(balance)} {amountUnit}
               {mode === "redeem" &&
                 ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
-              {isSupplyMode(mode) && ` · ${displayAmount(supply.optedIn)} currently supplied`}
+              {isSupplyMode(mode) &&
+                ` · ${displayAmount(supply.effectiveShares)} currently supplied`}
             </small>
           </div>
           <fieldset className="dollar-asset-choice" hidden={isSupplyMode(mode)}>
@@ -1144,18 +1135,37 @@ function DollarActionPanel({
           )}
           {mode === "supply" && (
             <p className="dollar-note">
-              Supplying lets Dollar holders redeem without holding Risk shares, and pays you a share
-              of the redemption fee. It takes two transactions -- your shares are staked into a
-              position first, then supplied -- and you can withdraw them again whenever the book has
-              room.
+              Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
+              shares become redeemable the moment this confirms, and you earn only where a
+              redemption actually consumes them -- nothing accrues for sitting idle. Unconsumed
+              shares stay withdrawable.
             </p>
           )}
           {mode === "unsupply" && (
             <p className="dollar-note">
-              Withdrawing takes your Risk shares back out of the redemption book and returns them to
-              this wallet. Anything already redeemed against has been converted and cannot be
-              withdrawn as shares.
+              Withdrawing returns unconsumed Risk shares to this wallet. Shares a redemption already
+              consumed are gone as shares -- they became proceeds, which you collect by claiming.
             </p>
+          )}
+          {isSupplyMode(mode) && hasClaimableProceeds(supply) && supply.positionId !== null && (
+            <div className="dollar-claim-row">
+              <div>
+                <span>Proceeds to claim</span>
+                <strong>
+                  {[
+                    [supply.claimableCollateral, asset] as const,
+                    [supply.claimableStaticsDollar, "Dollar"] as const,
+                    [supply.claimableStatics, "STATICS"] as const,
+                  ]
+                    .filter(([value]) => value > 0n)
+                    .map(([value, label]) => `${displayAmount(value)} ${label}`)
+                    .join(" · ")}
+                </strong>
+              </div>
+              <button type="button" disabled={anyPending} onClick={() => void claimProceeds()}>
+                {pendingAction === "claim" ? "Waiting for confirmation…" : "Claim"}
+              </button>
+            </div>
           )}
           {mode === "redeem" && (
             <p className="dollar-note">

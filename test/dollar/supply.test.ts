@@ -4,6 +4,7 @@ import {
   deriveSupplyStep,
   deriveWithdrawStep,
   emptyDollarSupplyState,
+  hasClaimableProceeds,
   type DollarSupplyState,
 } from "@/lib/dollar/supply";
 
@@ -14,37 +15,26 @@ const state = (overrides: Partial<DollarSupplyState> = {}): DollarSupplyState =>
   ...overrides,
 });
 
-describe("supplying Risk shares as redemption liquidity", () => {
-  it("asks for approval before it can pull shares into a position", () => {
+describe("supplying Risk Shares as redemption liquidity", () => {
+  it("asks for approval before it can pull shares in", () => {
     const next = deriveSupplyStep(
       100n,
       state({ walletShares: 100n, riskApprovedForPeriphery: false }),
       true
     );
     expect(next.step).toBe("approve-risk-periphery");
+    expect(next.moves).toBe(0n);
   });
 
-  // Staking alone does nothing for a redeemer, so the second call is the one
-  // that actually fills the book.
-  it("stakes first, then supplies", () => {
-    const holding = state({ walletShares: 100n });
-    expect(deriveSupplyStep(100n, holding, true).step).toBe("stake");
-    // After the stake confirms the principal is in the leg, not the wallet.
-    const staked = state({ walletShares: 0n, stakedAvailable: 100n });
-    expect(deriveSupplyStep(100n, staked, true).step).toBe("opt-in");
+  // Staking is supplying. The earlier model needed a second opt-in call before
+  // a redeemer could touch the shares; this one does not.
+  it("supplies in a single step once approved", () => {
+    const next = deriveSupplyStep(100n, state({ walletShares: 100n }), true);
+    expect(next).toMatchObject({ step: "stake", moves: 100n });
   });
 
-  // Principal already staked is reused rather than pulling more from the
-  // wallet, so a top-up only needs the shortfall.
-  it("reuses principal already sitting in the leg", () => {
-    const partial = state({ walletShares: 60n, stakedAvailable: 40n });
-    // Only the 60 shortfall is pulled from the wallet, not the full 100.
-    expect(deriveSupplyStep(100n, partial, true)).toMatchObject({ step: "stake", moves: 60n });
-    expect(deriveSupplyStep(40n, partial, true)).toMatchObject({ step: "opt-in", moves: 40n });
-  });
-
-  it("refuses more than the wallet and leg hold together", () => {
-    const next = deriveSupplyStep(100n, state({ walletShares: 10n, stakedAvailable: 10n }), true);
+  it("refuses more than the wallet holds", () => {
+    const next = deriveSupplyStep(100n, state({ walletShares: 10n }), true);
     expect(next.step).toBe("blocked");
     expect(next.reason).toMatch(/not have enough risk shares/i);
   });
@@ -58,42 +48,25 @@ describe("supplying Risk shares as redemption liquidity", () => {
   });
 });
 
-describe("withdrawing supplied Risk shares", () => {
-  // optOut ends in safeTransferFrom(this -> receiver), so it IS the withdrawal
-  // when nothing is idle in the leg -- not a first hop feeding a second.
-  it("opts out directly to the wallet when nothing is idle in the leg", () => {
-    const supplied = state({ optedIn: 100n, stakedAvailable: 0n });
-    const next = deriveWithdrawStep(100n, supplied);
-    expect(next.step).toBe("opt-out");
-    expect(next.moves).toBe(100n);
+describe("withdrawing supplied Risk Shares", () => {
+  it("withdraws unconsumed shares in one step", () => {
+    const next = deriveWithdrawStep(100n, state({ effectiveShares: 100n }));
+    expect(next).toMatchObject({ step: "unstake", moves: 100n });
   });
 
-  it("withdraws directly when the principal is no longer supplied", () => {
-    const idle = state({ optedIn: 0n, stakedAvailable: 100n });
-    expect(deriveWithdrawStep(100n, idle).step).toBe("withdraw");
+  // Consumed shares are gone -- they became proceeds. Someone who supplied 100
+  // and had 60 redeemed against can only withdraw 40, which is bewildering
+  // unless the reason says where the rest went.
+  it("explains that consumed shares are claimed rather than withdrawn", () => {
+    const partlyConsumed = state({ effectiveShares: 40n, claimableCollateral: 5n });
+    const next = deriveWithdrawStep(100n, partlyConsumed);
+    expect(next.step).toBe("blocked");
+    expect(next.reason).toMatch(/claimed rather than withdrawn/i);
+    expect(deriveWithdrawStep(40n, partlyConsumed)).toMatchObject({ step: "unstake", moves: 40n });
   });
 
-  // Idle principal earns nothing, so it goes first and the book keeps working
-  // for as long as possible.
-  it("drains the idle leg before touching the book", () => {
-    const mixed = state({ optedIn: 60n, stakedAvailable: 40n });
-    expect(deriveWithdrawStep(40n, mixed)).toMatchObject({ step: "withdraw", moves: 40n });
-    // Asking for 100 moves the 40 idle first; the 60 still supplied follows.
-    expect(deriveWithdrawStep(100n, mixed)).toMatchObject({ step: "withdraw", moves: 40n });
-    const afterLegDrained = state({ optedIn: 60n, stakedAvailable: 0n });
-    expect(deriveWithdrawStep(60n, afterLegDrained)).toMatchObject({ step: "opt-out", moves: 60n });
-  });
-
-  // The bug this replaces: withdrawLeg was called with the full amount after an
-  // opt-out that had already delivered part of it, reverting InsufficientPrincipal.
-  it("never asks a step to move more than its source holds", () => {
-    const mixed = state({ optedIn: 60n, stakedAvailable: 40n });
-    const next = deriveWithdrawStep(100n, mixed);
-    expect(next.moves).toBeLessThanOrEqual(mixed.stakedAvailable);
-  });
-
-  it("refuses more than was supplied", () => {
-    const next = deriveWithdrawStep(500n, state({ optedIn: 60n, stakedAvailable: 40n }));
+  it("gives the plain reason when nothing has been consumed", () => {
+    const next = deriveWithdrawStep(100n, state({ effectiveShares: 40n }));
     expect(next.step).toBe("blocked");
     expect(next.reason).toMatch(/more than you have supplied/i);
   });
@@ -102,5 +75,22 @@ describe("withdrawing supplied Risk shares", () => {
     const next = deriveWithdrawStep(100n, { ...emptyDollarSupplyState, positionId: null });
     expect(next.step).toBe("blocked");
     expect(next.reason).toMatch(/has not supplied/i);
+  });
+});
+
+describe("claimable proceeds", () => {
+  // Three assets now, and any one of them means there is something to collect.
+  it("detects proceeds in any of the three assets", () => {
+    expect(hasClaimableProceeds(state())).toBe(false);
+    expect(hasClaimableProceeds(state({ claimableCollateral: 1n }))).toBe(true);
+    expect(hasClaimableProceeds(state({ claimableStaticsDollar: 1n }))).toBe(true);
+    expect(hasClaimableProceeds(state({ claimableStatics: 1n }))).toBe(true);
+  });
+
+  // unstakeRiskShares settles but does not transfer, so a supplier can be fully
+  // withdrawn and still owed proceeds. The claim must survive that.
+  it("survives a full withdrawal", () => {
+    const withdrawn = state({ effectiveShares: 0n, claimableCollateral: 12n });
+    expect(hasClaimableProceeds(withdrawn)).toBe(true);
   });
 });
