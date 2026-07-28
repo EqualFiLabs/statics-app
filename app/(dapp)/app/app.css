@@ -2120,6 +2120,16 @@
   border-radius: var(--radius-lg);
 }
 
+/* Explains a route rather than warning about one, so it stays quiet. */
+.dollar-note {
+  padding: 0.9rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  border-radius: var(--radius-lg);
+}
+
 .dollar-action-reason {
   margin: 1rem 0 0;
   padding: 0.9rem;

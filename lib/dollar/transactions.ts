@@ -13,6 +13,26 @@ import { describeTransportFailure } from "@/lib/protocol/errors";
 export const DOLLAR_SLIPPAGE_BPS = 50n;
 const BPS = 10_000n;
 
+/** Collateral-per-Dollar rate guards are WAD-normalized by the pairing vault. */
+export const WAD = 10n ** 18n;
+
+/**
+ * How long a redemption stays signable.
+ *
+ * The pairing vault takes a deadline because the fill is drawn from a shared
+ * opt-in book that other people are consuming. Ten minutes is long enough for a
+ * hardware wallet confirmation and short enough that a transaction stuck in the
+ * mempool cannot execute against a book that has since emptied and refilled at
+ * a different rate.
+ */
+export const REDEEM_DEADLINE_SECONDS = 600;
+
+/** Deadline for a redemption signed now. Impure by nature, so it lives here
+ *  rather than being read during a render. */
+export function redeemDeadline(): bigint {
+  return BigInt(Math.floor(Date.now() / 1000) + REDEEM_DEADLINE_SECONDS);
+}
+
 export function minimumWithTolerance(amount: bigint): bigint {
   return (amount * (BPS - DOLLAR_SLIPPAGE_BPS)) / BPS;
 }
@@ -42,6 +62,15 @@ export function validateRecombinationSimulation(
 
 const errorMessages: Readonly<Record<string, string>> = {
   ZeroAmount: "Enter an amount greater than zero.",
+  NoOptInLiquidity:
+    "Nobody has opted Risk shares in for this series yet, so there is nothing to redeem against.",
+  FillBelowMinimum:
+    "The redeemable amount fell below your tolerance while confirming. Review the new quote.",
+  RateBelowMinimum:
+    "The collateral per Dollar moved below your 0.50% tolerance. Review the new quote.",
+  SeriesTransitionPending: "This Risk series is mid-transition. Try again once it settles.",
+  NotWETHCollateral: "This series is not WETH-collateralized, so it cannot pay out native ETH.",
+  DeadlineExpired: "This redemption took too long to confirm. Review a fresh quote.",
   InvalidProfile: "The configured WETH profile is unavailable.",
   InvalidProfileKind: "The configured profile is not a volatile collateral profile.",
   InvalidProfileMode: "The WETH profile is not active for this operation.",

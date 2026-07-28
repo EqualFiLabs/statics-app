@@ -28,6 +28,8 @@ export type DollarActivityKind =
   | "revoke-risk"
   | "deposit-eth"
   | "deposit-weth"
+  | "redeem-eth"
+  | "redeem-weth"
   | "recombine-eth"
   | "recombine-weth"
   | "approve-basket-asset"

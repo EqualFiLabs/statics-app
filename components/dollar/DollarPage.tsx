@@ -9,6 +9,7 @@ import {
   buildRecombineToETHCall,
   buildRecombineToWETHCall,
   staticsDollarCoreAbi,
+  staticsDollarPeripheryAbi,
   staticsDollarRiskTokenAbi,
   staticsDollarTokenAbi,
   wethAbi,
@@ -18,6 +19,7 @@ import {
   formatUnits,
   getAddress,
   parseUnits,
+  zeroAddress,
   type Address,
   type Hex,
 } from "viem";
@@ -31,6 +33,7 @@ import {
   type DollarReplacementReason,
 } from "@/lib/dollar/activity";
 import {
+  DOLLAR_OPT_IN_FILL_PAUSE,
   deriveDollarActionAvailability,
   dollarQuoteQueryKey,
   type DollarActionMode,
@@ -46,6 +49,8 @@ import {
   describeDollarError,
   isOnchainRevert,
   isWalletRejection,
+  WAD,
+  redeemDeadline,
   maximumWithTolerance,
   minimumWithTolerance,
   validateRecombinationSimulation,
@@ -62,6 +67,12 @@ import { readEvesMarketUrl } from "@/lib/site-config";
 import { overviewTiles } from "@/lib/overview";
 
 const deploymentState = readClientDollarDeployment();
+
+const modeLabels: Record<DollarActionMode, string> = {
+  deposit: "Deposit",
+  recombine: "Recombine",
+  redeem: "Redeem",
+};
 const evesMarketUrl = readEvesMarketUrl(process.env.NEXT_PUBLIC_EVES_MARKET_URL);
 
 function shortAddress(address: Address): string {
@@ -117,6 +128,7 @@ function useDollarSnapshot(deployment: DollarDeployment, wallet: Address) {
         globalHealth,
         priceWad,
         pausedOperations,
+        periphery,
       ] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.core,
@@ -184,10 +196,46 @@ function useDollarSnapshot(deployment: DollarDeployment, wallet: Address) {
           functionName: "pausedProfileOperations",
           args: [deployment.wethProfileId],
         }),
+        // Read from the pool rather than configured separately, so the two can
+        // never disagree about which periphery is in use.
+        publicClient.readContract({
+          address: deployment.contracts.core,
+          abi: staticsDollarCoreAbi,
+          functionName: "periphery",
+        }),
       ]);
+
+      // Redemption depends on liquidity somebody else supplied, so an absent or
+      // silent periphery means the route is simply unavailable -- never a
+      // failure of the page around it.
+      const [redeemableLiquidity, peripheryDollarAllowance] =
+        periphery && periphery !== zeroAddress
+          ? await Promise.all([
+              publicClient
+                .readContract({
+                  address: periphery,
+                  abi: staticsDollarPeripheryAbi,
+                  functionName: "redeemableLiquidity",
+                  args: [seriesId],
+                })
+                .catch(() => 0n),
+              publicClient
+                .readContract({
+                  address: deployment.contracts.dollar,
+                  abi: staticsDollarTokenAbi,
+                  functionName: "allowance",
+                  args: [wallet, periphery],
+                })
+                .catch(() => 0n),
+            ])
+          : [0n, 0n];
+
       return {
         profile,
         seriesId,
+        periphery,
+        redeemableLiquidity,
+        peripheryDollarAllowance,
         series,
         nativeBalance,
         wethBalance,
@@ -451,6 +499,24 @@ function DollarActionPanel({
           preview,
         };
       }
+      if (mode === "redeem") {
+        if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
+          throw new Error("This deployment has no periphery, so Dollar cannot be redeemed alone.");
+        }
+        const preview = await publicClient.readContract({
+          address: snapshot.data.periphery,
+          abi: staticsDollarPeripheryAbi,
+          functionName: "previewRedeem",
+          args: [snapshot.data.seriesId, amount],
+        });
+        return {
+          mode: "redeem" as const,
+          amount,
+          seriesId: snapshot.data.seriesId,
+          quotedAt: Date.now(),
+          preview,
+        };
+      }
       const preview = await publicClient.readContract({
         address: deployment.contracts.core,
         abi: staticsDollarCoreAbi,
@@ -601,6 +667,58 @@ function DollarActionPanel({
             args: [deployment.contracts.gateway, amount],
           }),
         });
+      } else if (actionAvailability.kind === "approve-dollar-periphery") {
+        if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
+          throw new Error("This deployment has no periphery to approve.");
+        }
+        await recordAndSend({
+          kind: "approve-dollar",
+          label: "Approve exact Dollar",
+          to: deployment.contracts.dollar,
+          data: encodeFunctionData({
+            abi: staticsDollarTokenAbi,
+            functionName: "approve",
+            args: [snapshot.data.periphery, amount],
+          }),
+        });
+      } else if (actionAvailability.kind === "execute" && currentQuote.mode === "redeem") {
+        const preview = await quote.refetch();
+        if (
+          !preview.data ||
+          preview.data.mode !== "redeem" ||
+          preview.data.amount !== amount ||
+          preview.data.seriesId !== snapshot.data.seriesId
+        ) {
+          throw new Error("Preview refresh failed.");
+        }
+        if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
+          throw new Error("This deployment has no periphery, so Dollar cannot be redeemed alone.");
+        }
+        const fill = preview.data.preview.staticsDollarRedeemed;
+        if (fill === 0n) throw new Error("There is no redemption liquidity to fill this amount.");
+        // The rate guard is collateral per Dollar, WAD-normalized -- the same
+        // number the contract recomputes after the split, so a fee or price
+        // move between preview and execution is caught rather than absorbed.
+        const rateWad = (preview.data.preview.collateralToRedeemer * WAD) / fill;
+        const data = encodeFunctionData({
+          abi: staticsDollarPeripheryAbi,
+          functionName: asset === "ETH" ? "redeemToETH" : "redeem",
+          args: [
+            snapshot.data.seriesId,
+            amount,
+            minimumWithTolerance(fill),
+            minimumWithTolerance(rateWad),
+            redeemDeadline(),
+            wallet,
+          ],
+        });
+        await recordAndSend({
+          kind: asset === "ETH" ? "redeem-eth" : "redeem-weth",
+          label: `Redeem Dollar for ${asset}`,
+          to: snapshot.data.periphery,
+          data,
+        });
+        setAmountInput("");
       } else if (actionAvailability.kind === "approve-risk") {
         await recordAndSend({
           kind: "approve-risk",
@@ -736,6 +854,9 @@ function DollarActionPanel({
       wethAllowance: state.wethAllowance,
       dollarAllowance: state.dollarAllowance,
       riskApproved: state.riskApproved,
+      peripheryDollarAllowance: state.peripheryDollarAllowance,
+      redeemableLiquidity: state.redeemableLiquidity,
+      optInFillsPaused: (state.pausedOperations & DOLLAR_OPT_IN_FILL_PAUSE) !== 0n,
     },
   });
   const balance =
@@ -752,7 +873,17 @@ function DollarActionPanel({
         )} Risk`
       : quote.data?.mode === "recombine"
         ? `${displayAmount(quote.data.preview.collateralOut)} ${asset}`
-        : "Enter an amount for an onchain preview";
+        : quote.data?.mode === "redeem"
+          ? `${displayAmount(quote.data.preview.collateralToRedeemer)} ${asset}`
+          : "Enter an amount for an onchain preview";
+
+  // A redemption is capped to whatever is opted in, so asking for more than the
+  // book holds fills part of the order. Saying so before signing is the whole
+  // difference between a partial fill and a surprise.
+  const redeemShortfall =
+    quote.data?.mode === "redeem" && quote.data.preview.staticsDollarRedeemed < quote.data.amount
+      ? quote.data.preview.staticsDollarRedeemed
+      : null;
   const previewLabel =
     quoteState === "ready"
       ? "Current preview"
@@ -787,7 +918,7 @@ function DollarActionPanel({
       <section className="dollar-workspace">
         <div className="dollar-action-card">
           <div className="dollar-tabs" aria-label="Dollar action">
-            {(["deposit", "recombine"] as const).map((choice) => (
+            {(["deposit", "recombine", "redeem"] as const).map((choice) => (
               <button
                 key={choice}
                 type="button"
@@ -798,7 +929,7 @@ function DollarActionPanel({
                 }}
                 disabled={anyPending}
               >
-                {choice}
+                {modeLabels[choice]}
               </button>
             ))}
           </div>
@@ -829,6 +960,8 @@ function DollarActionPanel({
             </div>
             <small>
               Available {displayAmount(balance)} {mode === "deposit" ? asset : "Dollar"}
+              {mode === "redeem" &&
+                ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
             </small>
           </div>
           <fieldset className="dollar-asset-choice">
@@ -859,6 +992,19 @@ function DollarActionPanel({
               </small>
             )}
           </div>
+          {redeemShortfall !== null && (
+            <p className="dollar-warning" role="status">
+              Only {displayAmount(redeemShortfall)} of the {displayAmount(quote.data!.amount)}{" "}
+              Dollar you entered can be redeemed right now -- that is all the Risk shares currently
+              opted in. The rest stays in your wallet.
+            </p>
+          )}
+          {mode === "redeem" && (
+            <p className="dollar-note">
+              Redeeming spends Risk shares somebody else opted in, so you do not need to hold any.
+              Recombine instead if you hold both and want the full collateral.
+            </p>
+          )}
           {mode === "recombine" && !state.riskApproved && (
             <p className="dollar-warning">
               ERC-1155 approval covers every Risk series, not only series{" "}
