@@ -7057,19 +7057,20 @@ export declare const staticsDollarCoreAbi: readonly [{
     }];
 }];
 /**
- * Periphery diamond: opt-in risk liquidity and the Dollar-only exit it backs.
+ * Periphery diamond: consumable Risk Share liquidity and the Dollar-only exit
+ * it backs.
  *
  * These live at a different address from the core pool. Read it from
  * `staticsDollarCoreAbi`'s `periphery()` rather than configuring it separately,
  * so the two can never disagree about which periphery is in use.
  *
  * The pairing vault is the reason `recombineManaged` is restricted to the
- * periphery: it burns a redeemer's Dollar against risk shares somebody else
- * opted in, which is what lets a holder exit without sourcing the junior
- * tranche themselves. Ordinary `recombine` still requires both legs.
+ * periphery: it burns a redeemer's Dollar against Risk Shares supplied through
+ * a PositionNFT, which lets a holder exit without sourcing the junior tranche.
+ * Ordinary `recombine` still requires both legs.
  */
 export declare const staticsDollarPeripheryAbi: readonly [{
-    readonly name: "createAndStake";
+    readonly name: "createAndStakeRiskShares";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -7087,7 +7088,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "positionId";
     }];
 }, {
-    readonly name: "stake";
+    readonly name: "stakeRiskShares";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -7102,19 +7103,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "activateLeg";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "withdrawLeg";
+    readonly name: "unstakeRiskShares";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -7130,9 +7119,166 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly type: "address";
         readonly name: "receiver";
     }];
-    readonly outputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "principalOut";
+    }];
 }, {
-    readonly name: "closeLeg";
+    readonly name: "claimRiskProceeds";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "fundRiskCollateralIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "fundRiskDollarIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "fundRiskStaticsIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "riskIncentives";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "address";
+            readonly name: "collateralToken";
+        }, {
+            readonly type: "address";
+            readonly name: "staticsToken";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsDollarReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "destinationSeriesId";
+        }, {
+            readonly type: "bool";
+            readonly name: "routedGlobal";
+        }, {
+            readonly type: "bool";
+            readonly name: "finalized";
+        }];
+        readonly name: "view_";
+    }];
+}, {
+    readonly name: "finalizeRiskIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "destinationSeriesId";
+    }, {
+        readonly type: "bool";
+        readonly name: "routedGlobal";
+    }];
+}, {
+    readonly name: "processSeriesTransition";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "oldSeriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "newSeriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPrincipal";
+    }];
+}, {
+    readonly name: "settleSeriesMigration";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "oldSeriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "newSeriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPrincipal";
+    }];
+}, {
+    readonly name: "closeRiskLiquidity";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -7144,7 +7290,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "leg";
+    readonly name: "riskLiquidity";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -7158,42 +7304,48 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint256";
-            readonly name: "eligiblePrincipal";
+            readonly name: "effectiveShares";
         }, {
             readonly type: "uint256";
-            readonly name: "pendingPrincipal";
+            readonly name: "claimableCollateral";
         }, {
             readonly type: "uint256";
-            readonly name: "pendingSince";
+            readonly name: "claimableStaticsDollar";
         }, {
             readonly type: "uint256";
-            readonly name: "collateralPassiveCheckpointRay";
-        }, {
-            readonly type: "uint256";
-            readonly name: "staticsDollarPassiveCheckpointRay";
-        }, {
-            readonly type: "uint256";
-            readonly name: "optInStored";
-        }, {
-            readonly type: "uint256";
-            readonly name: "collateralOptInCheckpointRay";
-        }, {
-            readonly type: "uint256";
-            readonly name: "staticsDollarOptInCheckpointRay";
-        }, {
-            readonly type: "uint256";
-            readonly name: "accruedCollateral";
-        }, {
-            readonly type: "uint256";
-            readonly name: "accruedStaticsDollar";
+            readonly name: "claimableStatics";
         }, {
             readonly type: "uint64";
-            readonly name: "optInEpoch";
+            readonly name: "epoch";
         }, {
             readonly type: "bool";
             readonly name: "exists";
         }];
-        readonly name: "leg";
+        readonly name: "view_";
+    }];
+}, {
+    readonly name: "totalRiskLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "effectiveShares";
+    }];
+}, {
+    readonly name: "riskLiquidityScaleRay";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "scaleRay";
     }];
 }, {
     readonly name: "positionSeriesCount";
@@ -7223,109 +7375,56 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "seriesId";
     }];
 }, {
-    readonly name: "rewardEligibleAt";
+    readonly name: "seriesMigration";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
         readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
+        readonly name: "oldSeriesId";
     }];
     readonly outputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "timestamp";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "newSeriesId";
+        }, {
+            readonly type: "uint256";
+            readonly name: "oldPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingOldPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingNewPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingStaticsDollar";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingCollateral";
+        }, {
+            readonly type: "bool";
+            readonly name: "returned";
+        }, {
+            readonly type: "bool";
+            readonly name: "claimed";
+        }];
+        readonly name: "migration";
     }];
 }, {
-    readonly name: "optIn";
+    readonly name: "reservedBalance";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "view";
     readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "amount";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "optOut";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "amount";
-    }, {
         readonly type: "address";
-        readonly name: "receiver";
+        readonly name: "token";
     }];
     readonly outputs: readonly [{
         readonly type: "uint256";
-        readonly name: "principalOut";
+        readonly name: "amount";
     }];
 }, {
-    readonly name: "optInBalanceOf";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "principal";
-    }];
-}, {
-    readonly name: "optInTotal";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "principal";
-    }];
-}, {
-    readonly name: "optInScaleRay";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "scaleRay";
-    }];
-}, {
-    readonly name: "cleanupOptInDust";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "OptedIn";
+    readonly name: "RiskSharesStaked";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7336,14 +7435,15 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "seriesId";
         readonly indexed: true;
     }, {
-        readonly type: "uint256";
-        readonly name: "principal";
+        readonly type: "address";
+        readonly name: "supplier";
+        readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "storedUnits";
+        readonly name: "amount";
     }];
 }, {
-    readonly name: "OptedOut";
+    readonly name: "RiskSharesUnstaked";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7359,10 +7459,10 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "principal";
+        readonly name: "amount";
     }];
 }, {
-    readonly name: "OptInDustCleared";
+    readonly name: "RiskProceedsClaimed";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7373,11 +7473,49 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "seriesId";
         readonly indexed: true;
     }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "collateralToken";
+    }, {
+        readonly type: "address";
+        readonly name: "staticsToken";
+    }, {
         readonly type: "uint256";
-        readonly name: "storedUnits";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
     }];
 }, {
-    readonly name: "LegRewardsSettled";
+    readonly name: "RiskProceedsAccrued";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint64";
+        readonly name: "epoch";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "bytes32";
+        readonly name: "source";
+    }];
+}, {
+    readonly name: "RiskProceedsSettled";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7395,10 +7533,100 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "staticsDollarAdded";
     }, {
         readonly type: "uint256";
+        readonly name: "staticsAdded";
+    }, {
+        readonly type: "uint256";
         readonly name: "accruedCollateral";
     }, {
         readonly type: "uint256";
         readonly name: "accruedStaticsDollar";
+    }, {
+        readonly type: "uint256";
+        readonly name: "accruedStatics";
+    }];
+}, {
+    readonly name: "RiskIncentivesFunded";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "funder";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "requestedAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "receivedAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesReleased";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint64";
+        readonly name: "epoch";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskSharesConsumed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesRolledOver";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "destinationSeriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesRoutedGlobal";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
     }];
 }, {
     readonly name: "redeem";
@@ -7490,7 +7718,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
             readonly name: "collateralToRedeemer";
         }, {
             readonly type: "uint256";
-            readonly name: "collateralToStakers";
+            readonly name: "collateralToRiskSuppliers";
         }, {
             readonly type: "uint256";
             readonly name: "collateralToInsurance";
@@ -7522,7 +7750,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "redemptionFeeBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "supplierShareBps";
     }];
 }, {
     readonly name: "setRedemptionParams";
@@ -7533,7 +7761,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "redemptionFeeBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "supplierShareBps";
     }];
     readonly outputs: readonly [];
 }, {
@@ -7559,7 +7787,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "collateralToRedeemer";
     }, {
         readonly type: "uint256";
-        readonly name: "collateralToStakers";
+        readonly name: "collateralToRiskSuppliers";
     }, {
         readonly type: "uint256";
         readonly name: "collateralToInsurance";
@@ -7594,46 +7822,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
         readonly name: "redemptionFeeBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
-    }];
-}, {
-    readonly name: "OptInIncentivesReleased";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "seriesId";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint256";
-        readonly name: "collateralAmount";
-    }, {
-        readonly type: "uint256";
-        readonly name: "staticsDollarAmount";
-    }, {
-        readonly type: "uint256";
-        readonly name: "filledStaticsDollarRisk";
-    }];
-}, {
-    readonly name: "OptInFeesAccrued";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "seriesId";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint64";
-        readonly name: "epoch";
-        readonly indexed: true;
-    }, {
-        readonly type: "address";
-        readonly name: "token";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint256";
-        readonly name: "amount";
-    }, {
-        readonly type: "bytes32";
-        readonly name: "source";
+        readonly name: "supplierShareBps";
     }];
 }, {
     readonly name: "CustodyReserved";
@@ -7661,7 +7850,7 @@ export declare const staticsDollarPeripheryAbi: readonly [{
  * one array makes the decode ambiguous. Decode against both.
  */
 export declare const staticsDollarPeripheryErrorAbi: readonly [{
-    readonly name: "NotAuthorized";
+    readonly name: "NotPositionOwnerOrApproved";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7671,7 +7860,7 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "caller";
     }];
 }, {
-    readonly name: "UnknownLeg";
+    readonly name: "UnknownRiskLiquidity";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7681,27 +7870,7 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "seriesId";
     }];
 }, {
-    readonly name: "NoOptInPosition";
-    readonly type: "error";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-}, {
-    readonly name: "NoZeroEffectiveDust";
-    readonly type: "error";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "positionId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "seriesId";
-    }];
-}, {
-    readonly name: "InsufficientBasePrincipal";
+    readonly name: "InsufficientRiskLiquidity";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7711,14 +7880,48 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "available";
     }];
 }, {
-    readonly name: "OptInAmountTooSmall";
+    readonly name: "NoRiskProceeds";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesNotIncentiveEligible";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesIncentivesNotFinalizable";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "RiskLiquidityHasValue";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "RiskLiquidityAmountTooSmall";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "requested";
     }];
 }, {
-    readonly name: "NoOptInLiquidity";
+    readonly name: "NoRiskLiquidity";
     readonly type: "error";
     readonly inputs: readonly [];
 }, {
@@ -7749,7 +7952,7 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "feeBps";
     }, {
         readonly type: "uint16";
-        readonly name: "stakerShareBps";
+        readonly name: "supplierShareBps";
     }];
 }, {
     readonly name: "SeriesTransitionPending";
@@ -7783,14 +7986,14 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "grossCollateral";
     }];
 }, {
-    readonly name: "OptInScaleExhausted";
+    readonly name: "RiskLiquidityScaleExhausted";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "storedUnits";
     }];
 }, {
-    readonly name: "ConsumeExceedsTier";
+    readonly name: "ConsumeExceedsLiquidity";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";
@@ -7852,7 +8055,14 @@ export declare const staticsDollarPeripheryErrorAbi: readonly [{
         readonly name: "afterBalance";
     }];
 }, {
-    readonly name: "NoRewardEligiblePrincipal";
+    readonly name: "SeriesMigrationNotReady";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesMigrationAlreadyProcessed";
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint256";

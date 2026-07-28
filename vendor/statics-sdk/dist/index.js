@@ -764,54 +764,58 @@ export const staticsDollarCoreAbi = parseAbi([
     "function profileSeriesAt(uint256 profileId,uint256 index) view returns (uint256 seriesId)",
 ]);
 /**
- * Periphery diamond: opt-in risk liquidity and the Dollar-only exit it backs.
+ * Periphery diamond: consumable Risk Share liquidity and the Dollar-only exit
+ * it backs.
  *
  * These live at a different address from the core pool. Read it from
  * `staticsDollarCoreAbi`'s `periphery()` rather than configuring it separately,
  * so the two can never disagree about which periphery is in use.
  *
  * The pairing vault is the reason `recombineManaged` is restricted to the
- * periphery: it burns a redeemer's Dollar against risk shares somebody else
- * opted in, which is what lets a holder exit without sourcing the junior
- * tranche themselves. Ordinary `recombine` still requires both legs.
+ * periphery: it burns a redeemer's Dollar against Risk Shares supplied through
+ * a PositionNFT, which lets a holder exit without sourcing the junior tranche.
+ * Ordinary `recombine` still requires both legs.
  */
 export const staticsDollarPeripheryAbi = parseAbi([
-    // -- StakingFacet: moving risk shares into a position leg.
-    // The leg is what opt-in draws from, so nothing below is reachable without
-    // this first. Note these shadow same-named functions on `staticsAbi`, which
-    // stake the Statics token instead -- different contract, different arguments.
-    "function createAndStake(uint256 seriesId,uint256 amount,address receiver) returns (uint256 positionId)",
-    "function stake(uint256 positionId,uint256 seriesId,uint256 amount)",
-    "function activateLeg(uint256 positionId,uint256 seriesId)",
-    "function withdrawLeg(uint256 positionId,uint256 seriesId,uint256 amount,address receiver)",
-    "function closeLeg(uint256 positionId,uint256 seriesId)",
-    "function leg(uint256 positionId,uint256 seriesId) view returns ((uint256 eligiblePrincipal,uint256 pendingPrincipal,uint256 pendingSince,uint256 collateralPassiveCheckpointRay,uint256 staticsDollarPassiveCheckpointRay,uint256 optInStored,uint256 collateralOptInCheckpointRay,uint256 staticsDollarOptInCheckpointRay,uint256 accruedCollateral,uint256 accruedStaticsDollar,uint64 optInEpoch,bool exists) leg)",
+    // -- StakingFacet: every staked Risk Share is immediately consumable.
+    "function createAndStakeRiskShares(uint256 seriesId,uint256 amount,address receiver) returns (uint256 positionId)",
+    "function stakeRiskShares(uint256 positionId,uint256 seriesId,uint256 amount)",
+    "function unstakeRiskShares(uint256 positionId,uint256 seriesId,uint256 amount,address receiver) returns (uint256 principalOut)",
+    "function claimRiskProceeds(uint256 positionId,uint256 seriesId,address receiver) returns (uint256 collateralAmount,uint256 staticsDollarAmount,uint256 staticsAmount)",
+    "function fundRiskCollateralIncentives(uint256 seriesId,uint256 amount) returns (uint256 received)",
+    "function fundRiskDollarIncentives(uint256 seriesId,uint256 amount) returns (uint256 received)",
+    "function fundRiskStaticsIncentives(uint256 seriesId,uint256 amount) returns (uint256 received)",
+    "function riskIncentives(uint256 seriesId) view returns ((address collateralToken,address staticsToken,uint256 collateralReserve,uint256 staticsDollarReserve,uint256 staticsReserve,uint256 destinationSeriesId,bool routedGlobal,bool finalized) view_)",
+    "function finalizeRiskIncentives(uint256 seriesId) returns (uint256 destinationSeriesId,bool routedGlobal)",
+    "function processSeriesTransition(uint256 oldSeriesId) returns (uint256 newSeriesId,uint256 newPrincipal)",
+    "function settleSeriesMigration(uint256 positionId,uint256 oldSeriesId) returns (uint256 newSeriesId,uint256 newPrincipal)",
+    "function closeRiskLiquidity(uint256 positionId,uint256 seriesId)",
+    "function riskLiquidity(uint256 positionId,uint256 seriesId) view returns ((uint256 effectiveShares,uint256 claimableCollateral,uint256 claimableStaticsDollar,uint256 claimableStatics,uint64 epoch,bool exists) view_)",
+    "function totalRiskLiquidity(uint256 seriesId) view returns (uint256 effectiveShares)",
+    "function riskLiquidityScaleRay(uint256 seriesId) view returns (uint256 scaleRay)",
     "function positionSeriesCount(uint256 positionId) view returns (uint256 count)",
     "function positionSeriesAt(uint256 positionId,uint256 index) view returns (uint256 seriesId)",
-    "function rewardEligibleAt(uint256 positionId,uint256 seriesId) view returns (uint256 timestamp)",
-    // -- OptInFacet: supplying risk shares as redemption liquidity
-    "function optIn(uint256 positionId,uint256 seriesId,uint256 amount)",
-    "function optOut(uint256 positionId,uint256 seriesId,uint256 amount,address receiver) returns (uint256 principalOut)",
-    "function optInBalanceOf(uint256 positionId,uint256 seriesId) view returns (uint256 principal)",
-    "function optInTotal(uint256 seriesId) view returns (uint256 principal)",
-    "function optInScaleRay(uint256 seriesId) view returns (uint256 scaleRay)",
-    "function cleanupOptInDust(uint256 positionId,uint256 seriesId)",
-    "event OptedIn(uint256 indexed positionId,uint256 indexed seriesId,uint256 principal,uint256 storedUnits)",
-    "event OptedOut(uint256 indexed positionId,uint256 indexed seriesId,address indexed receiver,uint256 principal)",
-    "event OptInDustCleared(uint256 indexed positionId,uint256 indexed seriesId,uint256 storedUnits)",
-    "event LegRewardsSettled(uint256 indexed positionId,uint256 indexed seriesId,uint256 collateralAdded,uint256 staticsDollarAdded,uint256 accruedCollateral,uint256 accruedStaticsDollar)",
+    "function seriesMigration(uint256 oldSeriesId) view returns ((uint256 newSeriesId,uint256 oldPrincipal,uint256 remainingOldPrincipal,uint256 remainingNewPrincipal,uint256 remainingStaticsDollar,uint256 remainingCollateral,bool returned,bool claimed) migration)",
+    "function reservedBalance(address token) view returns (uint256 amount)",
+    "event RiskSharesStaked(uint256 indexed positionId,uint256 indexed seriesId,address indexed supplier,uint256 amount)",
+    "event RiskSharesUnstaked(uint256 indexed positionId,uint256 indexed seriesId,address indexed receiver,uint256 amount)",
+    "event RiskProceedsClaimed(uint256 indexed positionId,uint256 indexed seriesId,address indexed receiver,address collateralToken,address staticsToken,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 staticsAmount)",
+    "event RiskProceedsAccrued(uint256 indexed seriesId,uint64 indexed epoch,address indexed token,uint256 amount,bytes32 source)",
+    "event RiskProceedsSettled(uint256 indexed positionId,uint256 indexed seriesId,uint256 collateralAdded,uint256 staticsDollarAdded,uint256 staticsAdded,uint256 accruedCollateral,uint256 accruedStaticsDollar,uint256 accruedStatics)",
+    "event RiskIncentivesFunded(uint256 indexed seriesId,address indexed token,address indexed funder,uint256 requestedAmount,uint256 receivedAmount)",
+    "event RiskIncentivesReleased(uint256 indexed seriesId,uint64 indexed epoch,uint256 riskSharesConsumed,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 staticsAmount)",
+    "event RiskIncentivesRolledOver(uint256 indexed seriesId,uint256 indexed destinationSeriesId,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 staticsAmount)",
+    "event RiskIncentivesRoutedGlobal(uint256 indexed seriesId,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 staticsAmount)",
     // -- PairingVaultFacet: redeeming Dollar alone against that liquidity
     "function redeem(uint256 seriesId,uint256 staticsDollarAmount,uint256 minStaticsDollarRedeemed,uint256 minCollateralPerStaticsDollarWad,uint256 deadline,address receiver) returns (uint8 status,uint256 staticsDollarRedeemed,uint256 collateralOut)",
     "function redeemToETH(uint256 seriesId,uint256 staticsDollarAmount,uint256 minStaticsDollarRedeemed,uint256 minCollateralPerStaticsDollarWad,uint256 deadline,address receiver) returns (uint8 status,uint256 staticsDollarRedeemed,uint256 ethOut)",
-    "function previewRedeem(uint256 seriesId,uint256 staticsDollarAmount) view returns ((uint256 staticsDollarRedeemed,uint256 grossCollateral,uint256 collateralToRedeemer,uint256 collateralToStakers,uint256 collateralToInsurance,uint256 seniorCollateralPerUnitWad) preview)",
+    "function previewRedeem(uint256 seriesId,uint256 staticsDollarAmount) view returns ((uint256 staticsDollarRedeemed,uint256 grossCollateral,uint256 collateralToRedeemer,uint256 collateralToRiskSuppliers,uint256 collateralToInsurance,uint256 seniorCollateralPerUnitWad) preview)",
     "function redeemableLiquidity(uint256 seriesId) view returns (uint256 staticsDollarAmount)",
-    "function redemptionParams() view returns (uint16 redemptionFeeBps,uint16 stakerShareBps)",
-    "function setRedemptionParams(uint16 redemptionFeeBps,uint16 stakerShareBps)",
-    "event Redeemed(address indexed caller,address indexed receiver,uint256 indexed seriesId,uint256 staticsDollarRedeemed,uint256 collateralToRedeemer,uint256 collateralToStakers,uint256 collateralToInsurance)",
+    "function redemptionParams() view returns (uint16 redemptionFeeBps,uint16 supplierShareBps)",
+    "function setRedemptionParams(uint16 redemptionFeeBps,uint16 supplierShareBps)",
+    "event Redeemed(address indexed caller,address indexed receiver,uint256 indexed seriesId,uint256 staticsDollarRedeemed,uint256 collateralToRedeemer,uint256 collateralToRiskSuppliers,uint256 collateralToInsurance)",
     "event RedemptionDeferred(address indexed caller,address indexed receiver,uint256 indexed seriesId,uint8 status,uint256 unhealthyProfileBitmap)",
-    "event RedemptionParamsSet(uint16 redemptionFeeBps,uint16 stakerShareBps)",
-    "event OptInIncentivesReleased(uint256 indexed seriesId,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 filledStaticsDollarRisk)",
-    "event OptInFeesAccrued(uint256 indexed seriesId,uint64 indexed epoch,address indexed token,uint256 amount,bytes32 source)",
+    "event RedemptionParamsSet(uint16 redemptionFeeBps,uint16 supplierShareBps)",
     "event CustodyReserved(bytes32 indexed account,address indexed token,uint256 amount)",
 ]);
 /**
@@ -824,27 +828,30 @@ export const staticsDollarPeripheryAbi = parseAbi([
  * one array makes the decode ambiguous. Decode against both.
  */
 export const staticsDollarPeripheryErrorAbi = parseAbi([
-    "error NotAuthorized(uint256 positionId,address caller)",
-    "error UnknownLeg(uint256 positionId,uint256 seriesId)",
-    "error NoOptInPosition(uint256 positionId,uint256 seriesId)",
-    "error NoZeroEffectiveDust(uint256 positionId,uint256 seriesId)",
-    "error InsufficientBasePrincipal(uint256 requested,uint256 available)",
-    "error OptInAmountTooSmall(uint256 requested)",
-    "error NoOptInLiquidity()",
+    "error NotPositionOwnerOrApproved(uint256 positionId,address caller)",
+    "error UnknownRiskLiquidity(uint256 positionId,uint256 seriesId)",
+    "error InsufficientRiskLiquidity(uint256 requested,uint256 available)",
+    "error NoRiskProceeds(uint256 positionId,uint256 seriesId)",
+    "error SeriesNotIncentiveEligible(uint256 seriesId)",
+    "error SeriesIncentivesNotFinalizable(uint256 seriesId)",
+    "error RiskLiquidityHasValue(uint256 positionId,uint256 seriesId)",
+    "error RiskLiquidityAmountTooSmall(uint256 requested)",
+    "error NoRiskLiquidity()",
     "error FillBelowMinimum(uint256 fill,uint256 minimum)",
     "error RateBelowMinimum(uint256 rateWad,uint256 minimumRateWad)",
-    "error InvalidRedemptionParams(uint16 feeBps,uint16 stakerShareBps)",
+    "error InvalidRedemptionParams(uint16 feeBps,uint16 supplierShareBps)",
     "error SeriesTransitionPending(uint256 seriesId)",
     "error NotWETHCollateral()",
     "error DeadlineExpired(uint256 deadline,uint256 currentTimestamp)",
     "error FixedAllocationExceedsGross(uint256 fixedSeniorCollateral,uint256 grossCollateral)",
-    "error OptInScaleExhausted(uint256 storedUnits)",
-    "error ConsumeExceedsTier(uint256 requested,uint256 available)",
+    "error RiskLiquidityScaleExhausted(uint256 storedUnits)",
+    "error ConsumeExceedsLiquidity(uint256 requested,uint256 available)",
     "error InsufficientUnreserved(address token,uint256 requested,uint256 available)",
     "error GlobalReservationShortfall(address token,uint256 reserved,uint256 balance)",
     "error DebitExceedsAuthorization(address token,uint256 spent,uint256 maximum)",
     "error BalanceDecreasedDuringPull(address token,uint256 beforeBalance,uint256 afterBalance)",
-    "error NoRewardEligiblePrincipal(uint256 seriesId)",
+    "error SeriesMigrationNotReady(uint256 seriesId)",
+    "error SeriesMigrationAlreadyProcessed(uint256 seriesId)",
     "error NotContractOwner(address caller,address owner)",
     // OpenZeppelin reverts these facets inherit. Without them an ordinary
     // transfer failure decodes as an unknown selector.

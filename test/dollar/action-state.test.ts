@@ -28,7 +28,7 @@ const healthySnapshot: DollarActionSnapshot = {
   riskApproved: true,
   peripheryDollarAllowance: 0n,
   redeemableLiquidity: 0n,
-  optInFillsPaused: false,
+  pairingFillsPaused: false,
 };
 
 function derive(overrides: Partial<DeriveDollarActionInput> = {}) {
@@ -216,7 +216,7 @@ describe("Dollar redemption against opt-in liquidity", () => {
   });
 
   it("honours the opt-in fill pause independently of minting", () => {
-    expect(redeeming({ optInFillsPaused: true })).toMatchObject({ kind: "blocked" });
+    expect(redeeming({ pairingFillsPaused: true })).toMatchObject({ kind: "blocked" });
     // Minting paused must not close the exit.
     expect(redeeming({ pausedOperations: DOLLAR_MINT_PAUSE })).toMatchObject({ kind: "execute" });
   });

@@ -1,6 +1,6 @@
 export const DOLLAR_MINT_PAUSE = 1n << 0n;
-/** PairingVaultFacet.PAUSE_OPT_IN_FILLS -- pausable without pausing minting. */
-export const DOLLAR_OPT_IN_FILL_PAUSE = 1n << 2n;
+/** PairingVaultFacet.PAUSE_PAIRING_FILLS -- pausable without pausing minting. */
+export const DOLLAR_PAIRING_FILL_PAUSE = 1n << 2n;
 
 export type DollarActionMode = "deposit" | "recombine" | "redeem" | "supply" | "unsupply";
 export type DollarCollateralChoice = "ETH" | "WETH";
@@ -27,8 +27,8 @@ export type DollarActionSnapshot = Readonly<{
   peripheryDollarAllowance: bigint;
   /** Dollar the opt-in book can currently fill. Zero means no exit today. */
   redeemableLiquidity: bigint;
-  /** True when opt-in fills are paused independently of minting. */
-  optInFillsPaused: boolean;
+  /** True when pairing fills are paused independently of minting. */
+  pairingFillsPaused: boolean;
 }>;
 
 export type DollarActionAvailability = Readonly<{
@@ -134,7 +134,7 @@ export function deriveDollarActionAvailability({
     if (snapshot.seriesStatus !== 1) {
       return unavailable("Redemption unavailable", "The Risk series is not currently active.");
     }
-    if (snapshot.optInFillsPaused) {
+    if (snapshot.pairingFillsPaused) {
       return unavailable("Redemption unavailable", "Dollar redemption is currently paused.");
     }
     if (snapshot.globalHealthPhase !== 0) {

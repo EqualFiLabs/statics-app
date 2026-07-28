@@ -9,60 +9,72 @@ import {
 } from "@statics-protocol/sdk";
 
 /**
- * Supplying Risk shares as redemption liquidity, and taking them back.
+ * Supplying Risk Shares as redemption liquidity.
  *
- * A Dollar holder can only exit alone because somebody else made their Risk
- * shares available. That takes two hops, and neither is obvious from holding
- * the shares:
+ * Staking is supplying -- there is no second step. A staked share is
+ * immediately consumable by a Dollar holder redeeming through the pairing
+ * vault, and nothing accrues for merely sitting there: proceeds exist only
+ * where a fill actually consumed the shares.
  *
- *   shares in wallet -> staked into a position leg -> opted in to the series book
+ * That leaves three actions rather than the five the earlier opt-in model
+ * needed:
  *
- * Staking alone does nothing for redeemers; opting in is what fills the book
- * that PairingVaultFacet draws on. Withdrawing reverses the same two hops,
- * because `withdrawLeg` can only see principal that is not opted in.
+ *   stake    put shares in, they become consumable at once
+ *   unstake  take unconsumed shares back out
+ *   claim    collect proceeds from shares that were consumed
  *
- * The position is an implementation detail of that path rather than something
- * a supplier chose, so this finds an existing leg to reuse and only creates a
- * position when there is none.
+ * Claiming is separate because `unstakeRiskShares` settles the accounting but
+ * does not transfer proceeds -- a supplier can withdraw everything and still
+ * have collateral, Dollar and STATICS waiting.
+ *
+ * The position is an implementation detail of the path rather than something a
+ * supplier chose, so an existing one is reused and a new position is created
+ * only when there is none.
  */
 
 export type DollarSupplyState = Readonly<{
-  /** Position already holding a leg for this series, when one exists. */
+  /** Position already holding risk liquidity for this series, when one exists. */
   positionId: bigint | null;
-  /** Principal in the leg that is not opted in -- what `optIn` can draw from. */
-  stakedAvailable: bigint;
-  /** Principal currently opted in and redeemable by Dollar holders. */
-  optedIn: bigint;
-  /** Risk shares still sitting in the wallet. */
+  /** Supplied shares still unconsumed, and therefore still withdrawable. */
+  effectiveShares: bigint;
+  /** Proceeds from shares a redemption already consumed. */
+  claimableCollateral: bigint;
+  claimableStaticsDollar: bigint;
+  claimableStatics: bigint;
+  /** Risk Shares still sitting in the wallet. */
   walletShares: bigint;
   /** ERC-1155 operator approval for the periphery, required before staking. */
   riskApprovedForPeriphery: boolean;
 }>;
 
 export type DollarSupplyStep =
-  | "needs-input"
-  | "approve-risk-periphery"
-  | "stake"
-  | "opt-in"
-  | "opt-out"
-  | "withdraw"
-  | "blocked";
+  "needs-input" | "approve-risk-periphery" | "stake" | "unstake" | "blocked";
 
 export const emptyDollarSupplyState: DollarSupplyState = {
   positionId: null,
-  stakedAvailable: 0n,
-  optedIn: 0n,
+  effectiveShares: 0n,
+  claimableCollateral: 0n,
+  claimableStaticsDollar: 0n,
+  claimableStatics: 0n,
   walletShares: 0n,
   riskApprovedForPeriphery: false,
 };
 
+export function hasClaimableProceeds(state: DollarSupplyState): boolean {
+  return (
+    state.claimableCollateral > 0n ||
+    state.claimableStaticsDollar > 0n ||
+    state.claimableStatics > 0n
+  );
+}
+
 /**
- * Finds the position already carrying a leg for this series.
+ * Finds the position already carrying risk liquidity for this series.
  *
  * There is no reverse index from series to position, so candidates come from
  * Transfer logs the way the position catalog finds them, and each is asked
- * directly. The scan stops at the first match because any leg on this series
- * serves equally well.
+ * directly. Newest first, because a supplier's most recent position is the
+ * likeliest holder, and the scan stops at the first match.
  */
 export async function loadDollarSupplyState(
   publicClient: PublicClient,
@@ -105,7 +117,6 @@ export async function loadDollarSupplyState(
 
   const candidates = [...new Set(transferLogs.map((log) => log.args.tokenId.toString()))]
     .map(BigInt)
-    // Newest first: a leg is far more likely on a recently received position.
     .sort((left, right) => (left === right ? 0 : left > right ? -1 : 1))
     .slice(0, 25);
 
@@ -121,31 +132,22 @@ export async function loadDollarSupplyState(
       .catch(() => null);
     if (!owner || owner.toLowerCase() !== wallet.toLowerCase()) continue;
 
-    const leg = await publicClient
+    const liquidity = await publicClient
       .readContract({
         address: periphery,
         abi: staticsDollarPeripheryAbi,
-        functionName: "leg",
+        functionName: "riskLiquidity",
         args: [positionId, seriesId],
       })
       .catch(() => null);
-    if (!leg?.exists) continue;
-
-    const optedIn = await publicClient
-      .readContract({
-        address: periphery,
-        abi: staticsDollarPeripheryAbi,
-        functionName: "optInBalanceOf",
-        args: [positionId, seriesId],
-      })
-      .catch(() => 0n);
+    if (!liquidity?.exists) continue;
 
     return {
       positionId,
-      // optIn and withdrawLeg both draw from pending + eligible. Opted-in
-      // principal has already left both, so it is not double counted here.
-      stakedAvailable: leg.pendingPrincipal + leg.eligiblePrincipal,
-      optedIn,
+      effectiveShares: liquidity.effectiveShares,
+      claimableCollateral: liquidity.claimableCollateral,
+      claimableStaticsDollar: liquidity.claimableStaticsDollar,
+      claimableStatics: liquidity.claimableStatics,
       walletShares,
       riskApprovedForPeriphery,
     };
@@ -155,11 +157,10 @@ export async function loadDollarSupplyState(
 }
 
 /**
- * The next transaction for supplying `amount` of Risk shares.
+ * The next transaction for supplying `amount` of Risk Shares.
  *
- * Staking and opting in are separate calls, so this returns one step at a time
- * and is re-derived after each confirmation -- the same shape the rest of the
- * Dollar page uses for approvals.
+ * `moves` is what the step should actually send. It is separate from the amount
+ * typed because an approval step moves nothing.
  */
 export function deriveSupplyStep(
   amount: bigint,
@@ -177,12 +178,7 @@ export function deriveSupplyStep(
       moves: 0n,
     };
   }
-  if (state.stakedAvailable >= amount) {
-    return { step: "opt-in", label: "Supply Risk shares", reason: null, moves: amount };
-  }
-
-  const toStake = amount - state.stakedAvailable;
-  if (state.walletShares < toStake) {
+  if (state.walletShares < amount) {
     return {
       step: "blocked",
       label: "Supply unavailable",
@@ -198,20 +194,16 @@ export function deriveSupplyStep(
       moves: 0n,
     };
   }
-  return { step: "stake", label: "Stake Risk shares", reason: null, moves: toStake };
+  return { step: "stake", label: "Supply Risk shares", reason: null, moves: amount };
 }
 
 /**
- * The next transaction for returning `amount` of Risk shares to the wallet.
+ * The next transaction for taking `amount` of unconsumed shares back.
  *
- * Both sources deliver straight to the wallet -- `optOut` ends in
- * `safeTransferFrom(address(this), receiver, ...)` just as `withdrawLeg` does,
- * so it is not a first hop that feeds a second. They are two independent
- * withdrawals that happen to need doing in sequence when one alone is short.
- *
- * The idle leg is drained first: principal sitting there is not earning opt-in
- * rewards, so taking it before touching the book leaves as much supplied as
- * possible for as long as possible.
+ * Only unconsumed shares can be withdrawn. Anything a redemption already
+ * consumed has become proceeds, which are collected by claiming instead --
+ * worth saying in the blocked reason, because "you have 100 supplied but can
+ * only withdraw 40" is otherwise baffling.
  */
 export function deriveWithdrawStep(
   amount: bigint,
@@ -228,27 +220,19 @@ export function deriveWithdrawStep(
       moves: 0n,
     };
   }
-  if (amount > state.stakedAvailable + state.optedIn) {
+  if (amount > state.effectiveShares) {
     return {
       step: "blocked",
       label: "Withdraw unavailable",
-      reason: "This is more than you have supplied to this series.",
+      reason: hasClaimableProceeds(state)
+        ? "That is more than you have unconsumed. Shares already redeemed against become proceeds, which are claimed rather than withdrawn."
+        : "That is more than you have supplied to this series.",
       moves: 0n,
     };
   }
-  const fromLeg = amount < state.stakedAvailable ? amount : state.stakedAvailable;
-  if (fromLeg > 0n) {
-    return { step: "withdraw", label: "Withdraw Risk shares", reason: null, moves: fromLeg };
-  }
-  return { step: "opt-out", label: "Stop supplying", reason: null, moves: amount };
+  return { step: "unstake", label: "Withdraw Risk shares", reason: null, moves: amount };
 }
 
-/**
- * The supply steps in the shape the Dollar page's single action button uses,
- * so supplying reads as one more mode rather than a second control scheme.
- * `moves` is the amount to send -- it is not always the amount typed, because a
- * step may only be able to move part of it.
- */
 export function supplyActionAvailability(
   mode: "supply" | "unsupply",
   amount: bigint,
@@ -291,25 +275,17 @@ export function buildStakeRiskCall(
   return positionId === null
     ? encodeFunctionData({
         abi: staticsDollarPeripheryAbi,
-        functionName: "createAndStake",
+        functionName: "createAndStakeRiskShares",
         args: [seriesId, amount, receiver],
       })
     : encodeFunctionData({
         abi: staticsDollarPeripheryAbi,
-        functionName: "stake",
+        functionName: "stakeRiskShares",
         args: [positionId, seriesId, amount],
       });
 }
 
-export function buildOptInCall(positionId: bigint, seriesId: bigint, amount: bigint): Hex {
-  return encodeFunctionData({
-    abi: staticsDollarPeripheryAbi,
-    functionName: "optIn",
-    args: [positionId, seriesId, amount],
-  });
-}
-
-export function buildOptOutCall(
+export function buildUnstakeRiskCall(
   positionId: bigint,
   seriesId: bigint,
   amount: bigint,
@@ -317,20 +293,19 @@ export function buildOptOutCall(
 ): Hex {
   return encodeFunctionData({
     abi: staticsDollarPeripheryAbi,
-    functionName: "optOut",
+    functionName: "unstakeRiskShares",
     args: [positionId, seriesId, amount, receiver],
   });
 }
 
-export function buildWithdrawLegCall(
+export function buildClaimRiskProceedsCall(
   positionId: bigint,
   seriesId: bigint,
-  amount: bigint,
   receiver: Address
 ): Hex {
   return encodeFunctionData({
     abi: staticsDollarPeripheryAbi,
-    functionName: "withdrawLeg",
-    args: [positionId, seriesId, amount, receiver],
+    functionName: "claimRiskProceeds",
+    args: [positionId, seriesId, receiver],
   });
 }
