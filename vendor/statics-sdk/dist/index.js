@@ -763,6 +763,81 @@ export const staticsDollarCoreAbi = parseAbi([
     "function profileSeriesCount(uint256 profileId) view returns (uint256 count)",
     "function profileSeriesAt(uint256 profileId,uint256 index) view returns (uint256 seriesId)",
 ]);
+/**
+ * Periphery diamond: opt-in risk liquidity and the Dollar-only exit it backs.
+ *
+ * These live at a different address from the core pool. Read it from
+ * `staticsDollarCoreAbi`'s `periphery()` rather than configuring it separately,
+ * so the two can never disagree about which periphery is in use.
+ *
+ * The pairing vault is the reason `recombineManaged` is restricted to the
+ * periphery: it burns a redeemer's Dollar against risk shares somebody else
+ * opted in, which is what lets a holder exit without sourcing the junior
+ * tranche themselves. Ordinary `recombine` still requires both legs.
+ */
+export const staticsDollarPeripheryAbi = parseAbi([
+    // -- OptInFacet: supplying risk shares as redemption liquidity
+    "function optIn(uint256 positionId,uint256 seriesId,uint256 amount)",
+    "function optOut(uint256 positionId,uint256 seriesId,uint256 amount,address receiver) returns (uint256 principalOut)",
+    "function optInBalanceOf(uint256 positionId,uint256 seriesId) view returns (uint256 principal)",
+    "function optInTotal(uint256 seriesId) view returns (uint256 principal)",
+    "function optInScaleRay(uint256 seriesId) view returns (uint256 scaleRay)",
+    "function cleanupOptInDust(uint256 positionId,uint256 seriesId)",
+    "event OptedIn(uint256 indexed positionId,uint256 indexed seriesId,uint256 principal,uint256 storedUnits)",
+    "event OptedOut(uint256 indexed positionId,uint256 indexed seriesId,address indexed receiver,uint256 principal)",
+    "event OptInDustCleared(uint256 indexed positionId,uint256 indexed seriesId,uint256 storedUnits)",
+    "event LegRewardsSettled(uint256 indexed positionId,uint256 indexed seriesId,uint256 collateralAdded,uint256 staticsDollarAdded,uint256 accruedCollateral,uint256 accruedStaticsDollar)",
+    // -- PairingVaultFacet: redeeming Dollar alone against that liquidity
+    "function redeem(uint256 seriesId,uint256 staticsDollarAmount,uint256 minStaticsDollarRedeemed,uint256 minCollateralPerStaticsDollarWad,uint256 deadline,address receiver) returns (uint8 status,uint256 staticsDollarRedeemed,uint256 collateralOut)",
+    "function redeemToETH(uint256 seriesId,uint256 staticsDollarAmount,uint256 minStaticsDollarRedeemed,uint256 minCollateralPerStaticsDollarWad,uint256 deadline,address receiver) returns (uint8 status,uint256 staticsDollarRedeemed,uint256 ethOut)",
+    "function previewRedeem(uint256 seriesId,uint256 staticsDollarAmount) view returns ((uint256 staticsDollarRedeemed,uint256 grossCollateral,uint256 collateralToRedeemer,uint256 collateralToStakers,uint256 collateralToInsurance,uint256 seniorCollateralPerUnitWad) preview)",
+    "function redeemableLiquidity(uint256 seriesId) view returns (uint256 staticsDollarAmount)",
+    "function redemptionParams() view returns (uint16 redemptionFeeBps,uint16 stakerShareBps)",
+    "function setRedemptionParams(uint16 redemptionFeeBps,uint16 stakerShareBps)",
+    "event Redeemed(address indexed caller,address indexed receiver,uint256 indexed seriesId,uint256 staticsDollarRedeemed,uint256 collateralToRedeemer,uint256 collateralToStakers,uint256 collateralToInsurance)",
+    "event RedemptionDeferred(address indexed caller,address indexed receiver,uint256 indexed seriesId,uint8 status,uint256 unhealthyProfileBitmap)",
+    "event RedemptionParamsSet(uint16 redemptionFeeBps,uint16 stakerShareBps)",
+    "event OptInIncentivesReleased(uint256 indexed seriesId,uint256 collateralAmount,uint256 staticsDollarAmount,uint256 filledStaticsDollarRisk)",
+    "event OptInFeesAccrued(uint256 indexed seriesId,uint64 indexed epoch,address indexed token,uint256 amount,bytes32 source)",
+    "event CustodyReserved(bytes32 indexed account,address indexed token,uint256 amount)",
+]);
+/**
+ * Reverts unique to the periphery facets above.
+ *
+ * Shared names -- ZeroAmount, ZeroAddress, SeriesNotActive,
+ * ProfileOperationPaused, InsufficientTransferReceived, UnexpectedExitStatus,
+ * NativeTransferFailed -- are already in `staticsDollarErrorAbi` with identical
+ * signatures and are deliberately not repeated, because a duplicate selector in
+ * one array makes the decode ambiguous. Decode against both.
+ */
+export const staticsDollarPeripheryErrorAbi = parseAbi([
+    "error NotAuthorized(uint256 positionId,address caller)",
+    "error UnknownLeg(uint256 positionId,uint256 seriesId)",
+    "error NoOptInPosition(uint256 positionId,uint256 seriesId)",
+    "error NoZeroEffectiveDust(uint256 positionId,uint256 seriesId)",
+    "error InsufficientBasePrincipal(uint256 requested,uint256 available)",
+    "error OptInAmountTooSmall(uint256 requested)",
+    "error NoOptInLiquidity()",
+    "error FillBelowMinimum(uint256 fill,uint256 minimum)",
+    "error RateBelowMinimum(uint256 rateWad,uint256 minimumRateWad)",
+    "error InvalidRedemptionParams(uint16 feeBps,uint16 stakerShareBps)",
+    "error SeriesTransitionPending(uint256 seriesId)",
+    "error NotWETHCollateral()",
+    "error DeadlineExpired(uint256 deadline,uint256 currentTimestamp)",
+    "error FixedAllocationExceedsGross(uint256 fixedSeniorCollateral,uint256 grossCollateral)",
+    "error OptInScaleExhausted(uint256 storedUnits)",
+    "error ConsumeExceedsTier(uint256 requested,uint256 available)",
+    "error InsufficientUnreserved(address token,uint256 requested,uint256 available)",
+    "error GlobalReservationShortfall(address token,uint256 reserved,uint256 balance)",
+    "error DebitExceedsAuthorization(address token,uint256 spent,uint256 maximum)",
+    "error BalanceDecreasedDuringPull(address token,uint256 beforeBalance,uint256 afterBalance)",
+    "error NoRewardEligiblePrincipal(uint256 seriesId)",
+    "error NotContractOwner(address caller,address owner)",
+    // OpenZeppelin reverts these facets inherit. Without them an ordinary
+    // transfer failure decodes as an unknown selector.
+    "error SafeERC20FailedOperation(address token)",
+    "error ReentrancyGuardReentrantCall()",
+]);
 export const staticsDollarErrorAbi = parseAbi([
     "error ZeroAddress()",
     "error ZeroAmount()",
