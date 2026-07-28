@@ -7069,6 +7069,175 @@ export declare const staticsDollarCoreAbi: readonly [{
  * tranche themselves. Ordinary `recombine` still requires both legs.
  */
 export declare const staticsDollarPeripheryAbi: readonly [{
+    readonly name: "createAndStake";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+}, {
+    readonly name: "stake";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "activateLeg";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "withdrawLeg";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "closeLeg";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "leg";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "eligiblePrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "pendingPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "pendingSince";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralPassiveCheckpointRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsDollarPassiveCheckpointRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "optInStored";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralOptInCheckpointRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsDollarOptInCheckpointRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "accruedCollateral";
+        }, {
+            readonly type: "uint256";
+            readonly name: "accruedStaticsDollar";
+        }, {
+            readonly type: "uint64";
+            readonly name: "optInEpoch";
+        }, {
+            readonly type: "bool";
+            readonly name: "exists";
+        }];
+        readonly name: "leg";
+    }];
+}, {
+    readonly name: "positionSeriesCount";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "count";
+    }];
+}, {
+    readonly name: "positionSeriesAt";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "index";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "rewardEligibleAt";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "timestamp";
+    }];
+}, {
     readonly name: "optIn";
     readonly type: "function";
     readonly stateMutability: "nonpayable";

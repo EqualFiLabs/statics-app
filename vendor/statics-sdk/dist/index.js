@@ -776,6 +776,19 @@ export const staticsDollarCoreAbi = parseAbi([
  * tranche themselves. Ordinary `recombine` still requires both legs.
  */
 export const staticsDollarPeripheryAbi = parseAbi([
+    // -- StakingFacet: moving risk shares into a position leg.
+    // The leg is what opt-in draws from, so nothing below is reachable without
+    // this first. Note these shadow same-named functions on `staticsAbi`, which
+    // stake the Statics token instead -- different contract, different arguments.
+    "function createAndStake(uint256 seriesId,uint256 amount,address receiver) returns (uint256 positionId)",
+    "function stake(uint256 positionId,uint256 seriesId,uint256 amount)",
+    "function activateLeg(uint256 positionId,uint256 seriesId)",
+    "function withdrawLeg(uint256 positionId,uint256 seriesId,uint256 amount,address receiver)",
+    "function closeLeg(uint256 positionId,uint256 seriesId)",
+    "function leg(uint256 positionId,uint256 seriesId) view returns ((uint256 eligiblePrincipal,uint256 pendingPrincipal,uint256 pendingSince,uint256 collateralPassiveCheckpointRay,uint256 staticsDollarPassiveCheckpointRay,uint256 optInStored,uint256 collateralOptInCheckpointRay,uint256 staticsDollarOptInCheckpointRay,uint256 accruedCollateral,uint256 accruedStaticsDollar,uint64 optInEpoch,bool exists) leg)",
+    "function positionSeriesCount(uint256 positionId) view returns (uint256 count)",
+    "function positionSeriesAt(uint256 positionId,uint256 index) view returns (uint256 seriesId)",
+    "function rewardEligibleAt(uint256 positionId,uint256 seriesId) view returns (uint256 timestamp)",
     // -- OptInFacet: supplying risk shares as redemption liquidity
     "function optIn(uint256 positionId,uint256 seriesId,uint256 amount)",
     "function optOut(uint256 positionId,uint256 seriesId,uint256 amount,address receiver) returns (uint256 principalOut)",

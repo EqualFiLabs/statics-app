@@ -1,6 +1,8 @@
 export const DOLLAR_MINT_PAUSE = 1n << 0n;
+/** PairingVaultFacet.PAUSE_OPT_IN_FILLS -- pausable without pausing minting. */
+export const DOLLAR_OPT_IN_FILL_PAUSE = 1n << 2n;
 
-export type DollarActionMode = "deposit" | "recombine";
+export type DollarActionMode = "deposit" | "recombine" | "redeem";
 export type DollarCollateralChoice = "ETH" | "WETH";
 export type DollarQuoteState = "idle" | "refreshing" | "ready" | "error";
 
@@ -21,6 +23,12 @@ export type DollarActionSnapshot = Readonly<{
   wethAllowance: bigint;
   dollarAllowance: bigint;
   riskApproved: boolean;
+  /** Dollar approved to the periphery, which pulls it on redeem. */
+  peripheryDollarAllowance: bigint;
+  /** Dollar the opt-in book can currently fill. Zero means no exit today. */
+  redeemableLiquidity: bigint;
+  /** True when opt-in fills are paused independently of minting. */
+  optInFillsPaused: boolean;
 }>;
 
 export type DollarActionAvailability = Readonly<{
@@ -30,6 +38,7 @@ export type DollarActionAvailability = Readonly<{
     | "refreshing"
     | "approve-weth"
     | "approve-dollar"
+    | "approve-dollar-periphery"
     | "approve-risk"
     | "execute";
   label: string;
@@ -114,6 +123,30 @@ export function deriveDollarActionAvailability({
     if (asset === "WETH" && amount > snapshot.wethBalance) {
       return unavailable("Deposit unavailable", "This wallet does not have enough WETH.");
     }
+  } else if (mode === "redeem") {
+    // Redeeming spends somebody else's opted-in Risk shares, so the only thing
+    // this wallet needs is Dollar -- that is the whole point of the route.
+    if (snapshot.seriesStatus !== 1) {
+      return unavailable("Redemption unavailable", "The Risk series is not currently active.");
+    }
+    if (snapshot.optInFillsPaused) {
+      return unavailable("Redemption unavailable", "Dollar redemption is currently paused.");
+    }
+    if (snapshot.globalHealthPhase !== 0) {
+      return unavailable(
+        "Redemption unavailable",
+        "Global protocol health currently prevents collateral exits."
+      );
+    }
+    if (amount > snapshot.dollarBalance) {
+      return unavailable("Redemption unavailable", "This wallet does not have enough Dollar.");
+    }
+    if (snapshot.redeemableLiquidity === 0n) {
+      return unavailable(
+        "No redemption liquidity",
+        "Nobody has opted Risk shares in for this series yet. Recombine instead, or wait."
+      );
+    }
   } else {
     if (![1, 2, 3, 4].includes(snapshot.seriesStatus)) {
       return unavailable(
@@ -140,7 +173,11 @@ export function deriveDollarActionAvailability({
 
   if (quoteState === "error") {
     return unavailable(
-      mode === "deposit" ? "Deposit unavailable" : "Recombination unavailable",
+      mode === "deposit"
+        ? "Deposit unavailable"
+        : mode === "redeem"
+          ? "Redemption unavailable"
+          : "Recombination unavailable",
       quoteError || "The protocol could not produce a current preview."
     );
   }
@@ -172,6 +209,16 @@ export function deriveDollarActionAvailability({
       executable: true,
     };
   }
+  // The periphery pulls the Dollar on redeem, so the approval targets it
+  // rather than the gateway that mint and recombine use.
+  if (mode === "redeem" && snapshot.peripheryDollarAllowance < amount) {
+    return {
+      kind: "approve-dollar-periphery",
+      label: "Approve exact Dollar",
+      reason: null,
+      executable: true,
+    };
+  }
   if (mode === "recombine" && snapshot.dollarAllowance !== amount) {
     return {
       kind: "approve-dollar",
@@ -191,7 +238,12 @@ export function deriveDollarActionAvailability({
 
   return {
     kind: "execute",
-    label: mode === "deposit" ? `Deposit ${asset}` : `Recombine to ${asset}`,
+    label:
+      mode === "deposit"
+        ? `Deposit ${asset}`
+        : mode === "redeem"
+          ? `Redeem for ${asset}`
+          : `Recombine to ${asset}`,
     reason: null,
     executable: true,
   };
