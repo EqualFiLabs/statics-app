@@ -23,6 +23,7 @@ import {
   ACROSS_SOLANA_CHAIN_ID,
   acrossError,
   normalizeAcrossTransaction,
+  parseAcrossAmount,
   readAcrossDestination,
   type AcrossChain,
   type AcrossToken,
@@ -42,11 +43,11 @@ type QuotePayload = {
   quote?: {
     approvalTxns?: unknown[];
     swapTx?: unknown;
-    steps?: { bridge?: { inputAmount?: string; outputAmount?: string } };
-    fees?: { total?: string; totalMax?: string };
+    steps?: { bridge?: { inputAmount?: unknown; outputAmount?: unknown } };
+    fees?: { total?: unknown; totalMax?: unknown };
     expectedFillTime?: number;
     quoteExpiryTimestamp?: number;
-    outputAmount?: string;
+    outputAmount?: unknown;
   };
   destination?: { chainId: number; token: string; symbol: string; decimals: number };
   error?: string;
@@ -381,14 +382,15 @@ export function AcrossBridgePanel() {
 
   const outputRaw =
     quote?.quote?.steps?.bridge?.outputAmount ?? quote?.quote?.outputAmount ?? undefined;
+  const outputAmount = parseAcrossAmount(outputRaw);
   const output =
-    outputRaw && quote?.destination
-      ? `${formatUnits(BigInt(outputRaw), quote.destination.decimals)} ${quote.destination.symbol}`
+    outputAmount !== null && quote?.destination
+      ? `${formatUnits(outputAmount, quote.destination.decimals)} ${quote.destination.symbol}`
       : "--";
-  const feeRaw = quote?.quote?.fees?.total ?? quote?.quote?.fees?.totalMax;
+  const feeAmount = parseAcrossAmount(quote?.quote?.fees?.total ?? quote?.quote?.fees?.totalMax);
   const fee =
-    feeRaw && selectedToken
-      ? `${formatUnits(BigInt(feeRaw), selectedToken.decimals)} ${selectedToken.symbol}`
+    feeAmount !== null && selectedToken
+      ? `${formatUnits(feeAmount, selectedToken.decimals)} ${selectedToken.symbol}`
       : "--";
 
   const sendEvmTransaction = async (
