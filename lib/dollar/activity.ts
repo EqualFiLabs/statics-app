@@ -30,6 +30,9 @@ export type DollarActivityKind =
   | "deposit-weth"
   | "redeem-eth"
   | "redeem-weth"
+  | "opt-in-risk"
+  | "opt-out-risk"
+  | "withdraw-risk"
   | "recombine-eth"
   | "recombine-weth"
   | "approve-basket-asset"
@@ -67,6 +70,11 @@ export type DollarActivityKind =
   | "repay-loan"
   | "extend-loan"
   | "recover-loan";
+
+/** Wall clock for an activity record. Impure, so it stays out of components. */
+export function activityTimestamp(): number {
+  return Date.now();
+}
 
 export type DollarActivity = Readonly<{
   id: string;

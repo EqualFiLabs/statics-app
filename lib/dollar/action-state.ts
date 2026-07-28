@@ -2,7 +2,7 @@ export const DOLLAR_MINT_PAUSE = 1n << 0n;
 /** PairingVaultFacet.PAUSE_OPT_IN_FILLS -- pausable without pausing minting. */
 export const DOLLAR_OPT_IN_FILL_PAUSE = 1n << 2n;
 
-export type DollarActionMode = "deposit" | "recombine" | "redeem";
+export type DollarActionMode = "deposit" | "recombine" | "redeem" | "supply" | "unsupply";
 export type DollarCollateralChoice = "ETH" | "WETH";
 export type DollarQuoteState = "idle" | "refreshing" | "ready" | "error";
 
@@ -40,6 +40,11 @@ export type DollarActionAvailability = Readonly<{
     | "approve-dollar"
     | "approve-dollar-periphery"
     | "approve-risk"
+    | "approve-risk-periphery"
+    | "stake"
+    | "opt-in"
+    | "opt-out"
+    | "withdraw"
     | "execute";
   label: string;
   reason: string | null;

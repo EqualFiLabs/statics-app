@@ -26,6 +26,7 @@ import {
 import { usePublicClient, useWalletClient } from "wagmi";
 
 import {
+  activityTimestamp,
   updateDollarActivity,
   writeDollarActivity,
   type DollarActivityKind,
@@ -40,6 +41,16 @@ import {
   type DollarCollateralChoice,
   type DollarQuoteState,
 } from "@/lib/dollar/action-state";
+import {
+  buildApproveRiskForPeripheryCall,
+  buildOptInCall,
+  buildOptOutCall,
+  buildStakeRiskCall,
+  buildWithdrawLegCall,
+  emptyDollarSupplyState,
+  loadDollarSupplyState,
+  supplyActionAvailability,
+} from "@/lib/dollar/supply";
 import {
   readClientDollarDeployment,
   verifyDollarDeployment,
@@ -72,7 +83,13 @@ const modeLabels: Record<DollarActionMode, string> = {
   deposit: "Deposit",
   recombine: "Recombine",
   redeem: "Redeem",
+  supply: "Supply",
+  unsupply: "Withdraw",
 };
+
+/** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
+const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
+  mode === "supply" || mode === "unsupply";
 const evesMarketUrl = readEvesMarketUrl(process.env.NEXT_PUBLIC_EVES_MARKET_URL);
 
 function shortAddress(address: Address): string {
@@ -576,7 +593,7 @@ function DollarActionPanel({
       label,
       amount: amountInput || "0",
       status: "simulating",
-      createdAt: Date.now(),
+      createdAt: activityTimestamp(),
     });
     try {
       const simulation = await publicClient.call({ account: wallet, to, data, value });
@@ -645,7 +662,63 @@ function DollarActionPanel({
         throw new Error(actionAvailability.reason || "Wait for a fresh protocol preview.");
       }
 
-      if (actionAvailability.kind === "approve-weth") {
+      if (isSupplyMode(mode)) {
+        const periphery = state.periphery;
+        if (periphery === zeroAddress) {
+          throw new Error("This deployment has no periphery, so Risk shares cannot be supplied.");
+        }
+        if (actionAvailability.kind === "approve-risk-periphery") {
+          await recordAndSend({
+            kind: "approve-risk",
+            label: "Approve Risk share operator",
+            to: deployment.contracts.risk,
+            data: buildApproveRiskForPeripheryCall(periphery),
+          });
+        } else if (actionAvailability.kind === "stake") {
+          // Only the shortfall is staked. Principal already sitting in the leg
+          // is reused rather than pulling more from the wallet than needed.
+          const toStake = amount - supply.stakedAvailable;
+          await recordAndSend({
+            kind: "stake-position",
+            label: supply.positionId === null ? "Create position and stake Risk" : "Stake Risk",
+            to: periphery,
+            data: buildStakeRiskCall(supply.positionId, state.seriesId, toStake, wallet),
+          });
+        } else if (actionAvailability.kind === "opt-in") {
+          if (supply.positionId === null)
+            throw new Error("No position holds this Risk series yet.");
+          await recordAndSend({
+            kind: "opt-in-risk",
+            label: "Supply Risk shares for redemption",
+            to: periphery,
+            data: buildOptInCall(supply.positionId, state.seriesId, amount),
+          });
+          setAmountInput("");
+        } else if (actionAvailability.kind === "opt-out") {
+          if (supply.positionId === null)
+            throw new Error("No position holds this Risk series yet.");
+          // Take back only what withdrawing is short of, so the rest keeps
+          // earning while it is still supplied.
+          const toOptOut = amount - supply.stakedAvailable;
+          await recordAndSend({
+            kind: "opt-out-risk",
+            label: "Stop supplying Risk shares",
+            to: periphery,
+            data: buildOptOutCall(supply.positionId, state.seriesId, toOptOut, wallet),
+          });
+        } else if (actionAvailability.kind === "withdraw") {
+          if (supply.positionId === null)
+            throw new Error("No position holds this Risk series yet.");
+          await recordAndSend({
+            kind: "withdraw-risk",
+            label: "Withdraw Risk shares",
+            to: periphery,
+            data: buildWithdrawLegCall(supply.positionId, state.seriesId, amount, wallet),
+          });
+          setAmountInput("");
+        }
+        await supplyState.refetch();
+      } else if (actionAvailability.kind === "approve-weth") {
         await recordAndSend({
           kind: "approve-weth",
           label: "Approve exact WETH",
@@ -824,47 +897,91 @@ function DollarActionPanel({
     }
   };
 
+  // Hooks cannot sit behind the preview early-return below, so this reads
+  // through snapshot.data and stays disabled until there is state to read.
+  const supplySeriesId = snapshot.data?.seriesId;
+  const supplyPeriphery = snapshot.data?.periphery;
+  const supplyState = useQuery({
+    queryKey: [
+      "dollar-supply",
+      deployment.chainId,
+      wallet,
+      supplySeriesId?.toString(),
+      supplyPeriphery,
+    ],
+    enabled:
+      Boolean(publicClient) &&
+      supplySeriesId !== undefined &&
+      Boolean(supplyPeriphery) &&
+      supplyPeriphery !== zeroAddress,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      if (!publicClient || supplySeriesId === undefined || !supplyPeriphery) {
+        throw new Error("Dollar state is not ready.");
+      }
+      return loadDollarSupplyState(
+        publicClient,
+        deployment.contracts.diamond,
+        supplyPeriphery,
+        deployment.contracts.risk,
+        wallet,
+        supplySeriesId,
+        deployment.deploymentStartBlock
+      );
+    },
+  });
+  const supply = supplyState.data ?? emptyDollarSupplyState;
+
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
     return <DollarPagePreview />;
   }
 
   const state = snapshot.data!;
-  const actionAvailability = deriveDollarActionAvailability({
-    mode,
-    asset,
-    amount,
-    quoteState,
-    quoteError: quote.isError ? describeDollarError(quote.error) : null,
-    quotedDollarAmount:
-      currentQuote?.mode === "deposit" ? currentQuote.preview.staticsDollarMinted : undefined,
-    snapshot: {
-      profileKind: state.profile.kind,
-      profileMode: state.profile.mode,
-      seniorOutstanding: state.profile.seniorOutstanding,
-      debtCeiling: state.profile.debtCeiling,
-      seriesStatus: state.series.status,
-      oracleAvailable: state.solvency.oracleAvailable,
-      healthy: state.solvency.healthy,
-      globalHealthPhase: state.globalHealth[0],
-      pausedOperations: state.pausedOperations,
-      nativeBalance: state.nativeBalance,
-      wethBalance: state.wethBalance,
-      dollarBalance: state.dollarBalance,
-      riskBalance: state.riskBalance,
-      wethAllowance: state.wethAllowance,
-      dollarAllowance: state.dollarAllowance,
-      riskApproved: state.riskApproved,
-      peripheryDollarAllowance: state.peripheryDollarAllowance,
-      redeemableLiquidity: state.redeemableLiquidity,
-      optInFillsPaused: (state.pausedOperations & DOLLAR_OPT_IN_FILL_PAUSE) !== 0n,
-    },
-  });
+
+  const actionAvailability = isSupplyMode(mode)
+    ? supplyActionAvailability(mode, amount, supply, state.series.status === 1)
+    : deriveDollarActionAvailability({
+        mode,
+        asset,
+        amount,
+        quoteState,
+        quoteError: quote.isError ? describeDollarError(quote.error) : null,
+        quotedDollarAmount:
+          currentQuote?.mode === "deposit" ? currentQuote.preview.staticsDollarMinted : undefined,
+        snapshot: {
+          profileKind: state.profile.kind,
+          profileMode: state.profile.mode,
+          seniorOutstanding: state.profile.seniorOutstanding,
+          debtCeiling: state.profile.debtCeiling,
+          seriesStatus: state.series.status,
+          oracleAvailable: state.solvency.oracleAvailable,
+          healthy: state.solvency.healthy,
+          globalHealthPhase: state.globalHealth[0],
+          pausedOperations: state.pausedOperations,
+          nativeBalance: state.nativeBalance,
+          wethBalance: state.wethBalance,
+          dollarBalance: state.dollarBalance,
+          riskBalance: state.riskBalance,
+          wethAllowance: state.wethAllowance,
+          dollarAllowance: state.dollarAllowance,
+          riskApproved: state.riskApproved,
+          peripheryDollarAllowance: state.peripheryDollarAllowance,
+          redeemableLiquidity: state.redeemableLiquidity,
+          optInFillsPaused: (state.pausedOperations & DOLLAR_OPT_IN_FILL_PAUSE) !== 0n,
+        },
+      });
   const balance =
     mode === "deposit"
       ? asset === "ETH"
         ? state.nativeBalance
         : state.wethBalance
-      : state.dollarBalance;
+      : mode === "supply"
+        ? // Everything supplyable: loose shares plus principal already staked.
+          supply.walletShares + supply.stakedAvailable
+        : mode === "unsupply"
+          ? supply.stakedAvailable + supply.optedIn
+          : state.dollarBalance;
+  const amountUnit = mode === "deposit" ? asset : isSupplyMode(mode) ? "Risk shares" : "Dollar";
   const preview = quote.data?.preview;
   const output =
     quote.data?.mode === "deposit"
@@ -876,6 +993,14 @@ function DollarActionPanel({
         : quote.data?.mode === "redeem"
           ? `${displayAmount(quote.data.preview.collateralToRedeemer)} ${asset}`
           : "Enter an amount for an onchain preview";
+
+  // Supplying has no quote of its own -- it moves a fixed number of shares --
+  // so the preview slot shows position instead of price.
+  const supplyOutput = isSupplyMode(mode)
+    ? mode === "supply"
+      ? `${displayAmount(supply.optedIn)} supplied now, ${displayAmount(supply.stakedAvailable)} staked and ready`
+      : `${displayAmount(supply.optedIn)} supplied, ${displayAmount(supply.stakedAvailable)} withdrawable now`
+    : null;
 
   // A redemption is capped to whatever is opted in, so asking for more than the
   // book holds fills part of the order. Saying so before signing is the whole
@@ -918,7 +1043,7 @@ function DollarActionPanel({
       <section className="dollar-workspace">
         <div className="dollar-action-card">
           <div className="dollar-tabs" aria-label="Dollar action">
-            {(["deposit", "recombine", "redeem"] as const).map((choice) => (
+            {(["deposit", "recombine", "redeem", "supply", "unsupply"] as const).map((choice) => (
               <button
                 key={choice}
                 type="button"
@@ -934,7 +1059,7 @@ function DollarActionPanel({
             ))}
           </div>
           <div className="dollar-field">
-            <label htmlFor="dollar-amount">{mode === "deposit" ? asset : "Dollar"} amount</label>
+            <label htmlFor="dollar-amount">{amountUnit} amount</label>
             <div>
               <input
                 id="dollar-amount"
@@ -959,12 +1084,13 @@ function DollarActionPanel({
               </button>
             </div>
             <small>
-              Available {displayAmount(balance)} {mode === "deposit" ? asset : "Dollar"}
+              Available {displayAmount(balance)} {amountUnit}
               {mode === "redeem" &&
                 ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
+              {isSupplyMode(mode) && ` · ${displayAmount(supply.optedIn)} currently supplied`}
             </small>
           </div>
-          <fieldset className="dollar-asset-choice">
+          <fieldset className="dollar-asset-choice" hidden={isSupplyMode(mode)}>
             <legend>{mode === "deposit" ? "Deposit asset" : "Receive asset"}</legend>
             {(["ETH", "WETH"] as const).map((choice) => (
               <button
@@ -982,8 +1108,8 @@ function DollarActionPanel({
             ))}
           </fieldset>
           <div className="dollar-quote">
-            <span>{previewLabel}</span>
-            <strong>{output}</strong>
+            <span>{isSupplyMode(mode) ? "Your Risk shares" : previewLabel}</span>
+            <strong>{supplyOutput ?? output}</strong>
             {preview && (
               <small>
                 {quoteState === "ready"
@@ -997,6 +1123,21 @@ function DollarActionPanel({
               Only {displayAmount(redeemShortfall)} of the {displayAmount(quote.data!.amount)}{" "}
               Dollar you entered can be redeemed right now -- that is all the Risk shares currently
               opted in. The rest stays in your wallet.
+            </p>
+          )}
+          {mode === "supply" && (
+            <p className="dollar-note">
+              Supplying lets Dollar holders redeem without holding Risk shares, and pays you a share
+              of the redemption fee. It takes two transactions -- your shares are staked into a
+              position first, then supplied -- and you can withdraw them again whenever the book has
+              room.
+            </p>
+          )}
+          {mode === "unsupply" && (
+            <p className="dollar-note">
+              Withdrawing takes your Risk shares back out of the redemption book and returns them to
+              this wallet. Anything already redeemed against has been converted and cannot be
+              withdrawn as shares.
             </p>
           )}
           {mode === "redeem" && (
