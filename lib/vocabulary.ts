@@ -53,7 +53,7 @@ export const glossary = {
   dollar: {
     label: "Dollar",
     plain: "Statics' own dollar, backed by assets you deposit.",
-    protocol: "Statics Dollar ($SD)",
+    protocol: "Statics Dollar (USDstx)",
   },
   riskShares: {
     label: "Risk shares",

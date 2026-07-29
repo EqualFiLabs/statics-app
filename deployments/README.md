@@ -4,10 +4,10 @@ Each public network is described by a reviewed manifest in this directory,
 `<chainId>.json`, binding every contract address to the runtime code hash that
 was deployed at it and to the protocol commit it was built from.
 
-There is no checked-in public deployment yet. Until one exists the app reports
-every non-local chain as unconfigured, which is the intended failure: a build
-with no reviewed manifest offers no transaction path rather than guessing at
-addresses.
+Robinhood Chain Testnet is recorded in `46630.json`. It binds the unified Statics
+deployment, USDG profile, and Robinhood Uniswap v4 dependencies to their runtime
+code hashes. The faucet entry is optional until its separately authorized live
+deployment is recorded.
 
 ## Generating one
 
@@ -16,7 +16,7 @@ Manifests are generated from a live deployment, then committed:
 ```
 npm run deployment:manifest -- \
   --rpc https://rpc.testnet.chain.robinhood.com \
-  --addresses ../statics/deployments/<network>.json \
+  --addresses ../statics/deployments/robinhood-testnet-46630-statics.json \
   --commit <40-character protocol commit> \
   --network "Robinhood Chain Testnet" \
   --start-block <block the diamond was deployed in> \
