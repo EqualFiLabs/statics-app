@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   decodeFunctionResult,
@@ -25,6 +25,7 @@ import {
 
 import {
   canonicalSwapPoolKey,
+  isCurrentCanonicalSwapQuote,
   permit2SwapApproval,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
@@ -78,7 +79,6 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const pool = useQuery({
     queryKey: ["canonical-swap-pool", basket.basketId.toString(), constituent.token.address],
     enabled: Boolean(publicClient) && deploymentState.status === "configured",
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -107,7 +107,6 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       Boolean(deploymentState.deployment.liquidity?.contracts.quoter) &&
       pool.data?.status === CanonicalPoolStatus.Active &&
       amount > 0n,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (
         !publicClient ||
@@ -130,10 +129,24 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         functionName: "quoteExactInputSingle",
         data: result.data,
       });
-      return { amount, amountOut, poolKey, zeroForOne };
+      return {
+        amount,
+        amountOut,
+        asset: constituent.token.address,
+        direction,
+        poolKey,
+        zeroForOne,
+      };
     },
   });
-  const currentQuote = quote.data?.amount === amount ? quote.data : null;
+  const currentQuote = isCurrentCanonicalSwapQuote(
+    quote.data,
+    amount,
+    constituent.token.address,
+    direction
+  )
+    ? quote.data!
+    : null;
   const minimumOut =
     currentQuote && slippageBps !== null
       ? minimumWithSlippage(currentQuote.amountOut, slippageBps)
@@ -470,6 +483,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             walletState.isTargetChain &&
             (!poolActive ||
               permit2Approval.isFetching ||
+              quote.isFetching ||
               !currentQuote ||
               minimumOut === null ||
               amount > inputBalance))
