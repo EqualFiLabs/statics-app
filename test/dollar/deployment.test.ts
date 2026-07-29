@@ -1,3 +1,4 @@
+import { keccak256 } from "viem";
 import { describe, expect, it } from "vitest";
 
 import { readDollarDeployment, verifyLiquidityDeployment } from "@/lib/dollar/deployment";
@@ -115,19 +116,50 @@ describe("Dollar deployment configuration", () => {
     ).rejects.toThrow("runtime code does not match");
   });
 
-  it("rejects environment-generated public deployments", () => {
-    // Same guarantee as before, reported differently: a public chain is now
-    // unconfigured rather than a thrown error, because a chain with no reviewed
-    // manifest is a chain the app is not set up for, not a broken build. The
-    // protection is that a full set of environment addresses cannot configure
-    // it.
+  it("rejects liquidity contracts bound to a different PoolManager", async () => {
+    const runtimeCodeHash = keccak256("0x6000");
+    const environment = {
+      ...localDeploymentEnvironment(),
+      ...liquidityDeploymentEnvironment(),
+      NEXT_PUBLIC_STATICS_DIAMOND_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_DOLLAR_CORE_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_DOLLAR_GATEWAY_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_DOLLAR_TOKEN_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_DOLLAR_RISK_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_WETH_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_POOL_MANAGER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_POSITION_MANAGER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_PERMIT2_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_SWAP_FEE_HOOK_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH: runtimeCodeHash,
+    };
+    const state = readDollarDeployment(environment);
+    if (state.status !== "configured") throw new Error("expected configured deployment");
+
+    const publicClient = {
+      getCode: async () => "0x6000",
+      readContract: async ({ functionName }: { functionName: string }) =>
+        functionName === "poolManager" ? "0x0000000000000000000000000000000000000002" : address,
+    };
+
+    await expect(
+      verifyLiquidityDeployment(publicClient as never, state.deployment)
+    ).rejects.toThrow("bound to a different PoolManager");
+  });
+
+  it("does not let environment values replace the reviewed public deployment", () => {
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
       NEXT_PUBLIC_STATICS_CHAIN_ID: "46630",
     });
 
-    expect(state.status).toBe("unavailable");
-    expect(state.status === "unavailable" && state.reason).toMatch(/manifest/);
+    expect(state.status).toBe("configured");
+    if (state.status === "configured") {
+      expect(state.deployment.source).toBe("checked-in-manifest");
+      expect(state.deployment.contracts.diamond).not.toBe(address);
+    }
   });
 
   it("requires a checked-in manifest outside development", () => {
