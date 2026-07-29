@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "network": "Robinhood Chain Testnet",
+  "chainId": 46630,
+  "deploymentStartBlock": "94949343",
+  "wethProfileId": "1",
+  "protocolCommit": "1270247ce274ffb58ac5d0a0c71ef52afe96aeb1",
+  "generatedAt": "2026-07-29T22:57:13.864Z",
+  "contracts": {
+    "diamond": {
+      "address": "0x69Af9C58e9E283032AE0087c38EF5E27c28E8345",
+      "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
+    },
+    "core": {
+      "address": "0xb925eb5867556698D80eff49Ce939914f03532e2",
+      "runtimeCodeHash": "0x35c10006ccb33b16c89c2c70508c41c4ff924a31b83f5e5a3f51b2e9856a069c"
+    },
+    "gateway": {
+      "address": "0x69Af9C58e9E283032AE0087c38EF5E27c28E8345",
+      "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
+    },
+    "dollar": {
+      "address": "0x387CA4c8D9a6E535f11DbA594A0D56d65BF1d2e5",
+      "runtimeCodeHash": "0xbeda0d65ff2ff979c715022a7f3593f173d6a2239219ac6bdb5d2578bbd443a4"
+    },
+    "risk": {
+      "address": "0x399Bbcbc82cd6eDa43F18d957E75feB09C66C709",
+      "runtimeCodeHash": "0x90ed9798e6cd9363fbb6c3c9524a967c29715ce5e10c2285c72763411704b9d8"
+    },
+    "weth": {
+      "address": "0x33e4191705c386532ba27cBF171Db86919200B94",
+      "runtimeCodeHash": "0x55f8ac53c64450f01880d8249fc5cb0c69c064e4bcb097ea80a02fff40485a7c"
+    },
+    "oracle": {
+      "address": "0xB75E151DdC106b35528dd2AaD856807F29d1091F",
+      "runtimeCodeHash": "0x35de14d4cccc9b416ad169fd7f2d424bebcddd2ae3d6aabf20cbf80f0e7b0f2f"
+    }
+  },
+  "liquidity": {
+    "poolManager": {
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "runtimeCodeHash": "0xbd3881180b547f5fe817545743cfb4343e96b1bc6640dcd70c106b0066e95626"
+    },
+    "positionManager": {
+      "address": "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
+      "runtimeCodeHash": "0xf3a0edb689229fa4bf135a728f2ec2eb4a2fbee2e41e3e74ffadb7b4c56e8a6d"
+    },
+    "permit2": {
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "runtimeCodeHash": "0x0117e0ed818bc3f2a8729ffc336c837e63e965f04b473047b39b35ad86aac259"
+    },
+    "swapFeeHook": {
+      "address": "0x9c683B8253578be82D741b592dc10a0c637CD0cc",
+      "runtimeCodeHash": "0xc5a86a25aa5217e8b45d3605066e38a7f6eaadba73b06e8b9e73e4ff6822d137"
+    },
+    "liquidityManager": {
+      "address": "0xd12b47594bDe07B86446d8ee7014b8477B6526c1",
+      "runtimeCodeHash": "0x37db2c153d58b0b32fe4cb80dd569d9b359beb052de8e69e02f7ad11c80476d6"
+    },
+    "stateView": {
+      "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "runtimeCodeHash": "0x7d9c591e0956fd89d98feb4ffcfe8bf1f7a62bd485edd979fa21d104b49878a6"
+    },
+    "quoter": {
+      "address": "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
+      "runtimeCodeHash": "0xd707b1da8cb165e5ea35a3b4450d971eb562ec171e23492aa117036b78a868f6"
+    },
+    "universalRouter": {
+      "address": "0x8876789976dEcBfCbBbe364623C63652db8C0904",
+      "runtimeCodeHash": "0xfdd90802f39ce5fc8bac4c2f1b3ac7bac530fd17ff46b0630f1bd00f1e14082f"
+    }
+  },
+  "pegged": {
+    "profileId": "2",
+    "collateral": {
+      "address": "0x2c0DEA86D8fBdb652305B37ea7cF3f1cdC2A1371",
+      "runtimeCodeHash": "0xf0793c28e47b9af3e2a38908f83b944a271d497629ac567b097fbbbd6ccb7515"
+    },
+    "oracle": {
+      "address": "0xbdc2C0D95A332F527D19160676462Be029ED22ab",
+      "runtimeCodeHash": "0x3ad6d1fa34dcde1ca4079ac0d354bfcf8d78eef56eca2e567b6c3db3d668ebd3"
+    }
+  },
+  "faucet": null
+}

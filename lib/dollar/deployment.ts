@@ -1,4 +1,12 @@
-import { getAddress, isHash, keccak256, type Address, type Hex, type PublicClient } from "viem";
+import {
+  getAddress,
+  isHash,
+  keccak256,
+  parseAbi,
+  type Address,
+  type Hex,
+  type PublicClient,
+} from "viem";
 
 import { deploymentManifests } from "@/deployments/manifests";
 import { parseDeploymentManifest } from "@/lib/dollar/manifest";
@@ -6,11 +14,25 @@ import { parseDeploymentManifest } from "@/lib/dollar/manifest";
 export type DollarContractName =
   "diamond" | "core" | "gateway" | "dollar" | "risk" | "weth" | "oracle";
 export type LiquidityContractName =
-  "poolManager" | "positionManager" | "permit2" | "swapFeeHook" | "liquidityManager" | "stateView";
+  | "poolManager"
+  | "positionManager"
+  | "permit2"
+  | "swapFeeHook"
+  | "liquidityManager"
+  | "stateView"
+  | "quoter"
+  | "universalRouter";
+
+type LocalLiquidityContractName = Exclude<LiquidityContractName, "quoter" | "universalRouter">;
 
 export type LiquidityDeployment = Readonly<{
-  contracts: Readonly<Record<LiquidityContractName, Address>>;
-  runtimeCodeHashes: Readonly<Record<LiquidityContractName, Hex>>;
+  contracts: Readonly<
+    Record<LocalLiquidityContractName, Address> &
+      Partial<Record<"quoter" | "universalRouter", Address>>
+  >;
+  runtimeCodeHashes: Readonly<
+    Record<LocalLiquidityContractName, Hex> & Partial<Record<"quoter" | "universalRouter", Hex>>
+  >;
 }>;
 
 export type DollarDeployment = Readonly<{
@@ -32,6 +54,10 @@ export type DollarDeployment = Readonly<{
     profileId: bigint;
     collateralCodeHash: Hex;
     oracleCodeHash: Hex;
+  }> | null;
+  faucet?: Readonly<{
+    address: Address;
+    runtimeCodeHash: Hex;
   }> | null;
 }>;
 
@@ -59,7 +85,7 @@ const hashVariables: Readonly<Record<DollarContractName, string>> = {
   oracle: "NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH",
 };
 
-const liquidityAddressVariables: Readonly<Record<LiquidityContractName, string>> = {
+const liquidityAddressVariables: Readonly<Record<LocalLiquidityContractName, string>> = {
   poolManager: "NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS",
   positionManager: "NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS",
   permit2: "NEXT_PUBLIC_STATICS_PERMIT2_ADDRESS",
@@ -68,7 +94,7 @@ const liquidityAddressVariables: Readonly<Record<LiquidityContractName, string>>
   stateView: "NEXT_PUBLIC_STATICS_STATE_VIEW_ADDRESS",
 };
 
-const liquidityHashVariables: Readonly<Record<LiquidityContractName, string>> = {
+const liquidityHashVariables: Readonly<Record<LocalLiquidityContractName, string>> = {
   poolManager: "NEXT_PUBLIC_STATICS_POOL_MANAGER_CODE_HASH",
   positionManager: "NEXT_PUBLIC_STATICS_POSITION_MANAGER_CODE_HASH",
   permit2: "NEXT_PUBLIC_STATICS_PERMIT2_CODE_HASH",
@@ -172,13 +198,13 @@ export function readDollarDeployment(
           name,
           parseAddress(environment[variable], variable),
         ])
-      ) as Record<LiquidityContractName, Address>,
+      ) as Record<LocalLiquidityContractName, Address>,
       runtimeCodeHashes: Object.fromEntries(
         Object.entries(liquidityHashVariables).map(([name, variable]) => [
           name,
           parseHash(environment[variable], variable),
         ])
-      ) as Record<LiquidityContractName, Hex>,
+      ) as Record<LocalLiquidityContractName, Hex>,
     };
   }
   const peggedValues = [
@@ -326,6 +352,13 @@ export async function verifyDollarDeployment(
       throw new Error("Pegged USDG runtime code does not match the deployment manifest.");
     }
   }
+  if (deployment.faucet) {
+    const code = await publicClient.getCode({ address: deployment.faucet.address });
+    if (!code || code === "0x") throw new Error("Testnet faucet has no runtime code.");
+    if (keccak256(code).toLowerCase() !== deployment.faucet.runtimeCodeHash.toLowerCase()) {
+      throw new Error("Testnet faucet runtime code does not match the deployment manifest.");
+    }
+  }
 }
 
 export async function verifyLiquidityDeployment(
@@ -335,13 +368,91 @@ export async function verifyLiquidityDeployment(
   const liquidity = deployment.liquidity;
   if (!liquidity) throw new Error("No verified Statics liquidity deployment is configured.");
   await Promise.all(
-    (Object.keys(liquidity.contracts) as LiquidityContractName[]).map(async (name) => {
-      const code = await publicClient.getCode({ address: liquidity.contracts[name] });
-      if (!code || code === "0x") throw new Error(`${name} has no runtime code.`);
-      if (keccak256(code).toLowerCase() !== liquidity.runtimeCodeHashes[name].toLowerCase()) {
-        throw new Error(`${name} runtime code does not match the deployment manifest.`);
+    (Object.entries(liquidity.contracts) as [LiquidityContractName, Address][]).map(
+      async ([name, address]) => {
+        const expectedHash = liquidity.runtimeCodeHashes[name];
+        if (!expectedHash) throw new Error(`${name} has no reviewed runtime code hash.`);
+        const code = await publicClient.getCode({ address });
+        if (!code || code === "0x") throw new Error(`${name} has no runtime code.`);
+        if (keccak256(code).toLowerCase() !== expectedHash.toLowerCase()) {
+          throw new Error(`${name} runtime code does not match the deployment manifest.`);
+        }
       }
-    })
+    )
   );
+
+  const poolManagerAbi = parseAbi(["function poolManager() view returns (address)"]);
+  const permit2Abi = parseAbi(["function permit2() view returns (address)"]);
+  const positionManagerAbi = parseAbi(["function positionManager() view returns (address)"]);
+  const staticsDiamondAbi = parseAbi(["function staticsDiamond() view returns (address)"]);
+  const poolManagerBound = [
+    "positionManager",
+    "stateView",
+    "quoter",
+    "universalRouter",
+    "swapFeeHook",
+    "liquidityManager",
+  ] as const;
+  for (const name of poolManagerBound) {
+    const address = liquidity.contracts[name];
+    if (!address) continue;
+    const bound = await publicClient.readContract({
+      address,
+      abi: poolManagerAbi,
+      functionName: "poolManager",
+    });
+    if (getAddress(bound) !== getAddress(liquidity.contracts.poolManager)) {
+      throw new Error(`${name} is bound to a different PoolManager.`);
+    }
+  }
+
+  const [
+    positionManagerPermit2,
+    managerPermit2,
+    managerPositionManager,
+    managerDiamond,
+    hookDiamond,
+  ] = await Promise.all([
+    publicClient.readContract({
+      address: liquidity.contracts.positionManager,
+      abi: permit2Abi,
+      functionName: "permit2",
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.liquidityManager,
+      abi: permit2Abi,
+      functionName: "permit2",
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.liquidityManager,
+      abi: positionManagerAbi,
+      functionName: "positionManager",
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.liquidityManager,
+      abi: staticsDiamondAbi,
+      functionName: "staticsDiamond",
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsDiamondAbi,
+      functionName: "staticsDiamond",
+    }),
+  ]);
+  if (
+    getAddress(positionManagerPermit2) !== getAddress(liquidity.contracts.permit2) ||
+    getAddress(managerPermit2) !== getAddress(liquidity.contracts.permit2)
+  ) {
+    throw new Error("Liquidity deployment is bound to a different Permit2.");
+  }
+  if (getAddress(managerPositionManager) !== getAddress(liquidity.contracts.positionManager)) {
+    throw new Error("Liquidity manager is bound to a different PositionManager.");
+  }
+  if (
+    getAddress(managerDiamond) !== getAddress(deployment.contracts.diamond) ||
+    getAddress(hookDiamond) !== getAddress(deployment.contracts.diamond)
+  ) {
+    throw new Error("Liquidity deployment is bound to a different StaticsDiamond.");
+  }
   return liquidity;
 }

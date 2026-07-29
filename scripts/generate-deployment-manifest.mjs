@@ -29,7 +29,7 @@ import { createPublicClient, http, getAddress, keccak256 } from "viem";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deploymentsDir = resolve(siteRoot, "deployments");
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const DOLLAR = ["diamond", "core", "gateway", "dollar", "risk", "weth", "oracle"];
 const LIQUIDITY = [
@@ -39,6 +39,8 @@ const LIQUIDITY = [
   "swapFeeHook",
   "liquidityManager",
   "stateView",
+  "quoter",
+  "universalRouter",
 ];
 
 function arg(name, { required = true } = {}) {
@@ -73,8 +75,12 @@ async function entryFor(client, name, address) {
   };
 }
 
+function address(value) {
+  return typeof value === "string" ? value : value?.address;
+}
+
 function pick(source, name) {
-  const value = source?.[name];
+  const value = address(source?.[name]);
   if (!value) throw new Error(`Address artifact is missing "${name}".`);
   return value;
 }
@@ -137,40 +143,56 @@ async function main() {
   }
 
   const artifact = JSON.parse(readFileSync(resolve(process.cwd(), addressesPath), "utf8"));
-  const contractsSource = artifact.contracts ?? artifact;
-
   const client = createPublicClient({ transport: http(rpcUrl) });
   const chainId = await client.getChainId();
-  if (artifact.chainId !== undefined && Number(artifact.chainId) !== chainId) {
+  const artifactChainId = artifact.network?.chainId ?? artifact.chainId;
+  if (artifactChainId !== undefined && Number(artifactChainId) !== chainId) {
     throw new Error(
-      `Artifact declares chain ${artifact.chainId} but ${rpcUrl} reports ${chainId}. ` +
+      `Artifact declares chain ${artifactChainId} but ${rpcUrl} reports ${chainId}. ` +
         "Refusing to write a manifest that names the wrong network."
     );
   }
 
+  const contractsSource = {
+    diamond: artifact.contracts?.staticsDiamond,
+    core: artifact.contracts?.staticsDollarCoreDiamond,
+    gateway: artifact.contracts?.staticsDiamond,
+    dollar: artifact.contracts?.staticsDollar,
+    risk: artifact.contracts?.staticsDollarRiskShares,
+    weth: artifact.externalDependencies?.weth,
+    oracle: artifact.contracts?.staticsDollarOracle,
+  };
   const contracts = {};
   for (const name of DOLLAR) {
     contracts[name] = await entryFor(client, name, pick(contractsSource, name));
   }
 
-  let liquidity = null;
-  if (LIQUIDITY.every((name) => contractsSource?.[name])) {
-    liquidity = {};
-    for (const name of LIQUIDITY) {
-      liquidity[name] = await entryFor(client, name, contractsSource[name]);
-    }
-  } else {
-    console.warn("No complete liquidity address set found; writing manifest without it.");
+  const liquiditySource = {
+    poolManager: artifact.externalDependencies?.poolManager,
+    positionManager: artifact.externalDependencies?.positionManager,
+    permit2: artifact.externalDependencies?.permit2,
+    swapFeeHook: artifact.contracts?.swapFeeHook,
+    liquidityManager: artifact.contracts?.liquidityManager,
+    stateView: artifact.externalDependencies?.stateView,
+    quoter: artifact.externalDependencies?.quoter,
+    universalRouter: artifact.externalDependencies?.universalRouter,
+  };
+  const liquidity = {};
+  for (const name of LIQUIDITY) {
+    liquidity[name] = await entryFor(client, name, pick(liquiditySource, name));
   }
 
   let pegged = null;
-  if (peggedProfile && contractsSource.usdg && contractsSource.usdgOracle) {
+  if (peggedProfile) {
     pegged = {
       profileId: peggedProfile,
-      collateral: await entryFor(client, "usdg", contractsSource.usdg),
-      oracle: await entryFor(client, "usdgOracle", contractsSource.usdgOracle),
+      collateral: await entryFor(client, "usdg", pick(artifact.testnetFixtures, "mockUsdg")),
+      oracle: await entryFor(client, "usdgOracle", pick(artifact.testnetFixtures, "usdgOracle")),
     };
   }
+
+  const faucetAddress = address(artifact.testnetFixtures?.faucet);
+  const faucet = faucetAddress ? await entryFor(client, "faucet", faucetAddress) : null;
 
   const manifest = {
     schemaVersion: SCHEMA_VERSION,
@@ -183,6 +205,7 @@ async function main() {
     contracts,
     liquidity,
     pegged,
+    faucet,
   };
 
   const target = resolve(deploymentsDir, `${chainId}.json`);

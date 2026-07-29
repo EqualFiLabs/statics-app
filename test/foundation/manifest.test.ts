@@ -115,6 +115,13 @@ describe("deployment manifest", () => {
     expect(deployment.pegged?.profileId).toBe(2n);
     expect(deployment.pegged?.collateral).toBe(address("9"));
   });
+
+  it("carries an optional code-bound public testnet faucet", () => {
+    const deployment = parseDeploymentManifest(manifest({ faucet: entry("b", "b") }));
+
+    expect(deployment.faucet?.address.toLowerCase()).toBe(address("b"));
+    expect(deployment.faucet?.runtimeCodeHash).toBe(hash("b"));
+  });
 });
 
 describe("deployment source selection", () => {
@@ -138,7 +145,7 @@ describe("deployment source selection", () => {
     expect(state.status === "unavailable" && state.reason).toMatch(/chain 8453/);
   });
 
-  it("ignores environment addresses once the chain is not local Anvil", () => {
+  it("uses the checked-in manifest instead of public environment addresses", () => {
     // The environment path is the thing being contained: setting these on a
     // build machine must not configure a public network.
     const state = readDollarDeployment({
@@ -148,7 +155,11 @@ describe("deployment source selection", () => {
       NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: address("2"),
     });
 
-    expect(state.status).toBe("unavailable");
+    expect(state.status).toBe("configured");
+    if (state.status === "configured") {
+      expect(state.deployment.source).toBe("checked-in-manifest");
+      expect(state.deployment.contracts.diamond).not.toBe(address("1"));
+    }
   });
 
   it("still reports nothing configured when no deployment is set at all", () => {
