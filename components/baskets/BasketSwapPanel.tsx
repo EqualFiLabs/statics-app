@@ -8,7 +8,6 @@ import {
   formatUnits,
   getAddress,
   parseUnits,
-  type Address,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 

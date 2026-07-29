@@ -7,11 +7,14 @@ export const SWAP_PERMIT_TTL_SECONDS = 20n * 60n;
 export type CanonicalSwapDirection = "asset-in" | "basket-in";
 
 export function isCurrentCanonicalSwapQuote(
-  quote: {
-    amount: bigint;
-    asset: Address;
-    direction: CanonicalSwapDirection;
-  } | null | undefined,
+  quote:
+    | {
+        amount: bigint;
+        asset: Address;
+        direction: CanonicalSwapDirection;
+      }
+    | null
+    | undefined,
   amount: bigint,
   asset: Address,
   direction: CanonicalSwapDirection
