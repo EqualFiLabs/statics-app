@@ -133,16 +133,16 @@
   cursor: not-allowed;
 }
 
-.ui-button--primary {
+.dapp-shell .ui-button--primary {
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-.ui-button--primary:hover:not(:disabled) {
+.dapp-shell .ui-button--primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-.ui-button--primary:active:not(:disabled) {
+.dapp-shell .ui-button--primary:active:not(:disabled) {
   background: var(--accent-press);
 }
 
