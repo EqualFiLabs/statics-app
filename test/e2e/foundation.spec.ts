@@ -124,7 +124,7 @@ test.describe("Dollar DApp foundation", () => {
       .click();
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.getByRole("link", { name: /all baskets/i }).click();
-    await navigateDapp(page, "/app/create");
+    await page.goto("/app/create");
     await expect(
       page.getByRole("heading", { name: "Basket launches are steward-controlled" })
     ).toBeVisible();
