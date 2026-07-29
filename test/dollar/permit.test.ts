@@ -1,7 +1,12 @@
 import { serializeSignature } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { PERMIT_TTL_SECONDS, decodePermitSignature, permitDeadline } from "@/lib/dollar/permit";
+import {
+  PERMIT_TTL_SECONDS,
+  decodePermitSignature,
+  exactPeggedMintPermitValue,
+  permitDeadline,
+} from "@/lib/dollar/permit";
 
 describe("Dollar permit helpers", () => {
   it("uses a short block-timestamp deadline", () => {
@@ -20,5 +25,12 @@ describe("Dollar permit helpers", () => {
       r: `0x${"11".repeat(32)}`,
       s: `0x${"22".repeat(32)}`,
     });
+  });
+
+  it("signs the fresh exact amount within the reviewed maximum", () => {
+    expect(exactPeggedMintPermitValue(100n, 105n)).toBe(100n);
+    expect(() => exactPeggedMintPermitValue(106n, 105n)).toThrow(
+      "The required USDG moved above the reviewed maximum."
+    );
   });
 });

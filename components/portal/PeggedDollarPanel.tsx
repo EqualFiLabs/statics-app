@@ -27,7 +27,11 @@ import {
   maximumWithTolerance,
   minimumWithTolerance,
 } from "@/lib/dollar/transactions";
-import { decodePermitSignature, permitDeadline } from "@/lib/dollar/permit";
+import {
+  decodePermitSignature,
+  exactPeggedMintPermitValue,
+  permitDeadline,
+} from "@/lib/dollar/permit";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -291,12 +295,15 @@ export function PeggedDollarPanel() {
       const before = snapshot;
       if (quote.direction === "mint" && fresh.direction === "mint") {
         const maximum = maximumWithTolerance(quote.totalCollateralIn);
-        if (fresh.totalCollateralIn > maximum) {
+        let permitValue: bigint;
+        try {
+          permitValue = exactPeggedMintPermitValue(fresh.totalCollateralIn, maximum);
+        } catch (cause) {
           setQuote(fresh);
           setReviewing(false);
-          throw new Error("The required USDG moved above the reviewed maximum.");
+          throw cause;
         }
-        const permit = await signPermit(deployment.pegged.collateral, maximum);
+        const permit = await signPermit(deployment.pegged.collateral, permitValue);
         await send(
           "mint-pegged",
           "Mint Statics Dollar with USDG",
@@ -377,24 +384,30 @@ export function PeggedDollarPanel() {
         : false;
 
   const primary = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (wallet.status === "signed-out" || wallet.status === "error") return wallet.login();
+    if (wallet.status === "wallet-missing") return void wallet.createWallet();
+    if (wallet.status !== "ready") return;
     if (deployment && wallet.chainId !== deployment.chainId) return void wallet.switchNetwork();
     return void nextAction();
   };
   const label =
-    wallet.status === "signed-out"
+    wallet.status === "signed-out" || wallet.status === "error"
       ? "Connect wallet"
-      : deployment && wallet.chainId !== deployment.chainId
-        ? `Switch to ${wallet.networkName}`
-        : pending
-          ? "Preparing…"
-          : quoteLoading
-            ? "Reading quote…"
-            : balanceInsufficient
-              ? `Insufficient ${direction === "mint" ? "USDG" : "USDstx"}`
-              : direction === "mint"
-                ? "Review mint"
-                : "Review redemption";
+      : wallet.status === "wallet-missing"
+        ? "Create embedded wallet"
+        : wallet.status !== "ready"
+          ? "Wallet loading…"
+          : deployment && wallet.chainId !== deployment.chainId
+            ? `Switch to ${wallet.networkName}`
+            : pending
+              ? "Preparing…"
+              : quoteLoading
+                ? "Reading quote…"
+                : balanceInsufficient
+                  ? `Insufficient ${direction === "mint" ? "USDG" : "USDstx"}`
+                  : direction === "mint"
+                    ? "Review mint"
+                    : "Review redemption";
 
   return (
     <div className="portal-panel" role="tabpanel">
@@ -410,6 +423,7 @@ export function PeggedDollarPanel() {
               setQuote(null);
               setReviewing(false);
             }}
+            disabled={pending}
           >
             {item === "mint" ? "Mint" : "Redeem"}
           </button>
@@ -430,8 +444,11 @@ export function PeggedDollarPanel() {
               setReviewing(false);
               setError(null);
             }}
+            disabled={pending}
           />
-          <button type="button">USDstx</button>
+          <button type="button" disabled={pending}>
+            USDstx
+          </button>
         </div>
         <small>Balance {display(snapshot?.dollarBalance, 18, "USDstx")}</small>
       </label>
@@ -506,10 +523,13 @@ export function PeggedDollarPanel() {
           type="button"
           disabled={
             pending ||
-            balanceInsufficient ||
-            wallet.status === "unconfigured" ||
             (wallet.status !== "signed-out" &&
-              (!deployment?.pegged ||
+              wallet.status !== "error" &&
+              wallet.status !== "wallet-missing" &&
+              wallet.status !== "ready") ||
+            (wallet.status === "ready" &&
+              (balanceInsufficient ||
+                !deployment?.pegged ||
                 (wallet.chainId === deployment.chainId && (!quote || !snapshot))))
           }
           onClick={primary}

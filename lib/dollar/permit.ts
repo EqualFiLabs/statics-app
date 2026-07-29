@@ -8,6 +8,16 @@ export function permitDeadline(blockTimestamp: bigint): bigint {
   return blockTimestamp + PERMIT_TTL_SECONDS;
 }
 
+export function exactPeggedMintPermitValue(
+  freshCollateralIn: bigint,
+  reviewedMaximumCollateralIn: bigint
+): bigint {
+  if (freshCollateralIn > reviewedMaximumCollateralIn) {
+    throw new Error("The required USDG moved above the reviewed maximum.");
+  }
+  return freshCollateralIn;
+}
+
 export function decodePermitSignature(deadline: bigint, signature: Hex): PermitSignature {
   const decoded = parseSignature(signature);
   const v =

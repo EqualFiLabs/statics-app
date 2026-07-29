@@ -37,7 +37,11 @@ import {
   parseSlippageBps,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import {
+  readClientDollarDeployment,
+  verifyDollarDeployment,
+  verifyLiquidityDeployment,
+} from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -84,6 +88,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         throw new Error("No verified Statics deployment is configured.");
       }
       await verifyDollarDeployment(publicClient, deploymentState.deployment);
+      await verifyLiquidityDeployment(publicClient, deploymentState.deployment);
       return publicClient.readContract({
         address: deploymentState.deployment.contracts.diamond,
         abi: staticsAbi,
@@ -129,6 +134,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         functionName: "quoteExactInputSingle",
         data: result.data,
       });
+      if (amountOut === 0n) throw new Error("The canonical quote returns no output.");
       return {
         amount,
         amountOut,
@@ -184,6 +190,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       !walletClient.data ||
       !currentQuote ||
       minimumOut === null ||
+      minimumOut === 0n ||
       deploymentState.status !== "configured" ||
       !deploymentState.deployment.liquidity?.contracts.quoter ||
       !deploymentState.deployment.liquidity.contracts.universalRouter
@@ -195,7 +202,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
     try {
       if (amount > inputBalance) throw new Error(`Insufficient ${inputToken.symbol} balance.`);
       await verifyDollarDeployment(publicClient, deploymentState.deployment);
-      const liquidity = deploymentState.deployment.liquidity;
+      const liquidity = await verifyLiquidityDeployment(publicClient, deploymentState.deployment);
       const router = liquidity.contracts.universalRouter;
       if (!router) throw new Error("Robinhood Universal Router is not configured.");
       const [freshBalance, permit2Allowance, freshQuote, block] = await Promise.all([
@@ -269,6 +276,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       if (freshAmountOut < minimumOut) {
         await quote.refetch();
         throw new Error("The refreshed output moved below the reviewed minimum.");
+      }
+      if (freshAmountOut === 0n || minimumOut === 0n) {
+        throw new Error("The swap amount is too small to produce a protected output.");
       }
 
       const deadline = block.timestamp + SWAP_PERMIT_TTL_SECONDS;
@@ -349,6 +359,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   };
 
   const poolActive = pool.data?.status === CanonicalPoolStatus.Active;
+  const readError = pool.error ?? quote.error;
   let label = "Review swap";
   let action: (() => void) | null = () => void submit();
   if (walletState.status === "signed-out" || walletState.status === "error") {
@@ -467,6 +478,11 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           This canonical pool must be Active before browser swaps are enabled.
         </p>
       )}
+      {readError && (
+        <p className="dapp-inline-error" role="alert">
+          {describeBasketError(readError)} Change the amount or pool to retry.
+        </p>
+      )}
       {error && (
         <p className="dapp-inline-error" role="alert">
           {error}
@@ -486,6 +502,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
               quote.isFetching ||
               !currentQuote ||
               minimumOut === null ||
+              minimumOut === 0n ||
               amount > inputBalance))
         }
       >
