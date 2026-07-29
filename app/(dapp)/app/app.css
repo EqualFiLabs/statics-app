@@ -1637,6 +1637,10 @@
   text-align: center;
 }
 
+/* Typography is restated rather than inherited, because a dialog may be
+ * portalled out of .dapp-shell to escape the header's backdrop-filter -- which
+ * makes the header a containing block for position:fixed -- and would otherwise
+ * fall back to the global mono font. */
 .wallet-dialog-backdrop {
   position: fixed;
   z-index: 80;
@@ -1644,7 +1648,12 @@
   display: grid;
   place-items: center;
   padding: 1rem;
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   background: rgba(0, 0, 0, 0.6);
+  -webkit-font-smoothing: antialiased;
 }
 
 .wallet-dialog {

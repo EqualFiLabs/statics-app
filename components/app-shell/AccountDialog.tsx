@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useSolanaWalletState } from "@/providers/solana-context";
 import { useWalletState } from "@/providers/wallet-context";
@@ -93,7 +94,13 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  return (
+  // Portalled to the body because the header sets backdrop-filter, which makes
+  // it a containing block for position:fixed descendants -- inset:0 would
+  // otherwise resolve against the 72px header strip and centre the dialog half
+  // above the viewport.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="wallet-dialog-backdrop" role="presentation" onMouseDown={onClose}>
       <section
         className="wallet-dialog account-dialog"
@@ -129,6 +136,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
