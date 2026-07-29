@@ -20,7 +20,12 @@ import {
   zora,
 } from "wagmi/chains";
 
-import { anvil, robinhoodMainnet, readWalletEnvironment } from "@/lib/wallet-config";
+import {
+  anvil,
+  robinhoodMainnet,
+  robinhoodTestnet,
+  readWalletEnvironment,
+} from "@/lib/wallet-config";
 
 export type FundingNetwork = Readonly<{
   chain: Chain;
@@ -59,6 +64,12 @@ export const fundingNetworks: readonly FundingNetwork[] = [
   { key: "world-chain", label: "World Chain", chain: worldchain, supportsUniswap: true },
   { key: "soneium", label: "Soneium", chain: soneium, supportsUniswap: true },
   { key: "tempo", label: "Tempo", chain: tempo, supportsUniswap: true },
+  {
+    key: "robinhood-testnet",
+    label: "Robinhood Testnet",
+    chain: robinhoodTestnet,
+    supportsUniswap: false,
+  },
   { key: "robinhood", label: "Robinhood Chain", chain: robinhoodMainnet, supportsUniswap: true },
   { key: "base", label: "Base", chain: base, supportsUniswap: true },
   { key: "arbitrum", label: "Arbitrum", chain: arbitrum, supportsUniswap: true },

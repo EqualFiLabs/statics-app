@@ -99,7 +99,7 @@ export function LandingPage() {
             <p className="version">
               Statics protocol
               <br />
-              Pre-launch
+              Public testnet beta
             </p>
           </div>
         </section>

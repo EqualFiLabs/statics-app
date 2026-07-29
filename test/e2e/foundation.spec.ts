@@ -34,11 +34,11 @@ test.describe("landing foundation", () => {
     await page.goto("/");
   });
 
-  test("preserves truthful pre-launch state without horizontal overflow", async ({ page }) => {
+  test("reports the public testnet beta without horizontal overflow", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeVisible();
-    await expect(page.getByText("Pre-launch").first()).toBeVisible();
+    await expect(page.getByText("Public testnet beta").first()).toBeVisible();
     await expect(page.getByText("19,482,731")).toHaveCount(0);
     await expect(page.getByText("Online", { exact: true })).toHaveCount(0);
 
