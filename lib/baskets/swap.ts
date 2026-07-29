@@ -4,6 +4,25 @@ import type { Permit2PermitSingle, V4PoolKey } from "@statics-protocol/sdk";
 
 export const SWAP_PERMIT_TTL_SECONDS = 20n * 60n;
 
+export type CanonicalSwapDirection = "asset-in" | "basket-in";
+
+export function isCurrentCanonicalSwapQuote(
+  quote: {
+    amount: bigint;
+    asset: Address;
+    direction: CanonicalSwapDirection;
+  } | null | undefined,
+  amount: bigint,
+  asset: Address,
+  direction: CanonicalSwapDirection
+): boolean {
+  return (
+    quote?.amount === amount &&
+    quote.asset.toLowerCase() === asset.toLowerCase() &&
+    quote.direction === direction
+  );
+}
+
 export function canonicalSwapPoolKey(pool: {
   currency0: Address;
   currency1: Address;
