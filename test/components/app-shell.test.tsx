@@ -51,7 +51,6 @@ describe("DApp wallet shell", () => {
   });
 
   it("shows the active address and requires a network switch when mismatched", () => {
-    const copyAddress = vi.fn().mockResolvedValue(undefined);
     const switchNetwork = vi.fn().mockResolvedValue(undefined);
     renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
@@ -60,14 +59,60 @@ describe("DApp wallet shell", () => {
       walletKind: "embedded",
       chainId: 1,
       isTargetChain: false,
-      copyAddress,
       switchNetwork,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+    expect(screen.getByRole("button", { name: "0x1234…5678" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Switch network" }));
-    expect(copyAddress).toHaveBeenCalledOnce();
     expect(switchNetwork).toHaveBeenCalledOnce();
+  });
+
+  // The pill used to copy silently on click, which gave no way to reach the
+  // Solana address or to sign out.
+  it("opens an account dialog from the address pill", () => {
+    const logout = vi.fn().mockResolvedValue(undefined);
+    const address = "0x1234567890abcdef1234567890abcdef12345678";
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address,
+      walletKind: "embedded",
+      chainId: 31_337,
+      isTargetChain: true,
+      logout,
+    });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Your account" });
+    expect(dialog).toBeInTheDocument();
+    // Both chains are named, and the full address is shown rather than the
+    // truncation from the pill.
+    expect(screen.getByText("Ethereum")).toBeInTheDocument();
+    expect(screen.getByText("Solana")).toBeInTheDocument();
+    expect(screen.getByText(address)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy Ethereum address" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    expect(logout).toHaveBeenCalledOnce();
+  });
+
+  // No Solana wallet exists until a Solana route is used, so the row has to say
+  // so rather than offering a copy control for nothing.
+  it("explains the absent Solana address instead of offering an empty copy", () => {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      walletKind: "embedded",
+      chainId: 31_337,
+      isTargetChain: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+    expect(screen.getByText(/No Solana wallet yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy Solana address" })).not.toBeInTheDocument();
   });
 
   it("explains the mismatch and names the chain the wallet is actually on", () => {
