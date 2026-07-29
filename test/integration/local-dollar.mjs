@@ -23,7 +23,6 @@ import {
   buildDepositETHTransaction,
   buildDepositWETHCall,
   buildIncreaseStakedLiquidityCall,
-  buildInitializeCanonicalPoolCall,
   buildMintCall,
   buildMintBasketCollateralCall,
   buildMintPeggedCall,
@@ -387,6 +386,19 @@ try {
   ) {
     throw new Error("Local basket fixture is not backed by the verified Statics Dollar token.");
   }
+  const [launchBasketSupply, launchVaultBalance] = await Promise.all([
+    publicClient.readContract({
+      address: configuredBasket.token,
+      abi: basketTokenAbi,
+      functionName: "totalSupply",
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "vaultBalance",
+      args: [fixture.basketId, deployment.contracts.dollar],
+    }),
+  ]);
   const basketShares = parseEther("1");
   const mintQuote = await publicClient.readContract({
     address: deployment.contracts.diamond,
@@ -475,8 +487,12 @@ try {
       args: [fixture.basketId, deployment.contracts.dollar],
     }),
   ]);
-  if (endingBasketBalance !== 0n || endingBasketSupply !== 0n || endingVaultBalance !== 0n) {
-    throw new Error("Basket redemption did not clear the user shares, supply, and backing.");
+  if (
+    endingBasketBalance !== 0n ||
+    endingBasketSupply !== launchBasketSupply ||
+    endingVaultBalance !== launchVaultBalance
+  ) {
+    throw new Error("Basket redemption did not restore the canonical launch baseline.");
   }
 
   const createPositionResult = await send(
@@ -719,8 +735,8 @@ try {
     data: firstBorrow.simulationData,
   });
   if (
-    simulatedPrincipals.length !== borrowQuote[3].length ||
-    simulatedPrincipals.some((amount, index) => amount !== borrowQuote[3][index])
+    simulatedPrincipals.length !== borrowQuote.principals.length ||
+    simulatedPrincipals.some((amount, index) => amount !== borrowQuote.principals[index])
   ) {
     throw new Error("Loan origination simulation did not match the authoritative borrow quote.");
   }
@@ -761,9 +777,9 @@ try {
     }),
   ]);
   if (
-    firstLoan.collateralShares !== borrowQuote[1] ||
-    firstBorrowCollateral.lockedShares !== borrowQuote[1] ||
-    principalBalanceAfter !== principalBalanceBefore + borrowQuote[3][0]
+    firstLoan.collateralShares !== borrowQuote.collateralShares ||
+    firstBorrowCollateral.lockedShares !== borrowQuote.collateralShares ||
+    principalBalanceAfter !== principalBalanceBefore + borrowQuote.principals[0]
   ) {
     throw new Error("Confirmed loan state, locked collateral, or principal receipt was incorrect.");
   }
@@ -861,7 +877,7 @@ try {
     repaidLoan ||
     repaidEvents.length !== 1 ||
     repaidCollateral.lockedShares !== 0n ||
-    repaidCollateral.depositedShares !== loanDepositShares - borrowQuote[0]
+    repaidCollateral.depositedShares !== loanDepositShares - borrowQuote.feeShares
   ) {
     throw new Error("Confirmed repayment did not delete the loan and unlock its collateral.");
   }
@@ -895,7 +911,13 @@ try {
     params: [Number(secondLoan.maturity) + 3_601],
   });
   await publicClient.request({ method: "evm_mine" });
-  const [callerBalanceBefore, surplusBefore, recoveryCollateralBefore] = await Promise.all([
+  const recoveryQuote = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "quoteRecovery",
+    args: [secondLoanId],
+  });
+  const [callerBalanceBefore, treasuryBefore, recoveryCollateralBefore] = await Promise.all([
     publicClient.readContract({
       address: deployment.contracts.dollar,
       abi: staticsDollarTokenAbi,
@@ -905,8 +927,8 @@ try {
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
-      functionName: "recoverySurplus",
-      args: [fixture.basketId, deployment.contracts.dollar],
+      functionName: "treasuryAccrued",
+      args: [deployment.contracts.dollar],
     }),
     publicClient.readContract({
       address: deployment.contracts.diamond,
@@ -944,7 +966,7 @@ try {
     })
     .then(() => true)
     .catch(() => false);
-  const [callerBalanceAfter, surplusAfter, recoveryCollateralAfter, outstandingAfter] =
+  const [callerBalanceAfter, treasuryAfter, recoveryCollateralAfter, outstandingAfter] =
     await Promise.all([
       publicClient.readContract({
         address: deployment.contracts.dollar,
@@ -955,8 +977,8 @@ try {
       publicClient.readContract({
         address: deployment.contracts.diamond,
         abi: staticsAbi,
-        functionName: "recoverySurplus",
-        args: [fixture.basketId, deployment.contracts.dollar],
+        functionName: "treasuryAccrued",
+        args: [deployment.contracts.dollar],
       }),
       publicClient.readContract({
         address: deployment.contracts.diamond,
@@ -975,23 +997,19 @@ try {
     recoveredLoan ||
     recoveredEvents.length !== 1 ||
     recoveredEvents[0].args.caller.toLowerCase() !== recoveryAccount.address.toLowerCase() ||
-    callerBalanceAfter !== callerBalanceBefore ||
-    surplusAfter <= surplusBefore ||
+    callerBalanceAfter !== callerBalanceBefore + recoveryQuote.callerAmounts[0] ||
+    treasuryAfter !== treasuryBefore + recoveryQuote.protocolAmounts[0] ||
     outstandingAfter !== 0n ||
     recoveryCollateralAfter.lockedShares !==
-      recoveryCollateralBefore.lockedShares - recoveryBorrowQuote[1] ||
+      recoveryCollateralBefore.lockedShares - recoveryBorrowQuote.collateralShares ||
     recoveryCollateralAfter.depositedShares !==
-      recoveryCollateralBefore.depositedShares - recoveryBorrowQuote[1]
+      recoveryCollateralBefore.depositedShares - recoveryQuote.burnShares
   ) {
     throw new Error(
-      "Permissionless recovery did not delete the loan, reclassify surplus, remove collateral, and leave the caller unrewarded."
+      "Permissionless recovery did not delete the loan and distribute its bounded penalty."
     );
   }
 
-  await send(
-    deployment.contracts.diamond,
-    buildInitializeCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar, Q96)
-  );
   await publicClient.request({ method: "evm_increaseTime", params: [3_600] });
   await publicClient.request({ method: "evm_mine" });
   await send(
@@ -1347,6 +1365,7 @@ try {
     redemptionFeeTiers: configuredBasket.redemptionFeeTiers,
     originationFeeBps: BigInt(configuredBasket.originationFeeBps),
     extensionFeeBps: BigInt(configuredBasket.extensionFeeBps),
+    recoveryPenaltyBps: BigInt(configuredBasket.recoveryPenaltyBps),
     ltvBps: BigInt(configuredBasket.ltvBps),
     constituents: [
       {
@@ -1440,6 +1459,28 @@ try {
     abi: staticsAbi,
     functionName: "creationFee",
   });
+  const wethLaunchMaximum = parseEther("10");
+  const wethBeforeLaunch = await publicClient.readContract({
+    address: deployment.contracts.weth,
+    abi: wethAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  if (wethBeforeLaunch < wethLaunchMaximum) {
+    await send(
+      deployment.contracts.weth,
+      encodeFunctionData({ abi: wethAbi, functionName: "deposit" }),
+      wethLaunchMaximum - wethBeforeLaunch
+    );
+  }
+  await send(
+    deployment.contracts.weth,
+    encodeFunctionData({
+      abi: wethAbi,
+      functionName: "approve",
+      args: [deployment.contracts.diamond, wethLaunchMaximum],
+    })
+  );
   const wethBasketCreation = buildCreateBasketTransaction(
     {
       name: "Local Wrapped Ether Reserve",
@@ -1452,8 +1493,12 @@ try {
       originationFeeBps: 100,
       extensionFeeBps: 25,
       ltvBps: 7_500,
+      recoveryPenaltyBps: 500,
       loanDuration: 30 * 24 * 60 * 60,
     },
+    [{ sqrtPriceAssetPerBasketX96: Q96, pairedAssetAmount: parseEther("1") }],
+    [wethLaunchMaximum],
+    (await publicClient.getBlock()).timestamp + 3_600n,
     currentCreationFee
   );
   const wethBasketCreationResult = await send(
@@ -1553,6 +1598,26 @@ try {
   ) {
     throw new Error("Atomic create-and-stake did not persist both selected reward assets.");
   }
+  const activationSelections = await Promise.all(
+    initialSelections.map((asset) =>
+      publicClient.readContract({
+        account: account.address,
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "rewardSelection",
+        args: [stakingPositionId, asset],
+      })
+    )
+  );
+  const activationTimestamp = activationSelections.reduce(
+    (latest, selection) => (selection.eligibleAt > latest ? selection.eligibleAt : latest),
+    0
+  );
+  await publicClient.request({
+    method: "evm_setNextBlockTimestamp",
+    params: [activationTimestamp + 1],
+  });
+  await publicClient.request({ method: "evm_mine" });
 
   const mintForReward = async (shares) => {
     const quote = await publicClient.readContract({

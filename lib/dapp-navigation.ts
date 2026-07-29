@@ -81,11 +81,11 @@ const routePresentations = {
       "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
   },
   create: {
-    label: "Create basket",
-    status: "Create",
-    title: "Create a basket",
+    label: "Launch policy",
+    status: "Governed",
+    title: "Basket launch policy",
     description:
-      "Choose up to 16 assets and how much of each. You will see the full cost before anything is signed. Anyone can create one.",
+      "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available.",
   },
   activity: {
     label: "Activity",

@@ -12,10 +12,6 @@ describe("basket routes without wallet configuration", () => {
         <BasketListPage />
       </WalletContext.Provider>
     );
-    expect(screen.getByRole("link", { name: /create basket/i })).toHaveAttribute(
-      "href",
-      "/app/create"
-    );
     expect(screen.getAllByRole("link", { name: /inspect basket/i })[0]).toHaveAttribute(
       "href",
       "/app/baskets/0"

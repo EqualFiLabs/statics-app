@@ -1,8 +1,22 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildCreateBasketTransaction, staticsAbi } from "@statics-protocol/sdk";
-import { createPublicClient, createWalletClient, http, keccak256, parseEther } from "viem";
+import {
+  Q96,
+  basketTokenAbi,
+  buildCreateBasketTransaction,
+  buildMintPeggedCall,
+  buildRedeemPeggedCall,
+  staticsAbi,
+} from "@statics-protocol/sdk";
+import {
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  http,
+  keccak256,
+  parseEther,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const labels = {
@@ -123,16 +137,69 @@ export async function seedLocalBasket({ deployment, rpcUrl, privateKey, basket =
   const account = privateKeyToAccount(privateKey);
   const publicClient = createPublicClient({ transport: http(rpcUrl) });
   const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
-  const basketId = await publicClient.readContract({
-    address: deployment.contracts.diamond,
-    abi: staticsAbi,
-    functionName: "basketCount",
-  });
+  const send = async (to, data, value = 0n) => {
+    const hash = await walletClient.sendTransaction({ to, data, value });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success")
+      throw new Error(`Local fixture transaction ${hash} reverted.`);
+    return receipt;
+  };
+  const [basketId, creationFee, currentBlock] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "basketCount",
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "creationFee",
+    }),
+    publicClient.getBlock(),
+  ]);
+  const assets = basket.assets ?? [deployment.contracts.dollar];
+  const maxAmountsIn = assets.map(() => parseEther("10"));
+  if (basket.assets === undefined) {
+    const dollarAmount = maxAmountsIn[0];
+    const preview = await publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "previewPeggedMint",
+      args: [BigInt(deployment.pegged.profileId), dollarAmount],
+    });
+    await send(
+      deployment.pegged.collateral,
+      encodeFunctionData({
+        abi: basketTokenAbi,
+        functionName: "approve",
+        args: [deployment.contracts.diamond, preview.totalCollateralIn],
+      })
+    );
+    await send(
+      deployment.contracts.diamond,
+      buildMintPeggedCall(
+        BigInt(deployment.pegged.profileId),
+        dollarAmount,
+        preview.totalCollateralIn,
+        account.address
+      )
+    );
+  }
+  for (let index = 0; index < assets.length; index += 1) {
+    await send(
+      assets[index],
+      encodeFunctionData({
+        abi: basketTokenAbi,
+        functionName: "approve",
+        args: [deployment.contracts.diamond, maxAmountsIn[index]],
+      })
+    );
+  }
   const transaction = buildCreateBasketTransaction(
     {
       name: basket.name ?? "Local Dollar Reserve",
       symbol: basket.symbol ?? "lsUSD",
-      assets: basket.assets ?? [deployment.contracts.dollar],
+      assets,
       bundleAmounts: basket.bundleAmounts ?? [parseEther("1")],
       mintFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
       redemptionFeeTiers: [{ minActionShares: 0n, feeShares: parseEther("0.001") }],
@@ -140,9 +207,16 @@ export async function seedLocalBasket({ deployment, rpcUrl, privateKey, basket =
       originationFeeBps: 100,
       extensionFeeBps: 25,
       ltvBps: 7_500,
+      recoveryPenaltyBps: 500,
       loanDuration: 30 * 24 * 60 * 60,
     },
-    parseEther("1")
+    assets.map(() => ({
+      sqrtPriceAssetPerBasketX96: Q96,
+      pairedAssetAmount: parseEther("1"),
+    })),
+    maxAmountsIn,
+    currentBlock.timestamp + 3_600n,
+    creationFee
   );
   await publicClient.call({
     account: account.address,
@@ -164,6 +238,39 @@ export async function seedLocalBasket({ deployment, rpcUrl, privateKey, basket =
   });
   if (nextCount !== basketId + 1n) {
     throw new Error("Local basket fixture did not increment the authoritative basket count.");
+  }
+  if (basket.assets === undefined) {
+    const remainder = await publicClient.readContract({
+      address: deployment.contracts.dollar,
+      abi: basketTokenAbi,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
+    if (remainder > 0n) {
+      const preview = await publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "previewPeggedRedemption",
+        args: [BigInt(deployment.pegged.profileId), remainder],
+      });
+      await send(
+        deployment.contracts.dollar,
+        encodeFunctionData({
+          abi: basketTokenAbi,
+          functionName: "approve",
+          args: [deployment.contracts.diamond, remainder],
+        })
+      );
+      await send(
+        deployment.contracts.diamond,
+        buildRedeemPeggedCall(
+          BigInt(deployment.pegged.profileId),
+          remainder,
+          preview.collateralOut,
+          account.address
+        )
+      );
+    }
   }
   return { basketId, hash, receipt };
 }
