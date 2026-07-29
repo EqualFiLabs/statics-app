@@ -124,8 +124,10 @@ test.describe("Dollar DApp foundation", () => {
       .click();
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.getByRole("link", { name: /all baskets/i }).click();
-    await page.getByRole("link", { name: /create basket/i }).click();
-    await expect(page).toHaveURL(/\/app\/create$/);
+    await navigateDapp(page, "/app/create");
+    await expect(
+      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
+    ).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
@@ -182,21 +184,17 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("supports the basket creation steps without enabling submission", async ({ page }) => {
+  test("keeps governed basket creation informational", async ({ page }) => {
     await page.goto("/app/create");
 
-    await page
-      .locator(".creation-steps")
-      .getByRole("button", { name: /economics/i })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await expect(page.getByRole("heading", { name: "Borrowing and flash policy" })).toBeVisible();
-
-    await page
-      .locator(".creation-steps")
-      .getByRole("button", { name: /review/i })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await expect(page.locator(".creation-review")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Create basket", exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /create basket/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Browse baskets" })).toHaveAttribute(
+      "href",
+      "/app/baskets"
+    );
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {

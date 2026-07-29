@@ -78,7 +78,6 @@ function BasketListRuntime() {
         </div>
         <div className="basket-section-actions">
           <span>{catalog.data?.baskets.length ?? 0} discovered</span>
-          <Link href="/app/create">Create basket →</Link>
         </div>
       </div>
       {catalog.data?.warning && (
@@ -99,8 +98,8 @@ function BasketListRuntime() {
           empty={{
             title: "No baskets yet",
             description:
-              "A basket is a fixed bundle of assets you can buy or sell as one unit. Nobody has created one on this deployment yet -- you can be first.",
-            action: { label: "Create a basket", href: "/app/create" },
+              "A basket is a fixed bundle of assets you can buy or sell as one unit. New launches are currently steward-controlled.",
+            action: { label: "View launch policy", href: "/app/create" },
           }}
         />
       ) : (

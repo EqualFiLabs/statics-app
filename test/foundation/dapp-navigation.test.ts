@@ -16,7 +16,7 @@ describe("DApp route presentation", () => {
     ["/app/portal", "Add funds", "Add funds to Statics"],
     ["/app/dollar", "Dollar", "Get Statics Dollar"],
     ["/app/baskets", "Baskets", "Baskets"],
-    ["/app/create", "Create basket", "Create a basket"],
+    ["/app/create", "Launch policy", "Basket launch policy"],
     ["/app/positions", "Positions", "Your positions"],
     ["/app/loans", "Loans", "Your loans"],
     ["/app/rewards", "Rewards", "Your rewards"],
