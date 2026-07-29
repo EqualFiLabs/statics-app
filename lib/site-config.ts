@@ -61,10 +61,10 @@ export const primaryNavigation: readonly SiteNavigationItem[] = [
 ] as const;
 
 export const protocolStatus = {
-  system: "Pre-launch",
-  network: "Not configured",
-  deployment: "Not deployed",
-  audit: "Not published",
+  system: "Public testnet beta",
+  network: "Robinhood Testnet",
+  deployment: "Testnet live",
+  audit: "Internal review",
 } as const;
 
 export type AppNavigationItem = Readonly<{

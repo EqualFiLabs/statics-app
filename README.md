@@ -124,12 +124,12 @@ The public beta reads protocol addresses only from `deployments/46630.json`. Do 
 addresses into the build environment. Configure the public app and dedicated RPC, then build:
 
 ```bash
-NEXT_PUBLIC_APP_ENV=production
-NEXT_PUBLIC_SITE_URL=https://your-statics-site.example
-NEXT_PUBLIC_APP_NETWORK=robinhood-testnet
-NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=https://your-dedicated-robinhood-testnet-rpc
-NEXT_PUBLIC_PRIVY_APP_ID=your-public-privy-app-id
-NEXT_PUBLIC_STATICS_CHAIN_ID=46630
+export NEXT_PUBLIC_APP_ENV=production
+export NEXT_PUBLIC_SITE_URL=https://your-statics-site.example
+export NEXT_PUBLIC_APP_NETWORK=robinhood-testnet
+export NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=https://your-dedicated-robinhood-testnet-rpc
+export NEXT_PUBLIC_PRIVY_APP_ID=your-public-privy-app-id
+export NEXT_PUBLIC_STATICS_CHAIN_ID=46630
 
 npm run build
 npm start

@@ -142,13 +142,23 @@ export function TestnetFaucetCard() {
     };
   }, [faucet, readSnapshot, visible, wallet.address, wallet.fundingWalletOnSelectedChain]);
 
-  if (!visible) return null;
-
   const underfunded = snapshot?.assets.some((asset) => asset.inventory < asset.amount) ?? false;
   const coolingDown =
     snapshot !== null &&
     snapshot.nextClaimAt !== 0n &&
     snapshot.blockTimestamp < snapshot.nextClaimAt;
+
+  useEffect(() => {
+    if (!visible || !coolingDown || !snapshot) return;
+    const remainingMilliseconds = (snapshot.nextClaimAt - snapshot.blockTimestamp) * 1_000n;
+    const timeout = window.setTimeout(
+      () => void readSnapshot().catch((cause) => setError(describeDollarError(cause))),
+      Number(remainingMilliseconds)
+    );
+    return () => window.clearTimeout(timeout);
+  }, [coolingDown, readSnapshot, snapshot, visible]);
+
+  if (!visible) return null;
 
   const claim = async () => {
     if (!deployment || !faucet || pending) return;

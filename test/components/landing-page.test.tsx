@@ -6,15 +6,16 @@ import { LandingPage } from "@/components/landing/LandingPage";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 
 describe("landing page", () => {
-  it("preserves the approved message while reporting truthful pre-launch state", () => {
+  it("preserves the approved message while reporting the public testnet beta", () => {
     render(<LandingPage />);
 
     expect(
       screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/system status:/i)).toHaveTextContent("Pre-launch");
-    expect(screen.getByText(/Deployment: Not deployed/i)).toBeInTheDocument();
-    expect(screen.getByText("Not deployed", { selector: "dd" })).toBeInTheDocument();
+    expect(screen.getByText(/system status:/i)).toHaveTextContent("Public testnet beta");
+    expect(screen.getByText(/Network: Robinhood Testnet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Deployment: Testnet live/i)).toBeInTheDocument();
+    expect(screen.getByText("Testnet live", { selector: "dd" })).toBeInTheDocument();
     expect(screen.queryByText("19,482,731")).not.toBeInTheDocument();
     expect(screen.queryByText("Online")).not.toBeInTheDocument();
   });
