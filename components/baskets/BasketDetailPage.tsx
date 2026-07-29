@@ -35,6 +35,7 @@ import {
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
+import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
 import { BasketDetailPreview } from "@/components/preview/DappPreview";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
@@ -90,7 +91,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
   const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-  const [mode, setMode] = useState<"mint" | "redeem">("mint");
+  const [mode, setMode] = useState<"mint" | "redeem" | "swap">("mint");
   const [autoDeposit, setAutoDeposit] = useState(true);
   const [amountInput, setAmountInput] = useState("");
   const [slippageInput, setSlippageInput] = useState(
@@ -149,12 +150,14 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
       Boolean(publicClient) &&
       deploymentState.status === "configured" &&
       Boolean(basket) &&
+      mode !== "swap" &&
       amount > 0n,
     placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
       }
+      if (mode === "swap") throw new Error("Canonical swaps use the Robinhood v4 quoter.");
       const functionName = mode === "mint" ? "quoteMint" : "quoteRedeem";
       const amounts = await publicClient.readContract({
         address: deploymentState.deployment.contracts.diamond,
@@ -175,18 +178,19 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
         : quote.isFetching || quote.isPlaceholderData || !currentQuote
           ? "refreshing"
           : "ready";
-  const availability = basket
-    ? deriveBasketActionAvailability({
-        mode,
-        amount,
-        status: basket.status,
-        quoteState,
-        slippageBps,
-        walletBalance: basket.walletBalance,
-        constituents: basket.constituents,
-        quoteAmounts: currentQuote?.amounts ?? null,
-      })
-    : null;
+  const availability =
+    basket && mode !== "swap"
+      ? deriveBasketActionAvailability({
+          mode,
+          amount,
+          status: basket.status,
+          quoteState,
+          slippageBps,
+          walletBalance: basket.walletBalance,
+          constituents: basket.constituents,
+          quoteAmounts: currentQuote?.amounts ?? null,
+        })
+      : null;
 
   const recordAndSend = async ({
     kind,
@@ -281,6 +285,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
 
   const executeNextAction = async () => {
     if (!basket || !availability || deploymentState.status !== "configured") return;
+    if (mode === "swap") return;
     setPending(true);
     setActionError(null);
     try {
@@ -491,7 +496,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
 
         <section className="basket-action-card" aria-labelledby="basket-action-title">
           <div className="dollar-tabs" aria-label="Basket action">
-            {(["mint", "redeem"] as const).map((choice) => (
+            {(["mint", "redeem", "swap"] as const).map((choice) => (
               <button
                 key={choice}
                 type="button"
@@ -506,102 +511,110 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
               </button>
             ))}
           </div>
-          <h3 id="basket-action-title">{mode === "mint" ? "Mint basket" : "Redeem basket"}</h3>
-          <label className="basket-field">
-            <span>{basket.symbol} amount</span>
-            <input
-              value={amountInput}
-              onChange={(event) => {
-                setAmountInput(event.target.value);
-                setActionError(null);
-              }}
-              inputMode="decimal"
-              placeholder="0.00"
-              disabled={pending}
-            />
-          </label>
-          <label className="basket-field">
-            <span>Slippage tolerance</span>
-            <div>
-              <input
-                value={slippageInput}
-                onChange={(event) => {
-                  setSlippageInput(event.target.value);
-                  setActionError(null);
-                }}
-                inputMode="decimal"
-                aria-describedby="basket-slippage-help"
-                disabled={pending}
-              />
-              <strong>%</strong>
-            </div>
-            <small id="basket-slippage-help">Allowed range 0–5%. Default 0.50%.</small>
-          </label>
-          {mode === "mint" && (
-            <label className="basket-toggle">
-              <input
-                type="checkbox"
-                checked={autoDeposit}
-                onChange={(event) => {
-                  setAutoDeposit(event.target.checked);
-                  setActionError(null);
-                }}
-                disabled={pending}
-                aria-describedby="basket-auto-deposit-help"
-              />
-              <span>
-                <strong>Start earning right away</strong>
-                <small id="basket-auto-deposit-help">
-                  {autoDeposit
-                    ? `Deposits your ${basket.symbol} so it earns fees in the assets it holds. Same transaction, and you can withdraw from the next block onward.`
-                    : `Your ${basket.symbol} stays in your wallet, where it earns nothing. You can deposit it later.`}
+          {mode === "swap" ? (
+            <BasketSwapPanel basket={basket} />
+          ) : (
+            <>
+              <h3 id="basket-action-title">{mode === "mint" ? "Mint basket" : "Redeem basket"}</h3>
+              <label className="basket-field">
+                <span>{basket.symbol} amount</span>
+                <input
+                  value={amountInput}
+                  onChange={(event) => {
+                    setAmountInput(event.target.value);
+                    setActionError(null);
+                  }}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  disabled={pending}
+                />
+              </label>
+              <label className="basket-field">
+                <span>Slippage tolerance</span>
+                <div>
+                  <input
+                    value={slippageInput}
+                    onChange={(event) => {
+                      setSlippageInput(event.target.value);
+                      setActionError(null);
+                    }}
+                    inputMode="decimal"
+                    aria-describedby="basket-slippage-help"
+                    disabled={pending}
+                  />
+                  <strong>%</strong>
+                </div>
+                <small id="basket-slippage-help">Allowed range 0–5%. Default 0.50%.</small>
+              </label>
+              {mode === "mint" && (
+                <label className="basket-toggle">
+                  <input
+                    type="checkbox"
+                    checked={autoDeposit}
+                    onChange={(event) => {
+                      setAutoDeposit(event.target.checked);
+                      setActionError(null);
+                    }}
+                    disabled={pending}
+                    aria-describedby="basket-auto-deposit-help"
+                  />
+                  <span>
+                    <strong>Start earning right away</strong>
+                    <small id="basket-auto-deposit-help">
+                      {autoDeposit
+                        ? `Deposits your ${basket.symbol} so it earns fees in the assets it holds. Same transaction, and you can withdraw from the next block onward.`
+                        : `Your ${basket.symbol} stays in your wallet, where it earns nothing. You can deposit it later.`}
+                    </small>
+                  </span>
+                </label>
+              )}
+              <div className="basket-quote">
+                <span>{quoteLabel}</span>
+                {quoteAmounts ? (
+                  <ul>
+                    {quoteAmounts.map((value, index) => {
+                      const constituent = basket.constituents[index];
+                      return (
+                        <li key={constituent?.token.address || index}>
+                          <span>{constituent?.token.symbol || `Leg ${index + 1}`}</span>
+                          <strong>{displayAmount(value, constituent?.token.decimals ?? 18)}</strong>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <strong>Enter an amount for a fresh quote</strong>
+                )}
+                <small>
+                  {mode === "mint"
+                    ? "Approvals use the displayed caller-side maximums."
+                    : "Redemption enforces receiver-side minimum outputs."}
                 </small>
-              </span>
-            </label>
+              </div>
+              {availability?.reason && (
+                <p className="dollar-action-reason">{availability.reason}</p>
+              )}
+              {actionError && (
+                <p className="dapp-inline-error" role="alert">
+                  {actionError}
+                </p>
+              )}
+              <button
+                className="dollar-submit"
+                type="button"
+                onClick={primaryAction ?? undefined}
+                disabled={
+                  pending ||
+                  primaryAction === null ||
+                  (walletState.status === "ready" &&
+                    walletState.isTargetChain &&
+                    !availability?.executable)
+                }
+              >
+                {pending ? "Waiting for confirmation…" : primaryLabel}
+              </button>
+            </>
           )}
-          <div className="basket-quote">
-            <span>{quoteLabel}</span>
-            {quoteAmounts ? (
-              <ul>
-                {quoteAmounts.map((value, index) => {
-                  const constituent = basket.constituents[index];
-                  return (
-                    <li key={constituent?.token.address || index}>
-                      <span>{constituent?.token.symbol || `Leg ${index + 1}`}</span>
-                      <strong>{displayAmount(value, constituent?.token.decimals ?? 18)}</strong>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <strong>Enter an amount for a fresh quote</strong>
-            )}
-            <small>
-              {mode === "mint"
-                ? "Approvals use the displayed caller-side maximums."
-                : "Redemption enforces receiver-side minimum outputs."}
-            </small>
-          </div>
-          {availability?.reason && <p className="dollar-action-reason">{availability.reason}</p>}
-          {actionError && (
-            <p className="dapp-inline-error" role="alert">
-              {actionError}
-            </p>
-          )}
-          <button
-            className="dollar-submit"
-            type="button"
-            onClick={primaryAction ?? undefined}
-            disabled={
-              pending ||
-              primaryAction === null ||
-              (walletState.status === "ready" &&
-                walletState.isTargetChain &&
-                !availability?.executable)
-            }
-          >
-            {pending ? "Waiting for confirmation…" : primaryLabel}
-          </button>
         </section>
       </div>
 
