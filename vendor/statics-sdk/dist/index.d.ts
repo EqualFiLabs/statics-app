@@ -5812,6 +5812,83 @@ export declare const permit2AllowanceAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }];
+export declare const staticsTestnetFaucetAbi: readonly [{
+    readonly name: "ASSET_COUNT";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "COOLDOWN";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "asset";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "index";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "lastClaimAt";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "account";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint64";
+    }];
+}, {
+    readonly name: "nextClaimAt";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "account";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "claim";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "Claimed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "account";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint64";
+        readonly name: "claimedAt";
+    }, {
+        readonly type: "address[5]";
+        readonly name: "assets";
+    }, {
+        readonly type: "uint256[5]";
+        readonly name: "amounts";
+    }];
+}];
 export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "RewardBucketMatured" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "BorrowedLiquidityStaked" | "BasketRewardAccrued" | "BasketRewardSettled" | "BasketRewardClaimed" | "BasketRewardDustRouted" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
 export type StaticsLiquidityEventArgs<Name extends StaticsLiquidityEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "PositionRewardSettled";
@@ -8562,6 +8639,7 @@ export declare const staticsDollarErrorAbi: readonly [{
     }];
 }];
 export declare function buildCreateBasketTransaction(params: CreateBasketParams, pools: readonly PoolLaunchParams[], maxAmountsIn: readonly bigint[], launchDeadline: bigint, creationFee: bigint): PreparedTransaction;
+export declare function buildTestnetFaucetClaimCall(): Hex;
 export declare function buildApproveV4PositionCall(operator: Address, tokenId: bigint): Hex;
 export declare function buildPermit2ApproveCall(token: Address, spender: Address, amount: bigint, expiration: number): Hex;
 export declare function buildPermit2PermitTypedData(chainId: number, permit2: Address, permitSingle: Permit2PermitSingle): {

@@ -659,6 +659,15 @@ export const permit2AllowanceAbi = parseAbi([
     "function allowance(address owner,address token,address spender) view returns (uint160 amount,uint48 expiration,uint48 nonce)",
     "function approve(address token,address spender,uint160 amount,uint48 expiration)",
 ]);
+export const staticsTestnetFaucetAbi = parseAbi([
+    "function ASSET_COUNT() view returns (uint256)",
+    "function COOLDOWN() view returns (uint256)",
+    "function asset(uint256 index) view returns (address token,uint256 amount)",
+    "function lastClaimAt(address account) view returns (uint64)",
+    "function nextClaimAt(address account) view returns (uint256)",
+    "function claim()",
+    "event Claimed(address indexed account,uint64 claimedAt,address[5] assets,uint256[5] amounts)",
+]);
 export const basketTokenAbi = parseAbi([
     "function name() view returns (string)",
     "function symbol() view returns (string)",
@@ -936,6 +945,12 @@ export function buildCreateBasketTransaction(params, pools, maxAmountsIn, launch
         }),
         value: creationFee,
     };
+}
+export function buildTestnetFaucetClaimCall() {
+    return encodeFunctionData({
+        abi: staticsTestnetFaucetAbi,
+        functionName: "claim",
+    });
 }
 export function buildApproveV4PositionCall(operator, tokenId) {
     return encodeFunctionData({

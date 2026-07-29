@@ -22,6 +22,7 @@ export type DollarActivityKind =
   | "approve-pegged-collateral"
   | "mint-pegged"
   | "redeem-pegged"
+  | "claim-testnet-fixtures"
   | "approve-weth"
   | "approve-dollar"
   | "approve-risk"

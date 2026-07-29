@@ -76,4 +76,19 @@ describe("wallet interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add token/ }));
     expect(screen.getByRole("dialog", { name: "Browse Solana tokens" })).toBeInTheDocument();
   });
+
+  it("does not show the Robinhood faucet on another Statics network", () => {
+    render(
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          fundingChainId: 31_337,
+          fundingNetworkName: "Robinhood Testnet",
+        }}
+      >
+        <WalletPage />
+      </WalletContext.Provider>
+    );
+    expect(screen.queryByRole("heading", { name: "Testnet asset faucet" })).not.toBeInTheDocument();
+  });
 });
