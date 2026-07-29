@@ -2,7 +2,7 @@
 
 import { getAddress, isAddress, type Address } from "viem";
 
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
+import { readClientDollarDeployment, type DollarDeploymentState } from "@/lib/dollar/deployment";
 import { getDefaultEvmSwapTokens } from "@/lib/portal/uniswap";
 import { getTokenListEntry } from "@/lib/token-list";
 
@@ -21,7 +21,10 @@ export function walletTokenStorageKey(chainId: number) {
   return `statics:wallet:tokens:${chainId}`;
 }
 
-export function defaultWalletTokens(chainId: number): WalletToken[] {
+export function defaultWalletTokens(
+  chainId: number,
+  deployment: DollarDeploymentState = readClientDollarDeployment()
+): WalletToken[] {
   const defaults: WalletToken[] = getDefaultEvmSwapTokens(chainId)
     .filter((token) => token.kind === "erc20")
     .map((token) => {
@@ -35,7 +38,6 @@ export function defaultWalletTokens(chainId: number): WalletToken[] {
         isDefault: true,
       };
     });
-  const deployment = readClientDollarDeployment();
   if (deployment.status === "configured" && deployment.deployment.chainId === chainId) {
     if (deployment.deployment.pegged) {
       defaults.push({
@@ -48,7 +50,7 @@ export function defaultWalletTokens(chainId: number): WalletToken[] {
     }
     defaults.push({
       address: deployment.deployment.contracts.dollar,
-      symbol: "sUSD",
+      symbol: "USDstx",
       name: "Statics Dollar",
       decimals: 18,
       isDefault: true,

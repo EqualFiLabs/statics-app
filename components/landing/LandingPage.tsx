@@ -161,20 +161,20 @@ export function LandingPage() {
             </p>
             <ul className="dollar-modes" aria-label="Statics dollar capabilities">
               <li>
-                <strong>$SD</strong>
+                <strong>USDstx</strong>
                 <span>Dollar</span>
               </li>
               <li>
-                <strong>Risk</strong>
+                <strong>ethLEV</strong>
                 <span>Shares</span>
               </li>
               <li>
                 <strong>Redeem</strong>
-                <span>Any time</span>
+                <span>When healthy</span>
               </li>
               <li>
-                <strong>Stake</strong>
-                <span>&amp; earn</span>
+                <strong>Permit</strong>
+                <span>One signature</span>
               </li>
             </ul>
           </article>
