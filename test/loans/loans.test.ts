@@ -9,6 +9,8 @@ import {
   hasExtensionExcess,
   isCurrentBorrowQuote,
   isCurrentExtensionQuote,
+  loadBorrowQuote,
+  loadExtensionQuote,
   loadLoanCatalog,
   loanTimeline,
   validateExtensionGrossAmounts,
@@ -28,6 +30,7 @@ const wallet = "0x0000000000000000000000000000000000000001" as Address;
 const diamond = "0x0000000000000000000000000000000000000002" as Address;
 const basketToken = "0x0000000000000000000000000000000000000003" as Address;
 const asset = "0x0000000000000000000000000000000000000004" as Address;
+const secondAsset = "0x1FBE1a0e43594b3455993B5dE5Fd0A7A266298d0" as Address;
 
 const basket = {
   basketId: 0n,
@@ -57,6 +60,19 @@ const basket = {
       vaultBalance: 100_000_000n,
       walletBalance: 20_000_000n,
       allowance: 10_000_000n,
+    },
+    {
+      token: {
+        address: secondAsset,
+        name: "Second Asset",
+        symbol: "TWO",
+        decimals: 18,
+        metadataAvailable: true,
+      },
+      bundleAmount: 1n,
+      vaultBalance: 100n,
+      walletBalance: 20n,
+      allowance: 10n,
     },
   ],
   mintFeeTiers: [],
@@ -214,8 +230,8 @@ describe("loan lifecycle state", () => {
             collateralShares: 90n,
             feeShares: 1n,
             maturity: loanId === 1n ? 6_000n : 1_000n,
-            assets: [asset],
-            principals: [75n],
+            assets: [asset, secondAsset],
+            principals: [75n, 65n],
           };
         }
         if (functionName === "ownerOf") {
@@ -239,10 +255,47 @@ describe("loan lifecycle state", () => {
     );
 
     expect(catalog.ownedLoans.map((loan) => loan.loanId)).toEqual([1n]);
+    expect(catalog.ownedLoans[0]?.assets.map((loanAsset) => loanAsset.token.address)).toEqual([
+      asset,
+      secondAsset,
+    ]);
     expect(catalog.publicRecoverableLoans.map((loan) => loan.loanId)).toEqual([3n]);
     expect(readContract).not.toHaveBeenCalledWith(
       expect.objectContaining({ functionName: "loan", args: [2n] })
     );
+  });
+
+  it("preserves canonical addresses across multi-asset borrow and extension quotes", async () => {
+    const publicClient = {
+      readContract: vi.fn(async ({ functionName }: { functionName: string }) => {
+        if (functionName === "quoteBorrow") {
+          return {
+            feeShares: 1n,
+            collateralShares: 99n,
+            debtShares: 90n,
+            penaltyShares: 5n,
+            assets: [asset, secondAsset],
+            principals: [45n, 45n],
+          };
+        }
+        if (functionName === "quoteExtension") {
+          return [
+            [asset, secondAsset],
+            [2n, 3n],
+          ] as const;
+        }
+        throw new Error(`Unexpected read ${functionName}`);
+      }),
+    } as unknown as PublicClient;
+
+    await expect(loadBorrowQuote(publicClient, deployment, 0n, 100n)).resolves.toMatchObject({
+      assets: [asset, secondAsset],
+    });
+    await expect(loadExtensionQuote(publicClient, deployment, 1n)).resolves.toEqual({
+      loanId: 1n,
+      assets: [asset, secondAsset],
+      requiredFees: [2n, 3n],
+    });
   });
 
   it("fails closed when an active loan read fails for a reason other than closure", async () => {

@@ -129,7 +129,7 @@ function normalizeLoan(
     debtShares: snapshot.debtShares,
     penaltyShares: snapshot.penaltyShares,
     maturity: BigInt(snapshot.maturity),
-    assets: snapshot.assets.map(getAddress),
+    assets: snapshot.assets.map((asset) => getAddress(asset)),
     principals: snapshot.principals,
   };
 }
@@ -320,7 +320,7 @@ export async function loadBorrowQuote(
     collateralShares: result.collateralShares,
     debtShares: result.debtShares,
     penaltyShares: result.penaltyShares,
-    assets: result.assets.map(getAddress),
+    assets: result.assets.map((asset) => getAddress(asset)),
     principals: result.principals,
   };
 }
@@ -339,7 +339,7 @@ export async function loadExtensionQuote(
   if (assets.length !== requiredFees.length) {
     throw new Error("The current extension quote returned an invalid fee vector.");
   }
-  return { loanId, assets: assets.map(getAddress), requiredFees };
+  return { loanId, assets: assets.map((asset) => getAddress(asset)), requiredFees };
 }
 
 export function validateExtensionGrossAmounts(
