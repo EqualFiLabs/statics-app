@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { DollarOverview, DollarPage } from "@/components/dollar/DollarPage";
+import { DollarOverview, DollarPage, DollarProfilePills } from "@/components/dollar/DollarPage";
 
 describe("Dollar surfaces without a deployment", () => {
   it("allows local action selection without enabling transactions", () => {
@@ -9,9 +9,11 @@ describe("Dollar surfaces without a deployment", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Recombine" }));
     fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    fireEvent.click(screen.getByRole("button", { name: "USDG" }));
+    expect(screen.getByRole("button", { name: "Redeem" })).toBeInTheDocument();
     expect(
       screen
-        .getAllByRole("button", { name: "Recombine" })
+        .getAllByRole("button", { name: "Deposit" })
         .filter((button) => button.hasAttribute("disabled"))
     ).toHaveLength(1);
   });
@@ -22,5 +24,18 @@ describe("Dollar surfaces without a deployment", () => {
       "href",
       "/app/positions"
     );
+  });
+
+  it("offers USDG as the third collateral profile", () => {
+    const onChange = vi.fn();
+    render(<DollarProfilePills value="ETH" peggedAvailable disabled={false} onChange={onChange} />);
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "ETH",
+      "WETH",
+      "USDG",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "USDG" }));
+    expect(onChange).toHaveBeenCalledWith("USDG");
   });
 });

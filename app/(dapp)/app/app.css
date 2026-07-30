@@ -2130,6 +2130,18 @@
   margin: 1.5rem 0 0;
 }
 
+.dollar-profile-choice {
+  margin: 0 0 1.5rem;
+}
+
+.dollar-profile-choice.has-pegged {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dollar-pegged-panel {
+  padding: 0;
+}
+
 .dollar-asset-choice legend {
   position: absolute;
   transform: translateY(-1.45rem);

@@ -87,7 +87,13 @@ async function walletClients(wallet: ReturnType<typeof useWalletState>) {
   };
 }
 
-export function PeggedDollarPanel() {
+export function PeggedDollarPanel({
+  embedded = false,
+  onPendingChange,
+}: {
+  embedded?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const wallet = useWalletState();
   const configured = configuredDeploymentState;
   const deployment = configured.status === "configured" ? configured.deployment : null;
@@ -105,6 +111,16 @@ export function PeggedDollarPanel() {
   } catch {
     amount = 0n;
   }
+
+  const updatePending = useCallback(
+    (next: boolean) => {
+      setPending(next);
+      onPendingChange?.(next);
+    },
+    [onPendingChange]
+  );
+
+  useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
 
   const readSnapshot = useCallback(async () => {
     if (!deployment?.pegged || !wallet.address || wallet.chainId !== deployment.chainId)
@@ -275,20 +291,20 @@ export function PeggedDollarPanel() {
 
   const nextAction = async () => {
     if (!deployment?.pegged || !quote || !snapshot || pending) return;
-    setPending(true);
+    updatePending(true);
     setError(null);
     try {
       setReviewing(true);
     } catch (cause) {
       setError(describeDollarError(cause));
     } finally {
-      setPending(false);
+      updatePending(false);
     }
   };
 
   const confirm = async () => {
     if (!deployment?.pegged || !quote || !snapshot || pending) return;
-    setPending(true);
+    updatePending(true);
     setError(null);
     try {
       const fresh = await readQuote();
@@ -372,7 +388,7 @@ export function PeggedDollarPanel() {
     } catch (cause) {
       setError(describeDollarError(cause));
     } finally {
-      setPending(false);
+      updatePending(false);
     }
   };
 
@@ -406,11 +422,13 @@ export function PeggedDollarPanel() {
                 : balanceInsufficient
                   ? `Insufficient ${direction === "mint" ? "USDG" : "USDstx"}`
                   : direction === "mint"
-                    ? "Review mint"
+                    ? embedded
+                      ? "Review deposit"
+                      : "Review mint"
                     : "Review redemption";
 
   return (
-    <div className="portal-panel" role="tabpanel">
+    <div className={`portal-panel${embedded ? " dollar-pegged-panel" : ""}`} role="tabpanel">
       <div className="portal-direction-tabs" aria-label="Statics Dollar direction">
         {(["mint", "redeem"] as const).map((item) => (
           <button
@@ -425,7 +443,7 @@ export function PeggedDollarPanel() {
             }}
             disabled={pending}
           >
-            {item === "mint" ? "Mint" : "Redeem"}
+            {item === "mint" ? (embedded ? "Deposit" : "Mint") : "Redeem"}
           </button>
         ))}
       </div>
@@ -511,10 +529,14 @@ export function PeggedDollarPanel() {
         >
           {pending
             ? direction === "mint"
-              ? "Minting…"
+              ? embedded
+                ? "Depositing…"
+                : "Minting…"
               : "Redeeming…"
             : direction === "mint"
-              ? "Confirm mint"
+              ? embedded
+                ? "Confirm deposit"
+                : "Confirm mint"
               : "Confirm redemption"}
         </button>
       ) : (
