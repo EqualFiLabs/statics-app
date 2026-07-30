@@ -36,4 +36,17 @@ describe("pegged Dollar wallet states", () => {
 
     expect(screen.getByRole("button", { name: "Wallet loading…" })).toBeDisabled();
   });
+
+  it("uses deposit language when embedded on the Dollar page", () => {
+    const onPendingChange = vi.fn();
+    const { unmount } = render(
+      <WalletContext.Provider value={{ ...defaultWalletState, status: "loading" }}>
+        <PeggedDollarPanel embedded onPendingChange={onPendingChange} />
+      </WalletContext.Provider>
+    );
+
+    expect(screen.getByRole("button", { name: "Deposit" })).toHaveAttribute("aria-pressed", "true");
+    unmount();
+    expect(onPendingChange).toHaveBeenCalledWith(false);
+  });
 });
