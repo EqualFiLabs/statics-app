@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { lpStakeEligibility, resolveLiquidityPool } from "@/components/liquidity/LiquidityPage";
 import {
   basketLiquiditySnapshot,
+  borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
   canonicalFullRange,
   canonicalStatusLabel,
@@ -16,6 +17,10 @@ import {
 import type { BasketRecord } from "@/lib/baskets/baskets";
 
 describe("canonical liquidity identifiers", () => {
+  it("anchors borrowed-liquidity deadlines to chain time", () => {
+    expect(borrowedLiquidityDeadline(1_000n)).toBe(2_200n);
+  });
+
   it("derives a stable pool ID from the complete canonical key", () => {
     const key = {
       currency0: "0x0000000000000000000000000000000000000001" as const,
