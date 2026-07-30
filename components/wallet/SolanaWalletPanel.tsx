@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { formatUnits, parseUnits } from "viem";
+import { ArrowDownUp, Download, Send } from "lucide-react";
 
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useSolanaAssets, type SolanaAsset } from "@/hooks/useSolanaAssets";
@@ -26,10 +27,12 @@ function displayBalance(value: bigint | null, decimals: number) {
     : whole;
 }
 
-export function SolanaWalletPanel() {
+export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
   const wallet = useSolanaAssets();
   const [modal, setModal] = useState<SolanaModal>(null);
+  const [removingTokens, setRemovingTokens] = useState(false);
   const native = wallet.assets.find((asset) => asset.mint === SOL_MINT);
+  const hasAddedTokens = wallet.assets.some((asset) => asset.removable);
   return (
     <>
       <section className="wallet-surface">
@@ -56,14 +59,17 @@ export function SolanaWalletPanel() {
         </div>
 
         <div className="wallet-quick-actions">
+          <button type="button" onClick={onPortal}>
+            <ArrowDownUp size={16} aria-hidden="true" />
+            Portal
+          </button>
           <button type="button" onClick={() => setModal("send")}>
-            <span>↑</span>Send
+            <Send size={16} aria-hidden="true" />
+            Send
           </button>
           <button type="button" onClick={() => setModal("receive")}>
-            <span>↓</span>Receive
-          </button>
-          <button type="button" onClick={() => setModal("tokens")}>
-            <span>＋</span>Add token
+            <Download size={16} aria-hidden="true" />
+            Receive
           </button>
         </div>
 
@@ -72,6 +78,19 @@ export function SolanaWalletPanel() {
             <div>
               <span>{"// Assets"}</span>
               <h2>Tokens</h2>
+            </div>
+            <div className="wallet-asset-actions">
+              <button type="button" onClick={() => setModal("tokens")}>
+                Add token
+              </button>
+              <button
+                type="button"
+                aria-pressed={removingTokens}
+                disabled={!hasAddedTokens && !removingTokens}
+                onClick={() => setRemovingTokens((current) => !current)}
+              >
+                {removingTokens ? "Done" : "Remove"}
+              </button>
             </div>
           </div>
           <div className="wallet-token-rows">
@@ -86,7 +105,7 @@ export function SolanaWalletPanel() {
                 </div>
                 <div>
                   <strong>{displayBalance(asset.balance, asset.decimals)}</strong>
-                  {!asset.isDefault ? (
+                  {removingTokens && asset.removable ? (
                     <button
                       className="wallet-remove-token"
                       type="button"

@@ -20,14 +20,16 @@ const modeLabels: Record<PortalMode, string> = {
 
 export function PortalWorkspace({
   initialMode = "swap",
+  initialSwapRuntime = "evm",
   compact = false,
 }: {
   initialMode?: PortalMode;
+  initialSwapRuntime?: "evm" | "solana";
   compact?: boolean;
 }) {
   const wallet = useWalletState();
   const [mode, setMode] = useState<PortalMode>(initialMode);
-  const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">("evm");
+  const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const slippage = usePortalSlippage();
 

@@ -243,7 +243,12 @@ export function WalletPage() {
     return (
       <>
         <WalletModeSelector mode={walletMode} onChange={setWalletMode} />
-        <SolanaWalletPanel />
+        <SolanaWalletPanel onPortal={() => setModal("portal")} />
+        {modal === "portal" && (
+          <WalletDialog label="Funding Portal" wide onClose={() => setModal(null)}>
+            <PortalWorkspace compact initialSwapRuntime="solana" />
+          </WalletDialog>
+        )}
       </>
     );
   }
