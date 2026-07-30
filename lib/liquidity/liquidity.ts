@@ -80,6 +80,8 @@ export type LpPositionRecord = Readonly<{
   staked: boolean;
 }>;
 
+export type LiquidityManageAction = "stake" | "activate" | "increase" | "claim" | "unstake";
+
 export type LiquidityCatalog = Readonly<{
   pools: readonly CanonicalPoolRecord[];
   positions: readonly LpPositionRecord[];
@@ -122,6 +124,41 @@ export function borrowedLiquidityReadiness(
   return invalidInput
     ? "Enter positive raw liquidity within the uint128 limit for every pool."
     : null;
+}
+
+export function liquidityPositionActions(
+  position: LpPositionRecord | undefined,
+  currentBlock: bigint
+): readonly LiquidityManageAction[] {
+  if (!position) return [];
+  if (!position.staked) return ["stake"];
+  const actions: LiquidityManageAction[] = [];
+  if (position.pendingLiquidity > 0n && currentBlock >= position.eligibleAtBlock) {
+    actions.push("activate");
+  }
+  actions.push("increase", "claim", "unstake");
+  return actions;
+}
+
+export function recommendedLiquidityAction(
+  position: LpPositionRecord,
+  currentBlock: bigint
+): LiquidityManageAction {
+  return liquidityPositionActions(position, currentBlock)[0] ?? "unstake";
+}
+
+export function liquidityActivationWait(
+  position: LpPositionRecord | undefined,
+  currentBlock: bigint
+): bigint | null {
+  if (
+    !position?.staked ||
+    position.pendingLiquidity === 0n ||
+    currentBlock >= position.eligibleAtBlock
+  ) {
+    return null;
+  }
+  return position.eligibleAtBlock - currentBlock;
 }
 
 export function v4PoolId(key: V4PoolKey): Hex {
@@ -388,6 +425,15 @@ export async function loadLiquidityCatalog(
         };
         const stakedOwned = staked && ownedPositionIds.has(staked.positionId.toString());
         if ((!owner || getAddress(owner) !== wallet) && !stakedOwned) return null;
+        const pendingRewards = stakedOwned
+          ? await publicClient.readContract({
+              account: wallet,
+              address: deployment.contracts.diamond,
+              abi: staticsAbi,
+              functionName: "pendingLiquidityRewards",
+              args: [staked.positionId, tokenId],
+            })
+          : null;
         return {
           tokenId,
           owner: owner ? getAddress(owner) : deployment.contracts.diamond,
@@ -401,8 +447,8 @@ export async function loadLiquidityCatalog(
           eligibleLiquidity: staked?.eligibleLiquidity ?? 0n,
           pendingLiquidity: staked?.pendingLiquidity ?? 0n,
           eligibleAtBlock: staked?.eligibleAtBlock ?? 0n,
-          claimable0: staked?.claimable0 ?? 0n,
-          claimable1: staked?.claimable1 ?? 0n,
+          claimable0: pendingRewards?.[1] ?? 0n,
+          claimable1: pendingRewards?.[3] ?? 0n,
           staked: staked?.staked ?? false,
         };
       })

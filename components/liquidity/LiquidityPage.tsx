@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -36,7 +37,10 @@ import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canonicalFullRange,
   canonicalStatusLabel,
+  liquidityActivationWait,
+  liquidityPositionActions,
   loadLiquidityCatalog,
+  recommendedLiquidityAction,
   v4PoolId,
   type CanonicalPoolRecord,
   type LpPositionRecord,
@@ -126,7 +130,18 @@ function LiquidityRuntime() {
   const position =
     catalog.data?.positions.find((item) => item.tokenId.toString() === tokenId) ??
     catalog.data?.positions[0];
-  const pool = resolveLiquidityPool(mode, catalog.data?.pools, poolId, position);
+  const currentBlock = catalog.data?.currentBlock ?? 0n;
+  const manageActions = liquidityPositionActions(position, currentBlock);
+  const resolvedMode: Mode =
+    mode === "create"
+      ? "create"
+      : manageActions.includes(mode)
+        ? mode
+        : position
+          ? recommendedLiquidityAction(position, currentBlock)
+          : "create";
+  const activationWait = liquidityActivationWait(position, currentBlock);
+  const pool = resolveLiquidityPool(resolvedMode, catalog.data?.pools, poolId, position);
   const positionNft =
     catalog.data?.positionNftIds.find((item) => item.toString() === positionId) ??
     catalog.data?.positionNftIds[0];
@@ -137,6 +152,16 @@ function LiquidityRuntime() {
       pool.key.currency1 === pool.basketToken.address ? pool.basketToken : pool.asset,
     ] as const;
   }, [pool]);
+  const amountInputsReady = (() => {
+    if (!tokens) return false;
+    try {
+      return (
+        parseUnits(amount0, tokens[0].decimals) > 0n && parseUnits(amount1, tokens[1].decimals) > 0n
+      );
+    } catch {
+      return false;
+    }
+  })();
 
   const send = async (
     kind:
@@ -381,7 +406,7 @@ function LiquidityRuntime() {
       return;
     const diamond = deploymentState.deployment.contracts.diamond;
     const positionManager = deploymentState.deployment.liquidity.contracts.positionManager;
-    if (mode === "stake") {
+    if (resolvedMode === "stake") {
       if (position.staked) throw new Error("The selected liquidity position is already staked.");
       const selectedPool = catalog.data?.pools.find((item) => item.poolId === position.poolId);
       const eligibility = lpStakeEligibility(position, selectedPool);
@@ -464,7 +489,7 @@ function LiquidityRuntime() {
           },
         }
       );
-    } else if (mode === "activate") {
+    } else if (resolvedMode === "activate") {
       if (!position.staked || position.pendingLiquidity === 0n)
         throw new Error("This liquidity position has nothing pending.");
       if ((catalog.data?.currentBlock ?? 0n) < position.eligibleAtBlock)
@@ -505,7 +530,7 @@ function LiquidityRuntime() {
           },
         }
       );
-    } else if (mode === "claim") {
+    } else if (resolvedMode === "claim") {
       if (!position.staked && position.positionId === 0n)
         throw new Error("The selected liquidity position has no reward record.");
       const reward = await publicClient.readContract({
@@ -611,7 +636,7 @@ function LiquidityRuntime() {
           },
         }
       );
-    } else if (mode === "increase") {
+    } else if (resolvedMode === "increase") {
       if (!position.staked) throw new Error("Stake this liquidity position before adding to it.");
       if (!pool || !tokens) throw new Error("Select the pool for this liquidity position.");
       if (position.poolId !== pool.poolId)
@@ -745,7 +770,7 @@ function LiquidityRuntime() {
           },
         }
       );
-    } else if (mode === "unstake") {
+    } else if (resolvedMode === "unstake") {
       if (!position.staked) throw new Error("The selected liquidity position is not staked.");
       await send(
         "unstake-lp-nft",
@@ -793,7 +818,7 @@ function LiquidityRuntime() {
     setPending(true);
     setError(null);
     try {
-      if (mode === "create") {
+      if (resolvedMode === "create") {
         if (!pool) throw new Error("No pool is selected.");
         await create(pool);
       } else await manage();
@@ -819,8 +844,49 @@ function LiquidityRuntime() {
           hasData: Boolean(catalog.data),
         });
 
-  let actionLabel = `${mode} reviewed liquidity action`;
-  let action: (() => void) | null = () => void run();
+  const selectedPool = position
+    ? catalog.data?.pools.find((candidate) => candidate.poolId === position.poolId)
+    : undefined;
+  const managementReason =
+    resolvedMode === "create"
+      ? !pool
+        ? "Select a canonical pool."
+        : pool.status !== 2 || pool.decommissioned || !pool.managerSynced
+          ? "The selected pool is not active and synced."
+          : !amountInputsReady
+            ? "Enter a positive maximum amount for both tokens."
+            : null
+      : !position
+        ? "Select a liquidity position."
+        : resolvedMode === "stake"
+          ? !positionNft
+            ? "Create or select a PositionNFT for the LP rewards."
+            : lpStakeEligibility(position, selectedPool)
+          : resolvedMode === "activate"
+            ? position.pendingLiquidity === 0n || currentBlock < position.eligibleAtBlock
+              ? `Activation becomes available at block ${position.eligibleAtBlock.toString()}.`
+              : null
+            : resolvedMode === "increase"
+              ? !amountInputsReady
+                ? "Enter a positive maximum amount for both tokens."
+                : null
+              : resolvedMode === "claim"
+                ? position.claimable0 === 0n && position.claimable1 === 0n
+                  ? "No LP rewards are currently claimable."
+                  : null
+                : !position.staked
+                  ? "The selected liquidity position is not staked."
+                  : null;
+  const actionLabels: Record<Mode, string> = {
+    create: "Approve or add liquidity",
+    stake: "Approve or stake LP position",
+    activate: "Activate LP rewards",
+    increase: "Approve or add liquidity",
+    claim: "Claim LP rewards",
+    unstake: "Unstake LP position",
+  };
+  let actionLabel = actionLabels[resolvedMode];
+  let action: (() => void) | null = managementReason ? null : () => void run();
   if (walletState.status === "signed-out" || walletState.status === "error") {
     actionLabel = "Sign in to continue";
     action = walletState.login;
@@ -861,50 +927,66 @@ function LiquidityRuntime() {
         <h3>Pool health</h3>
         <div className="pool-grid">
           {catalog.data?.pools.map((item) => (
-            <button type="button" key={item.poolId} onClick={() => setPoolId(item.poolId)}>
-              <span
-                className={`remaining-status is-${canonicalStatusLabel(
-                  item.status,
-                  item.decommissioned
-                )}`}
+            <article
+              key={item.poolId}
+              className={pool?.poolId === item.poolId ? "is-selected" : ""}
+            >
+              <button
+                type="button"
+                className="pool-select"
+                onClick={() => {
+                  setPoolId(item.poolId);
+                  setMode("create");
+                  setError(null);
+                }}
               >
-                {canonicalStatusLabel(item.status, item.decommissioned)}
-              </span>
-              <h4>
-                {item.basketSymbol} / {item.asset.symbol}
-              </h4>
-              <dl>
-                <div>
-                  <dt>Pool fee</dt>
-                  <dd>{Number(item.lpFee) / 10_000}%</dd>
-                </div>
-                <div>
-                  <dt>Trading fees</dt>
-                  <dd>
-                    {Number(item.hookFees.inputFeeBps) / 100}% in ·{" "}
-                    {Number(item.hookFees.outputFeeBps) / 100}% out
-                  </dd>
-                </div>
-                <div>
-                  <dt>Observation</dt>
-                  <dd>{item.observationCardinality} observations</dd>
-                </div>
-                <div>
-                  <dt>Manager sync</dt>
-                  <dd>{item.managerSynced ? "Synced" : "Not synced"}</dd>
-                </div>
-                <div>
-                  <dt>Pending protocol liquidity</dt>
-                  <dd>
-                    {item.pending0.toString()} / {item.pending1.toString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Locked protocol liquidity</dt>
-                  <dd>{item.lockedLiquidity.toString()}</dd>
-                </div>
-              </dl>
-            </button>
+                <span
+                  className={`remaining-status is-${canonicalStatusLabel(
+                    item.status,
+                    item.decommissioned
+                  )}`}
+                >
+                  {canonicalStatusLabel(item.status, item.decommissioned)}
+                </span>
+                <h4>
+                  {item.basketSymbol} / {item.asset.symbol}
+                </h4>
+                <span>
+                  {Number(item.lpFee) / 10_000}% LP fee · {Number(item.hookFees.inputFeeBps) / 100}%
+                  hook in
+                </span>
+              </button>
+              <details>
+                <summary>Pool diagnostics</summary>
+                <dl>
+                  <div>
+                    <dt>Hook fee</dt>
+                    <dd>
+                      {Number(item.hookFees.inputFeeBps) / 100}% in ·{" "}
+                      {Number(item.hookFees.outputFeeBps) / 100}% out
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Observation</dt>
+                    <dd>{item.observationCardinality} observations</dd>
+                  </div>
+                  <div>
+                    <dt>Manager</dt>
+                    <dd>{item.managerSynced ? "Synced" : "Not synced"}</dd>
+                  </div>
+                  <div>
+                    <dt>Pending POL</dt>
+                    <dd>
+                      {item.pending0.toString()} / {item.pending1.toString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Locked POL</dt>
+                    <dd>{item.lockedLiquidity.toString()}</dd>
+                  </div>
+                </dl>
+              </details>
+            </article>
           ))}
         </div>
       </section>
@@ -928,38 +1010,90 @@ function LiquidityRuntime() {
             <button
               type="button"
               key={item.tokenId.toString()}
-              className="lp-position"
-              onClick={() => setTokenId(item.tokenId.toString())}
+              className={`lp-position${position?.tokenId === item.tokenId ? " is-selected" : ""}`}
+              onClick={() => {
+                setTokenId(item.tokenId.toString());
+                setMode(recommendedLiquidityAction(item, currentBlock));
+                setError(null);
+              }}
             >
               <strong>Liquidity position #{item.tokenId.toString()}</strong>
               <small>
                 {item.staked ? "Staked" : "Wallet-owned"} · {item.liquidity.toString()} liquidity
               </small>
+              {item.staked && (
+                <small>
+                  Rewards: {item.claimable0.toString()} / {item.claimable1.toString()}
+                </small>
+              )}
             </button>
           ))}
         </section>
         <section className="remaining-workspace">
-          <div className="dollar-tabs liquidity-tabs">
-            {(["create", "stake", "activate", "increase", "claim", "unstake"] as const).map(
-              (item) => (
-                <button
-                  type="button"
-                  key={item}
-                  className={mode === item ? "active" : undefined}
-                  onClick={() => setMode(item)}
-                >
-                  {item}
-                </button>
-              )
-            )}
+          <div className="liquidity-entry-actions">
+            <button
+              type="button"
+              className={resolvedMode === "create" ? "active" : undefined}
+              onClick={() => {
+                setMode("create");
+                setError(null);
+              }}
+            >
+              Add liquidity
+            </button>
+            <Link href="/app/loans?destination=liquidity">Borrow to LP</Link>
           </div>
-          {mode === "create" ? (
+          {resolvedMode !== "create" && (
             <>
+              <div className="remaining-section-heading">
+                <div>
+                  <p className="dapp-section-label">Selected LP NFT</p>
+                  <h3>Liquidity position #{position?.tokenId.toString() ?? "—"}</h3>
+                </div>
+                <span className={`remaining-status ${position?.staked ? "is-active" : ""}`}>
+                  {position?.staked ? "earning" : "wallet-owned"}
+                </span>
+              </div>
+              <div className="dollar-tabs liquidity-tabs" aria-label="Available LP actions">
+                {manageActions.map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    className={resolvedMode === item ? "active" : undefined}
+                    disabled={
+                      item === "claim" && position?.claimable0 === 0n && position.claimable1 === 0n
+                    }
+                    onClick={() => {
+                      setMode(item);
+                      setError(null);
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {resolvedMode === "create" ? (
+            <>
+              <div className="remaining-section-heading">
+                <div>
+                  <p className="dapp-section-label">Wallet-funded LP</p>
+                  <h3>Add canonical liquidity</h3>
+                </div>
+              </div>
+              <p>
+                Supply both sides of one canonical basket pool. The resulting Uniswap v4 NFT stays
+                in your wallet until you choose to stake it for Statics LP rewards.
+              </p>
               <label className="basket-field">
                 <span>Pool</span>
                 <select
                   value={pool?.poolId ?? ""}
-                  onChange={(event) => setPoolId(event.target.value)}
+                  onChange={(event) => {
+                    setPoolId(event.target.value);
+                    setError(null);
+                  }}
                 >
                   {catalog.data?.pools.map((item) => (
                     <option value={item.poolId} key={item.poolId}>
@@ -972,10 +1106,13 @@ function LiquidityRuntime() {
                 <label className="basket-field" key={token.address}>
                   <span>Maximum {token.symbol}</span>
                   <input
+                    inputMode="decimal"
                     value={index === 0 ? amount0 : amount1}
-                    onChange={(event) =>
-                      index === 0 ? setAmount0(event.target.value) : setAmount1(event.target.value)
-                    }
+                    onChange={(event) => {
+                      if (index === 0) setAmount0(event.target.value);
+                      else setAmount1(event.target.value);
+                      setError(null);
+                    }}
                   />
                 </label>
               ))}
@@ -983,10 +1120,17 @@ function LiquidityRuntime() {
           ) : (
             <>
               <label className="basket-field">
-                <span>liquidity position</span>
+                <span>Liquidity position</span>
                 <select
                   value={position?.tokenId.toString() ?? ""}
-                  onChange={(event) => setTokenId(event.target.value)}
+                  onChange={(event) => {
+                    const next = catalog.data?.positions.find(
+                      (item) => item.tokenId.toString() === event.target.value
+                    );
+                    setTokenId(event.target.value);
+                    if (next) setMode(recommendedLiquidityAction(next, currentBlock));
+                    setError(null);
+                  }}
                 >
                   {catalog.data?.positions.map((item) => (
                     <option key={item.tokenId.toString()} value={item.tokenId.toString()}>
@@ -995,41 +1139,75 @@ function LiquidityRuntime() {
                   ))}
                 </select>
               </label>
-              {mode === "stake" && (
+              {resolvedMode === "stake" && (
                 <label className="basket-field">
-                  <span>Position</span>
+                  <span>Rewards position</span>
                   <select
                     value={positionNft?.toString() ?? ""}
-                    onChange={(event) => setPositionId(event.target.value)}
+                    onChange={(event) => {
+                      setPositionId(event.target.value);
+                      setError(null);
+                    }}
                   >
                     {catalog.data?.positionNftIds.map((item) => (
                       <option key={item.toString()} value={item.toString()}>
-                        #{item.toString()}
+                        Position #{item.toString()}
                       </option>
                     ))}
                   </select>
+                  <small>LP rewards accrue to this PositionNFT after activation.</small>
                 </label>
               )}
-              {mode === "increase" &&
+              {resolvedMode === "increase" &&
                 tokens?.map((token, index) => (
                   <label className="basket-field" key={token.address}>
                     <span>Maximum {token.symbol}</span>
                     <input
+                      inputMode="decimal"
                       value={index === 0 ? amount0 : amount1}
-                      onChange={(event) =>
-                        index === 0
-                          ? setAmount0(event.target.value)
-                          : setAmount1(event.target.value)
-                      }
+                      onChange={(event) => {
+                        if (index === 0) setAmount0(event.target.value);
+                        else setAmount1(event.target.value);
+                        setError(null);
+                      }}
                     />
                   </label>
                 ))}
+              {activationWait !== null && (
+                <p className="dollar-warning">
+                  New liquidity becomes eligible for activation in {activationWait.toString()} block
+                  {activationWait === 1n ? "" : "s"}. Existing eligible liquidity and rewards remain
+                  available.
+                </p>
+              )}
+              {position && (
+                <details className="liquidity-position-diagnostics">
+                  <summary>Position diagnostics</summary>
+                  <dl>
+                    <div>
+                      <dt>Total liquidity</dt>
+                      <dd>{position.liquidity.toString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Eligible</dt>
+                      <dd>{position.eligibleLiquidity.toString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Pending</dt>
+                      <dd>{position.pendingLiquidity.toString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Claimable pair</dt>
+                      <dd>
+                        {position.claimable0.toString()} / {position.claimable1.toString()}
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+              )}
             </>
           )}
-          <p className="dollar-warning">
-            Only nonzero, unsubscribed, full-range NFTs qualify. Activation begins on the next
-            block.
-          </p>
+          {managementReason && <p className="dollar-action-reason">{managementReason}</p>}
           {error && (
             <p className="dapp-inline-error" role="alert">
               {error}

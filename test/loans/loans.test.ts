@@ -13,6 +13,7 @@ import {
   loadExtensionQuote,
   loadLoanCatalog,
   loanTimeline,
+  readBorrowDestination,
   validateExtensionGrossAmounts,
 } from "@/lib/loans/loans";
 import type { PositionCatalog } from "@/lib/positions/positions";
@@ -112,6 +113,11 @@ const deployment = {
 } satisfies DollarDeployment;
 
 describe("loan lifecycle state", () => {
+  it("accepts only the supported borrow destination hint", () => {
+    expect(readBorrowDestination("liquidity")).toBe("liquidity");
+    expect(readBorrowDestination(["wallet", "liquidity"])).toBe("wallet");
+    expect(readBorrowDestination("somewhere-else")).toBe("wallet");
+  });
   beforeEach(() => {
     mocks.loadPositionCatalog.mockReset();
   });

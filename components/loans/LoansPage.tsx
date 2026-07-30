@@ -52,6 +52,7 @@ import {
   loadLoanCatalog,
   validateExtensionGrossAmounts,
   type BorrowQuote,
+  type BorrowDestination,
   type ExtensionQuote,
   type LoanMode,
   type LoanRecord,
@@ -64,7 +65,6 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
-type BorrowDestination = "wallet" | "liquidity";
 
 function displayAmount(value: bigint, decimals: number): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -103,13 +103,21 @@ function parseGrossAmounts(
   return amounts.some((amount) => amount === null) ? null : (amounts as readonly bigint[]);
 }
 
-export function LoansPage() {
+export function LoansPage({
+  initialBorrowDestination = "wallet",
+}: {
+  initialBorrowDestination?: BorrowDestination;
+}) {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
-  return <LoansRuntime />;
+  return <LoansRuntime initialBorrowDestination={initialBorrowDestination} />;
 }
 
-function LoansRuntime() {
+function LoansRuntime({
+  initialBorrowDestination,
+}: {
+  initialBorrowDestination: BorrowDestination;
+}) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -120,7 +128,8 @@ function LoansRuntime() {
   const [selectedPositionId, setSelectedPositionId] = useState("");
   const [selectedBasketId, setSelectedBasketId] = useState("");
   const [sharesInput, setSharesInput] = useState("");
-  const [borrowDestination, setBorrowDestination] = useState<BorrowDestination>("wallet");
+  const [borrowDestination, setBorrowDestination] =
+    useState<BorrowDestination>(initialBorrowDestination);
   const [borrowPoolLiquidity, setBorrowPoolLiquidity] = useState<Record<string, string>>({});
   const [grossInputs, setGrossInputs] = useState<Record<string, readonly string[]>>({});
   const [pending, setPending] = useState(false);

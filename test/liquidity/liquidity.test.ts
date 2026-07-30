@@ -6,6 +6,9 @@ import {
   borrowedLiquidityReadiness,
   canonicalFullRange,
   canonicalStatusLabel,
+  liquidityActivationWait,
+  liquidityPositionActions,
+  recommendedLiquidityAction,
   v4PoolId,
   type CanonicalPoolRecord,
   type LpPositionRecord,
@@ -147,5 +150,27 @@ describe("canonical liquidity identifiers", () => {
         [secondPool.poolId]: "2",
       })
     ).toBeNull();
+  });
+
+  it("reveals liquidity actions from the selected NFT state", () => {
+    const walletOwned = { staked: false } as LpPositionRecord;
+    const waiting = {
+      staked: true,
+      pendingLiquidity: 10n,
+      eligibleAtBlock: 101n,
+    } as LpPositionRecord;
+    const ready = { ...waiting, eligibleAtBlock: 100n } as LpPositionRecord;
+
+    expect(liquidityPositionActions(walletOwned, 100n)).toEqual(["stake"]);
+    expect(liquidityPositionActions(waiting, 100n)).toEqual(["increase", "claim", "unstake"]);
+    expect(liquidityActivationWait(waiting, 100n)).toBe(1n);
+    expect(liquidityPositionActions(ready, 100n)).toEqual([
+      "activate",
+      "increase",
+      "claim",
+      "unstake",
+    ]);
+    expect(liquidityActivationWait(ready, 100n)).toBeNull();
+    expect(recommendedLiquidityAction(ready, 100n)).toBe("activate");
   });
 });
