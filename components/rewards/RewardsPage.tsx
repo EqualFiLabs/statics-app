@@ -21,14 +21,12 @@ import {
   staticsAbi,
 } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
 import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
 import { loadStakingSnapshot } from "@/lib/positions/staking";
-import { RewardsPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   claimablePositionRewards,
@@ -57,10 +55,7 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function RewardsPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <RewardsPreview />;
-  }
-  if (wallet.status === "unconfigured") return <RewardsPreview />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
   return <RewardsRuntime />;
 }
 
@@ -444,7 +439,13 @@ function RewardsRuntime() {
   };
 
   if (deploymentState.status === "unavailable") {
-    return <RewardsPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="rewards"
+        empty={{ title: "Rewards unavailable", description: "No deployment is configured." }}
+      />
+    );
   }
 
   const surfaceState = deriveSurfaceState({

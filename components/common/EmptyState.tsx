@@ -74,6 +74,11 @@ export type SurfaceEmptyStateProps = Readonly<{
   onRetry?: () => void;
 }>;
 
+export type SurfaceBoundaryProps = SurfaceEmptyStateProps &
+  Readonly<{
+    children: React.ReactNode;
+  }>;
+
 /**
  * Maps a derived surface state onto the right message and the right action.
  *
@@ -85,6 +90,15 @@ export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmp
   const wallet = useWalletState();
 
   switch (state) {
+    case "unconfigured":
+      return (
+        <EmptyState
+          tone="error"
+          title="Statics is not configured"
+          description="This build does not contain a verified Statics deployment. No wallet or protocol action is available."
+        />
+      );
+
     case "signed-out":
       return (
         <EmptyState
@@ -146,4 +160,29 @@ export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmp
     default:
       return null;
   }
+}
+
+/**
+ * Keeps every data surface on one runtime path. A boundary either renders the
+ * real surface or the one shared explanation for why it is unavailable.
+ */
+export function SurfaceBoundary({
+  state,
+  subject,
+  empty,
+  onRetry,
+  children,
+}: SurfaceBoundaryProps) {
+  if (state === "ready") return children;
+  return <SurfaceEmptyState state={state} subject={subject} empty={empty} onRetry={onRetry} />;
+}
+
+export function UnconfiguredSurface({ subject }: { subject: string }) {
+  return (
+    <SurfaceEmptyState
+      state="unconfigured"
+      subject={subject}
+      empty={{ title: `${subject} unavailable`, description: "No deployment is configured." }}
+    />
+  );
 }

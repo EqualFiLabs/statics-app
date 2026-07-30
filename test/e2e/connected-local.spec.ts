@@ -30,7 +30,7 @@ function monitorBrowserFailures(page: Page): () => void {
   return () => expect(failures, "connected pages must not emit browser errors").toEqual([]);
 }
 
-test("renders every connected route without sample fallback", async ({ page }) => {
+test("renders every connected route through the live application", async ({ page }) => {
   const expectNoBrowserFailures = monitorBrowserFailures(page);
   for (const [route, heading] of routes) {
     await page.goto(route);
@@ -39,9 +39,6 @@ test("renders every connected route without sample fallback", async ({ page }) =
     // static "Protocol DApp" label.
     await expect(page.locator(".dapp-network")).toBeVisible();
     await expect(page.getByText("Local verified", { exact: true })).toBeVisible();
-    await expect(page.locator("[data-dapp-preview]")).toHaveCount(0);
-    await expect(page.getByText("Design preview", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Sample data only", { exact: true })).toHaveCount(0);
     if (route === "/app/baskets") {
       await expect(page.getByText("2 discovered", { exact: true })).toBeVisible();
     }
@@ -58,7 +55,6 @@ test("keeps the landing route outside wallet runtime", async ({ page }) => {
   ).toBeVisible();
   await expect(page.locator(".dapp-network")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(0);
-  await expect(page.locator("[data-dapp-preview]")).toHaveCount(0);
   expectNoBrowserFailures();
 });
 

@@ -33,10 +33,8 @@ import {
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
-import { LiquidityPreview } from "@/components/preview/RemainingSurfacesPreview";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   basketLiquiditySnapshot,
@@ -98,8 +96,7 @@ function amount(value: bigint, decimals: number): string {
 
 export function LiquidityPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) return <LiquidityPreview />;
-  if (wallet.status === "unconfigured") return <LiquidityPreview />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
   return <LiquidityRuntime />;
 }
 
@@ -1050,21 +1047,19 @@ function LiquidityRuntime() {
     }
   };
 
-  if (
+  const surfaceState =
     walletState.status === "unconfigured" ||
     deploymentState.status === "unavailable" ||
     !deploymentState.deployment.liquidity
-  )
-    return <LiquidityPreview />;
-
-  const surfaceState = deriveSurfaceState({
-    walletStatus: walletState.status,
-    isTargetChain: walletState.isTargetChain,
-    isLoading: catalog.isPending,
-    isError: catalog.isError,
-    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
-    hasData: Boolean(catalog.data),
-  });
+      ? "unconfigured"
+      : deriveSurfaceState({
+          walletStatus: walletState.status,
+          isTargetChain: walletState.isTargetChain,
+          isLoading: catalog.isPending,
+          isError: catalog.isError,
+          isEmpty: (catalog.data?.positions.length ?? 0) === 0,
+          hasData: Boolean(catalog.data),
+        });
 
   let actionLabel = `${mode} reviewed liquidity action`;
   let action: (() => void) | null = () => void run();

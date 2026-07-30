@@ -2,13 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Hex } from "viem";
 
-const previewMode = vi.hoisted(() => ({ enabled: true }));
-vi.mock("@/lib/dapp-preview", () => ({
-  get dappPreviewEnabled() {
-    return previewMode.enabled;
-  },
-}));
-
 import { ActivityPage } from "@/components/dollar/ActivityPage";
 import { writeDollarActivity } from "@/lib/dollar/activity";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
@@ -18,7 +11,6 @@ const originalHash: Hex = `0x${"11".repeat(32)}`;
 const replacementHash: Hex = `0x${"22".repeat(32)}`;
 
 function renderActivity(chainId: number) {
-  previewMode.enabled = false;
   return render(
     <WalletContext.Provider
       value={{
@@ -39,7 +31,6 @@ function renderActivity(chainId: number) {
 
 describe("Dollar activity page", () => {
   beforeEach(() => {
-    previewMode.enabled = true;
     window.localStorage.clear();
   });
 
@@ -143,7 +134,6 @@ describe("Dollar activity page", () => {
 
 describe("Dollar activity page across networks", () => {
   beforeEach(() => {
-    previewMode.enabled = true;
     window.localStorage.clear();
   });
 
@@ -162,7 +152,6 @@ describe("Dollar activity page across networks", () => {
       createdAt: 1,
     });
 
-    previewMode.enabled = false;
     render(
       <WalletContext.Provider
         value={{
@@ -198,7 +187,6 @@ describe("Dollar activity page across networks", () => {
       createdAt: 2,
     });
 
-    previewMode.enabled = false;
     render(
       <WalletContext.Provider
         value={{

@@ -42,10 +42,9 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 ## Current state
 
 - The approved landing page is served at `/` by Next.js 16 and React 19, with its copy, responsive visual system, Statics branding, and Robin Hood hero preserved.
-- `/app` always renders its complete route-specific interface. Runtime values come from the
-  configured local Anvil deployment when available; missing wallet, deployment, loading, and RPC
-  states render `--` without removing the screen, and dependent actions stay disabled.
-  `npm run dev:preview` renders labelled deterministic sample states for visual regression work.
+- `/app` uses one route-specific interface for both connected data and explicit unavailable,
+  disconnected, wrong-network, loading, empty, or failed states. There is no parallel preview
+  application to drift from production behavior.
   `npm run dev:connected` imports only Eves Market's public Privy identifiers, deploys the current
   protocol to persistent Anvil, verifies runtime code hashes, and serves authoritative local data.
 - The connected signed-out application has rendered every current route, opened the real Privy
@@ -394,10 +393,10 @@ Headless loan protocol evidence (2026-07-23): canonical SDK commit
 `8bf30cd3bdd8d32f1b5e4cc6ae4e3d3c0269b18f` added authoritative loan reads, lifecycle
 events, lending errors, and recovery timing; its 27 tests and TypeScript build passed. The vendored
 artifact records that clean protocol commit plus source and generated-artifact checksums. The
-unexercised `/app/loans` source path is designed to reconcile originated and closed loan events against current
-PositionNFT ownership, rebuilds fresh quotes before simulation, sequences one exact token approval
-at a time, preserves confirmed receipts whose resulting state still needs refresh verification, and
-keeps the approved development preview when local deployment configuration is absent.
+unexercised `/app/loans` source path is designed to reconcile originated and closed loan events
+against current PositionNFT ownership, rebuilds fresh quotes before simulation, sequences one token
+approval at a time, preserves confirmed receipts whose resulting state still needs refresh
+verification, and reports missing deployment configuration through the shared surface boundary.
 `npm run test:integration:local` deployed the current unified stack to ephemeral Anvil and confirmed
 borrow principal delivery and collateral locking, exact-fee extension with unchanged principals,
 exact-principal repayment and collateral unlock, and recovery by a second account strictly after
@@ -423,20 +422,19 @@ public-network or production transaction was performed.
 
 ### DApp visual design and product review
 
-- [x] Keep every existing `/app` route fully rendered when wallet, deployment, or RPC data is absent.
-- [x] Render unavailable onchain and wallet values as `--` without fabricating balances, addresses, positions, or status.
-- [x] Keep every unavailable-state transaction, copy, explorer, and export control disabled.
-- [x] Desktop, tablet, and mobile implementation plus snapshot coverage is locally verified and product-approved for the overview, Dollar, basket catalog/detail, PositionNFT catalog/detail, rewards, activity, and settings.
-- [~] Loan, multi-asset reward-claim, permissionless basket-creation, and canonical-liquidity
-  screens retain disabled unavailable-value states and responsive snapshot coverage; explicit
-  product approval remains pending before functional implementation is treated as product-complete.
-- [~] Populate the persistent screens with verified local onchain states during integration review
-  without changing their information hierarchy. Every route now survives an unavailable Anvil RPC
-  without collapsing; authenticated state and value-moving browser workflows remain open.
+- [x] Use one production component tree for connected and unavailable states.
+- [x] Distinguish unconfigured, signed-out, wallet-missing, wrong-network, loading, failed, empty,
+  and ready states without fabricating balances, addresses, positions, or status.
+- [x] Preserve last-known-good data during background refreshes and failed refreshes.
+- [x] Keep unavailable-state value-moving controls out of the interface until their prerequisites
+  exist.
+- [ ] Complete the consolidated information architecture and inspect it at desktop, tablet, and
+  mobile sizes against verified local data.
+- [ ] Exercise authenticated and value-moving browser workflows against the local deployment.
 
-Gate: reviewed screenshots cover every current DApp surface at desktop, tablet, and mobile sizes.
-Production actions still fail closed without verified wallet, network, and deployment
-configuration, while the non-value-moving screen layout remains visible.
+Gate: the connected application must remain usable across desktop, tablet, and mobile without a
+parallel preview implementation. Production actions continue to fail closed without verified
+wallet, network, and deployment configuration.
 
 ### Live-network readiness
 

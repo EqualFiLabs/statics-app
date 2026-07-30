@@ -825,7 +825,6 @@ try {
       env: {
         ...process.env,
         NEXT_PUBLIC_APP_ENV: "development",
-        NEXT_PUBLIC_DAPP_PREVIEW: "false",
         STATICS_NEXT_DIST_DIR: ".local/next-connected",
         STATICS_NEXT_TSCONFIG: ".local/tsconfig.connected.json",
       },
