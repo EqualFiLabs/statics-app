@@ -34,6 +34,12 @@ import {
 
 export type LoanTimeline = "active" | "grace" | "recoverable";
 export type LoanMode = "borrow" | "repay" | "extend" | "recover";
+export type BorrowDestination = "wallet" | "liquidity";
+
+export function readBorrowDestination(value: string | string[] | undefined): BorrowDestination {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate === "liquidity" ? "liquidity" : "wallet";
+}
 export type LoanQuoteState = "idle" | "refreshing" | "ready" | "error";
 
 export type LoanAsset = Readonly<{

@@ -13,10 +13,11 @@ describe("loan action ownership", () => {
   it("keeps every loan origination destination on Loans", () => {
     const loans = read("components/loans/LoansPage.tsx");
     const liquidity = read("components/liquidity/LiquidityPage.tsx");
+    const loanModel = read("lib/loans/loans.ts");
 
     expect(loans).toContain("buildBorrowCall");
     expect(loans).toContain("buildBorrowAndProvideLiquidityCall");
-    expect(loans).toContain('type BorrowDestination = "wallet" | "liquidity"');
+    expect(loanModel).toContain('type BorrowDestination = "wallet" | "liquidity"');
     expect(liquidity).not.toContain("buildBorrowCall");
     expect(liquidity).not.toContain("buildBorrowAndProvideLiquidityCall");
     expect(liquidity).not.toContain('"borrow-liquidity"');
