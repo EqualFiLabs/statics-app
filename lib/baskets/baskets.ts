@@ -297,7 +297,7 @@ export function deriveBasketActionAvailability(input: {
     return {
       kind: "blocked",
       label: "Redeem unavailable",
-      reason: "This wallet does not have enough BasketToken.",
+      reason: "The selected source does not have enough unlocked BasketToken.",
       executable: false,
     };
   }
@@ -397,16 +397,16 @@ export function describeBasketError(error: unknown): string {
 }
 
 /**
- * Validates a mint-into-collateral simulation.
+ * Validates a basket conversion that writes through position collateral.
  *
  * The collateral variants return different shapes from a plain mint:
  * `mintBasketCollateral` returns the constituent amounts pulled in, and
  * `createAndMintBasketCollateral` returns the new position id alongside them.
- * Both are checked so an auto-deposited mint is held to the same bar as a
- * mint that lands in the wallet.
+ * Every return shape is checked so a position-owned conversion is held to the
+ * same bar as a conversion that uses the wallet.
  */
 export function validateBasketCollateralSimulation(
-  functionName: "mintBasketCollateral" | "createAndMintBasketCollateral",
+  functionName: "mintBasketCollateral" | "createAndMintBasketCollateral" | "redeemBasketCollateral",
   result: Hex | undefined,
   expectedLegs: number
 ): readonly bigint[] {
