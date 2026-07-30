@@ -18,6 +18,7 @@ import {
   buildCreateAndMintBasketCollateralCall,
   buildMintBasketCollateralCall,
   buildMintCall,
+  buildRedeemBasketCollateralCall,
   buildRedeemCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
@@ -35,12 +36,19 @@ import {
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
+import {
+  positionSelection,
+  recommendedMintSelection,
+  selectedPositionId,
+  type BasketConversionAction,
+  type BasketConversionSelection,
+} from "@/lib/baskets/conversion-navigation";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
-import { loadPositionCatalog } from "@/lib/positions/positions";
+import { loadPositionCatalog, unlockedCollateral } from "@/lib/positions/positions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
@@ -68,20 +76,44 @@ function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
     .join(" · ");
 }
 
-export function BasketDetailPage({ basketId }: { basketId: bigint }) {
+export function BasketDetailPage({
+  basketId,
+  initialAction = "mint",
+  initialPositionId = null,
+}: {
+  basketId: bigint;
+  initialAction?: BasketConversionAction;
+  initialPositionId?: bigint | null;
+}) {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Basket" />;
-  return <BasketDetailRuntime basketId={basketId} />;
+  return (
+    <BasketDetailRuntime
+      basketId={basketId}
+      initialAction={initialAction}
+      initialPositionId={initialPositionId}
+    />
+  );
 }
 
-function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
+function BasketDetailRuntime({
+  basketId,
+  initialAction,
+  initialPositionId,
+}: {
+  basketId: bigint;
+  initialAction: BasketConversionAction;
+  initialPositionId: bigint | null;
+}) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-  const [mode, setMode] = useState<"mint" | "redeem" | "swap">("mint");
-  const [autoDeposit, setAutoDeposit] = useState(true);
+  const [mode, setMode] = useState<"mint" | "redeem" | "swap">(initialAction);
+  const [selectionOverride, setSelectionOverride] = useState<BasketConversionSelection | null>(
+    null
+  );
   const [amountInput, setAmountInput] = useState("");
   const [slippageInput, setSlippageInput] = useState(
     (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
@@ -137,6 +169,40 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
     },
   });
   const basket = catalog.data?.baskets.find((candidate) => candidate.basketId === basketId);
+  const ownedPositions = positions.data?.positions ?? [];
+  const redeemablePositions = ownedPositions.filter((position) =>
+    position.collateral.some(
+      (collateral) => collateral.basket.basketId === basketId && unlockedCollateral(collateral) > 0n
+    )
+  );
+  const initialSelection = initialPositionId === null ? null : positionSelection(initialPositionId);
+  const availableSelections: readonly BasketConversionSelection[] =
+    mode === "mint"
+      ? [
+          "wallet",
+          "new-position",
+          ...ownedPositions.map(({ positionId }) => positionSelection(positionId)),
+        ]
+      : ["wallet", ...redeemablePositions.map(({ positionId }) => positionSelection(positionId))];
+  const requestedSelection = selectionOverride ?? initialSelection;
+  const conversionSelection =
+    requestedSelection && availableSelections.includes(requestedSelection)
+      ? requestedSelection
+      : mode === "mint"
+        ? recommendedMintSelection(ownedPositions)
+        : "wallet";
+  const conversionPositionId = selectedPositionId(conversionSelection);
+  const conversionPosition =
+    conversionPositionId === null
+      ? null
+      : (ownedPositions.find(({ positionId }) => positionId === conversionPositionId) ?? null);
+  const conversionCollateral =
+    conversionPosition?.collateral.find((collateral) => collateral.basket.basketId === basketId) ??
+    null;
+  const sourceBalance =
+    mode === "redeem" && conversionCollateral
+      ? unlockedCollateral(conversionCollateral)
+      : (basket?.walletBalance ?? 0n);
   const quote = useQuery({
     queryKey: ["basket-quote", basketId.toString(), mode, amount.toString()],
     enabled:
@@ -171,7 +237,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
         : quote.isFetching || quote.isPlaceholderData || !currentQuote
           ? "refreshing"
           : "ready";
-  const availability =
+  const baseAvailability =
     basket && mode !== "swap"
       ? deriveBasketActionAvailability({
           mode,
@@ -179,11 +245,24 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
           status: basket.status,
           quoteState,
           slippageBps,
-          walletBalance: basket.walletBalance,
+          walletBalance: sourceBalance,
           constituents: basket.constituents,
           quoteAmounts: currentQuote?.amounts ?? null,
         })
       : null;
+  const availability =
+    baseAvailability &&
+    mode === "redeem" &&
+    conversionCollateral &&
+    positions.data &&
+    positions.data.currentBlock < conversionCollateral.withdrawableAfterBlock
+      ? {
+          kind: "blocked" as const,
+          label: "Redeem unavailable",
+          reason: "Basket collateral becomes redeemable in the next block.",
+          executable: false,
+        }
+      : baseAvailability;
 
   const recordAndSend = async ({
     kind,
@@ -282,18 +361,58 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
         // against a PositionNFT. So the default mints straight into one --
         // creating the position in the same call when there is not one yet --
         // and only an explicit opt-out leaves the shares in the wallet.
-        const depositTarget = autoDeposit ? (positions.data?.positions[0] ?? null) : null;
-        const collateralFunction = !autoDeposit
-          ? null
-          : depositTarget
-            ? ("mintBasketCollateral" as const)
-            : ("createAndMintBasketCollateral" as const);
+        const refreshedPositions = await positions.refetch();
+        const targetPositionId = selectedPositionId(conversionSelection);
+        const targetPosition =
+          targetPositionId === null
+            ? null
+            : (refreshedPositions.data?.positions.find(
+                (position) => position.positionId === targetPositionId
+              ) ?? null);
+        if (targetPositionId !== null && !targetPosition) {
+          throw new Error("The selected position is no longer owned by this wallet.");
+        }
+        const collateralFunction =
+          mode === "mint"
+            ? conversionSelection === "new-position"
+              ? ("createAndMintBasketCollateral" as const)
+              : targetPosition
+                ? ("mintBasketCollateral" as const)
+                : null
+            : targetPosition
+              ? ("redeemBasketCollateral" as const)
+              : null;
 
         let data: Hex;
-        if (mode === "redeem") {
+        if (mode === "redeem" && targetPosition) {
+          const freshCollateral = targetPosition.collateral.find(
+            (collateral) => collateral.basket.basketId === basketId
+          );
+          if (!freshCollateral || unlockedCollateral(freshCollateral) < amount) {
+            throw new Error("The selected position does not have enough unlocked BasketToken.");
+          }
+          if (
+            refreshedPositions.data &&
+            refreshedPositions.data.currentBlock < freshCollateral.withdrawableAfterBlock
+          ) {
+            throw new Error("Basket collateral becomes redeemable in the next block.");
+          }
+          data = buildRedeemBasketCollateralCall(
+            targetPosition.positionId,
+            basketId,
+            amount,
+            wallet,
+            bounds
+          );
+        } else if (mode === "redeem") {
           data = buildRedeemCall(basketId, amount, wallet, bounds);
         } else if (collateralFunction === "mintBasketCollateral") {
-          data = buildMintBasketCollateralCall(depositTarget!.positionId, basketId, amount, bounds);
+          data = buildMintBasketCollateralCall(
+            targetPosition!.positionId,
+            basketId,
+            amount,
+            bounds
+          );
         } else if (collateralFunction === "createAndMintBasketCollateral") {
           data = buildCreateAndMintBasketCollateralCall(basketId, amount, wallet, bounds);
         } else {
@@ -304,7 +423,9 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
           kind: mode === "mint" ? "mint-basket" : "redeem-basket",
           label:
             mode === "redeem"
-              ? `Redeem ${basket.symbol}`
+              ? collateralFunction === "redeemBasketCollateral"
+                ? `Redeem ${basket.symbol} from position`
+                : `Redeem ${basket.symbol}`
               : collateralFunction
                 ? `Buy and deposit ${basket.symbol}`
                 : `Buy ${basket.symbol}`,
@@ -321,7 +442,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
         });
         setAmountInput("");
       }
-      await Promise.all([catalog.refetch(), quote.refetch()]);
+      await Promise.all([catalog.refetch(), positions.refetch(), quote.refetch()]);
     } catch (error) {
       setActionError(describeBasketError(error));
     } finally {
@@ -510,28 +631,41 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
                 </div>
                 <small id="basket-slippage-help">Allowed range 0–5%. Default 0.50%.</small>
               </label>
-              {mode === "mint" && (
-                <label className="basket-toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoDeposit}
-                    onChange={(event) => {
-                      setAutoDeposit(event.target.checked);
-                      setActionError(null);
-                    }}
-                    disabled={pending}
-                    aria-describedby="basket-auto-deposit-help"
-                  />
-                  <span>
-                    <strong>Start earning right away</strong>
-                    <small id="basket-auto-deposit-help">
-                      {autoDeposit
-                        ? `Deposits your ${basket.symbol} so it earns fees in the assets it holds. Same transaction, and you can withdraw from the next block onward.`
-                        : `Your ${basket.symbol} stays in your wallet, where it earns nothing. You can deposit it later.`}
-                    </small>
-                  </span>
-                </label>
-              )}
+              <label className="basket-field">
+                <span>{mode === "mint" ? "Receive basket in" : "Redeem basket from"}</span>
+                <select
+                  value={conversionSelection}
+                  onChange={(event) => {
+                    setSelectionOverride(event.target.value as BasketConversionSelection);
+                    setActionError(null);
+                  }}
+                  disabled={pending || positions.isPending}
+                >
+                  <option value="wallet">
+                    Wallet{mode === "mint" ? " · does not earn basket rewards" : ""}
+                  </option>
+                  {mode === "mint" && <option value="new-position">New earning position</option>}
+                  {(mode === "mint" ? ownedPositions : redeemablePositions).map((position) => (
+                    <option
+                      key={position.positionId.toString()}
+                      value={positionSelection(position.positionId)}
+                    >
+                      Position #{position.positionId.toString()}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  {mode === "mint"
+                    ? conversionSelection === "wallet"
+                      ? `The ${basket.symbol} remains liquid in your wallet and earns no basket rewards.`
+                      : conversionSelection === "new-position"
+                        ? "Creates a PositionNFT and deposits the minted basket in the same transaction."
+                        : `Mints directly into Position #${conversionPositionId?.toString()} so it can earn selected rewards.`
+                    : conversionPositionId === null
+                      ? `Burns ${basket.symbol} held in your wallet.`
+                      : `Burns unlocked ${basket.symbol} collateral from Position #${conversionPositionId.toString()}.`}
+                </small>
+              </label>
               <div className="basket-quote">
                 <span>{quoteLabel}</span>
                 {quoteAmounts ? (

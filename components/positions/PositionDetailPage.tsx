@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
-  decodeFunctionResult,
   encodeFunctionData,
   formatUnits,
   getAddress,
@@ -19,22 +18,13 @@ import {
   basketTokenAbi,
   buildClosePositionCall,
   buildDepositBasketCollateralCall,
-  buildMintBasketCollateralCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
-  buildRedeemBasketCollateralCall,
   buildStakeCall,
   buildUnstakeCall,
   buildWithdrawBasketCollateralCall,
-  staticsAbi,
 } from "@statics-protocol/sdk";
 
-import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
-  maximumWithSlippage,
-  minimumWithSlippage,
-  parseSlippageBps,
-} from "@/lib/baskets/baskets";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canClosePosition,
@@ -54,7 +44,7 @@ import { deriveSurfaceState } from "@/lib/surface-state";
 
 const deploymentState = readClientDollarDeployment();
 
-type CollateralMode = "deposit" | "mint" | "withdraw" | "redeem";
+type CollateralMode = "deposit" | "withdraw";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -87,9 +77,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const [collateralMode, setCollateralMode] = useState<CollateralMode>("deposit");
   const [basketIdInput, setBasketIdInput] = useState("0");
   const [collateralAmountInput, setCollateralAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [stakeMode, setStakeMode] = useState<"stake" | "unstake">("stake");
   const [stakeAmountInput, setStakeAmountInput] = useState("");
   const [customRewardAddress, setCustomRewardAddress] = useState("");
@@ -131,8 +118,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     () => parseAmount(stakeAmountInput, catalog.data?.stakingToken.decimals ?? 18),
     [stakeAmountInput, catalog.data?.stakingToken.decimals]
   );
-  const slippageBps = parseSlippageBps(slippageInput);
-
   const sendTransaction = async ({
     kind,
     label,
@@ -241,72 +226,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       return;
     }
 
-    if (collateralMode === "mint") {
-      if (slippageBps === null) throw new Error("Slippage must be between 0% and 5%.");
-      const quote = await publicClient.readContract({
-        address: diamond,
-        abi: staticsAbi,
-        functionName: "quoteMint",
-        args: [basket.basketId, collateralAmount],
-      });
-      const maximums = quote.map((amount) => maximumWithSlippage(amount, slippageBps));
-      const approvalIndex = basket.constituents.findIndex(
-        (constituent, index) =>
-          constituent.walletBalance < (maximums[index] ?? 0n) ||
-          constituent.allowance < (maximums[index] ?? 0n)
-      );
-      if (approvalIndex >= 0) {
-        const constituent = basket.constituents[approvalIndex];
-        const maximum = maximums[approvalIndex];
-        if (!constituent || maximum === undefined) {
-          throw new Error("The underlying quote is incomplete.");
-        }
-        if (constituent.walletBalance < maximum) {
-          throw new Error(`The wallet does not hold enough ${constituent.token.symbol}.`);
-        }
-        await sendTransaction({
-          kind: "approve-basket-asset",
-          label: `Approve ${constituent.token.symbol}`,
-          amount: `${displayAmount(maximum, constituent.token.decimals)} ${constituent.token.symbol}`,
-          to: constituent.token.address,
-          data: encodeFunctionData({
-            abi: basketTokenAbi,
-            functionName: "approve",
-            args: [diamond, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-        return;
-      }
-      await sendTransaction({
-        kind: "mint-basket-collateral",
-        label: `Mint ${basket.symbol} into collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildMintBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          maximums
-        ),
-        validateSimulation: (result) => {
-          if (!result) throw new Error("The collateral mint simulation returned no result.");
-          const amounts = decodeFunctionResult({
-            abi: staticsAbi,
-            functionName: "mintBasketCollateral",
-            data: result,
-          });
-          if (
-            amounts.length !== basket.constituents.length ||
-            amounts.some((amount) => amount <= 0n)
-          ) {
-            throw new Error("The collateral mint simulation returned invalid inputs.");
-          }
-        },
-      });
-      setCollateralAmountInput("");
-      return;
-    }
-
     if (!existingCollateral || unlockedCollateral(existingCollateral) < collateralAmount) {
       throw new Error("The position does not have enough unlocked basket collateral.");
     }
@@ -314,56 +233,18 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       throw new Error("Basket collateral becomes removable in the next block.");
     }
 
-    if (collateralMode === "withdraw") {
-      await sendTransaction({
-        kind: "withdraw-basket-collateral",
-        label: `Withdraw ${basket.symbol} collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildWithdrawBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          wallet
-        ),
-      });
-    } else {
-      if (slippageBps === null) throw new Error("Slippage must be between 0% and 5%.");
-      const quote = await publicClient.readContract({
-        address: diamond,
-        abi: staticsAbi,
-        functionName: "quoteRedeem",
-        args: [basket.basketId, collateralAmount],
-      });
-      const minimums = quote.map((amount) => minimumWithSlippage(amount, slippageBps));
-      await sendTransaction({
-        kind: "redeem-basket-collateral",
-        label: `Redeem ${basket.symbol} collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildRedeemBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          wallet,
-          minimums
-        ),
-        validateSimulation: (result) => {
-          if (!result) throw new Error("The collateral redemption simulation returned no result.");
-          const amounts = decodeFunctionResult({
-            abi: staticsAbi,
-            functionName: "redeemBasketCollateral",
-            data: result,
-          });
-          if (
-            amounts.length !== basket.constituents.length ||
-            amounts.some((amount) => amount <= 0n)
-          ) {
-            throw new Error("The collateral redemption simulation returned invalid outputs.");
-          }
-        },
-      });
-    }
+    await sendTransaction({
+      kind: "withdraw-basket-collateral",
+      label: `Withdraw ${basket.symbol} collateral`,
+      amount: amountLabel,
+      to: diamond,
+      data: buildWithdrawBasketCollateralCall(
+        position.positionId,
+        basket.basketId,
+        collateralAmount,
+        wallet
+      ),
+    });
     setCollateralAmountInput("");
   };
 
@@ -541,7 +422,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           <p className="dapp-section-label">Basket collateral</p>
           <h3>Manage collateral legs</h3>
           <div className="dollar-tabs" aria-label="Collateral action">
-            {(["deposit", "mint", "withdraw", "redeem"] as const).map((mode) => (
+            {(["deposit", "withdraw"] as const).map((mode) => (
               <button
                 type="button"
                 key={mode}
@@ -587,21 +468,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               {existingCollateral ? displayAmount(unlockedCollateral(existingCollateral)) : "0"}
             </small>
           </label>
-          {(collateralMode === "mint" || collateralMode === "redeem") && (
-            <label className="basket-field">
-              <span>Slippage tolerance</span>
-              <div>
-                <input
-                  value={slippageInput}
-                  onChange={(event) => setSlippageInput(event.target.value)}
-                  inputMode="decimal"
-                  disabled={pendingAction !== null}
-                />
-                <strong>%</strong>
-              </div>
-              <small>Allowed range 0–5%. Fresh bounds are read immediately before signing.</small>
-            </label>
-          )}
           <button
             className="dollar-submit"
             type="button"
@@ -612,12 +478,24 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               ? "Waiting for confirmation…"
               : collateralMode === "deposit"
                 ? "Approve or deposit BasketToken"
-                : collateralMode === "mint"
-                  ? "Approve or mint into collateral"
-                  : collateralMode === "withdraw"
-                    ? "Withdraw BasketToken"
-                    : "Redeem collateral to underlyings"}
+                : "Withdraw BasketToken"}
           </button>
+          {basket && (
+            <div className="position-action-links">
+              <Link
+                className="dollar-primary-link"
+                href={`/app/baskets/${basket.basketId.toString()}?action=mint&positionId=${position.positionId.toString()}`}
+              >
+                Mint {basket.symbol} into this position →
+              </Link>
+              <Link
+                className="dollar-primary-link"
+                href={`/app/baskets/${basket.basketId.toString()}?action=redeem&positionId=${position.positionId.toString()}`}
+              >
+                Redeem this position&apos;s {basket.symbol} →
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="position-panel">
