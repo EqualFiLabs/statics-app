@@ -49,6 +49,7 @@ import {
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { PositionDetailPreview } from "@/components/preview/DappPreview";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 
@@ -608,6 +609,11 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
         Dollar, and liquidity obligation. This release intentionally does not provide a transfer
         button.
       </p>
+
+      <PositionCollateralSummary
+        collateral={position.collateral}
+        currentBlock={catalog.data.currentBlock}
+      />
 
       <div className="position-detail-grid">
         <section className="position-panel">

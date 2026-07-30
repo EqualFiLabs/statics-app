@@ -9,6 +9,7 @@ import { useState } from "react";
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionListPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
@@ -207,10 +208,15 @@ function PositionListRuntime() {
                 chainId={deploymentState.deployment.chainId}
                 label="Owner"
               />
+              <PositionCollateralSummary
+                collateral={position.collateral}
+                currentBlock={catalog.data.currentBlock}
+                compact
+              />
               <dl>
                 <div>
-                  <dt>Basket collateral</dt>
-                  <dd>{position.collateral.length} baskets</dd>
+                  <dt>Basket legs</dt>
+                  <dd>{position.collateral.length}</dd>
                 </div>
                 <div>
                   <dt>Global stake</dt>

@@ -2618,6 +2618,91 @@
   margin-top: 1rem;
 }
 
+.position-collateral-summary {
+  margin-top: 10px;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-lg);
+}
+
+.position-collateral-summary.is-compact {
+  padding: 1rem;
+}
+
+.position-collateral-summary > div > p:last-child,
+.position-collateral-empty {
+  margin: 0.45rem 0 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.position-collateral-summary ul {
+  display: grid;
+  gap: 10px;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.position-collateral-summary li {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+}
+
+.position-collateral-summary li > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.position-collateral-summary li a {
+  color: var(--accent);
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.position-collateral-summary li strong {
+  color: var(--app-text);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.position-collateral-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 1rem 0 0;
+  border: 1px solid var(--app-border);
+  background: var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.position-collateral-summary dl > div {
+  min-width: 0;
+  padding: 0.75rem;
+  background: var(--app-surface);
+}
+
+.position-collateral-summary dt {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.position-collateral-summary dd {
+  margin: 0.4rem 0 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 .position-card dl,
 .position-hero dl,
 .position-metrics {
@@ -4489,6 +4574,7 @@
 
   .position-card dl,
   .position-hero dl,
+  .position-collateral-summary dl,
   .position-metrics,
   .reward-grid,
   .reward-selector {
