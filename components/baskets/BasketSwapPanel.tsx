@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useSignTypedData } from "@privy-io/react-auth";
 import { useMemo, useState } from "react";
 import {
   decodeFunctionResult,
@@ -26,6 +27,8 @@ import {
   canonicalSwapPoolKey,
   isCurrentCanonicalSwapQuote,
   permit2SwapApproval,
+  privyPermit2Request,
+  signPermit2ForWallet,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
@@ -54,6 +57,7 @@ function display(value: bigint, decimals: number): string {
 
 export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const walletState = useWalletState();
+  const { signTypedData: signEmbeddedTypedData } = useSignTypedData();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const wallet =
@@ -294,13 +298,24 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         router,
         deadline
       );
-      const signature = await walletClient.data.signTypedData({
-        account: wallet,
-        ...buildPermit2PermitTypedData(
-          deploymentState.deployment.chainId,
-          liquidity.contracts.permit2,
-          permitSingle
-        ),
+      const typedData = buildPermit2PermitTypedData(
+        deploymentState.deployment.chainId,
+        liquidity.contracts.permit2,
+        permitSingle
+      );
+      const signature = await signPermit2ForWallet({
+        walletKind: walletState.walletKind,
+        typedData,
+        signEmbedded: async (permit) => {
+          const request = privyPermit2Request(permit, wallet);
+          const signed = await signEmbeddedTypedData(request.typedData, request.options);
+          return signed.signature as `0x${string}`;
+        },
+        signExternal: (permit) =>
+          walletClient.data!.signTypedData({
+            account: wallet,
+            ...permit,
+          }),
       });
       const execution = buildV4ExactInputSingleSwap({
         router,
