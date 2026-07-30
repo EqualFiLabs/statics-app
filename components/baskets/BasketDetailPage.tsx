@@ -38,17 +38,12 @@ import {
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
-import {
-  updateProtocolActivity,
-  writeProtocolActivity,
-  type ProtocolActivityKind,
-  type ProtocolActivityStatus,
-  type ProtocolReplacementReason,
-} from "@/lib/dollar/activity";
+import type { ProtocolActivityKind } from "@/lib/dollar/activity";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { loadPositionCatalog } from "@/lib/positions/positions";
-import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -61,10 +56,6 @@ function displayAmount(value: bigint, decimals = 18, precision = 6): string {
 
 function shortAddress(address: Address): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
-function currentTimestamp(): number {
-  return Date.now();
 }
 
 function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
@@ -107,7 +98,12 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
   const slippageBps = parseSlippageBps(slippageInput);
 
   const positions = useQuery({
-    queryKey: ["basket-detail-positions", wallet],
+    queryKey: protocolQueryKeys.positionCatalog(
+      deploymentState.status === "configured"
+        ? deploymentState.deployment.protocolCommit
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -124,13 +120,12 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
   });
 
   const catalog = useQuery({
-    queryKey: [
-      "basket-catalog",
+    queryKey: protocolQueryKeys.basketCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -206,79 +201,26 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
     if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
       throw new Error("The connected wallet is unavailable.");
     }
-    const id = crypto.randomUUID();
-    let stage: "simulating" | "signing" | "submitted" | "finished" = "simulating";
-    let replacementReason: ProtocolReplacementReason | undefined;
-    writeProtocolActivity({
-      id,
+    await executeProtocolTransaction({
+      publicClient,
       wallet,
       chainId: deploymentState.deployment.chainId,
       kind,
       label,
       amount: `${amountInput || "0"} ${basket?.symbol || "BasketToken"}`,
-      status: "simulating",
-      createdAt: currentTimestamp(),
+      to,
+      data,
+      sendTransaction: ({ to: transactionTarget, data: transactionData, value }) =>
+        walletClient.data!.sendTransaction({
+          account: wallet,
+          chain: walletClient.data!.chain,
+          to: transactionTarget,
+          data: transactionData,
+          value,
+        }),
+      describeError: describeBasketError,
+      validateSimulation: validate,
     });
-    try {
-      const simulation = await publicClient.call({ account: wallet, to, data });
-      validate?.(simulation.data);
-      stage = "signing";
-      updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-        status: "signing",
-      });
-      const hash = await walletClient.data.sendTransaction({
-        account: wallet,
-        chain: walletClient.data.chain,
-        to,
-        data,
-      });
-      stage = "submitted";
-      updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-        hash,
-        status: "submitted",
-      });
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        confirmations: 1,
-        onReplaced: (replacement) => {
-          replacementReason = replacement.reason;
-          updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-            status: "replaced",
-            replacementHash: replacement.transaction.hash,
-            replacementReason,
-          });
-        },
-      });
-      if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
-      if (replacementReason === "cancelled" || replacementReason === "replaced") {
-        const message =
-          replacementReason === "cancelled"
-            ? "The submitted transaction was cancelled in the wallet."
-            : "The submitted transaction was replaced by a different wallet transaction.";
-        stage = "finished";
-        updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-          status: "replaced",
-          confirmedHash: receipt.transactionHash,
-          error: message,
-        });
-        throw new Error(message);
-      }
-      stage = "finished";
-      updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-        status: "confirmed",
-        confirmedHash: receipt.transactionHash,
-      });
-    } catch (error) {
-      if (stage === "finished") throw error;
-      let status: ProtocolActivityStatus = "failed";
-      if (isWalletRejection(error)) status = "rejected";
-      else if (stage === "submitted" && isOnchainRevert(error)) status = "reverted";
-      updateProtocolActivity(wallet, deploymentState.deployment.chainId, id, {
-        status,
-        error: describeBasketError(error),
-      });
-      throw error;
-    }
   };
 
   const executeNextAction = async () => {

@@ -34,6 +34,7 @@ import {
   loadPositionCatalog,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -75,13 +76,12 @@ function RewardsRuntime() {
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const catalog = useQuery({
-    queryKey: [
-      "position-catalog",
+    queryKey: protocolQueryKeys.positionCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
