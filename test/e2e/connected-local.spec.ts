@@ -18,7 +18,7 @@ const routes: readonly (readonly [string, string | RegExp])[] = [
   ["/app/rewards", "Create and stake"],
   ["/app/liquidity", "Pools and your liquidity"],
   ["/app/activity", "Transactions"],
-  ["/app/settings", "Wallet settings"],
+  ["/app/tools", "App approvals"],
 ];
 
 function monitorBrowserFailures(page: Page): () => void {

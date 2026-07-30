@@ -128,7 +128,7 @@ test.describe("Dollar DApp foundation", () => {
       page.getByRole("heading", { name: "Basket launches are steward-controlled" })
     ).toBeVisible();
 
-    await navigateDapp(page, "/app/positions");
+    await page.goto("/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
     await page.goto("/app/positions/0");
     await expect(page).toHaveURL(/\/app\/positions\/0$/);
@@ -147,9 +147,6 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/tools");
     await expect(page).toHaveURL(/\/app\/tools$/);
-
-    await navigateDapp(page, "/app/settings");
-    await expect(page).toHaveURL(/\/app\/settings$/);
   });
 
   test("provides an accessible responsive application menu", async ({ page }, testInfo) => {

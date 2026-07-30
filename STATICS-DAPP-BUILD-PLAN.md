@@ -134,7 +134,7 @@ integration evidence.
 | `/app/portal`       | Swap on EVM/Solana, fund through Across, and mint or redeem configured pegged Statics Dollar                       | Yes                     |
 | `/app/dollar`       | Deposit ETH/WETH, obtain Statics Dollar and Risk Shares, recombine to ETH/WETH, and use configured pegged profiles | Yes                     |
 | `/app/activity`     | EVM, Solana, swap, bridge, and protocol lifecycle history with supported explorer links                            | Yes                     |
-| `/app/settings`     | Wallet information, embedded-wallet export guidance, and Statics-only logout                                       | Yes                     |
+| `/app/tools`        | Review and revoke ERC-20, Permit2, and operator approvals granted by the active wallet                             | Yes                     |
 | `/app/baskets`      | Discover and inspect permissionless baskets and their lifecycle/risk metadata                                      | Next release            |
 | `/app/baskets/[id]` | Quote, mint, redeem, and inspect constituent requirements and fees                                                 | Next release            |
 | `/app/create`       | Create a permissionless basket with validated configuration and creation fee                                       | Later release           |
@@ -142,6 +142,11 @@ integration evidence.
 | `/app/loans`        | Quote, borrow, repay, extend, and inspect recovery state per independent loan tranche                              | Planned broader release |
 | `/app/rewards`      | Global staking, activation/cooldown, multi-asset pending rewards, and claims                                       | Planned broader release |
 | `/app/liquidity`    | Canonical pool state, user v4 positions, staking, activation, claims, and exits                                    | Advanced release        |
+
+Wallet information, network and wallet type, address copying, explorer access, embedded-wallet
+export, and Statics sign-out live in the header account dialog instead of a duplicate Settings
+route. Position routes remain available from portfolio and workflow links without occupying a
+primary sidebar slot.
 
 ## User-facing protocol requirements
 

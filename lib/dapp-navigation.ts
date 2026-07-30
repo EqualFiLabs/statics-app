@@ -94,12 +94,6 @@ const routePresentations = {
     description:
       "Every action from this wallet, from the moment you confirm it to the moment it settles.",
   },
-  settings: {
-    label: "Settings",
-    status: "Settings",
-    title: "Settings",
-    description: "Your account, network, and wallet details, plus how to export your keys.",
-  },
   tools: {
     label: "Tools",
     status: "Tools",
@@ -119,7 +113,6 @@ export function getDappRoutePresentation(pathname: string): DappRoutePresentatio
   if (pathname.startsWith("/app/rewards")) return routePresentations.rewards;
   if (pathname.startsWith("/app/liquidity")) return routePresentations.liquidity;
   if (pathname.startsWith("/app/activity")) return routePresentations.activity;
-  if (pathname.startsWith("/app/settings")) return routePresentations.settings;
   if (pathname.startsWith("/app/tools")) return routePresentations.tools;
   return routePresentations.overview;
 }

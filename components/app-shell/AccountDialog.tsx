@@ -93,6 +93,12 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
     await wallet.logout();
     onClose();
   };
+  const networkLabel =
+    wallet.status === "ready" && !wallet.isTargetChain
+      ? wallet.chainId === null
+        ? "Unknown network"
+        : `Chain ${wallet.chainId}`
+      : wallet.networkName;
 
   // Portalled to the body because the header sets backdrop-filter, which makes
   // it a containing block for position:fixed descendants -- inset:0 would
@@ -115,6 +121,17 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
         <div className="wallet-dialog-content">
           <h2 id="account-dialog-title">Your account</h2>
 
+          <dl className="account-details">
+            <div>
+              <dt>Wallet type</dt>
+              <dd>{wallet.walletKind ?? "Connected wallet"}</dd>
+            </div>
+            <div>
+              <dt>Network</dt>
+              <dd>{networkLabel}</dd>
+            </div>
+          </dl>
+
           <CopyableAddress
             label="Ethereum"
             address={wallet.address ?? null}
@@ -126,13 +143,41 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             hint="No Solana wallet yet. One is created the first time you use a Solana route."
           />
 
+          {wallet.explorerUrl && (
+            <a
+              className="account-explorer"
+              href={wallet.explorerUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View Ethereum account on explorer ↗
+            </a>
+          )}
+
+          {wallet.walletKind === "embedded" && (
+            <div className="account-export-warning">
+              <strong>Export embedded wallet</strong>
+              <p>
+                Exporting reveals recovery material that controls this wallet and every asset it
+                holds. Never share it or paste it into a website, chat, or cloud note.
+              </p>
+              <button
+                type="button"
+                onClick={() => void wallet.exportWallet()}
+                disabled={wallet.busyAction !== null}
+              >
+                {wallet.busyAction === "export" ? "Opening secure export…" : "Review secure export"}
+              </button>
+            </div>
+          )}
+
           <button
-            className="account-disconnect"
+            className="account-signout"
             type="button"
             onClick={() => void disconnect()}
             disabled={wallet.busyAction !== null}
           >
-            {wallet.busyAction === "logout" ? "Disconnecting…" : "Disconnect"}
+            {wallet.busyAction === "logout" ? "Signing out…" : "Sign out of Statics"}
           </button>
         </div>
       </section>
