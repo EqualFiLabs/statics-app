@@ -21,7 +21,8 @@ describe("Dollar permit helpers", () => {
       s: `0x${"22".repeat(32)}`,
       yParity: 1,
     });
-    expect(decodePermitSignature(2_000n, signature)).toEqual({
+    expect(decodePermitSignature(2n ** 256n - 1n, 2_000n, signature)).toEqual({
+      value: 2n ** 256n - 1n,
       deadline: 2_000n,
       v: 28,
       r: `0x${"11".repeat(32)}`,

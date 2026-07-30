@@ -73,7 +73,11 @@ export async function signPermitForWallet<T>({
   throw new Error("The connected wallet type is unavailable.");
 }
 
-export function decodePermitSignature(deadline: bigint, signature: Hex): PermitSignature {
+export function decodePermitSignature(
+  value: bigint,
+  deadline: bigint,
+  signature: Hex
+): PermitSignature {
   const decoded = parseSignature(signature);
   const v =
     decoded.v !== undefined
@@ -82,5 +86,5 @@ export function decodePermitSignature(deadline: bigint, signature: Hex): PermitS
         ? 27 + decoded.yParity
         : undefined;
   if (v !== 27 && v !== 28) throw new Error("Wallet returned an invalid permit signature.");
-  return { deadline, v, r: decoded.r, s: decoded.s };
+  return { value, deadline, v, r: decoded.r, s: decoded.s };
 }
