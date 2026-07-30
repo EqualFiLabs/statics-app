@@ -69,6 +69,7 @@ import { overviewTiles } from "@/lib/overview";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
+import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -83,8 +84,6 @@ const modeLabels: Record<DollarActionMode, string> = {
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
   mode === "supply" || mode === "unsupply";
-type DollarProfileChoice = DollarCollateralChoice | "USDG";
-
 export function DollarProfileContent({
   profile,
   volatile,
@@ -523,16 +522,20 @@ export function DollarOverview() {
 function DollarActionPanel({
   deployment,
   wallet,
+  initialProfile,
 }: {
   deployment: DollarDeployment;
   wallet: Address;
+  initialProfile: DollarProfileChoice;
 }) {
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
   const snapshot = useDollarSnapshot(deployment, wallet);
   const [mode, setMode] = useState<DollarActionMode>("deposit");
-  const [asset, setAsset] = useState<DollarCollateralChoice>("ETH");
-  const [peggedSelected, setPeggedSelected] = useState(false);
+  const [asset, setAsset] = useState<DollarCollateralChoice>(
+    initialProfile === "WETH" ? "WETH" : "ETH"
+  );
+  const [peggedSelected, setPeggedSelected] = useState(initialProfile === "USDG");
   const [peggedPending, setPeggedPending] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
@@ -1343,7 +1346,7 @@ function DollarActionPanel({
   );
 }
 
-export function DollarPage() {
+export function DollarPage({ initialProfile = "ETH" }: { initialProfile?: DollarProfileChoice }) {
   const wallet = useWalletState();
   if (deploymentState.status === "unavailable") {
     return (
@@ -1379,6 +1382,7 @@ export function DollarPage() {
     <DollarActionPanel
       deployment={deploymentState.deployment}
       wallet={getAddress(wallet.address)}
+      initialProfile={initialProfile}
     />
   );
 }

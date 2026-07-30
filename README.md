@@ -8,8 +8,11 @@ The Statics marketing site and DApp foundation are built with Next.js 16 and Rea
 - `/app` — Dollar overview and route-scoped Privy/Wagmi wallet runtime.
 - `/app/wallet` — EVM and Solana assets, sends, receives, Portal access, and the public testnet
   fixture faucet.
-- `/app/portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and Statics Dollar.
-- `/app/dollar` — ETH/WETH deposits and recombination against verified deployments.
+- `/app/wallet?modal=portal` — canonical Uniswap EVM swaps, Jupiter Solana swaps, and Across
+  funding.
+- `/app/portal` — compatibility redirect to the canonical wallet Portal URL.
+- `/app/dollar?profile=USDG` — direct entry to the pegged Statics Dollar profile.
+- `/app/dollar` — ETH/WETH deposits, recombination, and Risk supply against verified deployments.
 - `/app/activity` — wallet-scoped EVM, Solana, swap, bridge, and protocol activity.
 
 Statics and Eves Market intentionally keep separate login sessions. Configure Statics with the

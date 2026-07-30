@@ -111,6 +111,11 @@ test.describe("Dollar DApp foundation", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Funding Portal" })).toHaveCount(0);
 
+    await page.goto("/app/portal");
+    await expect(page).toHaveURL(/\/app\/wallet\?modal=portal$/);
+    await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
 

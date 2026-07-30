@@ -54,10 +54,11 @@ The first useful release is Dollar-first: a user signs in, sees the same wallet 
 - `/app/wallet` now exposes EVM and Solana asset views, Eves-derived EVM token metadata and icons,
   custom ERC-20 management, Jupiter token discovery, SPL/Token-2022 discovery, and native/token
   sends. Unavailable RPC data leaves the complete surface visible with `--`.
-- `/app/portal` now exposes Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and pegged
-  Statics Dollar mint/redemption. The local USDG profile is code-hash-bound and headlessly
-  exercised; Across production execution remains unavailable until a checked-in verified
-  Robinhood mainnet USDG deployment manifest exists.
+- `/app/wallet?modal=portal` is the canonical funding interface for Uniswap EVM swaps, Jupiter
+  Solana swaps, and Across funding. `/app/portal` redirects there. Pegged Statics Dollar
+  mint/redemption lives at `/app/dollar?profile=USDG`. The local USDG profile is code-hash-bound
+  and headlessly exercised; Across production execution remains unavailable until a checked-in
+  verified Robinhood mainnet USDG deployment manifest exists.
 - `/app/activity` aggregates local EVM, Solana, swap, bridge, and protocol transaction histories.
   Submitted EVM receipts, Solana signatures, and Across deposits have reload recovery paths.
 - Final brand assets live in `public/assets/`; `mockup.png` remains the design reference.
@@ -424,12 +425,12 @@ public-network or production transaction was performed.
 
 - [x] Use one production component tree for connected and unavailable states.
 - [x] Distinguish unconfigured, signed-out, wallet-missing, wrong-network, loading, failed, empty,
-  and ready states without fabricating balances, addresses, positions, or status.
+      and ready states without fabricating balances, addresses, positions, or status.
 - [x] Preserve last-known-good data during background refreshes and failed refreshes.
 - [x] Keep unavailable-state value-moving controls out of the interface until their prerequisites
-  exist.
+      exist.
 - [ ] Complete the consolidated information architecture and inspect it at desktop, tablet, and
-  mobile sizes against verified local data.
+      mobile sizes against verified local data.
 - [ ] Exercise authenticated and value-moving browser workflows against the local deployment.
 
 Gate: the connected application must remain usable across desktop, tablet, and mobile without a
