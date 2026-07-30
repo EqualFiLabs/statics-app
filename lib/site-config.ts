@@ -137,6 +137,7 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
       { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
       { label: "Activity", enabled: true, href: "/app/activity" },
       { label: "Settings", enabled: true, href: "/app/settings" },
+      { label: "Tools", enabled: true, href: "/app/tools" },
     ],
   },
 ];

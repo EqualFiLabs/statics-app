@@ -12,10 +12,13 @@ import {
 import {
   basketTokenAbi,
   buildErc20PermitTypedData,
+  buildMintPeggedCall,
   buildMintPeggedWithPermitCall,
+  buildRedeemPeggedCall,
   buildRedeemPeggedWithPermitCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
+import { useSignTypedData } from "@privy-io/react-auth";
 
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -31,8 +34,11 @@ import {
   decodePermitSignature,
   exactPeggedMintPermitValue,
   permitDeadline,
+  privyPermitRequest,
+  signPermitForWallet,
 } from "@/lib/dollar/permit";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 type Direction = "mint" | "redeem";
@@ -54,6 +60,8 @@ type PeggedQuote =
 type Snapshot = {
   collateralBalance: bigint;
   dollarBalance: bigint;
+  collateralAllowance: bigint;
+  dollarAllowance: bigint;
 };
 
 function deploymentState() {
@@ -95,6 +103,7 @@ export function PeggedDollarPanel({
   onPendingChange?: (pending: boolean) => void;
 }) {
   const wallet = useWalletState();
+  const { signTypedData: signEmbeddedTypedData } = useSignTypedData();
   const configured = configuredDeploymentState;
   const deployment = configured.status === "configured" ? configured.deployment : null;
   const [direction, setDirection] = useState<Direction>("mint");
@@ -127,21 +136,34 @@ export function PeggedDollarPanel({
       return null;
     const { account, publicClient } = await walletClients(wallet);
     await verifyDollarDeployment(publicClient, deployment);
-    const [collateralBalance, dollarBalance] = await Promise.all([
-      publicClient.readContract({
-        address: deployment.pegged.collateral,
-        abi: basketTokenAbi,
-        functionName: "balanceOf",
-        args: [account],
-      }),
-      publicClient.readContract({
-        address: deployment.contracts.dollar,
-        abi: basketTokenAbi,
-        functionName: "balanceOf",
-        args: [account],
-      }),
-    ]);
-    const next = { collateralBalance, dollarBalance };
+    const [collateralBalance, dollarBalance, collateralAllowance, dollarAllowance] =
+      await Promise.all([
+        publicClient.readContract({
+          address: deployment.pegged.collateral,
+          abi: basketTokenAbi,
+          functionName: "balanceOf",
+          args: [account],
+        }),
+        publicClient.readContract({
+          address: deployment.contracts.dollar,
+          abi: basketTokenAbi,
+          functionName: "balanceOf",
+          args: [account],
+        }),
+        publicClient.readContract({
+          address: deployment.pegged.collateral,
+          abi: basketTokenAbi,
+          functionName: "allowance",
+          args: [account, deployment.contracts.gateway],
+        }),
+        publicClient.readContract({
+          address: deployment.contracts.dollar,
+          abi: basketTokenAbi,
+          functionName: "allowance",
+          args: [account, deployment.contracts.gateway],
+        }),
+      ]);
+    const next = { collateralBalance, dollarBalance, collateralAllowance, dollarAllowance };
     setSnapshot(next);
     return next;
   }, [deployment, wallet]);
@@ -273,18 +295,29 @@ export function PeggedDollarPanel({
       publicClient.getBlock(),
     ]);
     const deadline = permitDeadline(block.timestamp);
-    const signature = await walletClient.signTypedData({
-      account,
-      ...buildErc20PermitTypedData({
-        tokenName,
-        chainId: deployment.chainId,
-        token,
-        owner: account,
-        spender: deployment.contracts.gateway,
-        value,
-        nonce,
-        deadline,
-      }),
+    const typedData = buildErc20PermitTypedData({
+      tokenName,
+      chainId: deployment.chainId,
+      token,
+      owner: account,
+      spender: deployment.contracts.gateway,
+      value,
+      nonce,
+      deadline,
+    });
+    const signature = await signPermitForWallet({
+      walletKind: wallet.walletKind,
+      typedData,
+      signEmbedded: async (permit) => {
+        const request = privyPermitRequest(permit, account);
+        const signed = await signEmbeddedTypedData(request.typedData, request.options);
+        return signed.signature as `0x${string}`;
+      },
+      signExternal: (permit) =>
+        walletClient.signTypedData({
+          account,
+          ...permit,
+        }),
     });
     return decodePermitSignature(deadline, signature);
   };
@@ -308,30 +341,33 @@ export function PeggedDollarPanel({
     setError(null);
     try {
       const fresh = await readQuote();
-      const before = snapshot;
+      const before = (await readSnapshot()) ?? snapshot;
       if (quote.direction === "mint" && fresh.direction === "mint") {
         const maximum = maximumWithTolerance(quote.totalCollateralIn);
-        let permitValue: bigint;
         try {
-          permitValue = exactPeggedMintPermitValue(fresh.totalCollateralIn, maximum);
+          exactPeggedMintPermitValue(fresh.totalCollateralIn, maximum);
         } catch (cause) {
           setQuote(fresh);
           setReviewing(false);
           throw cause;
         }
-        const permit = await signPermit(deployment.pegged.collateral, permitValue);
+        const receiver = getAddress(wallet.address!);
+        const data =
+          before.collateralAllowance >= fresh.totalCollateralIn
+            ? buildMintPeggedCall(deployment.pegged.profileId, quote.amount, maximum, receiver)
+            : buildMintPeggedWithPermitCall(
+                deployment.pegged.profileId,
+                quote.amount,
+                maximum,
+                receiver,
+                await signPermit(deployment.pegged.collateral, MAX_ERC20_ALLOWANCE)
+              );
         await send(
           "mint-pegged",
           "Mint Statics Dollar with USDG",
           display(quote.amount, 18, "USDstx"),
           deployment.contracts.gateway,
-          buildMintPeggedWithPermitCall(
-            deployment.pegged.profileId,
-            quote.amount,
-            maximum,
-            getAddress(wallet.address!),
-            permit
-          ),
+          data,
           {
             validateSimulation: (result) => void validatePeggedMintSimulation(result),
             verifyConfirmation: async () => {
@@ -351,19 +387,23 @@ export function PeggedDollarPanel({
           setReviewing(false);
           throw new Error("The USDG output moved below the reviewed minimum.");
         }
-        const permit = await signPermit(deployment.contracts.dollar, quote.amount);
+        const receiver = getAddress(wallet.address!);
+        const data =
+          before.dollarAllowance >= quote.amount
+            ? buildRedeemPeggedCall(deployment.pegged.profileId, quote.amount, minimum, receiver)
+            : buildRedeemPeggedWithPermitCall(
+                deployment.pegged.profileId,
+                quote.amount,
+                minimum,
+                receiver,
+                await signPermit(deployment.contracts.dollar, MAX_ERC20_ALLOWANCE)
+              );
         await send(
           "redeem-pegged",
           "Redeem Statics Dollar for USDG",
           display(quote.amount, 18, "USDstx"),
           deployment.contracts.gateway,
-          buildRedeemPeggedWithPermitCall(
-            deployment.pegged.profileId,
-            quote.amount,
-            minimum,
-            getAddress(wallet.address!),
-            permit
-          ),
+          data,
           {
             validateSimulation: (result) => void validatePeggedRedemptionSimulation(result),
             verifyConfirmation: async () => {

@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@privy-io/react-auth", () => ({
+  useSignTypedData: () => ({ signTypedData: vi.fn() }),
+}));
+
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 

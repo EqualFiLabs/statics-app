@@ -23,6 +23,7 @@ describe("DApp route presentation", () => {
     ["/app/liquidity", "Liquidity", "Provide liquidity"],
     ["/app/activity", "Activity", "Your activity"],
     ["/app/settings", "Settings", "Settings"],
+    ["/app/tools", "Tools", "Approval tools"],
   ])("selects %s presentation", (pathname, label, title) => {
     expect(getDappRoutePresentation(pathname)).toMatchObject({ label, title });
   });

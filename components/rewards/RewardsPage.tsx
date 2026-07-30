@@ -36,6 +36,7 @@ import {
   loadPositionCatalog,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -221,7 +222,7 @@ function RewardsRuntime() {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [diamond, amount],
+            args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
       } else {

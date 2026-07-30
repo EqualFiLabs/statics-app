@@ -67,6 +67,8 @@ export type DollarActivityKind =
   | "unstake-lp-nft"
   | "borrow-liquidity"
   | "approve-loan-asset"
+  | "set-app-approval"
+  | "revoke-app-approval"
   | "borrow-loan"
   | "repay-loan"
   | "extend-loan"
