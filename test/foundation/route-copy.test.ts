@@ -92,7 +92,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(10);
+    expect(hrefs).toHaveLength(11);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -120,12 +120,18 @@ describe("sidebar completeness", () => {
       "Liquidity",
       "Baskets",
       "Dollar",
+      "Positions",
       "Loans",
       "Wallet",
       "Faucet",
       "Activity",
       "Tools",
     ]);
+  });
+
+  it("keeps position management directly discoverable", () => {
+    const manage = appNavigationGroups.find((group) => group.label === "Manage");
+    expect(manage?.items.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
   });
 
   it("keeps account plumbing grouped rather than promoted", () => {

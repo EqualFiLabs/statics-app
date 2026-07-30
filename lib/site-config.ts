@@ -120,7 +120,10 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
   },
   {
     label: "Manage",
-    items: [{ label: "Loans", enabled: true, href: "/app/loans" }],
+    items: [
+      { label: "Positions", enabled: true, href: "/app/positions" },
+      { label: "Loans", enabled: true, href: "/app/loans" },
+    ],
   },
   {
     label: "Account",
