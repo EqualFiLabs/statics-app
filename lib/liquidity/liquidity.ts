@@ -89,6 +89,41 @@ export type LiquidityCatalog = Readonly<{
   currentBlock: bigint;
 }>;
 
+export function canonicalFullRange(spacing: number): readonly [number, number] {
+  return [Math.ceil(-887_272 / spacing) * spacing, Math.floor(887_272 / spacing) * spacing];
+}
+
+export function borrowedLiquidityReadiness(
+  basket: Pick<BasketRecord, "constituents"> | undefined,
+  pools: readonly CanonicalPoolRecord[],
+  rawLiquidity: Readonly<Record<string, string>>
+): string | null {
+  if (!basket || pools.length !== basket.constituents.length) {
+    return "Every basket underlying needs a canonical pool.";
+  }
+  const unavailable = pools.some((pool) => {
+    const deviation = pool.spotTick - pool.referenceTick;
+    return (
+      pool.status !== CanonicalPoolStatus.Active ||
+      pool.decommissioned ||
+      !pool.managerSynced ||
+      pool.observationCardinality < 2 ||
+      deviation < -100 ||
+      deviation > 99
+    );
+  });
+  if (unavailable) {
+    return "Every canonical pool must be active, observed, synced, and within its price bound.";
+  }
+  const invalidInput = pools.some((pool) => {
+    const input = rawLiquidity[pool.poolId] ?? "";
+    return !/^\d+$/.test(input) || BigInt(input) <= 0n || BigInt(input) > (1n << 128n) - 1n;
+  });
+  return invalidInput
+    ? "Enter positive raw liquidity within the uint128 limit for every pool."
+    : null;
+}
+
 export function v4PoolId(key: V4PoolKey): Hex {
   return keccak256(
     encodeAbiParameters(
