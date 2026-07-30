@@ -92,7 +92,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(11);
+    expect(hrefs).toHaveLength(9);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -113,20 +113,16 @@ describe("dapp navigation grouping", () => {
 });
 
 describe("sidebar completeness", () => {
-  it("lists every destination, because the sidebar is not the constrained surface", () => {
-    // Holding things out of the menu was tried twice and was wrong twice. The
-    // tab bar is the surface with a hard limit; the sidebar shows everything.
+  it("keeps the primary menu focused on destination surfaces", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
       "Earn",
       "Liquidity",
       "Baskets",
       "Dollar",
-      "Positions",
       "Loans",
       "Wallet",
       "Activity",
-      "Settings",
       "Tools",
     ]);
   });
@@ -136,7 +132,6 @@ describe("sidebar completeness", () => {
     expect(account?.items.map((item) => item.href)).toEqual([
       "/app/wallet",
       "/app/activity",
-      "/app/settings",
       "/app/tools",
     ]);
   });
