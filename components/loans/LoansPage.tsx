@@ -34,6 +34,7 @@ import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   basketLiquiditySnapshot,
+  borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
   canonicalFullRange,
   loadLiquidityCatalog,
@@ -437,7 +438,8 @@ function LoansRuntime({
       }
       return matching;
     });
-    const deadline = BigInt(Math.floor(Date.now() / 1_000) + 1_200);
+    const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+    const deadline = borrowedLiquidityDeadline(latestBlock.timestamp);
     const poolInputs = basketPools.map((pool) => {
       const raw = borrowPoolLiquidity[pool.poolId] ?? "";
       if (!/^\d+$/.test(raw) || BigInt(raw) <= 0n) {

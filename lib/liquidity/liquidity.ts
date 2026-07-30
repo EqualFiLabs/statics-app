@@ -95,6 +95,10 @@ export function canonicalFullRange(spacing: number): readonly [number, number] {
   return [Math.ceil(-887_272 / spacing) * spacing, Math.floor(887_272 / spacing) * spacing];
 }
 
+export function borrowedLiquidityDeadline(blockTimestamp: bigint): bigint {
+  return blockTimestamp + 1_200n;
+}
+
 export function borrowedLiquidityReadiness(
   basket: Pick<BasketRecord, "constituents"> | undefined,
   pools: readonly CanonicalPoolRecord[],
