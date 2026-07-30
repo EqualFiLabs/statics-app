@@ -25,10 +25,8 @@ import {
 } from "@statics-protocol/sdk";
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
-import { LoansPreview } from "@/components/preview/RemainingSurfacesPreview";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   borrowableCollateral,
@@ -95,10 +93,7 @@ function parseGrossAmounts(
 
 export function LoansPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <LoansPreview />;
-  }
-  if (wallet.status === "unconfigured") return <LoansPreview />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
   return <LoansRuntime />;
 }
 
@@ -647,7 +642,13 @@ function LoansRuntime() {
   };
 
   if (deploymentState.status === "unavailable") {
-    return <LoansPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="loans"
+        empty={{ title: "Loans unavailable", description: "No deployment is configured." }}
+      />
+    );
   }
 
   const surfaceState = deriveSurfaceState({

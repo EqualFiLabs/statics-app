@@ -8,12 +8,10 @@ import { useState } from "react";
 
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { PositionListPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -29,10 +27,7 @@ function displayAmount(value: bigint, decimals = 18): string {
 
 export function PositionListPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <PositionListPreview />;
-  }
-  if (wallet.status === "unconfigured") return <PositionListPreview />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Positions" />;
   return <PositionListRuntime />;
 }
 
@@ -112,11 +107,14 @@ function PositionListRuntime() {
     }
   };
 
-  // Only a missing deployment falls back to the sample preview now. Signed
-  // out, loading and failed each get their own message, because rendering the
-  // em-dash preview for all three told a first-time visitor nothing.
   if (deploymentState.status === "unavailable") {
-    return <PositionListPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="positions"
+        empty={{ title: "Positions unavailable", description: "No deployment is configured." }}
+      />
+    );
   }
 
   const surfaceState = deriveSurfaceState({

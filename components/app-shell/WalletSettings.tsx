@@ -1,17 +1,22 @@
 "use client";
 
-import { WalletSettingsPreview } from "@/components/preview/DappPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 10)}…${address.slice(-8)}`;
 }
 
-export function WalletSettings({ previewMode = dappPreviewEnabled }: { previewMode?: boolean }) {
+export function WalletSettings() {
   const wallet = useWalletState();
-  if (previewMode || wallet.status === "unconfigured") {
-    return <WalletSettingsPreview />;
+  if (wallet.status === "unconfigured") {
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="wallet settings"
+        empty={{ title: "Wallet unavailable", description: "No wallet is configured." }}
+      />
+    );
   }
 
   return (

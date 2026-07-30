@@ -68,9 +68,7 @@ import {
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
-import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/DappPreview";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
 import { loadLoanCatalog } from "@/lib/loans/loans";
@@ -330,7 +328,14 @@ function DollarOverviewConnected({
 }) {
   const snapshot = useDollarSnapshot(deployment, wallet);
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
-    return <DollarOverviewPreview />;
+    return (
+      <SurfaceEmptyState
+        state={snapshot.isPending ? "loading" : "error"}
+        subject="Dollar portfolio"
+        onRetry={() => void snapshot.refetch()}
+        empty={{ title: "No Dollar position", description: "No Dollar position is available." }}
+      />
+    );
   }
   const data = snapshot.data!;
   return (
@@ -476,11 +481,17 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
 
 export function DollarOverview() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <DollarOverviewPreview />;
-  }
   if (deploymentState.status === "unavailable") {
-    return <DollarOverviewPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="portfolio"
+        empty={{
+          title: "Your portfolio is empty",
+          description: "Add funds to begin using Statics.",
+        }}
+      />
+    );
   }
   // The overview is the app's front door. Six cards of em dashes told a
   // first-time visitor nothing about why they were empty or what to do.
@@ -995,7 +1006,14 @@ function DollarActionPanel({
   const supply = supplyState.data ?? emptyDollarSupplyState;
 
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
-    return <DollarPagePreview />;
+    return (
+      <SurfaceEmptyState
+        state={snapshot.isPending ? "loading" : "error"}
+        subject="Dollar state"
+        onRetry={() => void snapshot.refetch()}
+        empty={{ title: "Dollar unavailable", description: "No Dollar state is available." }}
+      />
+    );
   }
 
   const state = snapshot.data!;
@@ -1379,15 +1397,35 @@ function DollarActionPanel({
 
 export function DollarPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <DollarPagePreview />;
-  }
   if (deploymentState.status === "unavailable") {
-    return <DollarPagePreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="Dollar"
+        empty={{ title: "Dollar unavailable", description: "No Dollar deployment is configured." }}
+      />
+    );
   }
-  if (wallet.status !== "ready" || !wallet.address) return <DollarPagePreview />;
-  if (!wallet.isTargetChain) {
-    return <DollarPagePreview />;
+  const surfaceState = deriveSurfaceState({
+    walletStatus: wallet.status,
+    isTargetChain: wallet.isTargetChain,
+    isLoading: false,
+    isError: false,
+    isEmpty: false,
+    hasData: false,
+  });
+  if (surfaceState !== "ready" || !wallet.address) {
+    return (
+      <SurfaceEmptyState
+        state={surfaceState}
+        subject="Dollar"
+        empty={{
+          title: "No Dollar position",
+          description: "Deposit collateral to get Statics Dollar.",
+          action: { label: "Add funds", href: "/app/wallet?modal=portal" },
+        }}
+      />
+    );
   }
   return (
     <DollarActionPanel

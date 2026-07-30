@@ -11,7 +11,6 @@ export default defineConfig({
     environment: "jsdom",
     env: {
       NEXT_PUBLIC_APP_ENV: "development",
-      NEXT_PUBLIC_DAPP_PREVIEW: "true",
     },
     setupFiles: ["./test/setup.ts"],
     include: ["test/**/*.test.{ts,tsx}"],

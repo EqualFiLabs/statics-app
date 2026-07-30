@@ -51,8 +51,8 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
-import { PositionDetailPreview } from "@/components/preview/DappPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import { deriveSurfaceState } from "@/lib/surface-state";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -74,10 +74,7 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <PositionDetailPreview positionId={positionId} />;
-  }
-  if (wallet.status === "unconfigured") return <PositionDetailPreview positionId={positionId} />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Position" />;
   return <PositionDetailRuntime positionId={positionId} />;
 }
 
@@ -557,17 +554,41 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     setCustomRewardAddress("");
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    walletState.status !== "ready" ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
-    return <PositionDetailPreview positionId={positionId} />;
+  if (deploymentState.status === "unavailable") {
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="position"
+        empty={{ title: "Position unavailable", description: "No deployment is configured." }}
+      />
+    );
+  }
+  const detailState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: false,
+    hasData: Boolean(catalog.data),
+  });
+  if (detailState !== "ready") {
+    return (
+      <SurfaceEmptyState
+        state={detailState}
+        subject="position"
+        onRetry={() => void catalog.refetch()}
+        empty={{ title: "Position unavailable", description: "No position data is available." }}
+      />
+    );
   }
   if (!position || !catalog.data) {
-    return <PositionDetailPreview positionId={positionId} />;
+    return (
+      <EmptyState
+        title="Position not found"
+        description={`Position #${positionId.toString()} is not owned by the connected wallet.`}
+        action={{ label: "View your positions", href: "/app/positions" }}
+      />
+    );
   }
 
   const closeReady = canClosePosition(position);

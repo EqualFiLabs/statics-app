@@ -36,8 +36,8 @@ import {
   type BasketRecord,
 } from "@/lib/baskets/baskets";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
-import { BasketDetailPreview } from "@/components/preview/DappPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import { deriveSurfaceState } from "@/lib/surface-state";
 import {
   updateProtocolActivity,
   writeProtocolActivity,
@@ -79,10 +79,7 @@ function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
 
 export function BasketDetailPage({ basketId }: { basketId: bigint }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <BasketDetailPreview basketId={basketId} />;
-  }
-  if (wallet.status === "unconfigured") return <BasketDetailPreview basketId={basketId} />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Basket" />;
   return <BasketDetailRuntime basketId={basketId} />;
 }
 
@@ -390,15 +387,40 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
     }
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
-    return <BasketDetailPreview basketId={basketId} />;
+  if (deploymentState.status === "unavailable") {
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="basket"
+        empty={{ title: "Basket unavailable", description: "No basket data is available." }}
+      />
+    );
+  }
+  if ((catalog.isPending || catalog.isError) && !catalog.data) {
+    return (
+      <SurfaceEmptyState
+        state={deriveSurfaceState({
+          walletStatus: "ready",
+          isTargetChain: true,
+          isLoading: catalog.isPending,
+          isError: catalog.isError,
+          isEmpty: false,
+          hasData: false,
+        })}
+        subject="basket"
+        onRetry={() => void catalog.refetch()}
+        empty={{ title: "Basket unavailable", description: "No basket data is available." }}
+      />
+    );
   }
   if (!basket) {
-    return <BasketDetailPreview basketId={basketId} />;
+    return (
+      <EmptyState
+        title="Basket not found"
+        description={`Basket #${basketId.toString()} is not part of this verified deployment.`}
+        action={{ label: "Browse baskets", href: "/app/baskets" }}
+      />
+    );
   }
 
   const quoteLabel =

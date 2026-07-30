@@ -9,26 +9,18 @@ import {
 } from "@/components/dollar/DollarPage";
 
 describe("Dollar surfaces without a deployment", () => {
-  it("allows local action selection without enabling transactions", () => {
+  it("does not render inert Dollar controls", () => {
     render(<DollarPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Recombine" }));
-    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
-    fireEvent.click(screen.getByRole("button", { name: "USDG" }));
-    expect(screen.getByRole("button", { name: "Redeem" })).toBeInTheDocument();
+    expect(screen.getByText("Statics is not configured")).toBeInTheDocument();
     expect(
-      screen
-        .getAllByRole("button", { name: "Deposit" })
-        .filter((button) => button.hasAttribute("disabled"))
-    ).toHaveLength(1);
+      screen.queryByRole("button", { name: /deposit|redeem|recombine/i })
+    ).not.toBeInTheDocument();
   });
 
-  it("keeps portfolio navigation available", () => {
+  it("uses the same unavailable boundary for the portfolio", () => {
     render(<DollarOverview />);
-    expect(screen.getByRole("link", { name: "Review positions →" })).toHaveAttribute(
-      "href",
-      "/app/positions"
-    );
+    expect(screen.getByText("Statics is not configured")).toBeInTheDocument();
   });
 
   it("offers USDG as the third collateral profile", () => {

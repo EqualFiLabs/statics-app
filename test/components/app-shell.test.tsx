@@ -167,7 +167,7 @@ describe("wallet settings", () => {
   it("warns before embedded-wallet export and exposes logout", () => {
     const exportWallet = vi.fn().mockResolvedValue(undefined);
     const logout = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<WalletSettings previewMode={false} />, {
+    renderWithWallet(<WalletSettings />, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -190,7 +190,7 @@ describe("wallet settings", () => {
   });
 
   it("does not offer private-key export for an external wallet", () => {
-    renderWithWallet(<WalletSettings previewMode={false} />, {
+    renderWithWallet(<WalletSettings />, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",

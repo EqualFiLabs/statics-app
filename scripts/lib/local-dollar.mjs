@@ -285,7 +285,6 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
 
   const values = {
     NEXT_PUBLIC_APP_ENV: "development",
-    NEXT_PUBLIC_DAPP_PREVIEW: "false",
     NEXT_PUBLIC_APP_NETWORK: "anvil",
     NEXT_PUBLIC_ANVIL_RPC_URL: rpcUrl,
     NEXT_PUBLIC_STATICS_CHAIN_ID: String(deployment.chainId),
