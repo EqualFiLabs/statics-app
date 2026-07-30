@@ -1,12 +1,5 @@
-import type { Metadata } from "next";
-
-import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
-
-export const metadata: Metadata = {
-  title: "Portal | Statics Protocol",
-  description: "Swap, bridge, and enter Statics Dollar.",
-};
+import { redirect } from "next/navigation";
 
 export default function StaticsPortalPage() {
-  return <PortalWorkspace />;
+  redirect("/app/wallet?modal=portal");
 }

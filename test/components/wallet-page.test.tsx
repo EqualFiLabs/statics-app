@@ -5,7 +5,20 @@ import { WalletPage } from "@/components/wallet/WalletPage";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 describe("wallet interactions", () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("opens and closes the canonical Portal from URL state", () => {
+    window.history.replaceState(null, "", "/app/wallet?modal=portal");
+    render(<WalletPage />);
+
+    expect(screen.getByRole("dialog", { name: "Funding Portal" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Funding Portal" })).not.toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
 
   it("keeps funding selection and Portal navigation usable without a runtime", () => {
     const selectFundingNetwork = vi.fn().mockResolvedValue(undefined);

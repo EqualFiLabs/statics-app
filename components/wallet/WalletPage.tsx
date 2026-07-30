@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -33,6 +33,7 @@ import {
   type WalletNft,
 } from "@/lib/wallet/nfts";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
+import { portalRequested, walletPortalUrl, withoutWalletPortal } from "@/lib/portal/navigation";
 import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
@@ -94,7 +95,7 @@ export function WalletPage() {
   const wallet = useWalletState();
   const network = getFundingNetwork(wallet.fundingChainId);
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
-  const [modal, setModal] = useState<WalletModal>(null);
+  const [modal, setModalState] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
   const [tab, setTab] = useState<WalletTab>("tokens");
   const [transferNft, setTransferNft] = useState<WalletNft | null>(null);
@@ -105,6 +106,36 @@ export function WalletPage() {
   const [riskShares, setRiskShares] = useState<readonly RiskShareBalance[]>([]);
   const refreshId = useRef(0);
   const tokenAddresses = useMemo(() => tokens.map((token) => token.address).join(","), [tokens]);
+
+  const setModal = useCallback((next: WalletModal) => {
+    setModalState(next);
+    if (typeof window === "undefined") return;
+    if (next === "portal") {
+      window.history.pushState(
+        null,
+        "",
+        walletPortalUrl(window.location.pathname, window.location.search)
+      );
+    } else if (portalRequested(window.location.search)) {
+      window.history.replaceState(
+        null,
+        "",
+        withoutWalletPortal(window.location.pathname, window.location.search)
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const syncPortal = () => {
+      setModalState((current) => {
+        if (portalRequested(window.location.search)) return "portal";
+        return current === "portal" ? null : current;
+      });
+    };
+    syncPortal();
+    window.addEventListener("popstate", syncPortal);
+    return () => window.removeEventListener("popstate", syncPortal);
+  }, []);
 
   const refreshBalances = async () => {
     const currentRefresh = ++refreshId.current;

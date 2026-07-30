@@ -1607,7 +1607,7 @@
 .portal-direction-tabs,
 .portal-chain-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   padding: 0.6rem;
   border-bottom: 1px solid var(--app-border);
 }
@@ -1839,6 +1839,25 @@
   margin: 0;
   padding: 0 2rem 1.5rem;
   text-align: center;
+}
+
+.portal-dollar-route {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2rem 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-lg);
+}
+
+.portal-dollar-route a {
+  flex: none;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* Typography is restated rather than inherited, because a dialog may be
