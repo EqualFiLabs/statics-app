@@ -26,14 +26,7 @@ import {
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 
-import {
-  activityTimestamp,
-  updateDollarActivity,
-  writeDollarActivity,
-  type DollarActivityKind,
-  type DollarActivityStatus,
-  type DollarReplacementReason,
-} from "@/lib/dollar/activity";
+import type { DollarActivityKind } from "@/lib/dollar/activity";
 import {
   DOLLAR_PAIRING_FILL_PAUSE,
   deriveDollarActionAvailability,
@@ -59,8 +52,6 @@ import {
 } from "@/lib/dollar/deployment";
 import {
   describeDollarError,
-  isOnchainRevert,
-  isWalletRejection,
   WAD,
   redeemDeadline,
   maximumWithTolerance,
@@ -76,6 +67,7 @@ import { loadBasketRewardSummary, totalRewardsByAsset } from "@/lib/baskets/rewa
 import { readEvesMarketUrl } from "@/lib/site-config";
 import { overviewTiles } from "@/lib/overview";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 
 const deploymentState = readClientDollarDeployment();
@@ -649,75 +641,31 @@ function DollarActionPanel({
   }) => {
     if (!publicClient || !walletClient.data)
       throw new Error("The connected wallet is unavailable.");
-    const id = crypto.randomUUID();
-    let stage: "simulating" | "signing" | "submitted" | "finished" = "simulating";
-    let replacementReason: DollarReplacementReason | undefined;
-    writeDollarActivity({
-      id,
+    await executeProtocolTransaction({
+      publicClient,
       wallet,
       chainId: deployment.chainId,
       kind,
       label,
       amount: amountInput || "0",
-      status: "simulating",
-      createdAt: activityTimestamp(),
+      to,
+      data,
+      value,
+      sendTransaction: ({
+        to: transactionTarget,
+        data: transactionData,
+        value: transactionValue,
+      }) =>
+        walletClient.data!.sendTransaction({
+          account: wallet,
+          chain: walletClient.data!.chain,
+          to: transactionTarget,
+          data: transactionData,
+          value: transactionValue,
+        }),
+      describeError: describeDollarError,
+      validateSimulation,
     });
-    try {
-      const simulation = await publicClient.call({ account: wallet, to, data, value });
-      validateSimulation?.(simulation.data);
-      stage = "signing";
-      updateDollarActivity(wallet, deployment.chainId, id, { status: "signing" });
-      const hash = await walletClient.data.sendTransaction({
-        account: wallet,
-        chain: walletClient.data.chain,
-        to,
-        data,
-        value,
-      });
-      stage = "submitted";
-      updateDollarActivity(wallet, deployment.chainId, id, { hash, status: "submitted" });
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        confirmations: 1,
-        onReplaced: (replacement) => {
-          replacementReason = replacement.reason;
-          updateDollarActivity(wallet, deployment.chainId, id, {
-            status: "replaced",
-            replacementHash: replacement.transaction.hash,
-            replacementReason,
-          });
-        },
-      });
-      if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
-      if (replacementReason === "cancelled" || replacementReason === "replaced") {
-        const message =
-          replacementReason === "cancelled"
-            ? "The submitted transaction was cancelled in the wallet."
-            : "The submitted transaction was replaced by a different wallet transaction.";
-        stage = "finished";
-        updateDollarActivity(wallet, deployment.chainId, id, {
-          status: "replaced",
-          confirmedHash: receipt.transactionHash,
-          error: message,
-        });
-        throw new Error(message);
-      }
-      stage = "finished";
-      updateDollarActivity(wallet, deployment.chainId, id, {
-        confirmedHash: receipt.transactionHash,
-        status: "confirmed",
-      });
-    } catch (error) {
-      if (stage === "finished") throw error;
-      let status: DollarActivityStatus = "failed";
-      if (isWalletRejection(error)) status = "rejected";
-      else if (stage === "submitted" && isOnchainRevert(error)) status = "reverted";
-      updateDollarActivity(wallet, deployment.chainId, id, {
-        status,
-        error: describeDollarError(error),
-      });
-      throw error;
-    }
   };
 
   const claimProceeds = async () => {

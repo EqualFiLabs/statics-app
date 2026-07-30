@@ -8,6 +8,7 @@ import { usePublicClient } from "wagmi";
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
 import { SurfaceBoundary, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -31,13 +32,12 @@ function BasketListRuntime() {
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
   const catalog = useQuery({
-    queryKey: [
-      "basket-catalog",
+    queryKey: protocolQueryKeys.basketCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      walletAddress,
-    ],
+        : undefined,
+      walletAddress
+    ),
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
     placeholderData: keepPreviousData,
     queryFn: async () => {

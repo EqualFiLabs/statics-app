@@ -15,6 +15,7 @@ import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -40,13 +41,12 @@ function PositionListRuntime() {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const catalog = useQuery({
-    queryKey: [
-      "position-catalog",
+    queryKey: protocolQueryKeys.positionCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&

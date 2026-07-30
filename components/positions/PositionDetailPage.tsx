@@ -47,6 +47,7 @@ import {
   validateCustomRewardAsset,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
@@ -97,13 +98,12 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const [customRewardAddress, setCustomRewardAddress] = useState("");
 
   const catalog = useQuery({
-    queryKey: [
-      "position-catalog",
+    queryKey: protocolQueryKeys.positionCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
