@@ -82,6 +82,37 @@ describe("wallet interactions", () => {
     expect(screen.getAllByRole("option", { name: "AERO" })).toHaveLength(2);
   });
 
+  it("reveals removal controls only while Remove mode is active", () => {
+    render(
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          fundingChainId: 8_453,
+          fundingNetworkName: "Base",
+          fundingNetworks: [
+            { chainId: 8_453, label: "Base", nativeSymbol: "ETH", supportsUniswap: true },
+          ],
+        }}
+      >
+        <WalletPage />
+      </WalletContext.Provider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Search tokens" }), {
+      target: { value: "AERO" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AERO/ }));
+
+    expect(screen.queryByRole("button", { name: "Remove AERO" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove AERO" }));
+
+    expect(screen.queryByText("Aerodrome Finance")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+  });
+
   it("keeps the Solana wallet surface navigable without RPC data", () => {
     render(<WalletPage />);
     fireEvent.click(screen.getByRole("button", { name: "Solana" }));
@@ -90,18 +121,8 @@ describe("wallet interactions", () => {
     expect(screen.getByRole("dialog", { name: "Browse Solana tokens" })).toBeInTheDocument();
   });
 
-  it("does not show the Robinhood faucet on another Statics network", () => {
-    render(
-      <WalletContext.Provider
-        value={{
-          ...defaultWalletState,
-          fundingChainId: 31_337,
-          fundingNetworkName: "Robinhood Testnet",
-        }}
-      >
-        <WalletPage />
-      </WalletContext.Provider>
-    );
+  it("keeps the faucet on its dedicated account route", () => {
+    render(<WalletPage />);
     expect(screen.queryByRole("heading", { name: "Testnet asset faucet" })).not.toBeInTheDocument();
   });
 });

@@ -38,6 +38,13 @@ const routePresentations = {
     description:
       "Check your balances, add funds, send assets, and move money in and out of Statics.",
   },
+  faucet: {
+    label: "Faucet",
+    status: "Testnet",
+    title: "Get testnet assets",
+    description:
+      "Claim the fixtures used by Statics or open Robinhood's faucet for more testnet ETH and stock tokens.",
+  },
   portal: {
     label: "Add funds",
     status: "Add funds",
@@ -104,6 +111,7 @@ const routePresentations = {
 
 export function getDappRoutePresentation(pathname: string): DappRoutePresentation {
   if (pathname.startsWith("/app/wallet")) return routePresentations.wallet;
+  if (pathname.startsWith("/app/faucet")) return routePresentations.faucet;
   if (pathname.startsWith("/app/portal")) return routePresentations.portal;
   if (pathname.startsWith("/app/dollar")) return routePresentations.dollar;
   if (pathname.startsWith("/app/baskets")) return routePresentations.baskets;

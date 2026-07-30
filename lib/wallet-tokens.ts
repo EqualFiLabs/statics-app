@@ -119,6 +119,22 @@ export function saveWalletTokens(chainId: number, tokens: readonly WalletToken[]
   window.dispatchEvent(new CustomEvent(storageEvent));
 }
 
+export function mergeWalletTokens(
+  current: readonly WalletToken[],
+  additions: readonly WalletToken[]
+): WalletToken[] {
+  const addresses = new Set(current.map((token) => token.address.toLowerCase()));
+  return [
+    ...current,
+    ...additions.filter((token) => {
+      const address = token.address.toLowerCase();
+      if (addresses.has(address)) return false;
+      addresses.add(address);
+      return true;
+    }),
+  ];
+}
+
 export function subscribeWalletTokens(listener: () => void) {
   window.addEventListener(storageEvent, listener);
   window.addEventListener("storage", listener);
