@@ -16,6 +16,7 @@ import { useSolanaWalletState } from "@/providers/solana-context";
 export type SolanaAsset = SolanaToken &
   Readonly<{
     balance: bigint | null;
+    removable: boolean;
     tokenAccount?: string;
     tokenProgramId?: string;
   }>;
@@ -118,23 +119,26 @@ export function useSolanaAssets() {
     return [...managed.tokens, ...discovered];
   }, [detected, managed.tokens]);
 
-  const assets = useMemo<SolanaAsset[]>(
-    () =>
-      tokens.map((token) => {
-        const value = balances[token.mint];
-        if (typeof value === "bigint") return { ...token, balance: value };
-        if (value) {
-          return {
-            ...token,
-            balance: value.amount,
-            tokenAccount: value.tokenAccount,
-            tokenProgramId: value.tokenProgramId,
-          };
-        }
-        return { ...token, balance: null };
-      }),
-    [balances, tokens]
-  );
+  const assets = useMemo<SolanaAsset[]>(() => {
+    const removableMints = new Set(
+      managed.tokens.filter((token) => !token.isDefault).map((token) => token.mint)
+    );
+    return tokens.map((token) => {
+      const value = balances[token.mint];
+      const removable = removableMints.has(token.mint);
+      if (typeof value === "bigint") return { ...token, balance: value, removable };
+      if (value) {
+        return {
+          ...token,
+          balance: value.amount,
+          removable,
+          tokenAccount: value.tokenAccount,
+          tokenProgramId: value.tokenProgramId,
+        };
+      }
+      return { ...token, balance: null, removable };
+    });
+  }, [balances, managed.tokens, tokens]);
 
   return {
     runtime,

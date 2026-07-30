@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WalletPage } from "@/components/wallet/WalletPage";
+import { DEFAULT_SOLANA_TOKENS, saveSolanaTokens } from "@/lib/solana-tokens";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 describe("wallet interactions", () => {
@@ -117,8 +118,42 @@ describe("wallet interactions", () => {
     render(<WalletPage />);
     fireEvent.click(screen.getByRole("button", { name: "Solana" }));
     expect(screen.getByRole("heading", { name: "Tokens" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Portal" }));
+    const portal = screen.getByRole("dialog", { name: "Funding Portal" });
+    expect(within(portal).getByRole("button", { name: "Solana" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(
+      within(portal).getByRole("button", { name: "Create Solana wallet" })
+    ).toBeInTheDocument();
+    fireEvent.click(within(portal).getByRole("button", { name: "Close" }));
+
     fireEvent.click(screen.getByRole("button", { name: /Add token/ }));
     expect(screen.getByRole("dialog", { name: "Browse Solana tokens" })).toBeInTheDocument();
+  });
+
+  it("reveals Solana removal controls only for added tokens", () => {
+    saveSolanaTokens([
+      ...DEFAULT_SOLANA_TOKENS,
+      {
+        mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        symbol: "JUP",
+        name: "Jupiter",
+        decimals: 6,
+      },
+    ]);
+    render(<WalletPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Solana" }));
+
+    expect(screen.queryByRole("button", { name: "Remove JUP" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove JUP" }));
+
+    expect(screen.queryByText("Jupiter")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
   });
 
   it("keeps the faucet on its dedicated account route", () => {

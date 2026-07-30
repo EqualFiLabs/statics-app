@@ -1343,9 +1343,7 @@
   color: var(--accent);
 }
 
-.wallet-quick-actions span {
-  display: inline-block;
-  margin-right: 0.65rem;
+.wallet-quick-actions svg {
   color: var(--accent);
 }
 
@@ -4550,14 +4548,22 @@
 }
 
 @media (max-width: 720px) {
-  .wallet-quick-actions,
   .portal-quote-grid {
     grid-template-columns: 1fr;
   }
 
+  .wallet-quick-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding-top: 0.75rem;
+  }
+
   .wallet-quick-actions button {
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
+    min-height: 44px;
+    flex-direction: row;
+    gap: 0.25rem;
+    padding: 0.45rem 0.25rem;
+    font-size: var(--text-caption);
   }
 
   .wallet-network-row {
