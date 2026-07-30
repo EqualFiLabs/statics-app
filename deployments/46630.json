@@ -5,7 +5,7 @@
   "deploymentStartBlock": "94949343",
   "wethProfileId": "1",
   "protocolCommit": "1270247ce274ffb58ac5d0a0c71ef52afe96aeb1",
-  "generatedAt": "2026-07-29T22:57:13.864Z",
+  "generatedAt": "2026-07-30T02:15:11.754Z",
   "contracts": {
     "diamond": {
       "address": "0x69Af9C58e9E283032AE0087c38EF5E27c28E8345",
@@ -81,5 +81,8 @@
       "runtimeCodeHash": "0x3ad6d1fa34dcde1ca4079ac0d354bfcf8d78eef56eca2e567b6c3db3d668ebd3"
     }
   },
-  "faucet": null
+  "faucet": {
+    "address": "0x8ac164E8A62184d2d2f6393ffb64C81157972207",
+    "runtimeCodeHash": "0xa0903aaf8ebd61099837a652bbb657ed715196ae265306f05b030b8facf7f103"
+  }
 }
