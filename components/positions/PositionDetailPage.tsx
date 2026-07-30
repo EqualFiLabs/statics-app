@@ -7,7 +7,6 @@ import {
   encodeFunctionData,
   formatUnits,
   getAddress,
-  parseEventLogs,
   parseUnits,
   type Address,
   type Hex,
@@ -18,7 +17,6 @@ import { useMemo, useState } from "react";
 
 import {
   basketTokenAbi,
-  buildClaimRewardsCall,
   buildClosePositionCall,
   buildDepositBasketCollateralCall,
   buildMintBasketCollateralCall,
@@ -40,7 +38,6 @@ import {
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canClosePosition,
-  claimablePositionRewards,
   describePositionError,
   loadPositionCatalog,
   unlockedCollateral,
@@ -193,104 +190,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     } finally {
       setPendingAction(null);
     }
-  };
-
-  const claimRewards = async () => {
-    if (!wallet || !publicClient || !position || deploymentState.status !== "configured") {
-      throw new Error("The connected position is unavailable.");
-    }
-    const refreshed = await catalog.refetch();
-    const current = refreshed.data?.positions.find(
-      (candidate) => candidate.positionId === position.positionId
-    );
-    if (!current) throw new Error("This position is no longer owned by the connected wallet.");
-    const rewards = claimablePositionRewards(current.rewards);
-    if (!rewards.length) throw new Error("This position has no rewards to claim.");
-    const assets = rewards.map((reward) => reward.token.address);
-    const minimums = rewards.map((reward) => reward.pending);
-    const balancesBefore = await Promise.all(
-      rewards.map((reward) =>
-        publicClient.readContract({
-          address: reward.token.address,
-          abi: basketTokenAbi,
-          functionName: "balanceOf",
-          args: [wallet],
-        })
-      )
-    );
-
-    await sendTransaction({
-      kind: "claim-rewards",
-      label: `Claim rewards from Position #${current.positionId.toString()}`,
-      amount: rewards
-        .map(
-          (reward) =>
-            `${displayAmount(reward.pending, reward.token.decimals)} ${reward.token.symbol}`
-        )
-        .join(" + "),
-      to: deploymentState.deployment.contracts.diamond,
-      data: buildClaimRewardsCall(current.positionId, assets, wallet, minimums),
-      validateSimulation: (result) => {
-        if (!result) throw new Error("The reward claim simulation returned no amounts.");
-        const amounts = decodeFunctionResult({
-          abi: staticsAbi,
-          functionName: "claimRewards",
-          data: result,
-        });
-        if (amounts.some((amount, index) => amount < (minimums[index] ?? 0n))) {
-          throw new Error("The reward claim simulation fell below the reviewed minimum.");
-        }
-      },
-      verifyConfirmation: async (receipt) => {
-        const events = parseEventLogs({
-          abi: staticsAbi,
-          eventName: "RewardClaimed",
-          logs: receipt.logs,
-          strict: true,
-        }).filter((event) => event.args.positionId === current.positionId);
-        if (
-          assets.some(
-            (asset) =>
-              !events.some(
-                (event) =>
-                  getAddress(event.args.asset) === asset &&
-                  getAddress(event.args.receiver) === wallet
-              )
-          )
-        ) {
-          throw new Error("The receipt did not contain every reviewed reward claim.");
-        }
-        const [pendingAfter, balancesAfter] = await Promise.all([
-          publicClient.readContract({
-            account: wallet,
-            address: deploymentState.deployment.contracts.diamond,
-            abi: staticsAbi,
-            functionName: "pendingRewards",
-            args: [current.positionId, assets],
-          }),
-          Promise.all(
-            rewards.map((reward) =>
-              publicClient.readContract({
-                address: reward.token.address,
-                abi: basketTokenAbi,
-                functionName: "balanceOf",
-                args: [wallet],
-              })
-            )
-          ),
-        ]);
-        if (pendingAfter.some((amount) => amount !== 0n)) {
-          throw new Error("Claimed rewards remain pending after confirmation.");
-        }
-        if (
-          balancesAfter.some(
-            (balance, index) => balance - (balancesBefore[index] ?? 0n) < (minimums[index] ?? 0n)
-          )
-        ) {
-          throw new Error("The wallet did not receive every reviewed reward amount.");
-        }
-      },
-    });
   };
 
   const executeCollateralAction = async () => {
@@ -869,19 +768,15 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           </button>
         </div>
         <p className="dollar-warning">
-          Claims use the fresh pending amounts shown above as per-asset minimums. Selecting an asset
-          never grants historical rewards.
+          Selecting an asset never grants historical rewards. Pending balances are claimed from the
+          Earn page, where every reward source is shown together.
         </p>
-        <button
-          className="dollar-submit"
-          type="button"
-          disabled={
-            pendingAction !== null || claimablePositionRewards(position.rewards).length === 0
-          }
-          onClick={() => void runAction("claim-rewards", claimRewards)}
+        <Link
+          className="dollar-primary-link"
+          href={`/app/rewards?positionId=${position.positionId.toString()}`}
         >
-          {pendingAction === "claim-rewards" ? "Claiming rewards…" : "Claim all pending rewards"}
-        </button>
+          View and claim rewards →
+        </Link>
       </section>
 
       {actionError && (
