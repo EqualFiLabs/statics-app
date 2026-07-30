@@ -19,7 +19,6 @@ import {
   BasketStatus,
   basketTokenAbi,
   buildActivateLiquidityPositionCall,
-  buildApproveV4PositionCall,
   buildBorrowAndProvideLiquidityCall,
   buildClaimLiquidityRewardsCall,
   buildIncreaseStakedLiquidityCall,
@@ -49,6 +48,12 @@ import {
 } from "@/lib/liquidity/liquidity";
 import { describePositionError, unlockedCollateral } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import {
+  MAX_ERC20_ALLOWANCE,
+  MAX_PERMIT2_ALLOWANCE,
+  MAX_PERMIT2_EXPIRATION,
+  operatorApprovalAbi,
+} from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -262,7 +267,7 @@ function LiquidityRuntime() {
           encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [contracts.permit2, required],
+            args: [contracts.permit2, MAX_ERC20_ALLOWANCE],
           }),
           {
             verifyConfirmation: async () => {
@@ -292,7 +297,12 @@ function LiquidityRuntime() {
           `Authorize ${token.symbol} for PositionManager`,
           `${amount(required, token.decimals)} ${token.symbol}`,
           contracts.permit2,
-          buildPermit2ApproveCall(token.address, contracts.positionManager, required, now + 3_600),
+          buildPermit2ApproveCall(
+            token.address,
+            contracts.positionManager,
+            MAX_PERMIT2_ALLOWANCE,
+            MAX_PERMIT2_EXPIRATION
+          ),
           {
             verifyConfirmation: async () => {
               const confirmed = await publicClient.readContract({
@@ -623,27 +633,30 @@ function LiquidityRuntime() {
         throw new Error("The selected liquidity position is not owned by this wallet.");
       const approved = await publicClient.readContract({
         address: positionManager,
-        abi: v4PositionManagerReadAbi,
-        functionName: "getApproved",
-        args: [position.tokenId],
+        abi: operatorApprovalAbi,
+        functionName: "isApprovedForAll",
+        args: [wallet, diamond],
       });
-      if (getAddress(approved) !== diamond) {
+      if (!approved) {
         await send(
           "approve-lp-nft",
-          `Approve Liquidity position #${position.tokenId}`,
-          `Liquidity position #${position.tokenId}`,
+          "Enable Statics liquidity position management",
+          "All wallet-owned liquidity positions",
           positionManager,
-          buildApproveV4PositionCall(diamond, position.tokenId),
+          encodeFunctionData({
+            abi: operatorApprovalAbi,
+            functionName: "setApprovalForAll",
+            args: [diamond, true],
+          }),
           {
             verifyConfirmation: async () => {
               const confirmed = await publicClient.readContract({
                 address: positionManager,
-                abi: v4PositionManagerReadAbi,
-                functionName: "getApproved",
-                args: [position.tokenId],
+                abi: operatorApprovalAbi,
+                functionName: "isApprovedForAll",
+                args: [wallet, diamond],
               });
-              if (getAddress(confirmed) !== diamond)
-                throw new Error("The liquidity position approval was not confirmed.");
+              if (!confirmed) throw new Error("The liquidity operator approval was not confirmed.");
             },
           }
         );
@@ -883,7 +896,7 @@ function LiquidityRuntime() {
             encodeFunctionData({
               abi: basketTokenAbi,
               functionName: "approve",
-              args: [diamond, required],
+              args: [diamond, MAX_ERC20_ALLOWANCE],
             }),
             {
               verifyConfirmation: async () => {

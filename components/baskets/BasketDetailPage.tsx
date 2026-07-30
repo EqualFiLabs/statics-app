@@ -48,6 +48,7 @@ import {
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { loadPositionCatalog } from "@/lib/positions/positions";
 import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -298,7 +299,6 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
         const quoted = currentQuote.amounts[availability.approvalIndex];
         if (!constituent || quoted === undefined)
           throw new Error("The approval quote is incomplete.");
-        const maximum = maximumWithSlippage(quoted, slippageBps);
         await recordAndSend({
           kind: "approve-basket-asset",
           label: `Approve ${constituent.token.symbol}`,
@@ -306,7 +306,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [deploymentState.deployment.contracts.diamond, maximum],
+            args: [deploymentState.deployment.contracts.diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
       } else if (availability.kind === "execute") {
@@ -336,7 +336,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
                 constituent.allowance < (bounds[index] ?? 0n)
             )
           ) {
-            throw new Error("The fresh quote requires another bounded underlying approval.");
+            throw new Error("The fresh quote requires another underlying approval.");
           }
         }
         // A minted basket held in the wallet earns nothing: rewards accrue

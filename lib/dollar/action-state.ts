@@ -206,10 +206,10 @@ export function deriveDollarActionAvailability({
     );
   }
 
-  if (mode === "deposit" && asset === "WETH" && snapshot.wethAllowance !== amount) {
+  if (mode === "deposit" && asset === "WETH" && snapshot.wethAllowance < amount) {
     return {
       kind: "approve-weth",
-      label: "Approve exact WETH",
+      label: "Enable WETH deposits",
       reason: null,
       executable: true,
     };
@@ -219,15 +219,15 @@ export function deriveDollarActionAvailability({
   if (mode === "redeem" && snapshot.peripheryDollarAllowance < amount) {
     return {
       kind: "approve-dollar-periphery",
-      label: "Approve exact Dollar",
+      label: "Enable Dollar redemptions",
       reason: null,
       executable: true,
     };
   }
-  if (mode === "recombine" && snapshot.dollarAllowance !== amount) {
+  if (mode === "recombine" && snapshot.dollarAllowance < amount) {
     return {
       kind: "approve-dollar",
-      label: "Approve exact Dollar",
+      label: "Enable Dollar recombination",
       reason: null,
       executable: true,
     };

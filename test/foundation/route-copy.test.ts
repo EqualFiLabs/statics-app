@@ -92,7 +92,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(10);
+    expect(hrefs).toHaveLength(11);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -127,6 +127,7 @@ describe("sidebar completeness", () => {
       "Wallet",
       "Activity",
       "Settings",
+      "Tools",
     ]);
   });
 
@@ -136,6 +137,7 @@ describe("sidebar completeness", () => {
       "/app/wallet",
       "/app/activity",
       "/app/settings",
+      "/app/tools",
     ]);
   });
 });

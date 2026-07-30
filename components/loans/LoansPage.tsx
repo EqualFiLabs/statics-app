@@ -51,6 +51,7 @@ import {
   ConfirmationVerificationError,
   executeProtocolTransaction,
 } from "@/lib/protocol/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -441,7 +442,7 @@ function LoansRuntime() {
           const data = encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [deploymentState.deployment.contracts.diamond, amount],
+            args: [deploymentState.deployment.contracts.diamond, MAX_ERC20_ALLOWANCE],
           });
           await executeProtocolTransaction({
             publicClient,
@@ -471,8 +472,8 @@ function LoansRuntime() {
                 functionName: "allowance",
                 args: [wallet, deploymentState.deployment.contracts.diamond],
               });
-              if (allowance !== amount) {
-                throw new Error("The confirmed token allowance is not the exact requested amount.");
+              if (allowance < amount) {
+                throw new Error("The confirmed token allowance is below the required amount.");
               }
             },
           });

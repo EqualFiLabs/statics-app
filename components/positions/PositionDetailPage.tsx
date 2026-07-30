@@ -47,6 +47,7 @@ import {
   validateCustomRewardAsset,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
@@ -324,7 +325,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [diamond, collateralAmount],
+            args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
         return;
@@ -375,7 +376,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [diamond, maximum],
+            args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
         return;
@@ -495,7 +496,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [diamond, stakeAmount],
+            args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
         return;
