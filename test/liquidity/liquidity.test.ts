@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  canonicalFullRange,
-  lpStakeEligibility,
-  resolveLiquidityPool,
-} from "@/components/liquidity/LiquidityPage";
+import { lpStakeEligibility, resolveLiquidityPool } from "@/components/liquidity/LiquidityPage";
 import {
   basketLiquiditySnapshot,
+  borrowedLiquidityReadiness,
+  canonicalFullRange,
   canonicalStatusLabel,
   v4PoolId,
   type CanonicalPoolRecord,
@@ -110,5 +108,44 @@ describe("canonical liquidity identifiers", () => {
         },
       ],
     });
+  });
+
+  it("requires every canonical pool and a bounded positive liquidity input", () => {
+    const basket = {
+      constituents: [{}, {}],
+    } as unknown as BasketRecord;
+    const readyPool = {
+      poolId: `0x${"11".repeat(32)}`,
+      status: 2,
+      decommissioned: false,
+      managerSynced: true,
+      observationCardinality: 2,
+      spotTick: 99,
+      referenceTick: 0,
+    } as CanonicalPoolRecord;
+    const secondPool = {
+      ...readyPool,
+      poolId: `0x${"22".repeat(32)}`,
+    } as CanonicalPoolRecord;
+
+    expect(borrowedLiquidityReadiness(basket, [readyPool], {})).toMatch(/Every basket/);
+    expect(
+      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "0",
+      })
+    ).toMatch(/positive raw liquidity/);
+    expect(
+      borrowedLiquidityReadiness(basket, [{ ...readyPool, spotTick: 100 }, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "1",
+      })
+    ).toMatch(/price bound/);
+    expect(
+      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "2",
+      })
+    ).toBeNull();
   });
 });
