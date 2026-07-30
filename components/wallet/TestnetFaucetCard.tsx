@@ -20,6 +20,8 @@ import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar
 import { describeDollarError } from "@/lib/dollar/transactions";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import type { WalletToken } from "@/lib/wallet-tokens";
+import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -30,6 +32,7 @@ type FaucetAsset = {
   inventory: bigint;
   walletBalance: bigint;
   symbol: string;
+  name: string;
   decimals: number;
 };
 
@@ -45,18 +48,32 @@ function display(value: bigint, decimals: number): string {
   return short ? `${whole}.${short}` : whole;
 }
 
+export function faucetWalletTokens(assets: readonly FaucetAsset[]): WalletToken[] {
+  return assets.map(({ address, symbol, name, decimals }) => ({
+    address,
+    symbol,
+    name,
+    decimals,
+  }));
+}
+
 export function TestnetFaucetCard() {
   const wallet = useWalletState();
   const deployment = deploymentState.status === "configured" ? deploymentState.deployment : null;
   const faucet = deployment?.faucet;
+  const faucetChainId = deployment?.chainId ?? 46_630;
+  const { tokens, addTokens } = useWalletTokens(faucetChainId);
   const [snapshot, setSnapshot] = useState<FaucetSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const visible = deployment?.chainId === 46_630 && wallet.fundingChainId === deployment.chainId;
+  const onFundingChain =
+    deployment?.chainId === 46_630 &&
+    wallet.fundingChainId === deployment.chainId &&
+    wallet.fundingWalletOnSelectedChain;
 
   const readSnapshot = useCallback(async () => {
-    if (!deployment || !faucet || !wallet.address || !wallet.fundingWalletOnSelectedChain) {
+    if (!deployment || !faucet || !wallet.address || !onFundingChain) {
       setSnapshot(null);
       return null;
     }
@@ -88,11 +105,16 @@ export function TestnetFaucetCard() {
           functionName: "asset",
           args: [BigInt(index)],
         });
-        const [symbol, decimals, inventory, walletBalance] = await Promise.all([
+        const [symbol, name, decimals, inventory, walletBalance] = await Promise.all([
           publicClient.readContract({
             address,
             abi: basketTokenAbi,
             functionName: "symbol",
+          }),
+          publicClient.readContract({
+            address,
+            abi: basketTokenAbi,
+            functionName: "name",
           }),
           publicClient.readContract({
             address,
@@ -112,16 +134,16 @@ export function TestnetFaucetCard() {
             args: [account],
           }),
         ]);
-        return { address, amount, inventory, walletBalance, symbol, decimals };
+        return { address, amount, inventory, walletBalance, symbol, name, decimals };
       })
     );
     const next = { assets: entries, nextClaimAt, blockTimestamp: block.timestamp };
     setSnapshot(next);
     return next;
-  }, [deployment, faucet, wallet]);
+  }, [deployment, faucet, onFundingChain, wallet]);
 
   useEffect(() => {
-    if (!visible || !faucet || !wallet.address || !wallet.fundingWalletOnSelectedChain) {
+    if (!onFundingChain || !faucet || !wallet.address) {
       const timeout = window.setTimeout(() => setSnapshot(null), 0);
       return () => window.clearTimeout(timeout);
     }
@@ -140,7 +162,7 @@ export function TestnetFaucetCard() {
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [faucet, readSnapshot, visible, wallet.address, wallet.fundingWalletOnSelectedChain]);
+  }, [faucet, onFundingChain, readSnapshot, wallet.address]);
 
   const underfunded = snapshot?.assets.some((asset) => asset.inventory < asset.amount) ?? false;
   const coolingDown =
@@ -149,16 +171,14 @@ export function TestnetFaucetCard() {
     snapshot.blockTimestamp < snapshot.nextClaimAt;
 
   useEffect(() => {
-    if (!visible || !coolingDown || !snapshot) return;
+    if (!onFundingChain || !coolingDown || !snapshot) return;
     const remainingMilliseconds = (snapshot.nextClaimAt - snapshot.blockTimestamp) * 1_000n;
     const timeout = window.setTimeout(
       () => void readSnapshot().catch((cause) => setError(describeDollarError(cause))),
       Number(remainingMilliseconds)
     );
     return () => window.clearTimeout(timeout);
-  }, [coolingDown, readSnapshot, snapshot, visible]);
-
-  if (!visible) return null;
+  }, [coolingDown, onFundingChain, readSnapshot, snapshot]);
 
   const claim = async () => {
     if (!deployment || !faucet || pending) return;
@@ -166,7 +186,7 @@ export function TestnetFaucetCard() {
       wallet.login();
       return;
     }
-    if (!wallet.fundingWalletOnSelectedChain) {
+    if (!onFundingChain) {
       await wallet.selectFundingNetwork(deployment.chainId);
       return;
     }
@@ -225,6 +245,20 @@ export function TestnetFaucetCard() {
       setPending(false);
     }
   };
+  const walletAddresses = new Set(tokens.map((token) => token.address.toLowerCase()));
+  const missingFaucetTokens =
+    snapshot?.assets.filter((asset) => !walletAddresses.has(asset.address.toLowerCase())) ?? [];
+  const addAllFaucetTokens = () => {
+    if (!snapshot) return;
+    addTokens(faucetWalletTokens(snapshot.assets));
+  };
+  const claimLabel = !wallet.address
+    ? "Sign in to claim"
+    : !onFundingChain
+      ? "Switch to Robinhood testnet"
+      : pending
+        ? "Claiming…"
+        : "Claim testnet assets";
 
   return (
     <section className="testnet-faucet" aria-labelledby="testnet-faucet-title">
@@ -232,9 +266,19 @@ export function TestnetFaucetCard() {
         <p className="dapp-section-label">Robinhood testnet</p>
         <h2 id="testnet-faucet-title">Testnet asset faucet</h2>
         <p>Claim the USDG, STATICS, and stock-token fixtures needed to exercise the beta.</p>
+        <p className="testnet-faucet-help">
+          Need more testnet ETH or stock tokens?{" "}
+          <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noreferrer">
+            Open the Robinhood Chain faucet ↗
+          </a>
+        </p>
       </div>
       {!faucet ? (
         <p className="dollar-action-reason">Faucet deployment has not been recorded yet.</p>
+      ) : !wallet.address ? (
+        <p>Sign in to read the Statics faucet inventory.</p>
+      ) : !onFundingChain ? (
+        <p>Switch to Robinhood Chain Testnet to read the faucet inventory.</p>
       ) : snapshot ? (
         <ul>
           {snapshot.assets.map((asset) => (
@@ -262,14 +306,28 @@ export function TestnetFaucetCard() {
           {error}
         </p>
       )}
-      <button
-        className="dollar-submit"
-        type="button"
-        onClick={() => void claim()}
-        disabled={!faucet || pending || loading || coolingDown || underfunded}
-      >
-        {pending ? "Claiming…" : wallet.address ? "Claim testnet assets" : "Sign in to claim"}
-      </button>
+      <div className="testnet-faucet-actions">
+        <button
+          className="dollar-submit"
+          type="button"
+          onClick={() => void claim()}
+          disabled={
+            !faucet || pending || (onFundingChain && (loading || coolingDown || underfunded))
+          }
+        >
+          {claimLabel}
+        </button>
+        <button
+          className="testnet-faucet-add"
+          type="button"
+          onClick={addAllFaucetTokens}
+          disabled={!snapshot || missingFaucetTokens.length === 0}
+        >
+          {snapshot && missingFaucetTokens.length === 0
+            ? "Faucet tokens added"
+            : "Add all to Wallet"}
+        </button>
+      </div>
     </section>
   );
 }

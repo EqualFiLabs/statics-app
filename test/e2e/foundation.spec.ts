@@ -145,6 +145,9 @@ test.describe("Dollar DApp foundation", () => {
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
 
+    await navigateDapp(page, "/app/faucet");
+    await expect(page).toHaveURL(/\/app\/faucet$/);
+
     await navigateDapp(page, "/app/tools");
     await expect(page).toHaveURL(/\/app\/tools$/);
   });
@@ -221,6 +224,7 @@ test.describe("Dollar DApp foundation", () => {
       "/app/loans",
       "/app/rewards",
       "/app/liquidity",
+      "/app/faucet",
       "/app/tools",
     ]) {
       await page.goto(route);
