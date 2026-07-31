@@ -3,7 +3,6 @@
 import {
   getEmbeddedConnectedWallet,
   PrivyProvider,
-  useActiveWallet,
   useCreateWallet,
   useExportWallet,
   usePrivy,
@@ -29,6 +28,7 @@ import {
   readWalletEnvironment,
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
+import { selectStaticsWallet } from "@/lib/wallet/selection";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
   defaultSolanaWalletState,
@@ -65,7 +65,7 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
 const FUNDING_CHAIN_STORAGE_KEY = "statics:funding-chain";
 
 function selectWallet({ wallets }: { wallets: ConnectedWallet[]; user: User | null }) {
-  return getEmbeddedConnectedWallet(wallets) ?? wallets[0];
+  return selectStaticsWallet(wallets);
 }
 
 function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
@@ -77,7 +77,6 @@ function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | n
 function WalletBridge({ children }: { children: React.ReactNode }) {
   const { ready, authenticated, error: privyError, login, logout } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
-  const { wallet: activeWallet, setActiveWallet } = useActiveWallet();
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
   const wagmiAccount = useAccount();
@@ -88,10 +87,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
 
-  const activeEthereumWallet =
-    activeWallet && "switchChain" in activeWallet ? activeWallet : undefined;
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
-  const selectedWallet = activeEthereumWallet ?? embeddedWallet ?? wallets[0];
+  const selectedWallet = selectStaticsWallet(wallets);
   const address = selectedWallet?.address ?? null;
   const walletKind = selectedWallet
     ? selectedWallet.walletClientType === "privy" || selectedWallet.walletClientType === "privy-v2"
@@ -158,18 +155,13 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       connectWallet: () => login({ loginMethods: ["wallet"] }),
       createWallet: () =>
         runAction("create", async () => {
-          const wallet = await createWallet();
-          const connectedWallet = wallets.find(
-            (candidate) => candidate.address.toLowerCase() === wallet.address.toLowerCase()
-          );
-          if (connectedWallet) setActiveWallet(connectedWallet);
+          await createWallet();
         }),
       logout: () => runAction("logout", logout),
       switchNetwork: () =>
         runAction("switch", async () => {
           if (!selectedWallet) throw new Error("Connect a wallet before switching networks.");
           await selectedWallet.switchChain(targetChain.id);
-          setActiveWallet(selectedWallet);
         }),
       selectFundingNetwork: (nextChainId) =>
         runAction("funding-switch", async () => {
@@ -179,7 +171,6 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           window.localStorage.setItem(FUNDING_CHAIN_STORAGE_KEY, String(nextChainId));
           if (!selectedWallet) return;
           await selectedWallet.switchChain(nextChainId);
-          setActiveWallet(selectedWallet);
         }),
       getEthereumProvider: async () => {
         if (!selectedWallet) return null;
@@ -210,11 +201,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       logout,
       privyError,
       selectedWallet,
-      setActiveWallet,
       status,
       targetChain,
       walletKind,
-      wallets,
     ]
   );
 
