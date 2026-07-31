@@ -136,10 +136,10 @@ export function groupByMaturity(selections: readonly RewardSelection[]): readonl
  * Same day gets a clock time; anything further gets a date, because "3:00 PM"
  * is misleading when it is tomorrow.
  */
-export function formatMaturity(eligibleAt: bigint, now: bigint): string {
+export function formatMaturity(eligibleAt: bigint, now: bigint, locale = "en"): string {
   const date = new Date(Number(eligibleAt) * 1_000);
   const sameDay = new Date(Number(now) * 1_000).toDateString() === date.toDateString();
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale, {
     timeStyle: "short",
     ...(sameDay ? {} : { dateStyle: "medium" }),
   }).format(date);

@@ -1,14 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  createPublicClient,
-  createWalletClient,
-  custom,
-  formatUnits,
-  getAddress,
-  parseUnits,
-} from "viem";
+import { useTranslations } from "next-intl";
+import { createPublicClient, createWalletClient, custom, formatUnits, getAddress } from "viem";
 import {
   basketTokenAbi,
   buildErc20PermitTypedData,
@@ -40,6 +34,8 @@ import {
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 type Direction = "mint" | "redeem";
 type PeggedQuote =
@@ -102,6 +98,8 @@ export function PeggedDollarPanel({
   embedded?: boolean;
   onPendingChange?: (pending: boolean) => void;
 }) {
+  const t = useTranslations("portal");
+  const locale = useAppLocale();
   const wallet = useWalletState();
   const { signTypedData: signEmbeddedTypedData } = useSignTypedData();
   const configured = configuredDeploymentState;
@@ -116,7 +114,7 @@ export function PeggedDollarPanel({
   const [error, setError] = useState<string | null>(null);
   let amount = 0n;
   try {
-    amount = amountInput ? parseUnits(amountInput, 18) : 0n;
+    amount = parseLocalizedUnits(amountInput, 18, locale);
   } catch {
     amount = 0n;
   }
@@ -448,28 +446,30 @@ export function PeggedDollarPanel({
   };
   const label =
     wallet.status === "signed-out" || wallet.status === "error"
-      ? "Connect wallet"
+      ? t("connectWallet")
       : wallet.status === "wallet-missing"
-        ? "Create embedded wallet"
+        ? t("createEmbeddedWallet")
         : wallet.status !== "ready"
-          ? "Wallet loading…"
+          ? t("walletLoading")
           : deployment && wallet.chainId !== deployment.chainId
-            ? `Switch to ${wallet.networkName}`
+            ? t("switchTo", { network: wallet.networkName })
             : pending
-              ? "Preparing…"
+              ? t("preparing")
               : quoteLoading
-                ? "Reading quote…"
+                ? t("readingQuote")
                 : balanceInsufficient
-                  ? `Insufficient ${direction === "mint" ? "USDG" : "USDstx"}`
+                  ? t("insufficientAsset", {
+                      symbol: direction === "mint" ? "USDG" : "USDstx",
+                    })
                   : direction === "mint"
                     ? embedded
-                      ? "Review deposit"
-                      : "Review mint"
-                    : "Review redemption";
+                      ? t("reviewDeposit")
+                      : t("reviewMint")
+                    : t("reviewRedemption");
 
   return (
     <div className={`portal-panel${embedded ? " dollar-pegged-panel" : ""}`} role="tabpanel">
-      <div className="portal-direction-tabs" aria-label="Statics Dollar direction">
+      <div className="portal-direction-tabs" aria-label={t("dollarDirection")}>
         {(["mint", "redeem"] as const).map((item) => (
           <button
             key={item}
@@ -483,14 +483,12 @@ export function PeggedDollarPanel({
             }}
             disabled={pending}
           >
-            {item === "mint" ? (embedded ? "Deposit" : "Mint") : "Redeem"}
+            {item === "mint" ? (embedded ? t("deposit") : t("mint")) : t("redeem")}
           </button>
         ))}
       </div>
       <label className="portal-field portal-asset-field">
-        <span>
-          {direction === "mint" ? "Statics Dollar to receive" : "Statics Dollar to redeem"}
-        </span>
+        <span>{direction === "mint" ? t("dollarToReceive") : t("dollarToRedeem")}</span>
         <div>
           <input
             inputMode="decimal"
@@ -508,11 +506,11 @@ export function PeggedDollarPanel({
             USDstx
           </button>
         </div>
-        <small>Balance {display(snapshot?.dollarBalance, 18, "USDstx")}</small>
+        <small>{t("balance", { balance: display(snapshot?.dollarBalance, 18, "USDstx") })}</small>
       </label>
       <dl className="portal-quote-grid">
         <div>
-          <dt>{direction === "mint" ? "Maximum USDG" : "Minimum USDG"}</dt>
+          <dt>{direction === "mint" ? t("maximumUsdg") : t("minimumUsdg")}</dt>
           <dd>
             {quote?.direction === "mint"
               ? display(maximumWithTolerance(quote.totalCollateralIn), 6, "USDG")
@@ -522,11 +520,11 @@ export function PeggedDollarPanel({
           </dd>
         </div>
         <div>
-          <dt>Protocol fee</dt>
+          <dt>{t("protocolFee")}</dt>
           <dd>{quote ? display(quote.feeAmount, 6, "USDG") : "--"}</dd>
         </div>
         <div>
-          <dt>Profile</dt>
+          <dt>{t("profile")}</dt>
           <dd>{deployment?.pegged ? `#${deployment.pegged.profileId.toString()}` : "--"}</dd>
         </div>
       </dl>

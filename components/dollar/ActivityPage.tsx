@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Connection } from "@solana/web3.js";
 import { getAddress, isAddress } from "viem";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
@@ -196,6 +197,7 @@ function solanaItem(activity: SolanaActivity): UnifiedActivity {
 }
 
 export function ActivityPage() {
+  const t = useTranslations("activity");
   const wallet = useWalletState();
   const solana = useSolanaWalletState();
   const evmAddress =
@@ -317,19 +319,21 @@ export function ActivityPage() {
   return (
     <section className="activity-panel" aria-labelledby="activity-title">
       <div>
-        <p className="dapp-section-label">{"// Activity"}</p>
-        <h2 id="activity-title">Transactions</h2>
+        <p className="dapp-section-label">
+          {"// "}
+          {t("label")}
+        </p>
+        <h2 id="activity-title">{t("transactions")}</h2>
       </div>
       {!isSurfaceReady(activityState) ? (
         <SurfaceEmptyState
           state={activityState}
-          subject="activity"
+          subject={t("subject")}
           empty={{
-            title: "No activity yet",
-            description:
-              "Everything you do in Statics shows up here, from the moment you confirm it to the moment it settles.",
-            action: { label: "Get Statics Dollar", href: "/app/dollar" },
-            secondary: { label: "Add funds", href: "/app/portal" },
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
+            action: { label: t("getDollar"), href: "/app/dollar" },
+            secondary: { label: t("addFunds"), href: "/app/portal" },
           }}
         />
       ) : (
@@ -344,6 +348,8 @@ export function ActivityPage() {
 }
 
 function ActivityItem({ activity }: { activity: UnifiedActivity }) {
+  const format = useFormatter();
+  const t = useTranslations("activity");
   const referenceLabel = activity.reference
     ? `${activity.reference.slice(0, 10)}…${activity.reference.slice(-8)}`
     : null;
@@ -359,7 +365,10 @@ function ActivityItem({ activity }: { activity: UnifiedActivity }) {
       <div>
         <strong className={`activity-status is-${activity.statusClass}`}>{activity.status}</strong>
         <time dateTime={new Date(activity.createdAt).toISOString()}>
-          {new Date(activity.createdAt).toLocaleString()}
+          {format.dateTime(new Date(activity.createdAt), {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })}
         </time>
       </div>
       {activity.reference &&
@@ -378,8 +387,9 @@ function ActivityItem({ activity }: { activity: UnifiedActivity }) {
         ))}
       {activity.originalReference && (
         <p>
-          Original transaction {activity.originalReference.slice(0, 10)}…
-          {activity.originalReference.slice(-8)}
+          {t("originalTransaction", {
+            reference: `${activity.originalReference.slice(0, 10)}…${activity.originalReference.slice(-8)}`,
+          })}
         </p>
       )}
       {activity.error && <p>{activity.error}</p>}

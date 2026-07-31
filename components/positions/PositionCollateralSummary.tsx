@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { formatUnits } from "viem";
+import { useTranslations } from "next-intl";
 
 import type { PositionCollateral } from "@/lib/positions/positions";
 
@@ -20,22 +21,18 @@ export function PositionCollateralSummary({
   currentBlock: bigint;
   compact?: boolean;
 }) {
+  const t = useTranslations("positions");
   return (
     <section
       className={`position-collateral-summary${compact ? " is-compact" : ""}`}
-      aria-label="BasketTokens held by this position"
+      aria-label={t("collateralLabel")}
     >
       <div>
-        <p className="dapp-section-label">BasketTokens held by this position</p>
-        {!compact && (
-          <p>
-            These BasketTokens belong to this PositionNFT. The Diamond holds them in custody while
-            they earn basket fees and support loans.
-          </p>
-        )}
+        <p className="dapp-section-label">{t("collateralLabel")}</p>
+        {!compact && <p>{t("collateralDescription")}</p>}
       </div>
       {collateral.length === 0 ? (
-        <p className="position-collateral-empty">No BasketTokens are deposited.</p>
+        <p className="position-collateral-empty">{t("noCollateral")}</p>
       ) : (
         <ul>
           {collateral.map((holding) => {
@@ -54,19 +51,19 @@ export function PositionCollateralSummary({
                 </div>
                 <dl>
                   <div>
-                    <dt>Deposited</dt>
+                    <dt>{t("deposited")}</dt>
                     <dd>{displayAmount(holding.depositedShares, decimals)}</dd>
                   </div>
                   <div>
-                    <dt>Available to withdraw</dt>
+                    <dt>{t("available")}</dt>
                     <dd>
                       {coolingDown
-                        ? "Next block"
+                        ? t("nextBlock")
                         : `${displayAmount(available, decimals)} ${holding.basket.symbol}`}
                     </dd>
                   </div>
                   <div>
-                    <dt>Securing loans</dt>
+                    <dt>{t("securingLoans")}</dt>
                     <dd>
                       {displayAmount(holding.lockedShares, decimals)} {holding.basket.symbol}
                     </dd>

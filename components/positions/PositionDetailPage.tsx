@@ -6,13 +6,13 @@ import {
   encodeFunctionData,
   formatUnits,
   getAddress,
-  parseUnits,
   type Address,
   type Hex,
   type TransactionReceipt,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   basketTokenAbi,
@@ -41,6 +41,9 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
+import { useAppLocale } from "@/i18n/client";
+import type { AppLocale } from "@/i18n/config";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -52,9 +55,9 @@ function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   return shortFraction ? `${whole}.${shortFraction}` : whole;
 }
 
-function parseAmount(value: string, decimals: number): bigint {
+function parseAmount(value: string, decimals: number, locale: AppLocale): bigint {
   try {
-    return value ? parseUnits(value, decimals) : 0n;
+    return parseLocalizedUnits(value, decimals, locale);
   } catch {
     return 0n;
   }
@@ -67,6 +70,8 @@ export function PositionDetailPage({ positionId }: { positionId: bigint }) {
 }
 
 function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
+  const t = useTranslations("positionDetail");
+  const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -111,12 +116,12 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     (item) => item.basket.basketId === basket?.basketId
   );
   const collateralAmount = useMemo(
-    () => parseAmount(collateralAmountInput, 18),
-    [collateralAmountInput]
+    () => parseAmount(collateralAmountInput, 18, locale),
+    [collateralAmountInput, locale]
   );
   const stakeAmount = useMemo(
-    () => parseAmount(stakeAmountInput, catalog.data?.stakingToken.decimals ?? 18),
-    [stakeAmountInput, catalog.data?.stakingToken.decimals]
+    () => parseAmount(stakeAmountInput, catalog.data?.stakingToken.decimals ?? 18, locale),
+    [stakeAmountInput, catalog.data?.stakingToken.decimals, locale]
   );
   const sendTransaction = async ({
     kind,
@@ -376,29 +381,29 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   return (
     <div className="position-detail">
       <Link className="basket-back" href="/app/positions">
-        ← All positions
+        ← {t("allPositions")}
       </Link>
       <section className="position-hero">
         <div>
-          <p className="dapp-section-label">Your position</p>
+          <p className="dapp-section-label">{t("yourPosition")}</p>
           <h2>Position #{position.positionId.toString()}</h2>
           <AddressDisplay
             address={position.owner}
             chainId={deploymentState.deployment.chainId}
-            label="Owner"
+            label={t("owner")}
           />
         </div>
         <dl>
           <div>
-            <dt>Active legs</dt>
+            <dt>{t("activeLegs")}</dt>
             <dd>{position.activeLegCount.toString()}</dd>
           </div>
           <div>
-            <dt>Basket legs</dt>
+            <dt>{t("basketLegs")}</dt>
             <dd>{position.collateral.length}</dd>
           </div>
           <div>
-            <dt>Reward assets</dt>
+            <dt>{t("rewardAssets")}</dt>
             <dd>
               {position.selectedRewardAssets.length}/{catalog.data.maximumRewardAssets.toString()}
             </dd>
@@ -406,11 +411,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
         </dl>
       </section>
 
-      <p className="dollar-warning">
-        Transferring this position transfers every attached collateral, staking, reward, loan,
-        Dollar, and liquidity obligation. This release intentionally does not provide a transfer
-        button.
-      </p>
+      <p className="dollar-warning">{t("transferWarning")}</p>
 
       <PositionCollateralSummary
         collateral={position.collateral}
@@ -419,9 +420,9 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
 
       <div className="position-detail-grid">
         <section className="position-panel">
-          <p className="dapp-section-label">Basket collateral</p>
-          <h3>Manage collateral legs</h3>
-          <div className="dollar-tabs" aria-label="Collateral action">
+          <p className="dapp-section-label">{t("basketCollateral")}</p>
+          <h3>{t("manageCollateral")}</h3>
+          <div className="dollar-tabs" aria-label={t("collateralAction")}>
             {(["deposit", "withdraw"] as const).map((mode) => (
               <button
                 type="button"
@@ -433,12 +434,12 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                 }}
                 disabled={pendingAction !== null}
               >
-                {mode}
+                {mode === "deposit" ? t("deposit") : t("withdraw")}
               </button>
             ))}
           </div>
           <label className="basket-field">
-            <span>Basket</span>
+            <span>{t("basket")}</span>
             <select
               value={basketIdInput}
               onChange={(event) => setBasketIdInput(event.target.value)}
@@ -475,10 +476,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             onClick={() => void runAction(`collateral-${collateralMode}`, executeCollateralAction)}
           >
             {pendingAction === `collateral-${collateralMode}`
-              ? "Waiting for confirmation…"
+              ? t("waiting")
               : collateralMode === "deposit"
-                ? "Approve or deposit BasketToken"
-                : "Withdraw BasketToken"}
+                ? t("approveDeposit")
+                : t("withdrawBasket")}
           </button>
           {basket && (
             <div className="position-action-links">
@@ -486,22 +487,22 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                 className="dollar-primary-link"
                 href={`/app/baskets/${basket.basketId.toString()}?action=mint&positionId=${position.positionId.toString()}`}
               >
-                Mint {basket.symbol} into this position →
+                {t("mintInto", { symbol: basket.symbol })} →
               </Link>
               <Link
                 className="dollar-primary-link"
                 href={`/app/baskets/${basket.basketId.toString()}?action=redeem&positionId=${position.positionId.toString()}`}
               >
-                Redeem this position&apos;s {basket.symbol} →
+                {t("redeemFrom", { symbol: basket.symbol })} →
               </Link>
             </div>
           )}
         </section>
 
         <section className="position-panel">
-          <p className="dapp-section-label">Global staking</p>
-          <h3>Stake {catalog.data.stakingToken.symbol}</h3>
-          <div className="dollar-tabs" aria-label="Staking action">
+          <p className="dapp-section-label">{t("globalStaking")}</p>
+          <h3>{t("stakeToken", { symbol: catalog.data.stakingToken.symbol })}</h3>
+          <div className="dollar-tabs" aria-label={t("stakingAction")}>
             {(["stake", "unstake"] as const).map((mode) => (
               <button
                 type="button"
@@ -513,13 +514,13 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                 }}
                 disabled={pendingAction !== null}
               >
-                {mode}
+                {mode === "stake" ? t("stake") : t("unstake")}
               </button>
             ))}
           </div>
           <dl className="position-metrics">
             <div>
-              <dt>Wallet balance</dt>
+              <dt>{t("walletBalance")}</dt>
               <dd>
                 {displayAmount(
                   catalog.data.stakingTokenBalance,
@@ -529,7 +530,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               </dd>
             </div>
             <div>
-              <dt>Position stake</dt>
+              <dt>{t("positionStake")}</dt>
               <dd>
                 {displayAmount(position.stakedBalance, catalog.data.stakingToken.decimals)}{" "}
                 {catalog.data.stakingToken.symbol}
@@ -549,10 +550,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               disabled={pendingAction !== null}
             />
           </label>
-          <p className="position-cooldown">
-            Your stake is always withdrawable. New stake and newly selected reward assets start
-            earning once they mature; withdrawals take from stake that is not yet earning first.
-          </p>
+          <p className="position-cooldown">{t("maturityDescription")}</p>
           <button
             className="dollar-submit"
             type="button"
@@ -560,10 +558,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             onClick={() => void runAction(`stake-${stakeMode}`, executeStakeAction)}
           >
             {pendingAction === `stake-${stakeMode}`
-              ? "Waiting for confirmation…"
+              ? t("waiting")
               : stakeMode === "stake"
-                ? `Approve or stake ${catalog.data.stakingToken.symbol}`
-                : `Unstake ${catalog.data.stakingToken.symbol}`}
+                ? t("approveStake", { symbol: catalog.data.stakingToken.symbol })
+                : t("unstakeToken", { symbol: catalog.data.stakingToken.symbol })}
           </button>
         </section>
       </div>
@@ -571,10 +569,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       <section className="position-panel position-rewards">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Position-selected rewards</p>
-            <h3>Choose up to {catalog.data.maximumRewardAssets.toString()} fee assets</h3>
+            <p className="dapp-section-label">{t("selectedRewards")}</p>
+            <h3>{t("chooseAssets", { count: catalog.data.maximumRewardAssets.toString() })}</h3>
           </div>
-          <span>{position.selectedRewardAssets.length} selected</span>
+          <span>{t("selectedCount", { count: position.selectedRewardAssets.length })}</span>
         </div>
         <div className="reward-grid">
           {catalog.data.rewardCandidates.map((candidate) => {
@@ -594,7 +592,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                 <AddressDisplay
                   address={candidate.token.address}
                   chainId={deploymentState.deployment.chainId}
-                  label="Token"
+                  label={t("token")}
                 />
                 <p>
                   Pending: {displayAmount(reward?.pending ?? 0n, candidate.token.decimals)}{" "}
@@ -610,10 +608,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                   }
                 >
                   {pendingAction === `reward-${candidate.token.address}`
-                    ? "Waiting…"
+                    ? t("waitingShort")
                     : selected
-                      ? "Remove selection"
-                      : "Select reward"}
+                      ? t("removeSelection")
+                      : t("selectReward")}
                 </button>
               </article>
             );
@@ -621,7 +619,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
         </div>
         <div className="custom-reward">
           <label className="basket-field">
-            <span>Custom ERC-20 reward address</span>
+            <span>{t("customReward")}</span>
             <input
               value={customRewardAddress}
               onChange={(event) => {
@@ -632,9 +630,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               autoComplete="off"
               disabled={pendingAction !== null}
             />
-            <small>
-              Contract code and ERC-20 metadata are verified before the opt-in transaction.
-            </small>
+            <small>{t("customRewardHelp")}</small>
           </label>
           <button
             className="dollar-submit"
@@ -642,18 +638,15 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             disabled={pendingAction !== null || customRewardAddress.length === 0}
             onClick={() => void runAction("custom-reward", addCustomReward)}
           >
-            {pendingAction === "custom-reward" ? "Waiting for confirmation…" : "Select address"}
+            {pendingAction === "custom-reward" ? t("waiting") : t("selectAddress")}
           </button>
         </div>
-        <p className="dollar-warning">
-          Selecting an asset never grants historical rewards. Pending balances are claimed from the
-          Earn page, where every reward source is shown together.
-        </p>
+        <p className="dollar-warning">{t("historicalWarning")}</p>
         <Link
           className="dollar-primary-link"
           href={`/app/rewards?positionId=${position.positionId.toString()}`}
         >
-          View and claim rewards →
+          {t("viewRewards")} →
         </Link>
       </section>
 
@@ -665,12 +658,12 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
 
       <section className="position-close">
         <div>
-          <p className="dapp-section-label">Terminal action</p>
-          <h3>Close position</h3>
+          <p className="dapp-section-label">{t("terminalAction")}</p>
+          <h3>{t("closePosition")}</h3>
           <p>
             {closeReady
-              ? "This position has no active protocol legs and can be burned."
-              : `Remove all ${position.activeLegCount.toString()} active legs before closing.`}
+              ? t("closeReady")
+              : t("closeBlocked", { count: position.activeLegCount.toString() })}
           </p>
         </div>
         <button
@@ -688,7 +681,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             })
           }
         >
-          {pendingAction === "close-position" ? "Closing position…" : "Close position"}
+          {pendingAction === "close-position" ? t("closing") : t("closePosition")}
         </button>
       </section>
     </div>

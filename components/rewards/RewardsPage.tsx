@@ -8,10 +8,10 @@ import {
   formatUnits,
   getAddress,
   parseEventLogs,
-  parseUnits,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   basketTokenAbi,
@@ -37,6 +37,9 @@ import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { focusRewardPositions } from "@/lib/rewards/navigation";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import type { AppLocale } from "@/i18n/config";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -46,9 +49,9 @@ function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   return shortFraction ? `${whole}.${shortFraction}` : whole;
 }
 
-function parseAmount(value: string, decimals: number): bigint {
+function parseAmount(value: string, decimals: number, locale: AppLocale): bigint {
   try {
-    return value ? parseUnits(value, decimals) : 0n;
+    return parseLocalizedUnits(value, decimals, locale);
   } catch {
     return 0n;
   }
@@ -61,6 +64,8 @@ export function RewardsPage({ initialPositionId = null }: { initialPositionId?: 
 }
 
 function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | null }) {
+  const t = useTranslations("rewards");
+  const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -163,7 +168,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       );
     },
   });
-  const amount = parseAmount(amountInput, catalog.data?.stakingToken.decimals ?? 18);
+  const amount = parseAmount(amountInput, catalog.data?.stakingToken.decimals ?? 18, locale);
 
   const createAndStake = async () => {
     if (
@@ -456,19 +461,19 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
   });
   const orderedPositions = focusRewardPositions(catalog.data?.positions ?? [], initialPositionId);
 
-  let primaryLabel = "Approve or create staking position";
+  let primaryLabel = t("approveOrCreate");
   let primaryAction: (() => void) | null = () => void createAndStake();
   if (walletState.status === "signed-out" || walletState.status === "error") {
-    primaryLabel = "Sign in to continue";
+    primaryLabel = t("signIn");
     primaryAction = walletState.login;
   } else if (walletState.status === "wallet-missing") {
-    primaryLabel = "Create embedded wallet";
+    primaryLabel = t("createWallet");
     primaryAction = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
-    primaryLabel = `Switch to ${walletState.networkName}`;
+    primaryLabel = t("switchTo", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();
   } else if (walletState.status !== "ready") {
-    primaryLabel = "Wallet loading…";
+    primaryLabel = t("walletLoading");
     primaryAction = null;
   }
 
@@ -486,12 +491,9 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       <section className="position-panel">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">From your deposited baskets</p>
-            <h2>Basket rewards</h2>
-            <p>
-              A deposited basket earns a share of the trading fees on its assets, paid in those same
-              assets. Each basket is claimed on its own.
-            </p>
+            <p className="dapp-section-label">{t("basketSource")}</p>
+            <h2>{t("basketTitle")}</h2>
+            <p>{t("basketDescription")}</p>
           </div>
         </div>
 
@@ -515,7 +517,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                       onClick={() => void claimBasketRewards(entry)}
                       disabled={!entry.claimable || claimingBasketKey !== null}
                     >
-                      {claimingBasketKey === key ? "Claiming…" : "Claim"}
+                      {claimingBasketKey === key ? t("claiming") : t("claim")}
                     </button>
                   </div>
                   {earned.length > 0 ? (
@@ -529,9 +531,11 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                     </dl>
                   ) : (
                     <p className="reward-position-idle">
-                      Earning in{" "}
-                      {entry.amounts.map((item) => item.token.symbol).join(", ") || "its assets"}.
-                      Nothing to claim yet.
+                      {t("earningNoClaim", {
+                        assets:
+                          entry.amounts.map((item) => item.token.symbol).join(", ") ||
+                          t("itsAssets"),
+                      })}
                     </p>
                   )}
                 </article>
@@ -548,13 +552,12 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
               isEmpty: (basketRewards.data?.entries.length ?? 0) === 0,
               hasData: Boolean(basketRewards.data),
             })}
-            subject="basket rewards"
+            subject={t("basketSubject")}
             onRetry={() => void basketRewards.refetch()}
             empty={{
-              title: "No baskets deposited yet",
-              description:
-                "Buy a basket with depositing switched on, and it starts earning a share of the trading fees on the assets it holds.",
-              action: { label: "Browse baskets", href: "/app/baskets" },
+              title: t("noBaskets"),
+              description: t("noBasketsDescription"),
+              action: { label: t("browseBaskets"), href: "/app/baskets" },
             }}
           />
         )}
@@ -563,18 +566,16 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       <section className="position-panel">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Start earning</p>
-            <h2>Create a position and stake Statics</h2>
-            <p>
-              This creates a position and deposits your Statics. Choose which fee assets it earns
-              from the new position after confirmation.
-            </p>
+            <p className="dapp-section-label">{t("startEarning")}</p>
+            <h2>{t("createAndStakeTitle")}</h2>
+            <p>{t("createAndStakeDescription")}</p>
           </div>
           {catalog.data && (
             <span>
-              Total staked:{" "}
-              {displayAmount(catalog.data.totalStaked, catalog.data.stakingToken.decimals)}{" "}
-              {catalog.data.stakingToken.symbol}
+              {t("totalStaked", {
+                amount: displayAmount(catalog.data.totalStaked, catalog.data.stakingToken.decimals),
+                symbol: catalog.data.stakingToken.symbol,
+              })}
             </span>
           )}
         </div>
@@ -593,12 +594,13 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                 disabled={pending}
               />
               <small>
-                Wallet balance:{" "}
-                {displayAmount(
-                  catalog.data.stakingTokenBalance,
-                  catalog.data.stakingToken.decimals
-                )}{" "}
-                {catalog.data.stakingToken.symbol}
+                {t("walletBalance", {
+                  amount: displayAmount(
+                    catalog.data.stakingTokenBalance,
+                    catalog.data.stakingToken.decimals
+                  ),
+                  symbol: catalog.data.stakingToken.symbol,
+                })}
               </small>
             </label>
           </>
@@ -613,17 +615,17 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
             (walletState.status === "ready" && walletState.isTargetChain && amount <= 0n)
           }
         >
-          {pending ? "Waiting for confirmation…" : primaryLabel}
+          {pending ? t("waiting") : primaryLabel}
         </button>
       </section>
 
       <section className="position-panel is-wide">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">From staking Statics</p>
-            <h2>Your staked positions</h2>
+            <p className="dapp-section-label">{t("stakingSource")}</p>
+            <h2>{t("stakedPositions")}</h2>
           </div>
-          <span>Multi-asset claims</span>
+          <span>{t("multiAssetClaims")}</span>
         </div>
         {catalog.isError && catalog.data && (
           <p className="dollar-warning" role="status">
@@ -683,10 +685,10 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                       ))}
                     </ul>
                   ) : (
-                    <p>No reward assets selected.</p>
+                    <p>{t("noAssetsSelected")}</p>
                   )}
                   <Link href={`/app/positions/${position.positionId.toString()}`}>
-                    Configure stake and reward assets →
+                    {t("configure")} →
                   </Link>
                   <button
                     className="dollar-submit"
@@ -698,8 +700,8 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                     onClick={() => void claimPositionRewards(position.positionId)}
                   >
                     {claimingPositionId === position.positionId
-                      ? "Claiming selected rewards…"
-                      : "Claim selected rewards"}
+                      ? t("claimingSelected")
+                      : t("claimSelected")}
                   </button>
                 </article>
               );
@@ -708,18 +710,17 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         ) : (
           <SurfaceEmptyState
             state={surfaceState}
-            subject="rewards"
+            subject={t("subject")}
             onRetry={() => void catalog.refetch()}
             empty={{
-              title: "Nothing staked yet",
-              description:
-                "Stake a position to start earning a share of protocol fees. You choose which assets to earn in, and you can claim whenever you like.",
+              title: t("nothingStaked"),
+              description: t("nothingStakedDescription"),
               action: {
-                label: pending ? "Working…" : "Create and stake",
+                label: pending ? t("working") : t("createAndStake"),
                 onClick: () => void createAndStake(),
                 disabled: pending,
               },
-              secondary: { label: "View your positions", href: "/app/positions" },
+              secondary: { label: t("viewPositions"), href: "/app/positions" },
             }}
           />
         )}
@@ -728,15 +729,12 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       <section className="position-panel">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">From providing liquidity</p>
-            <h2>Liquidity rewards</h2>
-            <p>
-              Each active liquidity position earns its pool fees separately. Review and claim those
-              fees with the position that earned them.
-            </p>
+            <p className="dapp-section-label">{t("liquiditySource")}</p>
+            <h2>{t("liquidityTitle")}</h2>
+            <p>{t("liquidityDescription")}</p>
           </div>
           <Link className="dollar-primary-link" href="/app/liquidity">
-            Review liquidity rewards →
+            {t("reviewLiquidity")} →
           </Link>
         </div>
       </section>

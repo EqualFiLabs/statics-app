@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   createPublicClient,
   createWalletClient,
   custom,
   formatUnits,
   getAddress,
-  parseUnits,
   type Address,
 } from "viem";
 
@@ -27,6 +27,8 @@ import {
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const erc20BalanceAbi = [
   {
@@ -74,6 +76,8 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
 }
 
 export function EvmSwapPanel() {
+  const t = useTranslations("portal");
+  const locale = useAppLocale();
   const wallet = useWalletState();
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -113,7 +117,7 @@ export function EvmSwapPanel() {
     ) ?? tokens.find((token) => token.address !== source?.address);
   const parsedAmount = (() => {
     try {
-      return source && amount ? parseUnits(amount, source.decimals) : 0n;
+      return source ? parseLocalizedUnits(amount, source.decimals, locale) : 0n;
     } catch {
       return 0n;
     }
@@ -356,10 +360,10 @@ export function EvmSwapPanel() {
       : wallet.address && !wallet.fundingWalletOnSelectedChain
         ? `Switch to ${wallet.fundingNetworkName}`
         : quoteLoading
-          ? "Finding route…"
+          ? t("findingRoute")
           : insufficient
-            ? "Insufficient balance"
-            : "Review swap";
+            ? t("insufficientBalance")
+            : t("reviewSwap");
   const actionDisabled =
     wallet.status === "unconfigured" ||
     submitting ||
@@ -378,7 +382,7 @@ export function EvmSwapPanel() {
         />
       )}
       <label className="portal-field">
-        <span>Funding network</span>
+        <span>{t("fundingNetwork")}</span>
         <select
           value={wallet.fundingChainId}
           onChange={(event) => {
@@ -396,7 +400,7 @@ export function EvmSwapPanel() {
         </select>
       </label>
       <SwapAssetField
-        label="You pay"
+        label={t("youPay")}
         slippage={slippage}
         onEditSlippage={() => setSettingsOpen(true)}
         tokens={tokens}
@@ -420,7 +424,7 @@ export function EvmSwapPanel() {
       <button
         className="portal-switch-assets"
         type="button"
-        aria-label="Switch swap direction"
+        aria-label={t("switchSwapDirection")}
         disabled={!source || !destination}
         onClick={() => {
           setSourceAddress(destination!.address);
@@ -433,7 +437,7 @@ export function EvmSwapPanel() {
         ⇅
       </button>
       <SwapAssetField
-        label="You receive"
+        label={t("youReceive")}
         tokens={tokens}
         selected={destination}
         excluded={source?.address}
@@ -449,7 +453,7 @@ export function EvmSwapPanel() {
       />
       <dl className="portal-quote-grid">
         <QuoteDatum
-          label="Minimum received"
+          label={t("minimumReceived")}
           value={
             minimumRaw && destination
               ? `${displayAmount(minimumRaw, destination)} ${destination.symbol}`
@@ -457,7 +461,7 @@ export function EvmSwapPanel() {
           }
         />
         <QuoteDatum
-          label="Price impact"
+          label={t("priceImpact")}
           value={
             quote?.quote?.priceImpact === undefined
               ? "--"
@@ -465,7 +469,7 @@ export function EvmSwapPanel() {
           }
         />
         <QuoteDatum
-          label="Network cost"
+          label={t("networkCost")}
           value={quote?.quote?.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
         />
       </dl>
@@ -492,10 +496,10 @@ export function EvmSwapPanel() {
             onClick={() => void confirmSwap()}
           >
             {submitState === "approving"
-              ? "Checking approval…"
+              ? t("checkingApproval")
               : submitState === "swapping"
-                ? "Swapping…"
-                : "Confirm swap"}
+                ? t("swapping")
+                : t("confirmSwap")}
           </button>
         </div>
       ) : (
@@ -537,6 +541,7 @@ function SwapAssetField({
   slippage?: number;
   onEditSlippage?: () => void;
 }) {
+  const t = useTranslations("portal");
   return (
     // A div rather than a label, because the slippage control lives in this
     // card and a button inside a label would also activate the amount input.
@@ -561,7 +566,7 @@ function SwapAssetField({
           value={selected?.address ?? ""}
           onChange={(event) => onToken(event.target.value)}
         >
-          {!selected && <option value="">Select asset</option>}
+          {!selected && <option value="">{t("selectAsset")}</option>}
           {tokens
             .filter((token) => token.address !== excluded)
             .map((token) => (
@@ -571,7 +576,7 @@ function SwapAssetField({
             ))}
         </select>
       </div>
-      <small>{readOnly ? "--" : `Balance ${balance}`}</small>
+      <small>{readOnly ? "--" : t("balance", { balance })}</small>
     </div>
   );
 }

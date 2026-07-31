@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits } from "viem";
+import { useTranslations } from "next-intl";
 
 import {
   SlippageInlineControl,
@@ -15,6 +16,8 @@ import { updateSolanaActivity, writeSolanaActivity } from "@/lib/portal/solana-a
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import type { SolanaToken } from "@/lib/solana-tokens";
 import { useSolanaWalletState } from "@/providers/solana-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 type JupiterOrder = {
   inAmount?: string;
@@ -38,6 +41,8 @@ async function json(response: Response): Promise<JupiterOrder> {
 }
 
 export function SolanaSwapPanel() {
+  const t = useTranslations("portal");
+  const locale = useAppLocale();
   const runtime = useSolanaWalletState();
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -54,7 +59,7 @@ export function SolanaSwapPanel() {
   const [error, setError] = useState<string | null>(null);
   let rawAmount = 0n;
   try {
-    rawAmount = amount ? parseUnits(amount, source.decimals) : 0n;
+    rawAmount = parseLocalizedUnits(amount, source.decimals, locale);
   } catch {
     rawAmount = 0n;
   }
@@ -175,12 +180,12 @@ export function SolanaSwapPanel() {
         />
       )}
       <div className="portal-destination">
-        <span>Network</span>
+        <span>{t("network")}</span>
         <strong>Solana</strong>
         <small>{wallet ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}` : "--"}</small>
       </div>
       <SolanaField
-        label="You pay"
+        label={t("youPay")}
         slippage={slippage}
         onEditSlippage={() => setSettingsOpen(true)}
         amount={amount}
@@ -216,7 +221,7 @@ export function SolanaSwapPanel() {
         ⇅
       </button>
       <SolanaField
-        label="You receive"
+        label={t("youReceive")}
         amount={output}
         tokens={tokens}
         token={destination}
@@ -231,15 +236,15 @@ export function SolanaSwapPanel() {
       />
       <dl className="portal-quote-grid">
         <div>
-          <dt>Minimum received</dt>
+          <dt>{t("minimumReceived")}</dt>
           <dd>{minimum}</dd>
         </div>
         <div>
-          <dt>Price impact</dt>
+          <dt>{t("priceImpact")}</dt>
           <dd>{quote?.priceImpactPct ? `${quote.priceImpactPct}%` : "--"}</dd>
         </div>
         <div>
-          <dt>Network cost</dt>
+          <dt>{t("networkCost")}</dt>
           <dd>--</dd>
         </div>
       </dl>
@@ -255,7 +260,7 @@ export function SolanaSwapPanel() {
           disabled={!runtime.configured || !runtime.ready}
           onClick={() => void runtime.createWallet()}
         >
-          Create Solana wallet
+          {t("createSolanaWallet")}
         </button>
       ) : reviewing ? (
         <button
@@ -264,7 +269,7 @@ export function SolanaSwapPanel() {
           disabled={submitting}
           onClick={() => void confirm()}
         >
-          {submitting ? "Submitting…" : "Confirm swap"}
+          {submitting ? t("submitting") : t("confirmSwap")}
         </button>
       ) : (
         <button
@@ -273,7 +278,7 @@ export function SolanaSwapPanel() {
           disabled={loading || !quote?.outAmount}
           onClick={() => setReviewing(true)}
         >
-          {loading ? "Finding route…" : "Review swap"}
+          {loading ? t("findingRoute") : t("reviewSwap")}
         </button>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { SurfaceStateKind } from "@/lib/surface-state";
 import { useWalletState } from "@/providers/wallet-context";
@@ -88,35 +89,36 @@ export type SurfaceBoundaryProps = SurfaceEmptyStateProps &
  */
 export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmptyStateProps) {
   const wallet = useWalletState();
+  const t = useTranslations("surface");
 
   switch (state) {
     case "unconfigured":
       return (
         <EmptyState
           tone="error"
-          title="Statics is not configured"
-          description="This build does not contain a verified Statics deployment. No wallet or protocol action is available."
+          title={t("notConfigured")}
+          description={t("notConfiguredDescription")}
         />
       );
 
     case "signed-out":
       return (
         <EmptyState
-          title={`Sign in to see your ${subject}`}
+          title={t("signInTitle", { subject })}
           // Phrased to avoid subject-verb agreement: `subject` is sometimes a
           // mass noun ("activity"), which made "your activity are" ungrammatical.
-          description="Your Statics account is tied to your wallet. Sign in, or connect one you already have."
-          action={{ label: "Sign in", onClick: wallet.login }}
+          description={t("signInDescription")}
+          action={{ label: t("signIn"), onClick: wallet.login }}
         />
       );
 
     case "wallet-missing":
       return (
         <EmptyState
-          title="Create your wallet"
-          description={`You are signed in, but you do not have a wallet yet. Create one to start using Statics.`}
+          title={t("createWallet")}
+          description={t("createWalletDescription")}
           action={{
-            label: wallet.busyAction === "create" ? "Creating…" : "Create wallet",
+            label: wallet.busyAction === "create" ? t("creating") : t("create"),
             onClick: () => void wallet.createWallet(),
             disabled: wallet.busyAction !== null,
           }}
@@ -126,10 +128,10 @@ export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmp
     case "wrong-network":
       return (
         <EmptyState
-          title="You are on the wrong network"
-          description={`Switch to ${wallet.networkName} to load your ${subject}.`}
+          title={t("wrongNetwork")}
+          description={t("wrongNetworkDescription", { network: wallet.networkName, subject })}
           action={{
-            label: wallet.busyAction === "switch" ? "Switching…" : "Switch network",
+            label: wallet.busyAction === "switch" ? t("switching") : t("switch"),
             onClick: () => void wallet.switchNetwork(),
             disabled: wallet.busyAction !== null,
           }}
@@ -137,20 +139,15 @@ export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmp
       );
 
     case "loading":
-      return (
-        <EmptyState
-          title={`Loading your ${subject}…`}
-          description="This should only take a moment."
-        />
-      );
+      return <EmptyState title={t("loading", { subject })} description={t("loadingDescription")} />;
 
     case "error":
       return (
         <EmptyState
           tone="error"
-          title={`Could not load your ${subject}`}
-          description="Something went wrong reading from the network. Your funds are not affected."
-          action={onRetry ? { label: "Try again", onClick: onRetry } : undefined}
+          title={t("error", { subject })}
+          description={t("errorDescription")}
+          action={onRetry ? { label: t("retry"), onClick: onRetry } : undefined}
         />
       );
 
@@ -178,11 +175,12 @@ export function SurfaceBoundary({
 }
 
 export function UnconfiguredSurface({ subject }: { subject: string }) {
+  const t = useTranslations("surface");
   return (
     <SurfaceEmptyState
       state="unconfigured"
       subject={subject}
-      empty={{ title: `${subject} unavailable`, description: "No deployment is configured." }}
+      empty={{ title: t("unavailable", { subject }), description: t("noDeployment") }}
     />
   );
 }

@@ -2,16 +2,10 @@
 
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  encodeFunctionData,
-  formatUnits,
-  getAddress,
-  parseUnits,
-  type Address,
-  type Hex,
-} from "viem";
+import { encodeFunctionData, formatUnits, getAddress, type Address, type Hex } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   basketTokenAbi,
@@ -53,6 +47,8 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -66,12 +62,17 @@ function shortAddress(address: Address): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function feeTierLabel(tiers: BasketRecord["mintFeeTiers"]): string {
-  if (tiers.length === 0) return "No configured tier";
+function feeTierLabel(
+  tiers: BasketRecord["mintFeeTiers"],
+  translate: (key: "noTier" | "tier", values?: Record<string, string>) => string
+): string {
+  if (tiers.length === 0) return translate("noTier");
   return tiers
-    .map(
-      (tier) =>
-        `${displayAmount(tier.feeShares)} shares from ${displayAmount(tier.minActionShares)}`
+    .map((tier) =>
+      translate("tier", {
+        fee: displayAmount(tier.feeShares),
+        minimum: displayAmount(tier.minActionShares),
+      })
     )
     .join(" · ");
 }
@@ -85,8 +86,9 @@ export function BasketDetailPage({
   initialAction?: BasketConversionAction;
   initialPositionId?: bigint | null;
 }) {
+  const t = useTranslations("baskets");
   const wallet = useWalletState();
-  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Basket" />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("singular")} />;
   return (
     <BasketDetailRuntime
       basketId={basketId}
@@ -105,6 +107,8 @@ function BasketDetailRuntime({
   initialAction: BasketConversionAction;
   initialPositionId: bigint | null;
 }) {
+  const locale = useAppLocale();
+  const t = useTranslations("baskets");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -122,11 +126,11 @@ function BasketDetailRuntime({
   const [actionError, setActionError] = useState<string | null>(null);
   const amount = useMemo(() => {
     try {
-      return amountInput ? parseUnits(amountInput, 18) : 0n;
+      return parseLocalizedUnits(amountInput, 18, locale);
     } catch {
       return 0n;
     }
-  }, [amountInput]);
+  }, [amountInput, locale]);
   const slippageBps = parseSlippageBps(slippageInput);
 
   const positions = useQuery({
@@ -454,8 +458,8 @@ function BasketDetailRuntime({
     return (
       <SurfaceEmptyState
         state="unconfigured"
-        subject="basket"
-        empty={{ title: "Basket unavailable", description: "No basket data is available." }}
+        subject={t("singular")}
+        empty={{ title: t("unavailable"), description: t("noData") }}
       />
     );
   }
@@ -470,49 +474,52 @@ function BasketDetailRuntime({
           isEmpty: false,
           hasData: false,
         })}
-        subject="basket"
+        subject={t("singular")}
         onRetry={() => void catalog.refetch()}
-        empty={{ title: "Basket unavailable", description: "No basket data is available." }}
+        empty={{ title: t("unavailable"), description: t("noData") }}
       />
     );
   }
   if (!basket) {
     return (
       <EmptyState
-        title="Basket not found"
-        description={`Basket #${basketId.toString()} is not part of this verified deployment.`}
-        action={{ label: "Browse baskets", href: "/app/baskets" }}
+        title={t("notFound")}
+        description={t("notFoundDescription", { id: basketId.toString() })}
+        action={{ label: t("browse"), href: "/app/baskets" }}
       />
     );
   }
 
   const quoteLabel =
     quoteState === "ready"
-      ? "Current onchain quote"
+      ? t("currentQuote")
       : quote.data
-        ? `Previous quote · ${formatUnits(quote.data.amount, 18)} ${basket.symbol}`
-        : "Onchain quote";
+        ? t("previousQuote", {
+            amount: formatUnits(quote.data.amount, 18),
+            symbol: basket.symbol,
+          })
+        : t("onchainQuote");
   const quoteAmounts = currentQuote?.amounts ?? quote.data?.amounts;
-  let primaryLabel = availability?.label || "Review basket";
+  let primaryLabel = availability?.label || t("review");
   let primaryAction: (() => void) | null = () => void executeNextAction();
   if (walletState.status === "signed-out" || walletState.status === "error") {
-    primaryLabel = "Sign in to continue";
+    primaryLabel = t("signIn");
     primaryAction = walletState.login;
   } else if (walletState.status === "wallet-missing") {
-    primaryLabel = "Create embedded wallet";
+    primaryLabel = t("createWallet");
     primaryAction = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
-    primaryLabel = `Switch to ${walletState.networkName}`;
+    primaryLabel = t("switchNetwork", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();
   } else if (walletState.status !== "ready") {
-    primaryLabel = "Wallet loading…";
+    primaryLabel = t("walletLoading");
     primaryAction = null;
   }
 
   return (
     <div className="basket-detail">
       <Link className="basket-back" href="/app/baskets">
-        ← All baskets
+        ← {t("all")}
       </Link>
       <section className="basket-hero">
         <div>
@@ -526,15 +533,15 @@ function BasketDetailRuntime({
         </div>
         <dl>
           <div>
-            <dt>Total supply</dt>
+            <dt>{t("totalSupply")}</dt>
             <dd>{displayAmount(basket.totalSupply)}</dd>
           </div>
           <div>
-            <dt>Your balance</dt>
-            <dd>{wallet ? displayAmount(basket.walletBalance) : "Connect"}</dd>
+            <dt>{t("yourBalance")}</dt>
+            <dd>{wallet ? displayAmount(basket.walletBalance) : t("connect")}</dd>
           </div>
           <div>
-            <dt>Creator</dt>
+            <dt>{t("creator")}</dt>
             <dd title={basket.creator}>{shortAddress(basket.creator)}</dd>
           </div>
         </dl>
@@ -544,8 +551,10 @@ function BasketDetailRuntime({
         <section className="basket-composition" aria-labelledby="basket-composition-title">
           <div className="basket-section-heading">
             <div>
-              <p className="dapp-section-label">Static composition</p>
-              <h3 id="basket-composition-title">{basket.constituents.length} underlyings</h3>
+              <p className="dapp-section-label">{t("staticComposition")}</p>
+              <h3 id="basket-composition-title">
+                {t("underlyingCount", { count: basket.constituents.length })}
+              </h3>
             </div>
           </div>
           <ol>
@@ -558,29 +567,23 @@ function BasketDetailRuntime({
                     {constituent.token.name} · {shortAddress(constituent.token.address)}
                   </small>
                   {!constituent.token.metadataAvailable && (
-                    <small className="is-warning">
-                      Token metadata unavailable; address is authoritative.
-                    </small>
+                    <small className="is-warning">{t("metadataUnavailable")}</small>
                   )}
                 </div>
                 <div>
                   <strong>
                     {displayAmount(constituent.bundleAmount, constituent.token.decimals)}
                   </strong>
-                  <small>per basket share</small>
+                  <small>{t("perShare")}</small>
                 </div>
               </li>
             ))}
           </ol>
-          <p className="dollar-warning">
-            Underlyings may implement transfer fees, rebasing, unusual approvals, or other
-            nonstandard behavior. Review every token address. Holding {basket.symbol} does not earn
-            basket-specific fees.
-          </p>
+          <p className="dollar-warning">{t("tokenWarning", { symbol: basket.symbol })}</p>
         </section>
 
         <section className="basket-action-card" aria-labelledby="basket-action-title">
-          <div className="dollar-tabs" aria-label="Basket action">
+          <div className="dollar-tabs" aria-label={t("action")}>
             {(["mint", "redeem", "swap"] as const).map((choice) => (
               <button
                 key={choice}
@@ -592,7 +595,7 @@ function BasketDetailRuntime({
                 }}
                 disabled={pending}
               >
-                {choice}
+                {t(choice)}
               </button>
             ))}
           </div>
@@ -600,9 +603,11 @@ function BasketDetailRuntime({
             <BasketSwapPanel basket={basket} />
           ) : (
             <>
-              <h3 id="basket-action-title">{mode === "mint" ? "Mint basket" : "Redeem basket"}</h3>
+              <h3 id="basket-action-title">
+                {mode === "mint" ? t("mintTitle") : t("redeemTitle")}
+              </h3>
               <label className="basket-field">
-                <span>{basket.symbol} amount</span>
+                <span>{t("amount", { symbol: basket.symbol })}</span>
                 <input
                   value={amountInput}
                   onChange={(event) => {
@@ -615,7 +620,7 @@ function BasketDetailRuntime({
                 />
               </label>
               <label className="basket-field">
-                <span>Slippage tolerance</span>
+                <span>{t("slippage")}</span>
                 <div>
                   <input
                     value={slippageInput}
@@ -629,10 +634,10 @@ function BasketDetailRuntime({
                   />
                   <strong>%</strong>
                 </div>
-                <small id="basket-slippage-help">Allowed range 0–5%. Default 0.50%.</small>
+                <small id="basket-slippage-help">{t("slippageHelp")}</small>
               </label>
               <label className="basket-field">
-                <span>{mode === "mint" ? "Receive basket in" : "Redeem basket from"}</span>
+                <span>{mode === "mint" ? t("receiveIn") : t("redeemFrom")}</span>
                 <select
                   value={conversionSelection}
                   onChange={(event) => {
@@ -642,28 +647,34 @@ function BasketDetailRuntime({
                   disabled={pending || positions.isPending}
                 >
                   <option value="wallet">
-                    Wallet{mode === "mint" ? " · does not earn basket rewards" : ""}
+                    {t("wallet")}
+                    {mode === "mint" ? ` · ${t("walletNoRewards")}` : ""}
                   </option>
-                  {mode === "mint" && <option value="new-position">New earning position</option>}
+                  {mode === "mint" && <option value="new-position">{t("newPosition")}</option>}
                   {(mode === "mint" ? ownedPositions : redeemablePositions).map((position) => (
                     <option
                       key={position.positionId.toString()}
                       value={positionSelection(position.positionId)}
                     >
-                      Position #{position.positionId.toString()}
+                      {t("positionNumber", { id: position.positionId.toString() })}
                     </option>
                   ))}
                 </select>
                 <small>
                   {mode === "mint"
                     ? conversionSelection === "wallet"
-                      ? `The ${basket.symbol} remains liquid in your wallet and earns no basket rewards.`
+                      ? t("walletMintHelp", { symbol: basket.symbol })
                       : conversionSelection === "new-position"
-                        ? "Creates a PositionNFT and deposits the minted basket in the same transaction."
-                        : `Mints directly into Position #${conversionPositionId?.toString()} so it can earn selected rewards.`
+                        ? t("newPositionHelp")
+                        : t("existingPositionHelp", {
+                            id: conversionPositionId?.toString() ?? "",
+                          })
                     : conversionPositionId === null
-                      ? `Burns ${basket.symbol} held in your wallet.`
-                      : `Burns unlocked ${basket.symbol} collateral from Position #${conversionPositionId.toString()}.`}
+                      ? t("walletBurnHelp", { symbol: basket.symbol })
+                      : t("positionBurnHelp", {
+                          symbol: basket.symbol,
+                          id: conversionPositionId.toString(),
+                        })}
                 </small>
               </label>
               <div className="basket-quote">
@@ -674,20 +685,18 @@ function BasketDetailRuntime({
                       const constituent = basket.constituents[index];
                       return (
                         <li key={constituent?.token.address || index}>
-                          <span>{constituent?.token.symbol || `Leg ${index + 1}`}</span>
+                          <span>
+                            {constituent?.token.symbol || t("leg", { number: index + 1 })}
+                          </span>
                           <strong>{displayAmount(value, constituent?.token.decimals ?? 18)}</strong>
                         </li>
                       );
                     })}
                   </ul>
                 ) : (
-                  <strong>Enter an amount for a fresh quote</strong>
+                  <strong>{t("enterAmount")}</strong>
                 )}
-                <small>
-                  {mode === "mint"
-                    ? "Approvals use the displayed caller-side maximums."
-                    : "Redemption enforces receiver-side minimum outputs."}
-                </small>
+                <small>{mode === "mint" ? t("mintProtection") : t("redeemProtection")}</small>
               </div>
               {availability?.reason && (
                 <p className="dollar-action-reason">{availability.reason}</p>
@@ -709,7 +718,7 @@ function BasketDetailRuntime({
                     !availability?.executable)
                 }
               >
-                {pending ? "Waiting for confirmation…" : primaryLabel}
+                {pending ? t("waiting") : primaryLabel}
               </button>
             </>
           )}
@@ -719,38 +728,38 @@ function BasketDetailRuntime({
       <section className="basket-parameters" aria-labelledby="basket-parameters-title">
         <div className="basket-section-heading">
           <div>
-            <p className="dapp-section-label">Current configuration</p>
-            <h3 id="basket-parameters-title">Fees and lending parameters</h3>
+            <p className="dapp-section-label">{t("configuration")}</p>
+            <h3 id="basket-parameters-title">{t("parameters")}</h3>
           </div>
         </div>
         <dl>
           <div>
-            <dt>Mint tiers</dt>
-            <dd>{feeTierLabel(basket.mintFeeTiers)}</dd>
+            <dt>{t("mintTiers")}</dt>
+            <dd>{feeTierLabel(basket.mintFeeTiers, (key, values) => t(key, values))}</dd>
           </div>
           <div>
-            <dt>Redemption tiers</dt>
-            <dd>{feeTierLabel(basket.redemptionFeeTiers)}</dd>
+            <dt>{t("redemptionTiers")}</dt>
+            <dd>{feeTierLabel(basket.redemptionFeeTiers, (key, values) => t(key, values))}</dd>
           </div>
           <div>
-            <dt>Flash fee</dt>
+            <dt>{t("flashFee")}</dt>
             <dd>{(basket.flashFeeBps / 100).toFixed(2)}%</dd>
           </div>
           <div>
-            <dt>Origination fee</dt>
+            <dt>{t("originationFee")}</dt>
             <dd>{(basket.originationFeeBps / 100).toFixed(2)}%</dd>
           </div>
           <div>
-            <dt>Extension fee</dt>
+            <dt>{t("extensionFee")}</dt>
             <dd>{(basket.extensionFeeBps / 100).toFixed(2)}%</dd>
           </div>
           <div>
-            <dt>Maximum LTV</dt>
+            <dt>{t("maximumLtv")}</dt>
             <dd>{(basket.ltvBps / 100).toFixed(2)}%</dd>
           </div>
           <div>
-            <dt>Loan duration</dt>
-            <dd>{Math.floor(basket.loanDuration / 86_400)} days</dd>
+            <dt>{t("loanDuration")}</dt>
+            <dd>{t("days", { count: Math.floor(basket.loanDuration / 86_400) })}</dd>
           </div>
         </dl>
       </section>
