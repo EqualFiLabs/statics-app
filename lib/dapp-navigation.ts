@@ -109,18 +109,24 @@ const routePresentations = {
   },
 } as const satisfies Record<string, DappRoutePresentation>;
 
+export type DappRouteId = keyof typeof routePresentations;
+
+export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/wallet")) return "wallet";
+  if (pathname.startsWith("/app/faucet")) return "faucet";
+  if (pathname.startsWith("/app/portal")) return "portal";
+  if (pathname.startsWith("/app/dollar")) return "dollar";
+  if (pathname.startsWith("/app/baskets")) return "baskets";
+  if (pathname.startsWith("/app/create")) return "create";
+  if (pathname.startsWith("/app/positions")) return "positions";
+  if (pathname.startsWith("/app/loans")) return "loans";
+  if (pathname.startsWith("/app/rewards")) return "rewards";
+  if (pathname.startsWith("/app/liquidity")) return "liquidity";
+  if (pathname.startsWith("/app/activity")) return "activity";
+  if (pathname.startsWith("/app/tools")) return "tools";
+  return "overview";
+}
+
 export function getDappRoutePresentation(pathname: string): DappRoutePresentation {
-  if (pathname.startsWith("/app/wallet")) return routePresentations.wallet;
-  if (pathname.startsWith("/app/faucet")) return routePresentations.faucet;
-  if (pathname.startsWith("/app/portal")) return routePresentations.portal;
-  if (pathname.startsWith("/app/dollar")) return routePresentations.dollar;
-  if (pathname.startsWith("/app/baskets")) return routePresentations.baskets;
-  if (pathname.startsWith("/app/create")) return routePresentations.create;
-  if (pathname.startsWith("/app/positions")) return routePresentations.positions;
-  if (pathname.startsWith("/app/loans")) return routePresentations.loans;
-  if (pathname.startsWith("/app/rewards")) return routePresentations.rewards;
-  if (pathname.startsWith("/app/liquidity")) return routePresentations.liquidity;
-  if (pathname.startsWith("/app/activity")) return routePresentations.activity;
-  if (pathname.startsWith("/app/tools")) return routePresentations.tools;
-  return routePresentations.overview;
+  return routePresentations[getDappRouteId(pathname)];
 }

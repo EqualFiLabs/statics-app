@@ -4,5 +4,364 @@
     "change": "Change language",
     "saving": "Changing language…",
     "error": "Language could not be changed. Try again."
+  },
+  "common": {
+    "skipToContent": "Skip to content",
+    "skipToApplication": "Skip to application content",
+    "close": "Close",
+    "planned": "Planned",
+    "comingSoon": "{label} link coming soon"
+  },
+  "metadata": {
+    "title": "Statics Protocol",
+    "titleTemplate": "{page} | Statics Protocol",
+    "description": "Statics unifies static multi-asset baskets, position-owned finance, and protocol-owned liquidity with a native dollar.",
+    "socialDescription": "Static assets. Static rules. Dynamic markets. Own your position."
+  },
+  "navigation": {
+    "primary": "Primary navigation",
+    "mainMenu": "Main menu",
+    "toggle": "Toggle navigation",
+    "home": "Statics Protocol home",
+    "launchApp": "Launch app",
+    "returnLanding": "Return to Statics Protocol landing page",
+    "site": "Site",
+    "dapp": "DApp navigation",
+    "application": "Application navigation",
+    "returnSite": "Return to site",
+    "mobileMenu": "Application menu. Current route: {route}",
+    "groups": {
+      "overview": "Overview",
+      "earn": "Earn",
+      "assets": "Assets",
+      "manage": "Manage",
+      "account": "Account"
+    },
+    "items": {
+      "overview": "Overview",
+      "earn": "Earn",
+      "liquidity": "Liquidity",
+      "baskets": "Baskets",
+      "dollar": "Dollar",
+      "positions": "Positions",
+      "loans": "Loans",
+      "wallet": "Wallet",
+      "faucet": "Faucet",
+      "activity": "Activity",
+      "tools": "Tools"
+    },
+    "marketing": {
+      "protocol": "Protocol",
+      "baskets": "Baskets",
+      "dollar": "Dollar",
+      "liquidity": "Liquidity",
+      "docs": "Docs",
+      "dev": "Dev"
+    }
+  },
+  "routes": {
+    "overview": {
+      "label": "Overview",
+      "status": "Portfolio",
+      "title": "Your portfolio",
+      "description": "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed."
+    },
+    "dollar": {
+      "label": "Dollar",
+      "status": "Dollar",
+      "title": "Get Statics Dollar",
+      "description": "Deposit ETH to receive Dollar, or convert your Dollar and risk shares back into ETH. You will see the exact amounts before you confirm."
+    },
+    "wallet": {
+      "label": "Wallet",
+      "status": "Wallet",
+      "title": "Your wallet",
+      "description": "Check your balances, add funds, send assets, and move money in and out of Statics."
+    },
+    "faucet": {
+      "label": "Faucet",
+      "status": "Testnet",
+      "title": "Get testnet assets",
+      "description": "Claim the fixtures used by Statics or open Robinhood's faucet for more testnet ETH and stock tokens."
+    },
+    "portal": {
+      "label": "Add funds",
+      "status": "Add funds",
+      "title": "Add funds to Statics",
+      "description": "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar."
+    },
+    "baskets": {
+      "label": "Baskets",
+      "status": "Baskets",
+      "title": "Baskets",
+      "description": "Buy or sell a fixed bundle of assets as one unit. You will see exactly what a basket holds before you buy."
+    },
+    "positions": {
+      "label": "Positions",
+      "status": "Positions",
+      "title": "Your positions",
+      "description": "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here."
+    },
+    "loans": {
+      "label": "Loans",
+      "status": "Loans",
+      "title": "Your loans",
+      "description": "Money you have borrowed against locked collateral. Review what you owe, what is locked, and when each loan is due."
+    },
+    "rewards": {
+      "label": "Rewards",
+      "status": "Rewards",
+      "title": "Your rewards",
+      "description": "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up."
+    },
+    "liquidity": {
+      "label": "Liquidity",
+      "status": "Liquidity",
+      "title": "Provide liquidity",
+      "description": "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned."
+    },
+    "create": {
+      "label": "Launch policy",
+      "status": "Governed",
+      "title": "Basket launch policy",
+      "description": "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available."
+    },
+    "activity": {
+      "label": "Activity",
+      "status": "Activity",
+      "title": "Your activity",
+      "description": "Every action from this wallet, from the moment you confirm it to the moment it settles."
+    },
+    "tools": {
+      "label": "Tools",
+      "status": "Tools",
+      "title": "Approval tools",
+      "description": "Review and revoke the permissions this wallet has granted to Statics."
+    }
+  },
+  "shell": {
+    "walletUnavailable": "Wallet unavailable",
+    "loadingWallet": "Loading wallet…",
+    "connectWallet": "Connect wallet",
+    "signIn": "Sign in",
+    "creating": "Creating…",
+    "createWallet": "Create wallet",
+    "retrySignIn": "Retry sign in",
+    "accountDetails": "Account details",
+    "walletReady": "Wallet ready",
+    "networkUnknown": "Network unknown",
+    "chain": "Chain {chainId}",
+    "wrongNetworkTitle": "You are on the wrong network.",
+    "wrongNetworkBody": "Statics data will not load until you switch to {network}.",
+    "wrongNetworkBodyWithChain": "Statics data will not load until you switch to {network} (chain {chainId}).",
+    "switching": "Switching…",
+    "switchNetwork": "Switch network",
+    "application": "Statics application",
+    "primary": "Primary"
+  },
+  "account": {
+    "title": "Your account",
+    "walletType": "Wallet type",
+    "connectedWallet": "Connected wallet",
+    "embeddedWallet": "Embedded wallet",
+    "externalWallet": "External wallet",
+    "network": "Network",
+    "unknownNetwork": "Unknown network",
+    "chain": "Chain {chainId}",
+    "ethereum": "Ethereum",
+    "ethereumMissing": "No Ethereum address yet.",
+    "solana": "Solana",
+    "solanaMissing": "No Solana wallet yet. One is created the first time you use a Solana route.",
+    "copied": "{label} address copied",
+    "copy": "Copy {label} address",
+    "explorer": "View Ethereum account on explorer",
+    "exportTitle": "Export embedded wallet",
+    "exportWarning": "Exporting reveals recovery material that controls this wallet and every asset it holds. Never share it or paste it into a website, chat, or cloud note.",
+    "openingExport": "Opening secure export…",
+    "reviewExport": "Review secure export",
+    "signingOut": "Signing out…",
+    "signOut": "Sign out of Statics"
+  },
+  "landing": {
+    "eyebrow": "The anchor is fixed. The market is not.",
+    "heroLine1": "Static assets.",
+    "heroLine2": "Static rules.",
+    "heroLine3": "Dynamic markets.",
+    "heroDescription": "Every basket is a fixed bundle, always redeemable for exactly what is inside it. No manager, no rebalancing, no liquidations. Markets move around that anchor — Statics pays the people who hold it steady.",
+    "whatsFixed": "What's fixed",
+    "foundations": "Protocol foundations",
+    "fixedBundles": "Fixed bundles",
+    "inKindRedemption": "In-kind redemption",
+    "openSource": "Open source",
+    "heroVisual": "Digital marble statue of Robin Hood",
+    "heroAlt": "A fragmented digital marble statue of Robin Hood wearing a feathered cap and goatee",
+    "systemStatus": "System status",
+    "network": "Network",
+    "deployment": "Deployment",
+    "time": "Time",
+    "protocol": "Statics protocol",
+    "publicBeta": "Public testnet beta",
+    "economies": "Protocol economies",
+    "basketsTitle": "Statics baskets",
+    "basketsHow": "How Statics baskets work",
+    "basketsDescription": "A fixed bundle of 1–16 assets, held as a single token. Redeem it any time for exactly what is inside — the same amounts, forever. No manager, no rebalancing, no discretion.",
+    "assetExamples": "Supported asset examples",
+    "ether": "Ether",
+    "bitcoin": "Bitcoin",
+    "dollarAssets": "Dollar assets",
+    "stableAssets": "Stable assets",
+    "additionalAssets": "Additional assets",
+    "governedAssets": "Governed assets",
+    "more": "+ More",
+    "dollarTitle": "Statics dollar",
+    "dollarHow": "How the Statics dollar works",
+    "dollarDescription": "A dollar backed by collateral anyone can verify on-chain. Risk shares take losses first, so the dollar stays whole.",
+    "dollarCapabilities": "Statics dollar capabilities",
+    "dollar": "Dollar",
+    "shares": "Shares",
+    "redeem": "Redeem",
+    "whenHealthy": "When healthy",
+    "permit": "Permit",
+    "oneSignature": "One signature",
+    "assetsPerBasket": "Assets per basket",
+    "chosenOnce": "Chosen once, at creation",
+    "redemption": "Redemption",
+    "inKind": "In kind",
+    "exactlyInside": "Exactly what is inside",
+    "rebalancing": "Rebalancing",
+    "never": "Never",
+    "weightsNeverChange": "Weights never change",
+    "liquidations": "Liquidations",
+    "none": "None",
+    "debtMatches": "Debt matches collateral",
+    "rewardAssets": "Reward assets",
+    "upTo64": "Up to 64",
+    "perPosition": "Per staked position",
+    "features": "Protocol features",
+    "ownPosition": "Own your position",
+    "ownPositionDescription": "Baskets, loans, and dollar series live in one position you can hold, transfer, or sell as a single asset.",
+    "noLiquidations": "No liquidations",
+    "noLiquidationsDescription": "Debt is denominated in the same assets as the collateral, so a price crash moves both sides together. There is nothing to liquidate.",
+    "deepLiquidity": "Liquidity that deepens",
+    "deepLiquidityDescription": "A share of every swap becomes permanent protocol-owned liquidity. Pools get deeper the more they trade, and that depth cannot be withdrawn.",
+    "stakeEarn": "Stake and earn",
+    "stakeEarnDescription": "Stake and opt into up to 64 reward assets. Rewards are swap fees paid in kind — real revenue, not emissions.",
+    "tagline": "Fixed assets. Fixed rules. Everything else is free to move.",
+    "principles": "Protocol principles",
+    "bundleNeverChanges": "The bundle never changes",
+    "redeemExactly": "Redeem for exactly what is inside",
+    "noKyc": "No KYC",
+    "noPermission": "No permission",
+    "noMiddlemen": "No middlemen",
+    "staticAssets": "Static assets",
+    "dynamicMarkets": "Dynamic markets",
+    "auditStatus": "Audit status",
+    "projectLinks": "Project links",
+    "legalLinks": "Legal links",
+    "docs": "Docs",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "X / Twitter",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "security": "Security",
+    "status": {
+      "system": "Public testnet beta",
+      "network": "Robinhood Testnet",
+      "deployment": "Testnet live",
+      "audit": "Internal review"
+    }
+  },
+  "glossary": {
+    "position": {
+      "label": "Position",
+      "plural": "Positions",
+      "plain": "Everything you hold in Statics, bundled into one transferable item."
+    },
+    "basket": {
+      "label": "Basket",
+      "plural": "Baskets",
+      "plain": "A fixed bundle of assets you can buy or sell as a single unit."
+    },
+    "underlying": {
+      "label": "Underlying",
+      "plural": "Underlyings",
+      "plain": "One of the assets a basket holds. A basket is worth what its underlyings are worth."
+    },
+    "dollar": {
+      "label": "Dollar",
+      "plural": "Dollars",
+      "plain": "Statics' own dollar, backed by assets you deposit."
+    },
+    "riskShares": {
+      "label": "Risk shares",
+      "plural": "Risk shares",
+      "plain": "The variable half of a deposit: it absorbs price moves so the Dollar stays stable."
+    },
+    "collateral": {
+      "label": "Collateral",
+      "plural": "Collateral",
+      "plain": "Assets you lock up to back a Dollar balance or a loan."
+    },
+    "loan": {
+      "label": "Loan",
+      "plural": "Loans",
+      "plain": "Money borrowed against collateral you have locked, repayable on its own schedule."
+    },
+    "liquidity": {
+      "label": "Liquidity",
+      "plural": "Liquidity",
+      "plain": "Assets you supply so other people can trade, earning you a share of the fees."
+    },
+    "liquidityPosition": {
+      "label": "Liquidity position",
+      "plural": "Liquidity positions",
+      "plain": "Your individual share of a trading pool."
+    },
+    "tradingFees": {
+      "label": "Trading fees",
+      "plural": "Trading fees",
+      "plain": "The cut taken on each trade in a pool, shared out to the people who supplied it."
+    },
+    "protocolLiquidity": {
+      "label": "Protocol-owned liquidity",
+      "plural": "Protocol-owned liquidity",
+      "plain": "Liquidity the protocol holds permanently, rather than any individual person."
+    },
+    "priceFeed": {
+      "label": "Price feed",
+      "plural": "Price feeds",
+      "plain": "The live price the protocol uses to value your assets."
+    },
+    "borrowLimit": {
+      "label": "Borrow limit",
+      "plural": "Borrow limits",
+      "plain": "The most that can be borrowed against the collateral backing this profile."
+    },
+    "health": {
+      "label": "Health",
+      "plural": "Health",
+      "plain": "How well covered your position is. Higher is safer."
+    },
+    "rewards": {
+      "label": "Rewards",
+      "plural": "Rewards",
+      "plain": "Fees you have earned and can claim."
+    },
+    "staking": {
+      "label": "Staking",
+      "plural": "Staking",
+      "plain": "Depositing Statics so it earns a share of protocol fees. It stays withdrawable."
+    },
+    "earningDelay": {
+      "label": "Earning delay",
+      "plural": "Earning delay",
+      "plain": "Newly staked funds start earning a little later. They are never locked up."
+    },
+    "openToAnyone": {
+      "label": "Open to anyone",
+      "plural": "Open to anyone",
+      "plain": "No approval or gatekeeper. Anyone can do this."
+    }
   }
 }

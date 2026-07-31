@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 
 import { readPublicEnvironment } from "@/lib/site-config";
 
@@ -22,29 +22,31 @@ const mono = IBM_Plex_Mono({
 
 const environment = readPublicEnvironment();
 
-export const metadata: Metadata = {
-  metadataBase: environment.siteUrl ? new URL(environment.siteUrl) : undefined,
-  title: {
-    default: "Statics Protocol",
-    template: "%s | Statics Protocol",
-  },
-  description:
-    "Statics unifies static multi-asset baskets, position-owned finance, and protocol-owned liquidity with a native dollar.",
-  icons: {
-    icon: "/assets/statics-icon.png",
-    apple: "/assets/statics-icon.png",
-  },
-  openGraph: {
-    title: "Statics Protocol",
-    description: "Static assets. Static rules. Dynamic markets. Own your position.",
-    type: "website",
-  },
-  twitter: {
-    card: "summary",
-    title: "Statics Protocol",
-    description: "Static assets. Static rules. Dynamic markets. Own your position.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("metadata");
+  return {
+    metadataBase: environment.siteUrl ? new URL(environment.siteUrl) : undefined,
+    title: {
+      default: t("title"),
+      template: t("titleTemplate", { page: "%s" }),
+    },
+    description: t("description"),
+    icons: {
+      icon: "/assets/statics-icon.png",
+      apple: "/assets/statics-icon.png",
+    },
+    openGraph: {
+      title: t("title"),
+      description: t("socialDescription"),
+      type: "website",
+    },
+    twitter: {
+      card: "summary",
+      title: t("title"),
+      description: t("socialDescription"),
+    },
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
