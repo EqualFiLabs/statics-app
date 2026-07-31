@@ -1,0 +1,8 @@
+{
+  "locale": {
+    "label": "Idioma",
+    "change": "Cambiar idioma",
+    "saving": "Cambiando el idioma…",
+    "error": "No se pudo cambiar el idioma. Inténtalo de nuevo."
+  }
+}
