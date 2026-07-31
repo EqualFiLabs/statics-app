@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { AcrossBridgePanel } from "@/components/portal/AcrossBridgePanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
@@ -13,11 +14,6 @@ import { useWalletState } from "@/providers/wallet-context";
 
 export type PortalMode = "swap" | "bridge";
 
-const modeLabels: Record<PortalMode, string> = {
-  swap: "Swap",
-  bridge: "Bridge",
-};
-
 export function PortalWorkspace({
   initialMode = "swap",
   initialSwapRuntime = "evm",
@@ -27,6 +23,7 @@ export function PortalWorkspace({
   initialSwapRuntime?: "evm" | "solana";
   compact?: boolean;
 }) {
+  const t = useTranslations("portal");
   const wallet = useWalletState();
   const [mode, setMode] = useState<PortalMode>(initialMode);
   const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
@@ -36,7 +33,7 @@ export function PortalWorkspace({
   return (
     <section className={`portal-workspace${compact ? " is-compact" : ""}`}>
       <div className="portal-header">
-        <div className="portal-mode-tabs" role="tablist" aria-label="Portal mode">
+        <div className="portal-mode-tabs" role="tablist" aria-label={t("mode")}>
           {(["swap", "bridge"] as const).map((item) => (
             <button
               key={item}
@@ -45,14 +42,14 @@ export function PortalWorkspace({
               aria-selected={mode === item}
               onClick={() => setMode(item)}
             >
-              {modeLabels[item]}
+              {t(item)}
             </button>
           ))}
         </div>
         <button
           className="portal-settings-button"
           type="button"
-          aria-label={`Portal settings, slippage ${slippage}%`}
+          aria-label={t("settings", { slippage })}
           onClick={() => setSettingsOpen(true)}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -72,7 +69,7 @@ export function PortalWorkspace({
 
       {mode === "swap" && (
         <>
-          <div className="portal-chain-tabs" aria-label="Swap chain type">
+          <div className="portal-chain-tabs" aria-label={t("chainType")}>
             <button
               type="button"
               aria-pressed={swapRuntime === "evm"}
@@ -95,8 +92,8 @@ export function PortalWorkspace({
       {mode === "bridge" && <AcrossBridgePanel />}
 
       <div className="portal-dollar-route">
-        <span>Want to deposit USDG or manage Statics Dollar?</span>
-        <Link href="/app/dollar?profile=USDG">Open Dollar →</Link>
+        <span>{t("dollarPrompt")}</span>
+        <Link href="/app/dollar?profile=USDG">{t("openDollar")} →</Link>
       </div>
 
       <p className="portal-runtime-state" aria-live="polite">

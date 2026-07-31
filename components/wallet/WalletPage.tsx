@@ -11,7 +11,6 @@ import {
   getAddress,
   isAddress,
   parseAbi,
-  parseUnits,
   zeroAddress,
   type Address,
   type Hex,
@@ -19,6 +18,7 @@ import {
 
 import { usePublicClient, useWalletClient } from "wagmi";
 import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
 import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
@@ -42,6 +42,8 @@ import { searchTokenList } from "@/lib/token-list";
 import { getNativeTokenLogoURI } from "@/lib/token-icons";
 import type { WalletToken } from "@/lib/wallet-tokens";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const erc20Abi = [
   {
@@ -91,6 +93,7 @@ function displayBalance(value: AssetBalance, decimals: number) {
 }
 
 export function WalletPage() {
+  const t = useTranslations("wallet");
   const wallet = useWalletState();
   const network = getFundingNetwork(wallet.fundingChainId);
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
@@ -209,7 +212,7 @@ export function WalletPage() {
   const nativeAsset = {
     id: "native",
     kind: "native" as const,
-    name: network?.chain.nativeCurrency.name ?? "Native asset",
+    name: network?.chain.nativeCurrency.name ?? t("nativeAsset"),
     symbol: nativeSymbol,
     decimals: network?.chain.nativeCurrency.decimals ?? 18,
     balance: nativeBalance,
@@ -245,7 +248,7 @@ export function WalletPage() {
         <WalletModeSelector mode={walletMode} onChange={setWalletMode} />
         <SolanaWalletPanel onPortal={() => setModal("portal")} />
         {modal === "portal" && (
-          <WalletDialog label="Funding Portal" wide onClose={() => setModal(null)}>
+          <WalletDialog label={t("fundingPortal")} wide onClose={() => setModal(null)}>
             <PortalWorkspace compact initialSwapRuntime="solana" />
           </WalletDialog>
         )}
@@ -259,7 +262,7 @@ export function WalletPage() {
       <section className="wallet-surface">
         <div className="wallet-network-row">
           <label>
-            <span>Network</span>
+            <span>{t("network")}</span>
             <select
               value={wallet.fundingChainId}
               onChange={(event) => void wallet.selectFundingNetwork(Number(event.target.value))}
@@ -272,7 +275,7 @@ export function WalletPage() {
             </select>
           </label>
           <button type="button" onClick={() => void refreshBalances()} disabled={refreshing}>
-            {refreshing ? "Refreshing…" : "Refresh"}
+            {refreshing ? t("refreshing") : t("refresh")}
           </button>
         </div>
 
@@ -287,15 +290,15 @@ export function WalletPage() {
         <div className="wallet-quick-actions">
           <button type="button" onClick={() => setModal("portal")}>
             <ArrowDownUp size={16} aria-hidden="true" />
-            Portal
+            {t("portal")}
           </button>
           <button type="button" onClick={() => setModal("send")}>
             <Send size={16} aria-hidden="true" />
-            Send
+            {t("send")}
           </button>
           <button type="button" onClick={() => setModal("receive")}>
             <Download size={16} aria-hidden="true" />
-            Receive
+            {t("receive")}
           </button>
         </div>
 
@@ -306,11 +309,11 @@ export function WalletPage() {
             {/* Only the tabs carry tablist semantics. The activity link leaves
                 the page, so including it would make the tablist invalid and
                 announce a destination as though it were a panel. */}
-            <div className="wallet-tabs-list" role="tablist" aria-label="Wallet holdings">
+            <div className="wallet-tabs-list" role="tablist" aria-label={t("holdings")}>
               {(
                 [
-                  ["tokens", "Tokens"],
-                  ["nfts", "NFTs"],
+                  ["tokens", t("tokens")],
+                  ["nfts", t("nfts")],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -326,7 +329,7 @@ export function WalletPage() {
               ))}
             </div>
             <Link className="wallet-tabs-activity" href="/app/activity">
-              Activity <ArrowUpRight size={13} aria-hidden="true" />
+              {t("activity")} <ArrowUpRight size={13} aria-hidden="true" />
             </Link>
           </div>
 
@@ -343,14 +346,14 @@ export function WalletPage() {
             <>
               <div className="wallet-section-heading">
                 <div>
-                  <h2>Tokens</h2>
+                  <h2>{t("tokens")}</h2>
                 </div>
                 <div className="wallet-asset-actions">
                   <button type="button" onClick={() => setModal("browse")}>
-                    Browse
+                    {t("browse")}
                   </button>
                   <button type="button" onClick={() => setModal("custom")}>
-                    Add token
+                    {t("addToken")}
                   </button>
                   <button
                     type="button"
@@ -358,7 +361,7 @@ export function WalletPage() {
                     disabled={!hasAddedTokens && !removingTokens}
                     onClick={() => setRemovingTokens((current) => !current)}
                   >
-                    {removingTokens ? "Done" : "Remove"}
+                    {removingTokens ? t("done") : t("remove")}
                   </button>
                 </div>
               </div>
@@ -382,18 +385,18 @@ export function WalletPage() {
                         <button
                           className="wallet-remove-token"
                           type="button"
-                          aria-label={`Remove ${asset.symbol}`}
+                          aria-label={t("removeToken", { symbol: asset.symbol })}
                           onClick={() => removeToken(asset.address)}
                         >
-                          Remove
+                          {t("remove")}
                         </button>
                       ) : (
                         <span>
                           {asset.kind === "native"
-                            ? "Native"
+                            ? t("native")
                             : asset.kind === "erc1155"
-                              ? "Risk shares"
-                              : "Token"}
+                              ? t("riskShares")
+                              : t("token")}
                         </span>
                       )}
                     </div>
@@ -406,13 +409,13 @@ export function WalletPage() {
       </section>
 
       {modal === "add-nft" && (
-        <WalletDialog label="Add an NFT collection" onClose={() => setModal(null)}>
+        <WalletDialog label={t("addNft")} onClose={() => setModal(null)}>
           <AddNftCollectionForm chainId={wallet.fundingChainId} onDone={() => setModal(null)} />
         </WalletDialog>
       )}
       {modal === "nft" && transferNft && (
         <WalletDialog
-          label={`Send ${transferNft.name}`}
+          label={t("sendNft", { name: transferNft.name })}
           onClose={() => {
             setModal(null);
             setTransferNft(null);
@@ -428,14 +431,17 @@ export function WalletPage() {
         </WalletDialog>
       )}
       {modal === "portal" && (
-        <WalletDialog label="Funding Portal" wide onClose={() => setModal(null)}>
+        <WalletDialog label={t("fundingPortal")} wide onClose={() => setModal(null)}>
           <PortalWorkspace compact />
         </WalletDialog>
       )}
       {modal === "receive" && (
-        <WalletDialog label="Receive" onClose={() => setModal(null)}>
+        <WalletDialog label={t("receive")} onClose={() => setModal(null)}>
           <div className="wallet-dialog-content">
-            <span>{"// Receive"}</span>
+            <span>
+              {"// "}
+              {t("receive")}
+            </span>
             <h2>{wallet.fundingNetworkName}</h2>
             <code>{wallet.address ?? "--"}</code>
             <button
@@ -444,7 +450,7 @@ export function WalletPage() {
               disabled={!wallet.address}
               onClick={() => void wallet.copyAddress()}
             >
-              Copy address
+              {t("copyAddress")}
             </button>
           </div>
         </WalletDialog>
@@ -482,8 +488,9 @@ function WalletModeSelector({
   mode: "evm" | "solana";
   onChange: (mode: "evm" | "solana") => void;
 }) {
+  const t = useTranslations("wallet");
   return (
-    <div className="portal-chain-tabs wallet-mode-tabs" aria-label="Wallet chain type">
+    <div className="portal-chain-tabs wallet-mode-tabs" aria-label={t("chainType")}>
       <button type="button" aria-pressed={mode === "evm"} onClick={() => onChange("evm")}>
         EVM
       </button>
@@ -505,6 +512,7 @@ function WalletDialog({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("wallet");
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -521,7 +529,12 @@ function WalletDialog({
         aria-label={label}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="wallet-dialog-close" type="button" onClick={onClose} aria-label="Close">
+        <button
+          className="wallet-dialog-close"
+          type="button"
+          onClick={onClose}
+          aria-label={t("close")}
+        >
           ×
         </button>
         {children}
@@ -543,6 +556,7 @@ function TokenBrowser({
   onCustom: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("wallet");
   const [search, setSearch] = useState("");
   const available = useMemo(
     () =>
@@ -554,19 +568,22 @@ function TokenBrowser({
     [chainId, search, tokens]
   );
   return (
-    <WalletDialog label="Browse tokens" wide onClose={onClose}>
+    <WalletDialog label={t("browseTokens")} wide onClose={onClose}>
       <div className="wallet-dialog-content wallet-token-browser">
-        <span>{"// Token catalog"}</span>
-        <h2>Browse tokens</h2>
+        <span>
+          {"// "}
+          {t("tokenCatalog")}
+        </span>
+        <h2>{t("browseTokens")}</h2>
         <input
           autoFocus
-          aria-label="Search tokens"
+          aria-label={t("searchTokens")}
           value={search}
-          placeholder="Symbol, name, or address"
+          placeholder={t("searchPlaceholder")}
           onChange={(event) => setSearch(event.target.value)}
         />
         <button className="wallet-inline-action" type="button" onClick={onCustom}>
-          Add custom token
+          {t("addCustom")}
         </button>
         <div className="wallet-catalog-list">
           {available.map((token) => (
@@ -602,6 +619,7 @@ function CustomTokenDialog({
   onAdd: (token: WalletToken) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("wallet");
   const wallet = useWalletState();
   const [input, setInput] = useState("");
   const [token, setToken] = useState<WalletToken | null>(null);
@@ -662,12 +680,15 @@ function CustomTokenDialog({
     existing.some((candidate) => candidate.address.toLowerCase() === address.toLowerCase())
   );
   return (
-    <WalletDialog label="Add token" onClose={onClose}>
+    <WalletDialog label={t("addToken")} onClose={onClose}>
       <div className="wallet-dialog-content">
-        <span>{"// Custom token"}</span>
-        <h2>Add ERC-20</h2>
+        <span>
+          {"// "}
+          {t("customToken")}
+        </span>
+        <h2>{t("addErc20")}</h2>
         <label className="portal-field">
-          <span>Contract address</span>
+          <span>{t("contractAddress")}</span>
           <input
             value={input}
             placeholder="0x…"
@@ -679,14 +700,14 @@ function CustomTokenDialog({
           />
         </label>
         <div className="wallet-token-metadata">
-          <span>Symbol</span>
-          <strong>{reading ? "Reading…" : (token?.symbol ?? "--")}</strong>
-          <span>Decimals</span>
+          <span>{t("symbol")}</span>
+          <strong>{reading ? t("reading") : (token?.symbol ?? "--")}</strong>
+          <span>{t("decimals")}</span>
           <strong>{token?.decimals ?? "--"}</strong>
         </div>
         {(error || duplicate) && (
           <p className="portal-error" role="alert">
-            {duplicate ? "This token is already listed." : error}
+            {duplicate ? t("duplicate") : error}
           </p>
         )}
         <button
@@ -695,7 +716,7 @@ function CustomTokenDialog({
           disabled={!token || duplicate}
           onClick={() => token && onAdd(token)}
         >
-          Add token
+          {t("addToken")}
         </button>
       </div>
     </WalletDialog>
@@ -733,6 +754,8 @@ function SendDialog({
   onConfirmed: () => Promise<void>;
   onClose: () => void;
 }) {
+  const locale = useAppLocale();
+  const t = useTranslations("wallet");
   const wallet = useWalletState();
   const [assetId, setAssetId] = useState(assets[0]?.id ?? "");
   const [recipient, setRecipient] = useState("");
@@ -743,7 +766,7 @@ function SendDialog({
   const asset = assets.find((candidate) => candidate.id === assetId) ?? assets[0];
   let amountRaw = 0n;
   try {
-    amountRaw = asset && amount ? parseUnits(amount, asset.decimals) : 0n;
+    amountRaw = asset ? parseLocalizedUnits(amount, asset.decimals, locale) : 0n;
   } catch {
     amountRaw = 0n;
   }
@@ -823,12 +846,15 @@ function SendDialog({
     if (valid) setReviewing(true);
   };
   return (
-    <WalletDialog label="Send" onClose={onClose}>
+    <WalletDialog label={t("send")} onClose={onClose}>
       <div className="wallet-dialog-content">
-        <span>{"// Send"}</span>
-        <h2>Send asset</h2>
+        <span>
+          {"// "}
+          {t("send")}
+        </span>
+        <h2>{t("sendAsset")}</h2>
         <label className="portal-field">
-          <span>Asset</span>
+          <span>{t("asset")}</span>
           <select
             value={assetId}
             onChange={(event) => {
@@ -844,7 +870,7 @@ function SendDialog({
           </select>
         </label>
         <label className="portal-field">
-          <span>Recipient</span>
+          <span>{t("recipient")}</span>
           <input
             value={recipient}
             placeholder="0x…"
@@ -856,7 +882,7 @@ function SendDialog({
           />
         </label>
         <label className="portal-field">
-          <span>Amount</span>
+          <span>{t("amount")}</span>
           <input
             inputMode="decimal"
             value={amount}
@@ -891,7 +917,7 @@ function SendDialog({
             disabled={pending}
             onClick={() => void confirm()}
           >
-            {pending ? "Sending…" : "Confirm send"}
+            {pending ? t("sending") : t("confirmSend")}
           </button>
         ) : (
           <button
@@ -904,10 +930,10 @@ function SendDialog({
             onClick={primary}
           >
             {wallet.status === "signed-out"
-              ? "Connect wallet"
+              ? t("connectWallet")
               : wallet.address && !wallet.fundingWalletOnSelectedChain
-                ? `Switch to ${wallet.fundingNetworkName}`
-                : "Review send"}
+                ? t("switchNetwork", { network: wallet.fundingNetworkName })
+                : t("reviewSend")}
           </button>
         )}
       </div>
@@ -928,6 +954,7 @@ function SendDialog({
  * someone believing they had handed over a position they still hold.
  */
 function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }) {
+  const t = useTranslations("wallet");
   const wallet = useWalletState();
   const chainId =
     deploymentState.status === "configured" ? deploymentState.deployment.chainId : undefined;
@@ -985,12 +1012,11 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
     <div className="wallet-nft-transfer">
       {nft.carries.length > 0 && (
         <p className="wallet-nft-transfer-warning">
-          <strong>This moves more than the NFT.</strong> {nft.carries.join(", ")} will belong to the
-          recipient. This cannot be undone.
+          <strong>{t("movesMore")}</strong> {t("cannotUndo", { assets: nft.carries.join(", ") })}
         </p>
       )}
       <label className="basket-field">
-        <span>Send to</span>
+        <span>{t("sendTo")}</span>
         <input
           value={recipient}
           onChange={(event) => {
@@ -1013,7 +1039,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
         onClick={() => void submit()}
         disabled={pending || problem !== null}
       >
-        {pending ? "Sending…" : problem ? problem : `Send ${nft.name}`}
+        {pending ? t("sending") : problem ? problem : t("sendNft", { name: nft.name })}
       </button>
     </div>
   );
@@ -1032,6 +1058,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
  * 1000000000000000000.
  */
 function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: () => void }) {
+  const t = useTranslations("wallet");
   const publicClient = usePublicClient({ chainId });
   const { addCollection } = useWalletNftCollections(chainId);
   const [address, setAddress] = useState("");
@@ -1058,14 +1085,9 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
 
   return (
     <div className="wallet-nft-transfer">
-      <p className="wallet-add-nft-note">
-        Paste an NFT contract address. Statics positions and liquidity positions are listed
-        automatically; anything else has to be added, because no network call can list every NFT a
-        wallet holds. ERC-1155 collections also need a token id, since balances there are held per
-        id and the standard cannot say which ids you own.
-      </p>
+      <p className="wallet-add-nft-note">{t("addNftDescription")}</p>
       <label className="basket-field">
-        <span>Contract address</span>
+        <span>{t("contractAddress")}</span>
         <input
           value={address}
           onChange={(event) => {
@@ -1078,14 +1100,14 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
         />
       </label>
       <label className="basket-field">
-        <span>Token id (ERC-1155 only)</span>
+        <span>{t("tokenId")}</span>
         <input
           value={tokenId}
           onChange={(event) => {
             setTokenId(event.target.value);
             setError(null);
           }}
-          placeholder="Leave blank for ERC-721"
+          placeholder={t("tokenIdPlaceholder")}
           inputMode="numeric"
           disabled={pending}
         />
@@ -1101,7 +1123,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
         onClick={() => void submit()}
         disabled={pending || address.trim().length === 0}
       >
-        {pending ? "Checking…" : "Add collection"}
+        {pending ? t("checking") : t("addCollection")}
       </button>
     </div>
   );

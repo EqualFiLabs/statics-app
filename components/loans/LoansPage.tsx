@@ -8,7 +8,6 @@ import {
   formatUnits,
   getAddress,
   parseEventLogs,
-  parseUnits,
   type Address,
   type Hex,
   type TransactionReceipt,
@@ -64,6 +63,9 @@ import {
 } from "@/lib/protocol/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import type { AppLocale } from "@/i18n/config";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -73,8 +75,8 @@ function displayAmount(value: bigint, decimals: number): string {
   return shortFraction ? `${whole}.${shortFraction}` : whole;
 }
 
-function displayDate(timestamp: bigint): string {
-  return new Intl.DateTimeFormat("en", {
+function displayDate(timestamp: bigint, locale: AppLocale): string {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(Number(timestamp) * 1_000));
@@ -84,10 +86,10 @@ function sameVector(left: readonly bigint[], right: readonly bigint[]): boolean 
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function parseAmountInput(value: string, decimals: number): bigint | null {
+function parseAmountInput(value: string, decimals: number, locale: AppLocale): bigint | null {
   if (!value.trim()) return null;
   try {
-    return parseUnits(value, decimals);
+    return parseLocalizedUnits(value, decimals, locale);
   } catch {
     return null;
   }
@@ -96,10 +98,11 @@ function parseAmountInput(value: string, decimals: number): bigint | null {
 function parseGrossAmounts(
   values: readonly string[],
   loan: LoanRecord,
-  quote: ExtensionQuote
+  quote: ExtensionQuote,
+  locale: AppLocale
 ): readonly bigint[] | null {
   const amounts = quote.requiredFees.map((_, index) =>
-    parseAmountInput(values[index] ?? "", loan.assets[index]?.token.decimals ?? 18)
+    parseAmountInput(values[index] ?? "", loan.assets[index]?.token.decimals ?? 18, locale)
   );
   return amounts.some((amount) => amount === null) ? null : (amounts as readonly bigint[]);
 }
@@ -119,6 +122,7 @@ function LoansRuntime({
 }: {
   initialBorrowDestination: BorrowDestination;
 }) {
+  const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -187,7 +191,7 @@ function LoansRuntime({
     position?.collateral.find((item) => item.basket.basketId.toString() === selectedBasketId) ??
     position?.collateral[0];
   const basket = positionCollateral?.basket;
-  const shares = basket ? (parseAmountInput(sharesInput, basket.token.decimals) ?? 0n) : 0n;
+  const shares = basket ? (parseAmountInput(sharesInput, basket.token.decimals, locale) ?? 0n) : 0n;
   const borrowPools =
     basket?.constituents
       .map((constituent) =>
@@ -266,7 +270,7 @@ function LoansRuntime({
     : [];
   const parsedGross =
     selectedLoan && currentExtensionQuote
-      ? parseGrossAmounts(grossValues, selectedLoan, currentExtensionQuote)
+      ? parseGrossAmounts(grossValues, selectedLoan, currentExtensionQuote, locale)
       : null;
   const grossError =
     mode === "extend" && currentExtensionQuote
@@ -1223,6 +1227,7 @@ function LoanTrancheButton({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const locale = useAppLocale();
   return (
     <button
       type="button"
@@ -1237,8 +1242,8 @@ function LoanTrancheButton({
         Basket #{loan.basket.basketId.toString()} · {loan.basket.symbol}
         {!loan.walletOwned ? " · Public recovery queue" : ""}
       </small>
-      <span className="loan-time">Matures {displayDate(loan.maturity)}</span>
-      <small>Recovery strictly after {displayDate(loan.maturity + 3_600n)}</small>
+      <span className="loan-time">Matures {displayDate(loan.maturity, locale)}</span>
+      <small>Recovery strictly after {displayDate(loan.maturity + 3_600n, locale)}</small>
     </button>
   );
 }
@@ -1457,6 +1462,7 @@ function LoanDetails({
   chainId: number;
   onGross: (index: number, value: string) => void;
 }) {
+  const locale = useAppLocale();
   return (
     <>
       <div className="loan-detail-meta">
@@ -1466,8 +1472,8 @@ function LoanDetails({
           label={`Position #${loan.positionId.toString()} owner`}
         />
         <p>
-          Matures {displayDate(loan.maturity)} · Recovery strictly after{" "}
-          {displayDate(loan.maturity + 3_600n)}
+          Matures {displayDate(loan.maturity, locale)} · Recovery strictly after{" "}
+          {displayDate(loan.maturity + 3_600n, locale)}
         </p>
       </div>
       <dl className="remaining-quote">

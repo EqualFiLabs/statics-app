@@ -19,7 +19,6 @@ import {
   encodeFunctionData,
   formatUnits,
   getAddress,
-  parseUnits,
   zeroAddress,
   type Address,
   type Hex,
@@ -59,6 +58,8 @@ import {
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
@@ -528,6 +529,7 @@ function DollarActionPanel({
   wallet: Address;
   initialProfile: DollarProfileChoice;
 }) {
+  const locale = useAppLocale();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
   const snapshot = useDollarSnapshot(deployment, wallet);
@@ -543,11 +545,11 @@ function DollarActionPanel({
 
   const amount = useMemo(() => {
     try {
-      return amountInput ? parseUnits(amountInput, 18) : 0n;
+      return parseLocalizedUnits(amountInput, 18, locale);
     } catch {
       return 0n;
     }
-  }, [amountInput]);
+  }, [amountInput, locale]);
 
   const quote = useQuery({
     queryKey: dollarQuoteQueryKey({

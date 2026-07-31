@@ -1,37 +1,37 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export function BasketCreatePage() {
+  const t = useTranslations("baskets");
   return (
     <>
       <section className="remaining-hero">
         <div>
-          <p className="dapp-section-label">Launch policy</p>
-          <h2>Basket launches are steward-controlled</h2>
-          <p>
-            Public basket creation is closed during the Robinhood testnet beta. Launches use the
-            same backed basket and canonical-pool flow, but the reviewed transaction is executed
-            through Statics governance.
-          </p>
+          <p className="dapp-section-label">{t("launchPolicy")}</p>
+          <h2>{t("stewardControlled")}</h2>
+          <p>{t("launchDescription")}</p>
         </div>
-        <span className="remaining-status is-warmup">Governed launch</span>
+        <span className="remaining-status is-warmup">{t("governedLaunch")}</span>
       </section>
       <section className="creation-workspace">
         <div className="creation-review">
           <section>
-            <p className="dapp-section-label">What this means</p>
-            <h3>No public creation transaction is offered</h3>
+            <p className="dapp-section-label">{t("meaning")}</p>
+            <h3>{t("noPublicTransaction")}</h3>
             <ul>
-              <li>Existing baskets remain permissionless to mint, redeem, trade, and use.</li>
-              <li>Each new basket launches with reviewed backing and canonical pool parameters.</li>
-              <li>Public launches can be enabled later through the protocol creation fee.</li>
+              <li>{t("existingRemainOpen")}</li>
+              <li>{t("reviewedParameters")}</li>
+              <li>{t("canEnableLater")}</li>
             </ul>
           </section>
           <section>
-            <p className="dapp-section-label">Available now</p>
-            <h3>Use the live basket catalog</h3>
-            <p>Inspect each basket&apos;s constituents, status, fees, and canonical liquidity.</p>
+            <p className="dapp-section-label">{t("availableNow")}</p>
+            <h3>{t("useCatalog")}</h3>
+            <p>{t("inspectDescription")}</p>
             <Link className="ui-button ui-button--primary" href="/app/baskets">
-              Browse baskets
+              {t("browse")}
             </Link>
           </section>
         </div>

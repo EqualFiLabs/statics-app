@@ -4,6 +4,7 @@ import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
+import { useTranslations } from "next-intl";
 
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
 import { SurfaceBoundary, UnconfiguredSurface } from "@/components/common/EmptyState";
@@ -21,12 +22,14 @@ function displayAmount(value: bigint, decimals = 18): string {
 }
 
 export function BasketListPage() {
+  const t = useTranslations("baskets");
   const wallet = useWalletState();
-  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Baskets" />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
   return <BasketListRuntime />;
 }
 
 function BasketListRuntime() {
+  const t = useTranslations("baskets");
   const wallet = useWalletState();
   const publicClient = usePublicClient();
   const walletAddress =
@@ -64,11 +67,11 @@ function BasketListRuntime() {
     <section className="basket-catalog" aria-labelledby="basket-catalog-title">
       <div className="basket-section-heading">
         <div>
-          <p className="dapp-section-label">Baskets</p>
-          <h2 id="basket-catalog-title">Statics baskets</h2>
+          <p className="dapp-section-label">{t("subject")}</p>
+          <h2 id="basket-catalog-title">{t("title")}</h2>
         </div>
         <div className="basket-section-actions">
-          <span>{catalog.data?.baskets.length ?? 0} discovered</span>
+          <span>{t("discovered", { count: catalog.data?.baskets.length ?? 0 })}</span>
         </div>
       </div>
       {catalog.data?.warning && (
@@ -78,18 +81,17 @@ function BasketListRuntime() {
       )}
       {catalog.isError && catalog.data && (
         <p className="dollar-warning" role="status">
-          Basket data is temporarily unavailable. Showing the last received state.
+          {t("stale")}
         </p>
       )}
       <SurfaceBoundary
         state={deploymentState.status === "unavailable" ? "unconfigured" : surfaceState}
-        subject="baskets"
+        subject={t("subject")}
         onRetry={() => void catalog.refetch()}
         empty={{
-          title: "No baskets yet",
-          description:
-            "A basket is a fixed bundle of assets you can buy or sell as one unit. New launches are currently steward-controlled.",
-          action: { label: "View launch policy", href: "/app/create" },
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          action: { label: t("viewPolicy"), href: "/app/create" },
         }}
       >
         {catalog.data && isSurfaceReady(surfaceState) ? (
@@ -110,19 +112,19 @@ function BasketListRuntime() {
                 <p>{basket.symbol}</p>
                 <dl>
                   <div>
-                    <dt>Underlyings</dt>
+                    <dt>{t("underlyings")}</dt>
                     <dd>{basket.constituents.length}</dd>
                   </div>
                   <div>
-                    <dt>Total supply</dt>
+                    <dt>{t("totalSupply")}</dt>
                     <dd>{displayAmount(basket.totalSupply)}</dd>
                   </div>
                   <div>
-                    <dt>Your balance</dt>
-                    <dd>{walletAddress ? displayAmount(basket.walletBalance) : "Connect"}</dd>
+                    <dt>{t("yourBalance")}</dt>
+                    <dd>{walletAddress ? displayAmount(basket.walletBalance) : t("connect")}</dd>
                   </div>
                 </dl>
-                <span className="basket-card-link">Inspect basket →</span>
+                <span className="basket-card-link">{t("inspect")} →</span>
               </Link>
             ))}
           </div>

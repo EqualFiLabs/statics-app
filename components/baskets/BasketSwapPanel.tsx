@@ -2,13 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import {
-  decodeFunctionResult,
-  encodeFunctionData,
-  formatUnits,
-  getAddress,
-  parseUnits,
-} from "viem";
+import { useTranslations } from "next-intl";
+import { decodeFunctionResult, encodeFunctionData, formatUnits, getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 
 import {
@@ -47,6 +42,8 @@ import {
   hasUsablePermit2Allowance,
 } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -57,6 +54,8 @@ function display(value: bigint, decimals: number): string {
 }
 
 export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
+  const locale = useAppLocale();
+  const t = useTranslations("baskets");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -76,11 +75,11 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const inputBalance = direction === "asset-in" ? constituent.walletBalance : basket.walletBalance;
   const amount = useMemo(() => {
     try {
-      return amountInput ? parseUnits(amountInput, inputToken.decimals) : 0n;
+      return parseLocalizedUnits(amountInput, inputToken.decimals, locale);
     } catch {
       return 0n;
     }
-  }, [amountInput, inputToken.decimals]);
+  }, [amountInput, inputToken.decimals, locale]);
   const slippageBps = parseSlippageBps(slippageInput);
 
   const pool = useQuery({
@@ -391,37 +390,37 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
 
   const poolActive = pool.data?.status === CanonicalPoolStatus.Active;
   const readError = pool.error ?? quote.error;
-  let label = "Review swap";
+  let label = t("reviewSwap");
   let action: (() => void) | null = () => void submit();
   if (walletState.status === "signed-out" || walletState.status === "error") {
-    label = "Sign in to continue";
+    label = t("signIn");
     action = walletState.login;
   } else if (walletState.status === "wallet-missing") {
-    label = "Create embedded wallet";
+    label = t("createWallet");
     action = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
-    label = `Switch to ${walletState.networkName}`;
+    label = t("switchNetwork", { network: walletState.networkName });
     action = () => void walletState.switchNetwork();
   } else if (walletState.status !== "ready") {
-    label = "Wallet loading…";
+    label = t("walletLoading");
     action = null;
   } else if (!poolActive) {
-    label = pool.isPending ? "Reading canonical pool…" : "Canonical pool warming";
+    label = pool.isPending ? t("readingPool") : t("poolWarming");
   } else if (permit2Approval.isFetching) {
-    label = "Reading allowance…";
+    label = t("readingAllowance");
   } else if ((permit2Approval.data ?? 0n) < amount) {
-    label = `Enable ${inputToken.symbol} swaps`;
+    label = t("enableSwaps", { symbol: inputToken.symbol });
   } else if (quote.isFetching) {
-    label = "Reading quote…";
+    label = t("readingQuote");
   } else if (amount > inputBalance) {
-    label = `Insufficient ${inputToken.symbol}`;
+    label = t("insufficient", { symbol: inputToken.symbol });
   }
 
   return (
     <>
-      <h3 id="basket-action-title">Swap canonical pool</h3>
+      <h3 id="basket-action-title">{t("swapTitle")}</h3>
       <label className="basket-field">
-        <span>Underlying pool</span>
+        <span>{t("underlyingPool")}</span>
         <select
           value={assetIndex}
           onChange={(event) => {
@@ -438,7 +437,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           ))}
         </select>
       </label>
-      <div className="portal-direction-tabs" aria-label="Canonical swap direction">
+      <div className="portal-direction-tabs" aria-label={t("swapDirection")}>
         <button
           type="button"
           aria-pressed={direction === "asset-in"}
@@ -463,7 +462,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         </button>
       </div>
       <label className="basket-field">
-        <span>{inputToken.symbol} amount</span>
+        <span>{t("amount", { symbol: inputToken.symbol })}</span>
         <input
           value={amountInput}
           onChange={(event) => {
@@ -475,11 +474,14 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           disabled={pending}
         />
         <small>
-          Balance {display(inputBalance, inputToken.decimals)} {inputToken.symbol}
+          {t("balance", {
+            amount: display(inputBalance, inputToken.decimals),
+            symbol: inputToken.symbol,
+          })}
         </small>
       </label>
       <label className="basket-field">
-        <span>Slippage tolerance</span>
+        <span>{t("slippage")}</span>
         <div>
           <input
             value={slippageInput}
@@ -489,29 +491,30 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           />
           <strong>%</strong>
         </div>
-        <small>Allowed range 0–5%. Default 0.50%.</small>
+        <small>{t("slippageHelp")}</small>
       </label>
       <div className="basket-quote">
-        <span>Robinhood Uniswap v4 quote</span>
+        <span>{t("v4Quote")}</span>
         <strong>
           {currentQuote
             ? `${display(currentQuote.amountOut, outputToken.decimals)} ${outputToken.symbol}`
-            : "Enter an amount for a fresh quote"}
+            : t("enterAmount")}
         </strong>
         {minimumOut !== null && (
           <small>
-            Minimum {display(minimumOut, outputToken.decimals)} {outputToken.symbol}
+            {t("minimum", {
+              amount: display(minimumOut, outputToken.decimals),
+              symbol: outputToken.symbol,
+            })}
           </small>
         )}
       </div>
       {!poolActive && !pool.isPending && (
-        <p className="dollar-action-reason">
-          This canonical pool must be Active before browser swaps are enabled.
-        </p>
+        <p className="dollar-action-reason">{t("poolInactive")}</p>
       )}
       {readError && (
         <p className="dapp-inline-error" role="alert">
-          {describeBasketError(readError)} Change the amount or pool to retry.
+          {describeBasketError(readError)} {t("retrySwap")}
         </p>
       )}
       {error && (
@@ -537,7 +540,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
               amount > inputBalance))
         }
       >
-        {pending ? "Waiting for confirmation…" : label}
+        {pending ? t("waiting") : label}
       </button>
     </>
   );

@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
@@ -36,13 +37,14 @@ function describeApprovalError(cause: unknown): string {
 }
 
 export function ApprovalToolsPage() {
+  const t = useTranslations("tools");
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") {
     return (
       <SurfaceEmptyState
         state="unconfigured"
-        subject="approvals"
-        empty={{ title: "Approvals unavailable", description: "No wallet is configured." }}
+        subject={t("title")}
+        empty={{ title: t("unavailable"), description: t("noDeployment") }}
       />
     );
   }
@@ -50,6 +52,7 @@ export function ApprovalToolsPage() {
 }
 
 function ApprovalToolsRuntime() {
+  const t = useTranslations("tools");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -95,11 +98,10 @@ function ApprovalToolsRuntime() {
   ) {
     return (
       <EmptyState
-        title="Connect your wallet to manage approvals"
-        description="Approval authority belongs to a specific wallet, so Statics must know which account to inspect."
+        title={t("connectTitle")}
+        description={t("connectDescription")}
         action={{
-          label:
-            walletState.status === "wallet-missing" ? "Create embedded wallet" : "Connect wallet",
+          label: walletState.status === "wallet-missing" ? t("createWallet") : t("connectWallet"),
           onClick:
             walletState.status === "wallet-missing"
               ? () => void walletState.createWallet()
@@ -109,29 +111,19 @@ function ApprovalToolsRuntime() {
     );
   }
   if (walletState.status !== "ready") {
-    return (
-      <EmptyState
-        title="Wallet loading"
-        description="Statics is waiting for the active wallet before reading approvals."
-      />
-    );
+    return <EmptyState title={t("loadingTitle")} description={t("loadingDescription")} />;
   }
   if (!walletState.isTargetChain) {
     return (
       <EmptyState
-        title="Switch to Robinhood Chain Testnet"
-        description="The Tools page only manages approvals for the verified Statics deployment."
-        action={{ label: "Switch network", onClick: () => void walletState.switchNetwork() }}
+        title={t("switchTitle")}
+        description={t("switchDescription")}
+        action={{ label: t("switch"), onClick: () => void walletState.switchNetwork() }}
       />
     );
   }
   if (deploymentState.status !== "configured") {
-    return (
-      <EmptyState
-        title="Tools unavailable"
-        description="No verified Statics deployment is configured."
-      />
-    );
+    return <EmptyState title={t("unavailable")} description={t("noDeployment")} />;
   }
 
   const records = approvals.data ?? [];
@@ -222,22 +214,18 @@ function ApprovalToolsRuntime() {
   return (
     <section className="approval-tools" aria-labelledby="approval-tools-title">
       <div className="approval-tools-heading">
-        <p className="dapp-section-label">Account tools</p>
-        <h2 id="approval-tools-title">App approvals</h2>
-        <p>
-          Statics uses maximum approvals so routine deposits, minting, repayment, staking, swaps,
-          and liquidity management do not ask for the same authority repeatedly. Revoke any
-          authority here at any time.
-        </p>
+        <p className="dapp-section-label">{t("label")}</p>
+        <h2 id="approval-tools-title">{t("title")}</h2>
+        <p>{t("description")}</p>
       </div>
 
       <div className="approval-tools-summary">
         <div>
-          <span>Known authorities</span>
+          <span>{t("known")}</span>
           <strong>{records.length}</strong>
         </div>
         <div>
-          <span>Currently active</span>
+          <span>{t("active")}</span>
           <strong>{active.length}</strong>
         </div>
         <button
@@ -246,17 +234,14 @@ function ApprovalToolsRuntime() {
           disabled={busy || active.length === 0}
         >
           {bulkProgress
-            ? `Revoking ${bulkProgress.current} of ${bulkProgress.total}…`
-            : "Revoke all app approvals"}
+            ? t("revoking", { current: bulkProgress.current, total: bulkProgress.total })
+            : t("revokeAll")}
         </button>
       </div>
 
-      <p className="approval-tools-note">
-        “Revoke all” submits one explicit wallet transaction per active authority. It stops if a
-        transaction is rejected or fails; approvals already confirmed remain revoked.
-      </p>
+      <p className="approval-tools-note">{t("revokeNote")}</p>
 
-      {approvals.isPending && <p className="approval-tools-note">Reading current approvals…</p>}
+      {approvals.isPending && <p className="approval-tools-note">{t("reading")}</p>}
       {approvals.error && (
         <p className="dapp-inline-error" role="alert">
           {describeApprovalError(approvals.error)}
@@ -289,7 +274,7 @@ function ApprovalToolsRuntime() {
                 <AddressDisplay
                   address={approval.spender}
                   chainId={deploymentState.deployment.chainId}
-                  label="Spender"
+                  label={t("spender")}
                 />
                 <small>{approval.purposes.join(" · ")}</small>
               </div>
@@ -302,7 +287,7 @@ function ApprovalToolsRuntime() {
                       onClick={() => void updateOne(approval, true)}
                       disabled={busy}
                     >
-                      {rowPending ? "Confirming…" : "Set maximum"}
+                      {rowPending ? t("confirming") : t("setMaximum")}
                     </button>
                   )}
                   {status !== "Revoked" && (
@@ -312,7 +297,7 @@ function ApprovalToolsRuntime() {
                       onClick={() => void updateOne(approval, false)}
                       disabled={busy}
                     >
-                      {rowPending ? "Confirming…" : "Revoke"}
+                      {rowPending ? t("confirming") : t("revoke")}
                     </button>
                   )}
                 </div>

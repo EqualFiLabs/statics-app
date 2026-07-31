@@ -1,7 +1,11 @@
+"use client";
+
 import { formatUnits } from "viem";
+import { useTranslations } from "next-intl";
 
 import type { TokenMetadata } from "@/lib/baskets/baskets";
 import { formatMaturity, groupByMaturity, type StakingSnapshot } from "@/lib/positions/staking";
+import { useAppLocale } from "@/i18n/client";
 
 function displayAmount(value: bigint, decimals: number, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -26,6 +30,8 @@ export function StakeMaturity({
   stakingToken: TokenMetadata;
   now: bigint;
 }>) {
+  const locale = useAppLocale();
+  const t = useTranslations("rewardsPicker");
   if (!snapshot) return null;
 
   const maturing = groupByMaturity(snapshot.maturing);
@@ -33,7 +39,7 @@ export function StakeMaturity({
   if (maturing.length === 0) {
     // Only worth saying when there is something earning to say it about.
     return snapshot.earning.length > 0 ? (
-      <p className="stake-maturity is-earning">All of your stake is earning.</p>
+      <p className="stake-maturity is-earning">{t("allEarning")}</p>
     ) : null;
   }
 
@@ -44,8 +50,10 @@ export function StakeMaturity({
           <strong>
             {displayAmount(group.pendingStake, stakingToken.decimals)} {stakingToken.symbol}
           </strong>{" "}
-          starts earning {group.tokens.map((token) => token.symbol).join(", ")} at{" "}
-          {formatMaturity(group.eligibleAt, now)}.
+          {t("startsEarning", {
+            assets: group.tokens.map((token) => token.symbol).join(", "),
+            time: formatMaturity(group.eligibleAt, now, locale),
+          })}
         </p>
       ))}
     </div>
