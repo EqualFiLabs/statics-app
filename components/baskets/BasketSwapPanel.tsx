@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { decodeFunctionResult, encodeFunctionData, formatUnits, getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
@@ -73,13 +73,12 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const inputToken = direction === "asset-in" ? constituent.token : basket.token;
   const outputToken = direction === "asset-in" ? basket.token : constituent.token;
   const inputBalance = direction === "asset-in" ? constituent.walletBalance : basket.walletBalance;
-  const amount = useMemo(() => {
-    try {
-      return parseLocalizedUnits(amountInput, inputToken.decimals, locale);
-    } catch {
-      return 0n;
-    }
-  }, [amountInput, inputToken.decimals, locale]);
+  let amount = 0n;
+  try {
+    amount = parseLocalizedUnits(amountInput, inputToken.decimals, locale);
+  } catch {
+    amount = 0n;
+  }
   const slippageBps = parseSlippageBps(slippageInput);
 
   const pool = useQuery({

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -75,14 +75,6 @@ import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 
 const deploymentState = readClientDollarDeployment();
 
-const modeLabels: Record<DollarActionMode, string> = {
-  deposit: "Deposit",
-  recombine: "Recombine",
-  redeem: "Redeem",
-  supply: "Supply",
-  unsupply: "Withdraw",
-};
-
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
   mode === "supply" || mode === "unsupply";
@@ -143,6 +135,10 @@ function displayAmount(value: bigint, decimals = 18, precision = 4): string {
   const formatted = formatUnits(value, decimals);
   const [whole, fraction = ""] = formatted.split(".");
   return fraction ? `${whole}.${fraction.slice(0, precision)}`.replace(/\.$/, "") : whole;
+}
+
+function currentTimestamp(): number {
+  return Date.now();
 }
 
 function profileModeLabel(mode: number): string {
@@ -548,13 +544,12 @@ function DollarActionPanel({
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const amount = useMemo(() => {
-    try {
-      return parseLocalizedUnits(amountInput, 18, locale);
-    } catch {
-      return 0n;
-    }
-  }, [amountInput, locale]);
+  let amount = 0n;
+  try {
+    amount = parseLocalizedUnits(amountInput, 18, locale);
+  } catch {
+    amount = 0n;
+  }
 
   const quote = useQuery({
     queryKey: dollarQuoteQueryKey({
@@ -581,7 +576,7 @@ function DollarActionPanel({
           mode: "deposit" as const,
           amount,
           seriesId: snapshot.data.seriesId,
-          quotedAt: Date.now(),
+          quotedAt: currentTimestamp(),
           preview,
         };
       }
@@ -599,7 +594,7 @@ function DollarActionPanel({
           mode: "redeem" as const,
           amount,
           seriesId: snapshot.data.seriesId,
-          quotedAt: Date.now(),
+          quotedAt: currentTimestamp(),
           preview,
         };
       }
@@ -613,7 +608,7 @@ function DollarActionPanel({
         mode: "recombine" as const,
         amount,
         seriesId: snapshot.data.seriesId,
-        quotedAt: Date.now(),
+        quotedAt: currentTimestamp(),
         preview,
       };
     },

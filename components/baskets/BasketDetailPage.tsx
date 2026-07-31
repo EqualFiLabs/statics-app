@@ -4,7 +4,7 @@ import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { encodeFunctionData, formatUnits, getAddress, type Address, type Hex } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -124,13 +124,12 @@ function BasketDetailRuntime({
   );
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const amount = useMemo(() => {
-    try {
-      return parseLocalizedUnits(amountInput, 18, locale);
-    } catch {
-      return 0n;
-    }
-  }, [amountInput, locale]);
+  let amount = 0n;
+  try {
+    amount = parseLocalizedUnits(amountInput, 18, locale);
+  } catch {
+    amount = 0n;
+  }
   const slippageBps = parseSlippageBps(slippageInput);
 
   const positions = useQuery({
