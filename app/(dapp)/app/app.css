@@ -468,6 +468,35 @@
   align-items: center;
 }
 
+.locale-switcher--dapp-mobile {
+  display: none;
+}
+
+.dapp-shell .locale-switcher select {
+  min-height: var(--control-height-sm);
+  padding: 0 2rem 0 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.dapp-shell .locale-switcher select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.dapp-shell .locale-switcher-error {
+  display: block;
+  max-width: 14rem;
+  margin-top: 0.35rem;
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
 .dapp-return {
   display: inline-flex;
   align-items: center;
@@ -4770,6 +4799,19 @@
 
   .dapp-return {
     display: none;
+  }
+
+  .locale-switcher--dapp {
+    display: none;
+  }
+
+  .locale-switcher--dapp-mobile {
+    display: block;
+    padding: 0.75rem 1rem 1.25rem;
+  }
+
+  .locale-switcher--dapp-mobile select {
+    width: 100%;
   }
 
   .dapp-header-actions,

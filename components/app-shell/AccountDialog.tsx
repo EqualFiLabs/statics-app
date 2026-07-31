@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import { useSolanaWalletState } from "@/providers/solana-context";
 import { useWalletState } from "@/providers/wallet-context";
@@ -25,6 +26,7 @@ function CopyableAddress({
   hint: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const t = useTranslations("account");
 
   useEffect(() => {
     if (!copied) return;
@@ -58,7 +60,7 @@ function CopyableAddress({
         <button
           type="button"
           onClick={() => void copy()}
-          aria-label={copied ? `${label} address copied` : `Copy ${label} address`}
+          aria-label={copied ? t("copied", { label }) : t("copy", { label })}
         >
           {copied ? (
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -79,6 +81,8 @@ function CopyableAddress({
 export function AccountDialog({ onClose }: { onClose: () => void }) {
   const wallet = useWalletState();
   const solana = useSolanaWalletState();
+  const t = useTranslations("account");
+  const tCommon = useTranslations("common");
   const solanaAddress = solana.wallets[0]?.address ?? null;
 
   useEffect(() => {
@@ -96,8 +100,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   const networkLabel =
     wallet.status === "ready" && !wallet.isTargetChain
       ? wallet.chainId === null
-        ? "Unknown network"
-        : `Chain ${wallet.chainId}`
+        ? t("unknownNetwork")
+        : t("chain", { chainId: wallet.chainId })
       : wallet.networkName;
 
   // Portalled to the body because the header sets backdrop-filter, which makes
@@ -115,33 +119,40 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
         aria-labelledby="account-dialog-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="wallet-dialog-close" type="button" onClick={onClose} aria-label="Close">
+        <button
+          className="wallet-dialog-close"
+          type="button"
+          onClick={onClose}
+          aria-label={tCommon("close")}
+        >
           ×
         </button>
         <div className="wallet-dialog-content">
-          <h2 id="account-dialog-title">Your account</h2>
+          <h2 id="account-dialog-title">{t("title")}</h2>
 
           <dl className="account-details">
             <div>
-              <dt>Wallet type</dt>
-              <dd>{wallet.walletKind ?? "Connected wallet"}</dd>
+              <dt>{t("walletType")}</dt>
+              <dd>
+                {wallet.walletKind === "embedded"
+                  ? t("embeddedWallet")
+                  : wallet.walletKind === "external"
+                    ? t("externalWallet")
+                    : t("connectedWallet")}
+              </dd>
             </div>
             <div>
-              <dt>Network</dt>
+              <dt>{t("network")}</dt>
               <dd>{networkLabel}</dd>
             </div>
           </dl>
 
           <CopyableAddress
-            label="Ethereum"
+            label={t("ethereum")}
             address={wallet.address ?? null}
-            hint="No Ethereum address yet."
+            hint={t("ethereumMissing")}
           />
-          <CopyableAddress
-            label="Solana"
-            address={solanaAddress}
-            hint="No Solana wallet yet. One is created the first time you use a Solana route."
-          />
+          <CopyableAddress label={t("solana")} address={solanaAddress} hint={t("solanaMissing")} />
 
           {wallet.explorerUrl && (
             <a
@@ -150,23 +161,20 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               target="_blank"
               rel="noreferrer"
             >
-              View Ethereum account on explorer ↗
+              {t("explorer")} ↗
             </a>
           )}
 
           {wallet.walletKind === "embedded" && (
             <div className="account-export-warning">
-              <strong>Export embedded wallet</strong>
-              <p>
-                Exporting reveals recovery material that controls this wallet and every asset it
-                holds. Never share it or paste it into a website, chat, or cloud note.
-              </p>
+              <strong>{t("exportTitle")}</strong>
+              <p>{t("exportWarning")}</p>
               <button
                 type="button"
                 onClick={() => void wallet.exportWallet()}
                 disabled={wallet.busyAction !== null}
               >
-                {wallet.busyAction === "export" ? "Opening secure export…" : "Review secure export"}
+                {wallet.busyAction === "export" ? t("openingExport") : t("reviewExport")}
               </button>
             </div>
           )}
@@ -177,7 +185,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             onClick={() => void disconnect()}
             disabled={wallet.busyAction !== null}
           >
-            {wallet.busyAction === "logout" ? "Signing out…" : "Sign out of Statics"}
+            {wallet.busyAction === "logout" ? t("signingOut") : t("signOut")}
           </button>
         </div>
       </section>

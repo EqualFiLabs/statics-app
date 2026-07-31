@@ -1,4 +1,8 @@
-import { explain, glossary, protocolTerm, term, termPlural, type TermKey } from "@/lib/vocabulary";
+"use client";
+
+import { useTranslations } from "next-intl";
+
+import { glossary, type TermKey } from "@/lib/vocabulary";
 
 type TermProps = {
   name: TermKey;
@@ -21,15 +25,18 @@ type TermProps = {
  * can ask for" to both pointer and assistive-tech users.
  */
 export function Term({ name, plural = false, showProtocol = false }: TermProps) {
-  const label = plural ? termPlural(name) : term(name);
+  const t = useTranslations("glossary");
+  const label = t(`${name}.${plural ? "plural" : "label"}`);
+  const explanation = t(`${name}.plain`);
+  const protocolName = glossary[name].protocol;
 
   return (
     <>
-      <abbr className="ui-term" title={explain(name)}>
+      <abbr className="ui-term" title={explanation}>
         {label}
       </abbr>
-      {showProtocol && glossary[name].protocol !== label && (
-        <span className="ui-term-protocol"> ({protocolTerm(name)})</span>
+      {showProtocol && protocolName !== label && (
+        <span className="ui-term-protocol"> ({protocolName})</span>
       )}
     </>
   );

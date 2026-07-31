@@ -4,5 +4,356 @@
     "change": "更改语言",
     "saving": "正在更改语言…",
     "error": "无法更改语言，请重试。"
+  },
+  "common": {
+    "skipToContent": "跳到内容",
+    "skipToApplication": "跳到应用内容",
+    "close": "关闭",
+    "planned": "计划中",
+    "comingSoon": "{label} 链接即将推出"
+  },
+  "metadata": {
+    "title": "Statics Protocol",
+    "titleTemplate": "{page} | Statics Protocol",
+    "description": "Statics 将静态多资产篮子、头寸自有金融和协议自有流动性与原生美元整合在一起。",
+    "socialDescription": "静态资产，静态规则，动态市场。拥有你的头寸。"
+  },
+  "navigation": {
+    "primary": "主导航",
+    "mainMenu": "主菜单",
+    "toggle": "切换导航",
+    "home": "Statics Protocol 首页",
+    "launchApp": "启动应用",
+    "returnLanding": "返回 Statics Protocol 首页",
+    "site": "网站",
+    "dapp": "DApp 导航",
+    "application": "应用导航",
+    "returnSite": "返回网站",
+    "mobileMenu": "应用菜单。当前页面：{route}",
+    "groups": {
+      "overview": "概览",
+      "earn": "赚取",
+      "assets": "资产",
+      "manage": "管理",
+      "account": "账户"
+    },
+    "items": {
+      "overview": "概览",
+      "earn": "赚取",
+      "liquidity": "流动性",
+      "baskets": "篮子",
+      "dollar": "美元",
+      "positions": "头寸",
+      "loans": "贷款",
+      "wallet": "钱包",
+      "faucet": "水龙头",
+      "activity": "活动",
+      "tools": "工具"
+    },
+    "marketing": {
+      "protocol": "协议",
+      "baskets": "篮子",
+      "dollar": "美元",
+      "liquidity": "流动性",
+      "docs": "文档",
+      "dev": "开发"
+    }
+  },
+  "routes": {
+    "overview": {
+      "label": "概览",
+      "status": "资产组合",
+      "title": "你的资产组合",
+      "description": "在一个地方查看你持有的一切：美元余额、头寸、抵押品以及待领取的奖励。"
+    },
+    "dollar": {
+      "label": "美元",
+      "status": "美元",
+      "title": "获取 Statics Dollar",
+      "description": "存入 ETH 获取美元，或将美元和风险份额兑换回 ETH。确认前会显示准确数量。"
+    },
+    "wallet": {
+      "label": "钱包",
+      "status": "钱包",
+      "title": "你的钱包",
+      "description": "查看余额、添加资金、发送资产，以及将资金转入或转出 Statics。"
+    },
+    "faucet": {
+      "label": "水龙头",
+      "status": "测试网",
+      "title": "获取测试网资产",
+      "description": "领取 Statics 测试资产，或打开 Robinhood 水龙头获取更多测试网 ETH 和股票代币。"
+    },
+    "portal": {
+      "label": "添加资金",
+      "status": "添加资金",
+      "title": "向 Statics 添加资金",
+      "description": "从其他网络或其他代币转入资金。进行兑换、跨链或转换为 Statics Dollar。"
+    },
+    "baskets": {
+      "label": "篮子",
+      "status": "篮子",
+      "title": "篮子",
+      "description": "将一组固定资产作为一个整体买卖。购买前可查看篮子中包含的确切资产。"
+    },
+    "positions": {
+      "label": "头寸",
+      "status": "头寸",
+      "title": "你的头寸",
+      "description": "每个头寸汇集你的篮子、贷款和美元。在这里管理抵押品、质押和奖励。"
+    },
+    "loans": {
+      "label": "贷款",
+      "status": "贷款",
+      "title": "你的贷款",
+      "description": "以锁定的抵押品借入的资产。查看欠款、锁定资产和每笔贷款的到期时间。"
+    },
+    "rewards": {
+      "label": "奖励",
+      "status": "奖励",
+      "title": "你的奖励",
+      "description": "质押一个头寸以获得协议费用分成。选择希望赚取的资产并领取累积奖励。"
+    },
+    "liquidity": {
+      "label": "流动性",
+      "status": "流动性",
+      "title": "提供流动性",
+      "description": "提供资产供其他用户交易，并赚取一部分交易费。查看你的池子及其收益。"
+    },
+    "create": {
+      "label": "启动政策",
+      "status": "治理管理",
+      "title": "篮子启动政策",
+      "description": "测试网测试期间不开放公开创建篮子。了解治理启动流程并浏览现有篮子。"
+    },
+    "activity": {
+      "label": "活动",
+      "status": "活动",
+      "title": "你的活动",
+      "description": "查看此钱包从确认到结算的每项操作。"
+    },
+    "tools": {
+      "label": "工具",
+      "status": "工具",
+      "title": "授权工具",
+      "description": "查看并撤销此钱包授予 Statics 的权限。"
+    }
+  },
+  "shell": {
+    "walletUnavailable": "钱包不可用",
+    "loadingWallet": "正在加载钱包…",
+    "connectWallet": "连接钱包",
+    "signIn": "登录",
+    "creating": "正在创建…",
+    "createWallet": "创建钱包",
+    "retrySignIn": "重试登录",
+    "accountDetails": "账户详情",
+    "walletReady": "钱包已就绪",
+    "networkUnknown": "网络未知",
+    "chain": "链 {chainId}",
+    "wrongNetworkTitle": "当前网络不正确。",
+    "wrongNetworkBody": "切换到 {network} 后才能加载 Statics 数据。",
+    "wrongNetworkBodyWithChain": "切换到 {network}（链 {chainId}）后才能加载 Statics 数据。",
+    "switching": "正在切换…",
+    "switchNetwork": "切换网络",
+    "application": "Statics 应用",
+    "primary": "主要"
+  },
+  "account": {
+    "title": "你的账户",
+    "walletType": "钱包类型",
+    "connectedWallet": "已连接钱包",
+    "embeddedWallet": "嵌入式钱包",
+    "externalWallet": "外部钱包",
+    "network": "网络",
+    "unknownNetwork": "未知网络",
+    "chain": "链 {chainId}",
+    "ethereum": "Ethereum",
+    "ethereumMissing": "尚无 Ethereum 地址。",
+    "solana": "Solana",
+    "solanaMissing": "尚无 Solana 钱包。首次使用 Solana 路径时会自动创建。",
+    "copied": "已复制 {label} 地址",
+    "copy": "复制 {label} 地址",
+    "explorer": "在浏览器中查看 Ethereum 账户",
+    "exportTitle": "导出嵌入式钱包",
+    "exportWarning": "导出会显示控制此钱包及其中全部资产的恢复材料。切勿分享，也不要粘贴到网站、聊天或云笔记中。",
+    "openingExport": "正在打开安全导出…",
+    "reviewExport": "查看安全导出",
+    "signingOut": "正在退出…",
+    "signOut": "退出 Statics"
+  },
+  "landing": {
+    "eyebrow": "锚点固定，市场不固定。",
+    "heroLine1": "静态资产。",
+    "heroLine2": "静态规则。",
+    "heroLine3": "动态市场。",
+    "heroDescription": "每个篮子都是固定组合，始终可以赎回其中完全相同的资产。没有管理人、没有再平衡、没有清算。市场围绕这个锚点波动，Statics 奖励维护锚点的人。",
+    "whatsFixed": "哪些保持固定",
+    "foundations": "协议基础",
+    "fixedBundles": "固定组合",
+    "inKindRedemption": "实物赎回",
+    "openSource": "开源",
+    "heroVisual": "Robin Hood 数字大理石雕像",
+    "heroAlt": "一尊戴羽毛帽、留山羊胡的 Robin Hood 碎片化数字大理石雕像",
+    "systemStatus": "系统状态",
+    "network": "网络",
+    "deployment": "部署",
+    "time": "时间",
+    "protocol": "Statics 协议",
+    "publicBeta": "公开测试网测试版",
+    "economies": "协议经济",
+    "basketsTitle": "Statics 篮子",
+    "basketsHow": "Statics 篮子的运作方式",
+    "basketsDescription": "将 1 至 16 种固定资产组合为一个代币。随时可赎回其中完全相同的资产，数量永久不变。没有管理人、再平衡或自由裁量。",
+    "assetExamples": "支持的资产示例",
+    "ether": "Ether",
+    "bitcoin": "Bitcoin",
+    "dollarAssets": "美元资产",
+    "stableAssets": "稳定资产",
+    "additionalAssets": "其他资产",
+    "governedAssets": "治理资产",
+    "more": "+ 更多",
+    "dollarTitle": "Statics 美元",
+    "dollarHow": "Statics 美元的运作方式",
+    "dollarDescription": "由任何人都能在链上验证的抵押品支持的美元。风险份额先吸收损失，使美元尽可能保持完整。",
+    "dollarCapabilities": "Statics 美元功能",
+    "dollar": "美元",
+    "shares": "份额",
+    "redeem": "赎回",
+    "whenHealthy": "健康时",
+    "permit": "许可",
+    "oneSignature": "一次签名",
+    "assetsPerBasket": "每个篮子的资产数",
+    "chosenOnce": "创建时一次确定",
+    "redemption": "赎回",
+    "inKind": "实物",
+    "exactlyInside": "完全按其中资产",
+    "rebalancing": "再平衡",
+    "never": "永不",
+    "weightsNeverChange": "权重永不改变",
+    "liquidations": "清算",
+    "none": "无",
+    "debtMatches": "债务与抵押品一致",
+    "rewardAssets": "奖励资产",
+    "upTo64": "最多 64 种",
+    "perPosition": "每个质押头寸",
+    "features": "协议功能",
+    "ownPosition": "拥有你的头寸",
+    "ownPositionDescription": "篮子、贷款和美元系列存放在一个头寸中，你可以将其作为单一资产持有、转移或出售。",
+    "noLiquidations": "无清算",
+    "noLiquidationsDescription": "债务与抵押品以相同资产计价，因此价格下跌会同时影响两边，无需清算。",
+    "deepLiquidity": "不断加深的流动性",
+    "deepLiquidityDescription": "每次兑换的一部分成为协议永久持有的流动性。交易越多，池子越深，且这部分流动性无法撤回。",
+    "stakeEarn": "质押并赚取",
+    "stakeEarnDescription": "质押并选择最多 64 种奖励资产。奖励是以实物支付的兑换费用，属于真实收入，而非代币增发。",
+    "tagline": "固定资产，固定规则，其他一切自由流动。",
+    "principles": "协议原则",
+    "bundleNeverChanges": "组合永不改变",
+    "redeemExactly": "准确赎回其中资产",
+    "noKyc": "无需 KYC",
+    "noPermission": "无需许可",
+    "noMiddlemen": "没有中间人",
+    "staticAssets": "静态资产",
+    "dynamicMarkets": "动态市场",
+    "auditStatus": "审计状态",
+    "projectLinks": "项目链接",
+    "legalLinks": "法律链接",
+    "docs": "文档",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "X / Twitter",
+    "terms": "条款",
+    "privacy": "隐私",
+    "security": "安全",
+    "status": {
+      "system": "公开测试网测试版",
+      "network": "Robinhood Testnet",
+      "deployment": "测试网已上线",
+      "audit": "内部审查"
+    }
+  },
+  "glossary": {
+    "position": {
+      "label": "头寸",
+      "plural": "头寸",
+      "plain": "你在 Statics 中持有的一切，汇集在一个可转移项目中。"
+    },
+    "basket": { "label": "篮子", "plural": "篮子", "plain": "一组固定资产，可作为一个整体买卖。" },
+    "underlying": {
+      "label": "底层资产",
+      "plural": "底层资产",
+      "plain": "篮子持有的一种资产。篮子的价值取决于其底层资产。"
+    },
+    "dollar": {
+      "label": "美元",
+      "plural": "美元",
+      "plain": "Statics 自有的美元，由你存入的资产支持。"
+    },
+    "riskShares": {
+      "label": "风险份额",
+      "plural": "风险份额",
+      "plain": "存款中的浮动部分：吸收价格波动以帮助美元保持稳定。"
+    },
+    "collateral": {
+      "label": "抵押品",
+      "plural": "抵押品",
+      "plain": "你锁定用来支持美元余额或贷款的资产。"
+    },
+    "loan": {
+      "label": "贷款",
+      "plural": "贷款",
+      "plain": "以锁定抵押品借入的资产，按其自身时间表偿还。"
+    },
+    "liquidity": {
+      "label": "流动性",
+      "plural": "流动性",
+      "plain": "你提供给其他用户交易的资产，并从中获得费用分成。"
+    },
+    "liquidityPosition": {
+      "label": "流动性头寸",
+      "plural": "流动性头寸",
+      "plain": "你在一个交易池中的个人份额。"
+    },
+    "tradingFees": {
+      "label": "交易费",
+      "plural": "交易费",
+      "plain": "每笔交易收取并分配给资产提供者的费用。"
+    },
+    "protocolLiquidity": {
+      "label": "协议自有流动性",
+      "plural": "协议自有流动性",
+      "plain": "由协议永久持有，而非个人持有的流动性。"
+    },
+    "priceFeed": {
+      "label": "价格源",
+      "plural": "价格源",
+      "plain": "协议用于评估资产价值的实时价格。"
+    },
+    "borrowLimit": {
+      "label": "借款上限",
+      "plural": "借款上限",
+      "plain": "可从此配置文件抵押品中借出的最大数量。"
+    },
+    "health": {
+      "label": "健康度",
+      "plural": "健康度",
+      "plain": "你的头寸获得保障的程度。数值越高越安全。"
+    },
+    "rewards": { "label": "奖励", "plural": "奖励", "plain": "你已赚取并可领取的费用。" },
+    "staking": {
+      "label": "质押",
+      "plural": "质押",
+      "plain": "存入 Statics 以获得协议费用分成，同时仍可取回。"
+    },
+    "earningDelay": {
+      "label": "收益等待期",
+      "plural": "收益等待期",
+      "plain": "新质押的资金会稍后开始赚取奖励，但从不锁定。"
+    },
+    "openToAnyone": {
+      "label": "向所有人开放",
+      "plural": "向所有人开放",
+      "plain": "无需批准或守门人，任何人都可以参与。"
+    }
   }
 }

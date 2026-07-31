@@ -4,5 +4,364 @@
     "change": "Cambiar idioma",
     "saving": "Cambiando el idioma…",
     "error": "No se pudo cambiar el idioma. Inténtalo de nuevo."
+  },
+  "common": {
+    "skipToContent": "Saltar al contenido",
+    "skipToApplication": "Saltar al contenido de la aplicación",
+    "close": "Cerrar",
+    "planned": "Planeado",
+    "comingSoon": "El enlace {label} estará disponible próximamente"
+  },
+  "metadata": {
+    "title": "Statics Protocol",
+    "titleTemplate": "{page} | Statics Protocol",
+    "description": "Statics reúne cestas estáticas de múltiples activos, finanzas propiedad de la posición y liquidez propiedad del protocolo con un dólar nativo.",
+    "socialDescription": "Activos estáticos. Reglas estáticas. Mercados dinámicos. Sé dueño de tu posición."
+  },
+  "navigation": {
+    "primary": "Navegación principal",
+    "mainMenu": "Menú principal",
+    "toggle": "Alternar navegación",
+    "home": "Inicio de Statics Protocol",
+    "launchApp": "Abrir aplicación",
+    "returnLanding": "Volver a la página de inicio de Statics Protocol",
+    "site": "Sitio",
+    "dapp": "Navegación de la DApp",
+    "application": "Navegación de la aplicación",
+    "returnSite": "Volver al sitio",
+    "mobileMenu": "Menú de la aplicación. Ruta actual: {route}",
+    "groups": {
+      "overview": "Resumen",
+      "earn": "Ganar",
+      "assets": "Activos",
+      "manage": "Gestionar",
+      "account": "Cuenta"
+    },
+    "items": {
+      "overview": "Resumen",
+      "earn": "Ganar",
+      "liquidity": "Liquidez",
+      "baskets": "Cestas",
+      "dollar": "Dólar",
+      "positions": "Posiciones",
+      "loans": "Préstamos",
+      "wallet": "Billetera",
+      "faucet": "Faucet",
+      "activity": "Actividad",
+      "tools": "Herramientas"
+    },
+    "marketing": {
+      "protocol": "Protocolo",
+      "baskets": "Cestas",
+      "dollar": "Dólar",
+      "liquidity": "Liquidez",
+      "docs": "Documentación",
+      "dev": "Desarrollo"
+    }
+  },
+  "routes": {
+    "overview": {
+      "label": "Resumen",
+      "status": "Cartera",
+      "title": "Tu cartera",
+      "description": "Todo lo que tienes en un solo lugar: saldo en dólares, posiciones, garantía y recompensas pendientes de reclamar."
+    },
+    "dollar": {
+      "label": "Dólar",
+      "status": "Dólar",
+      "title": "Obtén Statics Dollar",
+      "description": "Deposita ETH para recibir dólares o convierte tus dólares y participaciones de riesgo de nuevo en ETH. Verás los importes exactos antes de confirmar."
+    },
+    "wallet": {
+      "label": "Billetera",
+      "status": "Billetera",
+      "title": "Tu billetera",
+      "description": "Consulta tus saldos, añade fondos, envía activos y mueve dinero dentro y fuera de Statics."
+    },
+    "faucet": {
+      "label": "Faucet",
+      "status": "Red de prueba",
+      "title": "Obtén activos de prueba",
+      "description": "Reclama los activos de prueba de Statics o abre el faucet de Robinhood para obtener más ETH y tokens de acciones de prueba."
+    },
+    "portal": {
+      "label": "Añadir fondos",
+      "status": "Añadir fondos",
+      "title": "Añade fondos a Statics",
+      "description": "Transfiere dinero desde otra red u otro token. Intercambia, usa un puente o conviértelo a Statics Dollar."
+    },
+    "baskets": {
+      "label": "Cestas",
+      "status": "Cestas",
+      "title": "Cestas",
+      "description": "Compra o vende un conjunto fijo de activos como una sola unidad. Verás exactamente qué contiene una cesta antes de comprar."
+    },
+    "positions": {
+      "label": "Posiciones",
+      "status": "Posiciones",
+      "title": "Tus posiciones",
+      "description": "Cada posición reúne tus cestas, préstamos y dólares. Gestiona la garantía, el staking y las recompensas desde aquí."
+    },
+    "loans": {
+      "label": "Préstamos",
+      "status": "Préstamos",
+      "title": "Tus préstamos",
+      "description": "Dinero que has pedido prestado contra una garantía bloqueada. Revisa cuánto debes, qué está bloqueado y cuándo vence cada préstamo."
+    },
+    "rewards": {
+      "label": "Recompensas",
+      "status": "Recompensas",
+      "title": "Tus recompensas",
+      "description": "Haz staking de una posición para obtener una parte de las comisiones del protocolo. Elige en qué activos quieres ganar y reclama lo acumulado."
+    },
+    "liquidity": {
+      "label": "Liquidez",
+      "status": "Liquidez",
+      "title": "Aporta liquidez",
+      "description": "Aporta activos para que otras personas puedan operar y gana una parte de las comisiones. Revisa tus pools y lo que han generado."
+    },
+    "create": {
+      "label": "Política de lanzamiento",
+      "status": "Gobernado",
+      "title": "Política de lanzamiento de cestas",
+      "description": "La creación pública de cestas está cerrada durante la beta de prueba. Consulta cómo funcionan los lanzamientos gobernados y explora las cestas disponibles."
+    },
+    "activity": {
+      "label": "Actividad",
+      "status": "Actividad",
+      "title": "Tu actividad",
+      "description": "Cada acción de esta billetera, desde el momento en que la confirmas hasta que se liquida."
+    },
+    "tools": {
+      "label": "Herramientas",
+      "status": "Herramientas",
+      "title": "Herramientas de permisos",
+      "description": "Revisa y revoca los permisos que esta billetera ha concedido a Statics."
+    }
+  },
+  "shell": {
+    "walletUnavailable": "Billetera no disponible",
+    "loadingWallet": "Cargando billetera…",
+    "connectWallet": "Conectar billetera",
+    "signIn": "Iniciar sesión",
+    "creating": "Creando…",
+    "createWallet": "Crear billetera",
+    "retrySignIn": "Reintentar inicio de sesión",
+    "accountDetails": "Detalles de la cuenta",
+    "walletReady": "Billetera lista",
+    "networkUnknown": "Red desconocida",
+    "chain": "Cadena {chainId}",
+    "wrongNetworkTitle": "Estás en la red incorrecta.",
+    "wrongNetworkBody": "Los datos de Statics no se cargarán hasta que cambies a {network}.",
+    "wrongNetworkBodyWithChain": "Los datos de Statics no se cargarán hasta que cambies a {network} (cadena {chainId}).",
+    "switching": "Cambiando…",
+    "switchNetwork": "Cambiar de red",
+    "application": "Aplicación Statics",
+    "primary": "Principal"
+  },
+  "account": {
+    "title": "Tu cuenta",
+    "walletType": "Tipo de billetera",
+    "connectedWallet": "Billetera conectada",
+    "embeddedWallet": "Billetera integrada",
+    "externalWallet": "Billetera externa",
+    "network": "Red",
+    "unknownNetwork": "Red desconocida",
+    "chain": "Cadena {chainId}",
+    "ethereum": "Ethereum",
+    "ethereumMissing": "Aún no hay una dirección de Ethereum.",
+    "solana": "Solana",
+    "solanaMissing": "Aún no hay una billetera de Solana. Se crea la primera vez que usas una ruta de Solana.",
+    "copied": "Dirección de {label} copiada",
+    "copy": "Copiar dirección de {label}",
+    "explorer": "Ver la cuenta de Ethereum en el explorador",
+    "exportTitle": "Exportar billetera integrada",
+    "exportWarning": "La exportación revela el material de recuperación que controla esta billetera y todos sus activos. Nunca lo compartas ni lo pegues en un sitio web, chat o nota en la nube.",
+    "openingExport": "Abriendo exportación segura…",
+    "reviewExport": "Revisar exportación segura",
+    "signingOut": "Cerrando sesión…",
+    "signOut": "Cerrar sesión en Statics"
+  },
+  "landing": {
+    "eyebrow": "El ancla es fija. El mercado no.",
+    "heroLine1": "Activos estáticos.",
+    "heroLine2": "Reglas estáticas.",
+    "heroLine3": "Mercados dinámicos.",
+    "heroDescription": "Cada cesta es un conjunto fijo, siempre canjeable por exactamente lo que contiene. Sin gestor, sin rebalanceos y sin liquidaciones. Los mercados se mueven alrededor de ese ancla; Statics recompensa a quienes la mantienen firme.",
+    "whatsFixed": "Qué permanece fijo",
+    "foundations": "Fundamentos del protocolo",
+    "fixedBundles": "Conjuntos fijos",
+    "inKindRedemption": "Canje en especie",
+    "openSource": "Código abierto",
+    "heroVisual": "Estatua digital de mármol de Robin Hood",
+    "heroAlt": "Una estatua digital fragmentada de mármol de Robin Hood con gorro de plumas y perilla",
+    "systemStatus": "Estado del sistema",
+    "network": "Red",
+    "deployment": "Despliegue",
+    "time": "Hora",
+    "protocol": "Protocolo Statics",
+    "publicBeta": "Beta pública de prueba",
+    "economies": "Economías del protocolo",
+    "basketsTitle": "Cestas Statics",
+    "basketsHow": "Cómo funcionan las cestas Statics",
+    "basketsDescription": "Un conjunto fijo de 1 a 16 activos en un solo token. Canjéalo en cualquier momento por exactamente lo que contiene: los mismos importes, para siempre. Sin gestor, rebalanceos ni discreción.",
+    "assetExamples": "Ejemplos de activos compatibles",
+    "ether": "Ether",
+    "bitcoin": "Bitcoin",
+    "dollarAssets": "Activos en dólares",
+    "stableAssets": "Activos estables",
+    "additionalAssets": "Activos adicionales",
+    "governedAssets": "Activos gobernados",
+    "more": "+ Más",
+    "dollarTitle": "Dólar Statics",
+    "dollarHow": "Cómo funciona el dólar Statics",
+    "dollarDescription": "Un dólar respaldado por una garantía que cualquiera puede verificar en la cadena. Las participaciones de riesgo absorben primero las pérdidas para mantener íntegro el dólar.",
+    "dollarCapabilities": "Funciones del dólar Statics",
+    "dollar": "Dólar",
+    "shares": "Participaciones",
+    "redeem": "Canjear",
+    "whenHealthy": "Cuando está sano",
+    "permit": "Permiso",
+    "oneSignature": "Una firma",
+    "assetsPerBasket": "Activos por cesta",
+    "chosenOnce": "Elegidos una vez al crearla",
+    "redemption": "Canje",
+    "inKind": "En especie",
+    "exactlyInside": "Exactamente lo que contiene",
+    "rebalancing": "Rebalanceo",
+    "never": "Nunca",
+    "weightsNeverChange": "Los pesos nunca cambian",
+    "liquidations": "Liquidaciones",
+    "none": "Ninguna",
+    "debtMatches": "La deuda coincide con la garantía",
+    "rewardAssets": "Activos de recompensa",
+    "upTo64": "Hasta 64",
+    "perPosition": "Por posición en staking",
+    "features": "Funciones del protocolo",
+    "ownPosition": "Sé dueño de tu posición",
+    "ownPositionDescription": "Las cestas, los préstamos y las series de dólares viven en una posición que puedes mantener, transferir o vender como un solo activo.",
+    "noLiquidations": "Sin liquidaciones",
+    "noLiquidationsDescription": "La deuda está denominada en los mismos activos que la garantía, por lo que una caída de precio mueve ambos lados a la vez. No hay nada que liquidar.",
+    "deepLiquidity": "Liquidez que aumenta",
+    "deepLiquidityDescription": "Una parte de cada intercambio se convierte en liquidez permanente del protocolo. Los pools se profundizan cuanto más operan y esa liquidez no puede retirarse.",
+    "stakeEarn": "Haz staking y gana",
+    "stakeEarnDescription": "Haz staking y elige hasta 64 activos de recompensa. Las recompensas son comisiones pagadas en especie: ingresos reales, no emisiones.",
+    "tagline": "Activos fijos. Reglas fijas. Todo lo demás puede moverse.",
+    "principles": "Principios del protocolo",
+    "bundleNeverChanges": "El conjunto nunca cambia",
+    "redeemExactly": "Canjea exactamente lo que contiene",
+    "noKyc": "Sin KYC",
+    "noPermission": "Sin permisos",
+    "noMiddlemen": "Sin intermediarios",
+    "staticAssets": "Activos estáticos",
+    "dynamicMarkets": "Mercados dinámicos",
+    "auditStatus": "Estado de auditoría",
+    "projectLinks": "Enlaces del proyecto",
+    "legalLinks": "Enlaces legales",
+    "docs": "Documentación",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "X / Twitter",
+    "terms": "Términos",
+    "privacy": "Privacidad",
+    "security": "Seguridad",
+    "status": {
+      "system": "Beta pública de prueba",
+      "network": "Robinhood Testnet",
+      "deployment": "Activo en testnet",
+      "audit": "Revisión interna"
+    }
+  },
+  "glossary": {
+    "position": {
+      "label": "Posición",
+      "plural": "Posiciones",
+      "plain": "Todo lo que tienes en Statics, reunido en un elemento transferible."
+    },
+    "basket": {
+      "label": "Cesta",
+      "plural": "Cestas",
+      "plain": "Un conjunto fijo de activos que puedes comprar o vender como una sola unidad."
+    },
+    "underlying": {
+      "label": "Subyacente",
+      "plural": "Subyacentes",
+      "plain": "Uno de los activos que contiene una cesta. Una cesta vale lo que valen sus subyacentes."
+    },
+    "dollar": {
+      "label": "Dólar",
+      "plural": "Dólares",
+      "plain": "El dólar propio de Statics, respaldado por los activos que depositas."
+    },
+    "riskShares": {
+      "label": "Participaciones de riesgo",
+      "plural": "Participaciones de riesgo",
+      "plain": "La parte variable de un depósito: absorbe los movimientos de precio para que el dólar permanezca estable."
+    },
+    "collateral": {
+      "label": "Garantía",
+      "plural": "Garantía",
+      "plain": "Activos que bloqueas para respaldar un saldo en dólares o un préstamo."
+    },
+    "loan": {
+      "label": "Préstamo",
+      "plural": "Préstamos",
+      "plain": "Dinero prestado contra una garantía bloqueada, pagadero según su propio calendario."
+    },
+    "liquidity": {
+      "label": "Liquidez",
+      "plural": "Liquidez",
+      "plain": "Activos que aportas para que otras personas puedan operar y que te dan una parte de las comisiones."
+    },
+    "liquidityPosition": {
+      "label": "Posición de liquidez",
+      "plural": "Posiciones de liquidez",
+      "plain": "Tu participación individual en un pool de negociación."
+    },
+    "tradingFees": {
+      "label": "Comisiones de negociación",
+      "plural": "Comisiones de negociación",
+      "plain": "La parte cobrada en cada operación y repartida entre quienes aportaron activos."
+    },
+    "protocolLiquidity": {
+      "label": "Liquidez propiedad del protocolo",
+      "plural": "Liquidez propiedad del protocolo",
+      "plain": "Liquidez que el protocolo conserva de forma permanente, en lugar de pertenecer a una persona."
+    },
+    "priceFeed": {
+      "label": "Fuente de precios",
+      "plural": "Fuentes de precios",
+      "plain": "El precio en vivo que usa el protocolo para valorar tus activos."
+    },
+    "borrowLimit": {
+      "label": "Límite de préstamo",
+      "plural": "Límites de préstamo",
+      "plain": "El máximo que puede pedirse prestado contra la garantía de este perfil."
+    },
+    "health": {
+      "label": "Salud",
+      "plural": "Salud",
+      "plain": "Qué tan bien cubierta está tu posición. Cuanto mayor, más segura."
+    },
+    "rewards": {
+      "label": "Recompensas",
+      "plural": "Recompensas",
+      "plain": "Comisiones que has ganado y puedes reclamar."
+    },
+    "staking": {
+      "label": "Staking",
+      "plural": "Staking",
+      "plain": "Depositar Statics para ganar una parte de las comisiones del protocolo. Sigue disponible para retirar."
+    },
+    "earningDelay": {
+      "label": "Espera para ganar",
+      "plural": "Espera para ganar",
+      "plain": "Los fondos recién depositados comienzan a ganar un poco más tarde. Nunca quedan bloqueados."
+    },
+    "openToAnyone": {
+      "label": "Abierto a todos",
+      "plural": "Abierto a todos",
+      "plain": "Sin aprobación ni guardián. Cualquiera puede hacerlo."
+    }
   }
 }
