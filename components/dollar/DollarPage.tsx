@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   buildDepositETHTransaction,
@@ -108,6 +109,7 @@ export function DollarProfilePills({
   disabled: boolean;
   onChange: (choice: DollarProfileChoice) => void;
 }) {
+  const t = useTranslations("dollar");
   const choices: readonly DollarProfileChoice[] = peggedAvailable
     ? ["ETH", "WETH", "USDG"]
     : ["ETH", "WETH"];
@@ -115,7 +117,7 @@ export function DollarProfilePills({
     <fieldset
       className={`dollar-asset-choice dollar-profile-choice${peggedAvailable ? " has-pegged" : ""}`}
     >
-      <legend>Collateral profile</legend>
+      <legend>{t("collateralProfile")}</legend>
       {choices.map((choice) => (
         <button
           key={choice}
@@ -318,6 +320,7 @@ function DollarOverviewConnected({
   deployment: DollarDeployment;
   wallet: Address;
 }) {
+  const t = useTranslations("dollar");
   const snapshot = useDollarSnapshot(deployment, wallet);
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
     return (
@@ -333,7 +336,7 @@ function DollarOverviewConnected({
   return (
     <section className="dollar-overview-card" aria-labelledby="dollar-overview-title">
       <div>
-        <p className="dapp-section-label">Statics Dollar</p>
+        <p className="dapp-section-label">{t("staticsDollar")}</p>
         <h2 id="dollar-overview-title">{displayAmount(data.dollarBalance)} Dollar</h2>
         <p>
           Series {data.seriesId.toString()} · {displayAmount(data.riskBalance)} active Risk
@@ -342,10 +345,10 @@ function DollarOverviewConnected({
       <div className="dollar-overview-health">
         <span>{data.solvency.healthy ? "Healthy" : "Impaired"}</span>
         <strong>${displayAmount(data.priceWad)}</strong>
-        <small>WETH oracle</small>
+        <small>{t("wethOracle")}</small>
       </div>
       <Link className="dollar-primary-link" href="/app/dollar">
-        Open Dollar
+        {t("openDollar")}
       </Link>
     </section>
   );
@@ -369,6 +372,7 @@ function DollarOverviewConnected({
  * those assets, rather than being a count of claims buried in a tile.
  */
 function OverviewPortfolio({ wallet }: { wallet: Address }) {
+  const t = useTranslations("dollar");
   const publicClient = usePublicClient();
 
   // loadLoanCatalog loads the position catalog internally, so one read covers
@@ -420,10 +424,10 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
   if (hasNothing) {
     return (
       <EmptyState
-        title="Nothing here yet"
-        description="Buy a basket and it starts earning more of the assets it holds. Or get Statics Dollar and stake it to earn in whichever assets you choose."
-        action={{ label: "Browse baskets", href: "/app/baskets" }}
-        secondary={{ label: "Get Statics Dollar", href: "/app/dollar" }}
+        title={t("nothingHere")}
+        description={t("nothingHereDescription")}
+        action={{ label: t("browseBaskets"), href: "/app/baskets" }}
+        secondary={{ label: t("getDollar"), href: "/app/dollar" }}
       />
     );
   }
@@ -433,7 +437,7 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
       {earned.length > 0 && (
         <section className="overview-earned" aria-labelledby="overview-earned-title">
           <div>
-            <p className="dapp-section-label">Earned by your baskets</p>
+            <p className="dapp-section-label">{t("earnedByBaskets")}</p>
             <h2 id="overview-earned-title">
               {earned
                 .map(
@@ -442,10 +446,10 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
                 )
                 .join(" + ")}
             </h2>
-            <p>Paid in the assets your baskets hold. Claim it whenever you like.</p>
+            <p>{t("basketRewardDescription")}</p>
           </div>
           <Link className="dollar-primary-link" href="/app/rewards">
-            Claim
+            {t("claim")}
           </Link>
         </section>
       )}
@@ -529,6 +533,7 @@ function DollarActionPanel({
   wallet: Address;
   initialProfile: DollarProfileChoice;
 }) {
+  const t = useTranslations("dollar");
   const locale = useAppLocale();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
@@ -1106,7 +1111,7 @@ function DollarActionPanel({
                         }}
                         disabled={anyPending}
                       >
-                        {modeLabels[choice]}
+                        {t(choice)}
                       </button>
                     )
                   )}
@@ -1133,7 +1138,7 @@ function DollarActionPanel({
                       }}
                       disabled={anyPending || (mode === "deposit" && asset === "ETH")}
                     >
-                      {mode === "deposit" && asset === "ETH" ? "Keep gas" : "Max"}
+                      {mode === "deposit" && asset === "ETH" ? t("keepGas") : t("max")}
                     </button>
                   </div>
                   <small>
@@ -1145,7 +1150,7 @@ function DollarActionPanel({
                   </small>
                 </div>
                 <div className="dollar-quote">
-                  <span>{isSupplyMode(mode) ? "Your Risk shares" : previewLabel}</span>
+                  <span>{isSupplyMode(mode) ? t("yourRiskShares") : previewLabel}</span>
                   <strong>{supplyOutput ?? output}</strong>
                   {preview && (
                     <small>
@@ -1185,7 +1190,7 @@ function DollarActionPanel({
             supply.positionId !== null && (
               <div className="dollar-claim-row">
                 <div>
-                  <span>Proceeds to claim</span>
+                  <span>{t("proceedsToClaim")}</span>
                   <strong>
                     {[
                       [supply.claimableCollateral, asset] as const,
@@ -1198,7 +1203,7 @@ function DollarActionPanel({
                   </strong>
                 </div>
                 <button type="button" disabled={anyPending} onClick={() => void claimProceeds()}>
-                  {pendingAction === "claim" ? "Waiting for confirmation…" : "Claim"}
+                  {pendingAction === "claim" ? t("waiting") : t("claim")}
                 </button>
               </div>
             )}
@@ -1237,26 +1242,26 @@ function DollarActionPanel({
 
         {peggedSelected && (
           <aside className="dollar-protocol-card">
-            <p className="dapp-section-label">USDG profile</p>
+            <p className="dapp-section-label">{t("usdgProfile")}</p>
             <dl>
               <div>
-                <dt>Profile</dt>
+                <dt>{t("profile")}</dt>
                 <dd>#{deployment.pegged?.profileId.toString()}</dd>
               </div>
               <div>
-                <dt>Collateral</dt>
+                <dt>{t("collateral")}</dt>
                 <dd>USDG</dd>
               </div>
               <div>
-                <dt>Dollar received</dt>
+                <dt>{t("dollarReceived")}</dt>
                 <dd>USDstx</dd>
               </div>
               <div>
-                <dt>Risk shares</dt>
-                <dd>None</dd>
+                <dt>{t("riskShares")}</dt>
+                <dd>{t("none")}</dd>
               </div>
               <div>
-                <dt>Gateway</dt>
+                <dt>{t("gateway")}</dt>
                 <dd title={deployment.contracts.gateway}>
                   {shortAddress(deployment.contracts.gateway)}
                 </dd>
@@ -1275,7 +1280,7 @@ function DollarActionPanel({
             </p>
             <dl>
               <div>
-                <dt>Health</dt>
+                <dt>{t("health")}</dt>
                 <dd>
                   {!state.solvency.oracleAvailable
                     ? "Oracle unavailable"
@@ -1285,39 +1290,39 @@ function DollarActionPanel({
                 </dd>
               </div>
               <div>
-                <dt>Price feed</dt>
+                <dt>{t("priceFeed")}</dt>
                 <dd>${displayAmount(state.priceWad)}</dd>
               </div>
               <div>
-                <dt>Collateral ratio</dt>
+                <dt>{t("collateralRatio")}</dt>
                 <dd>{Number(state.profile.collateralRatioBps) / 100}%</dd>
               </div>
               <div>
-                <dt>Debt</dt>
+                <dt>{t("debt")}</dt>
                 <dd>{displayAmount(state.profile.seniorOutstanding)} Dollar</dd>
               </div>
               <div>
-                <dt>Borrow limit</dt>
+                <dt>{t("borrowLimit")}</dt>
                 <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
               </div>
               <div>
-                <dt>Profile mode</dt>
+                <dt>{t("profileMode")}</dt>
                 <dd>{profileModeLabel(state.profile.mode)}</dd>
               </div>
               <div>
-                <dt>Series state</dt>
+                <dt>{t("seriesState")}</dt>
                 <dd>{seriesStatusLabel(state.series.status)}</dd>
               </div>
               <div>
-                <dt>Paused mask</dt>
+                <dt>{t("pausedMask")}</dt>
                 <dd>{state.pausedOperations.toString()}</dd>
               </div>
               <div>
-                <dt>Status</dt>
+                <dt>{t("status")}</dt>
                 <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
               </div>
               <div>
-                <dt>Gateway</dt>
+                <dt>{t("gateway")}</dt>
                 <dd title={deployment.contracts.gateway}>
                   {shortAddress(deployment.contracts.gateway)}
                 </dd>
