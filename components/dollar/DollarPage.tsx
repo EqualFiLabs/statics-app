@@ -18,6 +18,7 @@ import {
 } from "@statics-protocol/sdk";
 import {
   encodeFunctionData,
+  formatEther,
   formatUnits,
   getAddress,
   zeroAddress,
@@ -43,6 +44,7 @@ import {
   hasClaimableProceeds,
   emptyDollarSupplyState,
   loadDollarSupplyState,
+  preferredSupplyPosition,
   supplyActionAvailability,
 } from "@/lib/dollar/supply";
 import {
@@ -541,6 +543,7 @@ function DollarActionPanel({
   const [peggedSelected, setPeggedSelected] = useState(initialProfile === "USDG");
   const [peggedPending, setPeggedPending] = useState(false);
   const [amountInput, setAmountInput] = useState("");
+  const [supplyPositionOverride, setSupplyPositionOverride] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -723,13 +726,32 @@ function DollarActionPanel({
             data: buildApproveRiskForPeripheryCall(periphery),
           });
         } else if (actionAvailability.kind === "stake") {
+          const refreshedSupply = await supplyState.refetch();
+          if (!refreshedSupply.data) throw new Error("The current Position state is unavailable.");
+          if (
+            refreshedSupply.data.positionId === null &&
+            supplyPositionOverride !== null &&
+            supplyPositionOverride !== "new" &&
+            !refreshedSupply.data.ownedPositionIds.includes(BigInt(supplyPositionOverride))
+          ) {
+            throw new Error("The selected position is no longer owned by this wallet.");
+          }
+          const freshTargetPositionId = preferredSupplyPosition(
+            refreshedSupply.data.positionId,
+            refreshedSupply.data.ownedPositionIds,
+            supplyPositionOverride
+          );
           // Staking is supplying -- the shares are consumable the moment this
           // confirms, so there is no follow-up step.
           await recordAndSend({
             kind: "supply-risk",
-            label: supply.positionId === null ? "Create position and supply Risk" : "Supply Risk",
+            label:
+              freshTargetPositionId === null
+                ? "Create position and supply Risk"
+                : `Supply Risk in Position #${freshTargetPositionId.toString()}`,
             to: periphery,
-            data: buildStakeRiskCall(supply.positionId, state.seriesId, moves, wallet),
+            data: buildStakeRiskCall(freshTargetPositionId, state.seriesId, moves, wallet),
+            value: freshTargetPositionId === null ? refreshedSupply.data.positionCreationFee : 0n,
           });
           setAmountInput("");
         } else if (actionAvailability.kind === "unstake") {
@@ -957,6 +979,11 @@ function DollarActionPanel({
     },
   });
   const supply = supplyState.data ?? emptyDollarSupplyState;
+  const supplyTargetPositionId = preferredSupplyPosition(
+    supply.positionId,
+    supply.ownedPositionIds,
+    supplyPositionOverride
+  );
 
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
     return (
@@ -1166,12 +1193,34 @@ function DollarActionPanel({
             </p>
           )}
           {!peggedSelected && mode === "supply" && (
-            <p className="dollar-note">
-              Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
-              shares become redeemable the moment this confirms, and you earn only where a
-              redemption actually consumes them -- nothing accrues for sitting idle. Unconsumed
-              shares stay withdrawable.
-            </p>
+            <>
+              {supply.positionId === null && (
+                <label className="basket-field">
+                  <span>Supply through</span>
+                  <select
+                    value={supplyTargetPositionId?.toString() ?? "new"}
+                    onChange={(event) => setSupplyPositionOverride(event.target.value)}
+                    disabled={anyPending}
+                  >
+                    {supply.ownedPositionIds.map((positionId) => (
+                      <option key={positionId.toString()} value={positionId.toString()}>
+                        Position #{positionId.toString()}
+                      </option>
+                    ))}
+                    <option value="new">
+                      Open new Position — {formatEther(supply.positionCreationFee)} ETH fee
+                    </option>
+                  </select>
+                  <small>Reusing a Position you own avoids the account-opening fee.</small>
+                </label>
+              )}
+              <p className="dollar-note">
+                Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
+                shares become redeemable the moment this confirms, and you earn only where a
+                redemption actually consumes them -- nothing accrues for sitting idle. Unconsumed
+                shares stay withdrawable.
+              </p>
+            </>
           )}
           {!peggedSelected && mode === "unsupply" && (
             <p className="dollar-note">

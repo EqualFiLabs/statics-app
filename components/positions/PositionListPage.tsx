@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { decodeFunctionResult, formatUnits, getAddress } from "viem";
+import { decodeFunctionResult, formatEther, formatUnits, getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -67,12 +67,21 @@ function PositionListRuntime() {
   });
 
   const createPosition = async () => {
-    if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
+    if (
+      !wallet ||
+      !publicClient ||
+      !walletClient.data ||
+      !catalog.data ||
+      deploymentState.status !== "configured"
+    ) {
       return;
     }
     setPending(true);
     setActionError(null);
     try {
+      const refreshed = await catalog.refetch();
+      if (!refreshed.data) throw new Error("The current Position fee is unavailable.");
+      const creationFee = refreshed.data.positionCreationFee;
       const data = buildCreatePositionCall(wallet);
       await executeProtocolTransaction({
         publicClient,
@@ -80,9 +89,10 @@ function PositionListRuntime() {
         chainId: deploymentState.deployment.chainId,
         kind: "create-position",
         label: "Create position",
-        amount: "1 position",
+        amount: `${formatEther(creationFee)} ETH account fee`,
         to: deploymentState.deployment.contracts.diamond,
         data,
+        value: creationFee,
         sendTransaction: ({ to, data: transactionData, value }) =>
           walletClient.data.sendTransaction({
             account: wallet,
@@ -152,6 +162,11 @@ function PositionListRuntime() {
           <p className="dapp-section-label">{t("subject")}</p>
           <h2 id="position-catalog-title">{t("title")}</h2>
           <p>{t("description")}</p>
+          {catalog.data && (
+            <small>
+              {t("creationFee", { fee: formatEther(catalog.data.positionCreationFee) })}
+            </small>
+          )}
         </div>
         <button
           className="dollar-submit"

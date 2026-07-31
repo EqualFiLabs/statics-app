@@ -184,6 +184,11 @@ try {
     if (receipt.status !== "success") throw new Error(`Local transaction ${hash} reverted.`);
     return { receipt, simulationData: simulation.data };
   };
+  const positionCreationFee = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "positionCreationFee",
+  });
 
   const assertAvailableRecombination = (functionName, simulationData) => {
     if (!simulationData) throw new Error(`${functionName} simulation returned no result.`);
@@ -497,7 +502,8 @@ try {
 
   const createPositionResult = await send(
     deployment.contracts.diamond,
-    buildCreatePositionCall(account.address)
+    buildCreatePositionCall(account.address),
+    positionCreationFee
   );
   if (!createPositionResult.simulationData) {
     throw new Error("Position creation simulation returned no token ID.");
@@ -673,7 +679,8 @@ try {
 
   const createLoanPosition = await send(
     deployment.contracts.diamond,
-    buildCreatePositionCall(account.address)
+    buildCreatePositionCall(account.address),
+    positionCreationFee
   );
   if (!createLoanPosition.simulationData) {
     throw new Error("Loan PositionNFT creation simulation returned no token ID.");
@@ -1574,7 +1581,8 @@ try {
     buildCreateAndStakeCall(stakeAmount, account.address, [
       deployment.contracts.dollar,
       deployment.contracts.weth,
-    ])
+    ]),
+    positionCreationFee
   );
   if (!createStakeResult.simulationData) {
     throw new Error("Create-and-stake simulation returned no PositionNFT ID.");

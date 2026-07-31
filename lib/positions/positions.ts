@@ -78,6 +78,7 @@ export type PositionCatalog = Readonly<{
   stakingTokenAllowance: bigint;
   totalStaked: bigint;
   maximumRewardAssets: bigint;
+  positionCreationFee: bigint;
   currentBlock: bigint;
   currentTimestamp: bigint;
 }>;
@@ -201,6 +202,7 @@ export async function loadPositionCatalog(
     stakingToken,
     totalStaked,
     maximumRewardAssets,
+    positionCreationFee,
     latestBlock,
   ] = await Promise.all([
     publicClient.getContractEvents({
@@ -242,6 +244,11 @@ export async function loadPositionCatalog(
       address: deployment.contracts.diamond,
       abi: staticsAbi,
       functionName: "maxRewardAssetsPerPosition",
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "positionCreationFee",
     }),
     publicClient.getBlock({ blockTag: "latest" }),
   ]);
@@ -344,6 +351,7 @@ export async function loadPositionCatalog(
     stakingTokenAllowance,
     totalStaked,
     maximumRewardAssets,
+    positionCreationFee,
     currentBlock: latestBlock.number,
     currentTimestamp: latestBlock.timestamp,
   };
@@ -374,6 +382,10 @@ export async function validateCustomRewardAsset(
 }
 
 const positionErrorMessages: Readonly<Record<string, string>> = {
+  IncorrectPositionCreationFee:
+    "The Position account fee changed. Refresh the current fee and try again.",
+  PositionCreationFeeTransferFailed:
+    "The protocol could not forward the Position account fee to treasury.",
   PositionHasActiveLegs: "Remove every active position leg before closing this PositionNFT.",
   NotPositionOwnerOrApproved: "This wallet is not authorized to manage the PositionNFT.",
   ERC721NonexistentToken: "This PositionNFT no longer exists.",

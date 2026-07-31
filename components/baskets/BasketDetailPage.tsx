@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { encodeFunctionData, formatUnits, getAddress, type Address, type Hex } from "viem";
+import {
+  encodeFunctionData,
+  formatEther,
+  formatUnits,
+  getAddress,
+  type Address,
+  type Hex,
+} from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -272,12 +279,16 @@ function BasketDetailRuntime({
     label,
     to,
     data,
+    value = 0n,
+    activityAmount,
     validate,
   }: {
     kind: ProtocolActivityKind;
     label: string;
     to: Address;
     data: Hex;
+    value?: bigint;
+    activityAmount?: string;
     validate?: (result: Hex | undefined) => void;
   }) => {
     if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
@@ -289,9 +300,10 @@ function BasketDetailRuntime({
       chainId: deploymentState.deployment.chainId,
       kind,
       label,
-      amount: `${amountInput || "0"} ${basket?.symbol || "BasketToken"}`,
+      amount: activityAmount ?? `${amountInput || "0"} ${basket?.symbol || "BasketToken"}`,
       to,
       data,
+      value,
       sendTransaction: ({ to: transactionTarget, data: transactionData, value }) =>
         walletClient.data!.sendTransaction({
           account: wallet,
@@ -434,6 +446,16 @@ function BasketDetailRuntime({
                 : `Buy ${basket.symbol}`,
           to: deploymentState.deployment.contracts.diamond,
           data,
+          value:
+            collateralFunction === "createAndMintBasketCollateral"
+              ? (refreshedPositions.data?.positionCreationFee ?? 0n)
+              : 0n,
+          activityAmount:
+            collateralFunction === "createAndMintBasketCollateral"
+              ? `${amountInput || "0"} ${basket.symbol} + ${formatEther(
+                  refreshedPositions.data?.positionCreationFee ?? 0n
+                )} ETH account fee`
+              : undefined,
           validate: (result) =>
             void (collateralFunction
               ? validateBasketCollateralSimulation(
@@ -664,7 +686,9 @@ function BasketDetailRuntime({
                     ? conversionSelection === "wallet"
                       ? t("walletMintHelp", { symbol: basket.symbol })
                       : conversionSelection === "new-position"
-                        ? t("newPositionHelp")
+                        ? t("newPositionHelp", {
+                            fee: formatEther(positions.data?.positionCreationFee ?? 0n),
+                          })
                         : t("existingPositionHelp", {
                             id: conversionPositionId?.toString() ?? "",
                           })

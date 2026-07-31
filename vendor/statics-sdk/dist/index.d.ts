@@ -597,7 +597,7 @@ export declare const staticsAbi: readonly [{
 }, {
     readonly name: "createAndDepositBasketCollateral";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "payable";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "basketId";
@@ -648,7 +648,7 @@ export declare const staticsAbi: readonly [{
 }, {
     readonly name: "createAndMintBasketCollateral";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "payable";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "basketId";
@@ -824,7 +824,7 @@ export declare const staticsAbi: readonly [{
 }, {
     readonly name: "createAndStake";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "payable";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "amount";
@@ -1379,7 +1379,7 @@ export declare const staticsAbi: readonly [{
 }, {
     readonly name: "createPosition";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "payable";
     readonly inputs: readonly [{
         readonly type: "address";
         readonly name: "receiver";
@@ -1388,6 +1388,24 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256";
         readonly name: "positionId";
     }];
+}, {
+    readonly name: "positionCreationFee";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "setPositionCreationFee";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [];
 }, {
     readonly name: "closePosition";
     readonly type: "function";
@@ -3034,6 +3052,31 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256";
         readonly name: "positionId";
         readonly indexed: true;
+    }];
+}, {
+    readonly name: "PositionCreationFeeSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "previousAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newAmount";
+    }];
+}, {
+    readonly name: "PositionCreationFeePaid";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "treasury";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
     }];
 }, {
     readonly name: "PositionLegActivated";
@@ -5907,7 +5950,7 @@ export declare const staticsTestnetFaucetAbi: readonly [{
 }];
 export type StaticsLiquidityEventName = "StakingPositionCreated" | "Staked" | "Unstaked" | "GlobalFeeAccrued" | "RewardClaimed" | "TreasuryFeesDistributed" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "RewardBucketMatured" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "RewardAssetDustRouted" | "PositionRewardSettled" | "LiquidityIntegrationInstalled" | "CanonicalPoolInitialized" | "CanonicalPoolCheckpointed" | "CanonicalPoolActivated" | "LiquidityManagerInstalled" | "CanonicalPoolSyncedToManager" | "SwapFeeConfigurationChanged" | "CanonicalPoolFeeConfigurationSet" | "CanonicalPoolFeeConfigurationCleared" | "PermanentLiquidityTreasuryAccrued" | "BasketLiquidityUnwound" | "BorrowedLiquidityPositionMinted" | "BorrowedLiquidityProvided" | "BorrowedLiquidityStaked" | "BasketRewardAccrued" | "BasketRewardSettled" | "BasketRewardClaimed" | "BasketRewardDustRouted" | "LiquidityPositionStaked" | "LiquidityPositionActivated" | "StakedLiquidityIncreased" | "LiquidityPositionUnstaked" | "LiquidityRewardAccrued" | "LiquidityRewardSettled" | "LiquidityRewardClaimed";
 export type StaticsLiquidityEventArgs<Name extends StaticsLiquidityEventName> = ContractEventArgs<typeof staticsAbi, Name>;
-export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "PositionRewardSettled";
+export type StaticsPositionEventName = "PositionCreated" | "PositionClosed" | "PositionCreationFeeSet" | "PositionCreationFeePaid" | "PositionLegActivated" | "PositionLegDeactivated" | "Transfer" | "BasketCollateralDeposited" | "BasketCollateralWithdrawn" | "BasketCollateralRedeemed" | "BasketRewardSettled" | "BasketRewardClaimed" | "StakingPositionCreated" | "Staked" | "Unstaked" | "RewardAssetOptedIn" | "RewardStakeScheduled" | "PositionRewardEligibilityActivated" | "RewardAssetOptedOut" | "PositionRewardSettled";
 export type StaticsPositionEventArgs<Name extends StaticsPositionEventName> = ContractEventArgs<typeof staticsAbi, Name>;
 export type StaticsLendingEventName = "LoanOriginated" | "LoanRepaid" | "LoanExtended" | "LoanExtensionFeePaid" | "LoanRecovered" | "RecoveryPenaltyDistributed";
 export type StaticsLendingEventArgs<Name extends StaticsLendingEventName> = ContractEventArgs<typeof staticsAbi, Name>;
@@ -6382,6 +6425,26 @@ export declare const staticsPositionErrorAbi: readonly [{
     readonly inputs: readonly [{
         readonly type: "address";
         readonly name: "caller";
+    }];
+}, {
+    readonly name: "IncorrectPositionCreationFee";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "required";
+    }, {
+        readonly type: "uint256";
+        readonly name: "provided";
+    }];
+}, {
+    readonly name: "PositionCreationFeeTransferFailed";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "treasury";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
     }];
 }, {
     readonly name: "PositionInitializing";
@@ -7422,7 +7485,7 @@ export declare const staticsDollarCoreAbi: readonly [{
 export declare const staticsDollarPeripheryAbi: readonly [{
     readonly name: "createAndStakeRiskShares";
     readonly type: "function";
-    readonly stateMutability: "nonpayable";
+    readonly stateMutability: "payable";
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "seriesId";
@@ -8750,6 +8813,7 @@ export declare function buildExtendCall(loanId: bigint, grossAmountsIn: readonly
 export declare function buildRecoverCall(loanId: bigint): Hex;
 export declare function buildFlashLoanCall(basketId: bigint, shares: bigint, receiver: Address, data: Hex): Hex;
 export declare function buildCreatePositionCall(receiver: Address): Hex;
+export declare function buildSetPositionCreationFeeCall(amount: bigint): Hex;
 export declare function buildClosePositionCall(positionId: bigint): Hex;
 export declare function buildQuarantineBasketCall(basketId: bigint): Hex;
 export declare function buildReleaseBasketQuarantineCall(basketId: bigint): Hex;

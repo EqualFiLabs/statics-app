@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   decodeFunctionResult,
   encodeFunctionData,
+  formatEther,
   formatUnits,
   getAddress,
   parseEventLogs,
@@ -18,6 +19,7 @@ import {
   buildClaimRewardsCall,
   buildClaimBasketRewardsCall,
   buildCreateAndStakeCall,
+  buildStakeCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
 
@@ -72,6 +74,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
+  const [stakePositionOverride, setStakePositionOverride] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [claimingBasketKey, setClaimingBasketKey] = useState<string | null>(null);
   const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
@@ -169,6 +172,13 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     },
   });
   const amount = parseAmount(amountInput, catalog.data?.stakingToken.decimals ?? 18, locale);
+  const ownedPositionIds = catalog.data?.positions.map((position) => position.positionId) ?? [];
+  const requestedStakePosition =
+    stakePositionOverride ??
+    (initialPositionId !== null && ownedPositionIds.includes(initialPositionId)
+      ? initialPositionId.toString()
+      : (ownedPositionIds[0]?.toString() ?? "new"));
+  const stakePositionId = requestedStakePosition === "new" ? null : BigInt(requestedStakePosition);
 
   const createAndStake = async () => {
     if (
@@ -184,8 +194,17 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     setPending(true);
     setActionError(null);
     try {
-      const token = catalog.data.stakingToken;
+      const refreshed = await catalog.refetch();
+      if (!refreshed.data) throw new Error("The current Position state is unavailable.");
+      const token = refreshed.data.stakingToken;
       const diamond = deploymentState.deployment.contracts.diamond;
+      const targetPosition =
+        stakePositionId === null
+          ? null
+          : refreshed.data.positions.find((position) => position.positionId === stakePositionId);
+      if (stakePositionId !== null && !targetPosition) {
+        throw new Error("The selected position is no longer owned by this wallet.");
+      }
       const common = {
         publicClient,
         wallet,
@@ -208,10 +227,10 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           }),
         describeError: describePositionError,
       };
-      if (catalog.data.stakingTokenBalance < amount) {
+      if (refreshed.data.stakingTokenBalance < amount) {
         throw new Error(`The wallet does not hold enough ${token.symbol}.`);
       }
-      if (catalog.data.stakingTokenAllowance < amount) {
+      if (refreshed.data.stakingTokenAllowance < amount) {
         await executeProtocolTransaction({
           ...common,
           kind: "approve-staking-token",
@@ -227,22 +246,36 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       } else {
         await executeProtocolTransaction({
           ...common,
-          kind: "create-and-stake",
-          label: `Create position and stake ${token.symbol}`,
-          amount: `${amountInput} ${token.symbol}`,
+          kind: stakePositionId === null ? "create-and-stake" : "stake-position",
+          label:
+            stakePositionId === null
+              ? `Create position and stake ${token.symbol}`
+              : `Stake ${token.symbol} in Position #${stakePositionId.toString()}`,
+          amount:
+            stakePositionId === null
+              ? `${amountInput} ${token.symbol} + ${formatEther(refreshed.data.positionCreationFee)} ETH account fee`
+              : `${amountInput} ${token.symbol}`,
           to: diamond,
-          data: buildCreateAndStakeCall(amount, wallet, []),
-          validateSimulation: (result) => {
-            if (!result) throw new Error("The create-and-stake simulation returned no position.");
-            const positionId = decodeFunctionResult({
-              abi: staticsAbi,
-              functionName: "createAndStake",
-              data: result,
-            });
-            if (positionId === 0n) {
-              throw new Error("The create-and-stake simulation returned an invalid ID.");
-            }
-          },
+          data:
+            stakePositionId === null
+              ? buildCreateAndStakeCall(amount, wallet, [])
+              : buildStakeCall(stakePositionId, amount),
+          value: stakePositionId === null ? refreshed.data.positionCreationFee : 0n,
+          validateSimulation:
+            stakePositionId === null
+              ? (result) => {
+                  if (!result)
+                    throw new Error("The create-and-stake simulation returned no position.");
+                  const positionId = decodeFunctionResult({
+                    abi: staticsAbi,
+                    functionName: "createAndStake",
+                    data: result,
+                  });
+                  if (positionId === 0n) {
+                    throw new Error("The create-and-stake simulation returned an invalid ID.");
+                  }
+                }
+              : undefined,
         });
         setAmountInput("");
       }
@@ -602,6 +635,29 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
                   symbol: catalog.data.stakingToken.symbol,
                 })}
               </small>
+            </label>
+            <label className="basket-field">
+              <span>{t("stakeIn")}</span>
+              <select
+                value={requestedStakePosition}
+                onChange={(event) => {
+                  setStakePositionOverride(event.target.value);
+                  setActionError(null);
+                }}
+                disabled={pending}
+              >
+                {ownedPositionIds.map((positionId) => (
+                  <option key={positionId.toString()} value={positionId.toString()}>
+                    {t("positionNumber", { id: positionId.toString() })}
+                  </option>
+                ))}
+                <option value="new">
+                  {t("openNewPosition", {
+                    fee: formatEther(catalog.data.positionCreationFee),
+                  })}
+                </option>
+              </select>
+              <small>{t("reusePositionHelp")}</small>
             </label>
           </>
         )}

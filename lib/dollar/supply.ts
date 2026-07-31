@@ -35,6 +35,10 @@ import {
 export type DollarSupplyState = Readonly<{
   /** Position already holding risk liquidity for this series, when one exists. */
   positionId: bigint | null;
+  /** Every currently owned Position, newest first, available for a new Risk leg. */
+  ownedPositionIds: readonly bigint[];
+  /** Exact native fee required only when no owned Position is selected. */
+  positionCreationFee: bigint;
   /** Supplied shares still unconsumed, and therefore still withdrawable. */
   effectiveShares: bigint;
   /** Proceeds from shares a redemption already consumed. */
@@ -52,6 +56,8 @@ export type DollarSupplyStep =
 
 export const emptyDollarSupplyState: DollarSupplyState = {
   positionId: null,
+  ownedPositionIds: [],
+  positionCreationFee: 0n,
   effectiveShares: 0n,
   claimableCollateral: 0n,
   claimableStaticsDollar: 0n,
@@ -85,41 +91,49 @@ export async function loadDollarSupplyState(
   seriesId: bigint,
   fromBlock: bigint
 ): Promise<DollarSupplyState> {
-  const [walletShares, riskApprovedForPeriphery, transferLogs] = await Promise.all([
-    publicClient
-      .readContract({
-        address: risk,
-        abi: staticsDollarRiskTokenAbi,
-        functionName: "balanceOf",
-        args: [wallet, seriesId],
-      })
-      .catch(() => 0n),
-    publicClient
-      .readContract({
-        address: risk,
-        abi: staticsDollarRiskTokenAbi,
-        functionName: "isApprovedForAll",
-        args: [wallet, periphery],
-      })
-      .catch(() => false),
-    publicClient
-      .getContractEvents({
+  const [walletShares, riskApprovedForPeriphery, transferLogs, positionCreationFee] =
+    await Promise.all([
+      publicClient
+        .readContract({
+          address: risk,
+          abi: staticsDollarRiskTokenAbi,
+          functionName: "balanceOf",
+          args: [wallet, seriesId],
+        })
+        .catch(() => 0n),
+      publicClient
+        .readContract({
+          address: risk,
+          abi: staticsDollarRiskTokenAbi,
+          functionName: "isApprovedForAll",
+          args: [wallet, periphery],
+        })
+        .catch(() => false),
+      publicClient
+        .getContractEvents({
+          address: diamond,
+          abi: staticsAbi,
+          eventName: "Transfer",
+          args: { to: wallet },
+          fromBlock,
+          toBlock: "latest",
+          strict: true,
+        })
+        .catch(() => []),
+      publicClient.readContract({
         address: diamond,
         abi: staticsAbi,
-        eventName: "Transfer",
-        args: { to: wallet },
-        fromBlock,
-        toBlock: "latest",
-        strict: true,
-      })
-      .catch(() => []),
-  ]);
+        functionName: "positionCreationFee",
+      }),
+    ]);
 
   const candidates = [...new Set(transferLogs.map((log) => log.args.tokenId.toString()))]
     .map(BigInt)
     .sort((left, right) => (left === right ? 0 : left > right ? -1 : 1))
     .slice(0, 25);
 
+  const ownedPositionIds: bigint[] = [];
+  let matched: DollarSupplyState | null = null;
   for (const positionId of candidates) {
     // A Transfer to this wallet does not mean it still holds the position.
     const owner = await publicClient
@@ -131,6 +145,7 @@ export async function loadDollarSupplyState(
       })
       .catch(() => null);
     if (!owner || owner.toLowerCase() !== wallet.toLowerCase()) continue;
+    ownedPositionIds.push(positionId);
 
     const liquidity = await publicClient
       .readContract({
@@ -140,10 +155,11 @@ export async function loadDollarSupplyState(
         args: [positionId, seriesId],
       })
       .catch(() => null);
-    if (!liquidity?.exists) continue;
-
-    return {
+    if (!liquidity?.exists || matched) continue;
+    matched = {
       positionId,
+      ownedPositionIds,
+      positionCreationFee,
       effectiveShares: liquidity.effectiveShares,
       claimableCollateral: liquidity.claimableCollateral,
       claimableStaticsDollar: liquidity.claimableStaticsDollar,
@@ -153,7 +169,29 @@ export async function loadDollarSupplyState(
     };
   }
 
-  return { ...emptyDollarSupplyState, walletShares, riskApprovedForPeriphery };
+  return matched
+    ? { ...matched, ownedPositionIds }
+    : {
+        ...emptyDollarSupplyState,
+        ownedPositionIds,
+        positionCreationFee,
+        walletShares,
+        riskApprovedForPeriphery,
+      };
+}
+
+export function preferredSupplyPosition(
+  existingSeriesPosition: bigint | null,
+  ownedPositionIds: readonly bigint[],
+  override: string | null
+): bigint | null {
+  if (existingSeriesPosition !== null) return existingSeriesPosition;
+  if (override === "new") return null;
+  if (override !== null) {
+    const requested = BigInt(override);
+    if (ownedPositionIds.includes(requested)) return requested;
+  }
+  return ownedPositionIds[0] ?? null;
 }
 
 /**
