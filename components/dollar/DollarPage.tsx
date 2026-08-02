@@ -1176,9 +1176,7 @@ function DollarActionPanel({
                   <strong>{supplyOutput ?? output}</strong>
                   {preview && (
                     <small>
-                      {quoteState === "ready"
-                        ? "Current input verified. Bounds include 0.50% execution tolerance."
-                        : "Refreshing for the current input; submission remains disabled."}
+                      {quoteState === "ready" ? t("quoteVerified") : t("quoteRefreshing")}
                     </small>
                   )}
                 </div>
@@ -1196,7 +1194,7 @@ function DollarActionPanel({
             <>
               {supply.positionId === null && (
                 <label className="basket-field">
-                  <span>Supply through</span>
+                  <span>{t("supplyThrough")}</span>
                   <select
                     value={supplyTargetPositionId?.toString() ?? "new"}
                     onChange={(event) => setSupplyPositionOverride(event.target.value)}
@@ -1204,14 +1202,14 @@ function DollarActionPanel({
                   >
                     {supply.ownedPositionIds.map((positionId) => (
                       <option key={positionId.toString()} value={positionId.toString()}>
-                        Position #{positionId.toString()}
+                        {t("positionNumber", { id: positionId.toString() })}
                       </option>
                     ))}
                     <option value="new">
-                      Open new Position — {formatEther(supply.positionCreationFee)} ETH fee
+                      {t("openNewPosition", { fee: formatEther(supply.positionCreationFee) })}
                     </option>
                   </select>
-                  <small>Reusing a Position you own avoids the account-opening fee.</small>
+                  <small>{t("reuseSupplyPositionHelp")}</small>
                 </label>
               )}
               <p className="dollar-note">
