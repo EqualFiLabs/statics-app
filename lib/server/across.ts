@@ -1,50 +1,18 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import path from "node:path";
-
 const ACROSS_API_BASE = "https://app.across.to/api";
-const fallbackConfigPath = path.join(homedir(), ".openclaw", "workspace", ".across");
 
 type AcrossConfig = { apiKey: string; integratorId: string };
 export type AcrossResult =
   { ok: true; status: number; payload: unknown } | { ok: false; status: number; payload: unknown };
 
-function parseConfig(text: string) {
-  const values = new Map<string, string>();
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const separator = line.indexOf("=");
-    if (separator < 0) {
-      if (!values.has("ACROSS_API_KEY")) values.set("ACROSS_API_KEY", line);
-      continue;
-    }
-    const key = line.slice(0, separator).trim();
-    const value = line
-      .slice(separator + 1)
-      .trim()
-      .replace(/^['"]|['"]$/g, "");
-    if (key && value) values.set(key, value);
-  }
-  return values;
-}
-
-async function config(): Promise<AcrossConfig> {
-  let file = new Map<string, string>();
-  try {
-    file = parseConfig(await readFile(fallbackConfigPath, "utf8"));
-  } catch {
-    // The fallback is optional; environment variables remain authoritative.
-  }
-  const apiKey =
-    process.env.ACROSS_API_KEY?.trim() || file.get("ACROSS_API_KEY") || file.get("API_KEY") || "";
-  const integratorId =
-    process.env.ACROSS_INTEGRATOR_ID?.trim() ||
-    file.get("ACROSS_INTEGRATOR_ID") ||
-    file.get("INTEGRATOR_ID") ||
-    "";
+export function resolveAcrossConfig(
+  environment: Record<string, string | undefined> = process.env
+): AcrossConfig {
+  const apiKey = environment.ACROSS_API_KEY?.trim() || "";
+  const integratorId = environment.ACROSS_INTEGRATOR_ID?.trim() || "";
   if (!apiKey || !/^0x[0-9a-fA-F]{4}$/.test(integratorId)) {
-    throw new Error("Across API key and 2-byte integrator ID are not configured.");
+    throw new Error(
+      "ACROSS_API_KEY and a 2-byte ACROSS_INTEGRATOR_ID must be configured in the server environment."
+    );
   }
   return { apiKey, integratorId };
 }
@@ -65,7 +33,7 @@ export async function callAcross(
 ): Promise<AcrossResult> {
   let credentials: AcrossConfig;
   try {
-    credentials = await config();
+    credentials = resolveAcrossConfig();
   } catch (error) {
     return {
       ok: false,

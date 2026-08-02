@@ -5,10 +5,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const protocolRoot = resolve(
-  repositoryRoot,
-  process.env.STATICS_PROTOCOL_REPOSITORY || "../statics"
-);
+const configuredProtocolRoot = process.env.STATICS_PROTOCOL_REPOSITORY?.trim();
+if (!configuredProtocolRoot) {
+  throw new Error("STATICS_PROTOCOL_REPOSITORY must name a clean public Statics checkout.");
+}
+const protocolRoot = resolve(repositoryRoot, configuredProtocolRoot);
 const sdkRoot = resolve(protocolRoot, "sdk");
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
 

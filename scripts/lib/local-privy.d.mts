@@ -3,6 +3,8 @@ export interface PublicPrivyConfig {
   clientId?: string;
 }
 
+export function requirePublicPrivySource(value: string | undefined): string;
+
 export function readPublicPrivyConfig(contents: string): PublicPrivyConfig;
 
 export function mergePublicPrivyConfig(contents: string, config: PublicPrivyConfig): string;

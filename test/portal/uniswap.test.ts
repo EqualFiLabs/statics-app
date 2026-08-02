@@ -14,6 +14,9 @@ describe("Uniswap integration", () => {
     await expect(
       resolveUniswapApiKey({ NEXT_PUBLIC_APP_ENV: "production", UNISWAP_API_KEY: "secret" })
     ).resolves.toBe("secret");
+    await expect(resolveUniswapApiKey({ NEXT_PUBLIC_APP_ENV: "development" })).rejects.toThrow(
+      "server environment"
+    );
     expect(readUniswapIntegratorFee({})).toEqual({});
     expect(() => readUniswapIntegratorFee({ UNISWAP_INTEGRATOR_FEE_BIPS: "10" })).toThrow(
       /configured together/i

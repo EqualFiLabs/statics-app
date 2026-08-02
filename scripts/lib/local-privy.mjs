@@ -4,6 +4,16 @@ const requiredName = "NEXT_PUBLIC_PRIVY_APP_ID";
 const optionalName = "NEXT_PUBLIC_PRIVY_CLIENT_ID";
 const publicNames = new Set([requiredName, optionalName]);
 
+export function requirePublicPrivySource(value) {
+  const source = value?.trim();
+  if (!source) {
+    throw new Error(
+      "EVES_MARKET_ENV_PATH must name the local environment file containing public Privy identifiers."
+    );
+  }
+  return source;
+}
+
 function parseValue(rawValue) {
   const value = rawValue.trim();
   if (

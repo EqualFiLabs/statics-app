@@ -2,13 +2,10 @@
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { importPublicPrivyConfig } from "./lib/local-privy.mjs";
+import { importPublicPrivyConfig, requirePublicPrivySource } from "./lib/local-privy.mjs";
 
 const siteRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const sourcePath = resolve(
-  siteRoot,
-  process.env.EVES_MARKET_ENV_PATH || "../market-ui/eves-market-ui/.env.local"
-);
+const sourcePath = resolve(siteRoot, requirePublicPrivySource(process.env.EVES_MARKET_ENV_PATH));
 const targetPath = resolve(siteRoot, ".env.local");
 
 try {

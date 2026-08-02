@@ -336,6 +336,10 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
   writeFileSync(path, `${lines.join("\n")}\n`, { mode: 0o600 });
 }
 
-export function defaultProtocolRoot(siteRoot) {
-  return resolve(siteRoot, process.env.STATICS_PROTOCOL_REPOSITORY || "../statics");
+export function defaultProtocolRoot(siteRoot, environment = process.env) {
+  const configured = environment.STATICS_PROTOCOL_REPOSITORY?.trim();
+  if (!configured) {
+    throw new Error("STATICS_PROTOCOL_REPOSITORY must name a clean public Statics checkout.");
+  }
+  return resolve(siteRoot, configured);
 }

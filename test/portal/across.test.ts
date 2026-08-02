@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeAcrossTransaction } from "@/lib/portal/across";
+import { resolveAcrossConfig } from "@/lib/server/across";
 import {
   readBridgeActivity,
   refreshBridgeActivity,
@@ -15,6 +16,13 @@ describe("Across bridge behavior", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  it("accepts credentials only from the server environment", () => {
+    expect(
+      resolveAcrossConfig({ ACROSS_API_KEY: "server-key", ACROSS_INTEGRATOR_ID: "0x1234" })
+    ).toEqual({ apiKey: "server-key", integratorId: "0x1234" });
+    expect(() => resolveAcrossConfig({})).toThrow("server environment");
   });
 
   it("rejects transactions outside the reviewed wallet and origin chain", () => {
