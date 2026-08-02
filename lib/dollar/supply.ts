@@ -129,8 +129,7 @@ export async function loadDollarSupplyState(
 
   const candidates = [...new Set(transferLogs.map((log) => log.args.tokenId.toString()))]
     .map(BigInt)
-    .sort((left, right) => (left === right ? 0 : left > right ? -1 : 1))
-    .slice(0, 25);
+    .sort((left, right) => (left === right ? 0 : left > right ? -1 : 1));
 
   const ownedPositionIds: bigint[] = [];
   let matched: DollarSupplyState | null = null;
@@ -146,6 +145,7 @@ export async function loadDollarSupplyState(
       .catch(() => null);
     if (!owner || owner.toLowerCase() !== wallet.toLowerCase()) continue;
     ownedPositionIds.push(positionId);
+    if (matched) continue;
 
     const liquidity = await publicClient
       .readContract({
@@ -155,7 +155,7 @@ export async function loadDollarSupplyState(
         args: [positionId, seriesId],
       })
       .catch(() => null);
-    if (!liquidity?.exists || matched) continue;
+    if (!liquidity?.exists) continue;
     matched = {
       positionId,
       ownedPositionIds,

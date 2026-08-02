@@ -1237,7 +1237,7 @@ function DollarActionPanel({
                   <span>{t("proceedsToClaim")}</span>
                   <strong>
                     {[
-                      [supply.claimableCollateral, asset] as const,
+                      [supply.claimableCollateral, t("collateral")] as const,
                       [supply.claimableStaticsDollar, "Dollar"] as const,
                       [supply.claimableStatics, "STATICS"] as const,
                     ]
