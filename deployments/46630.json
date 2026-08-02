@@ -1,11 +1,17 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "network": "Robinhood Chain Testnet",
   "chainId": 46630,
   "deploymentStartBlock": "94949343",
   "wethProfileId": "1",
   "protocolCommit": "1270247ce274ffb58ac5d0a0c71ef52afe96aeb1",
-  "generatedAt": "2026-07-30T02:15:11.754Z",
+  "source": {
+    "repository": "https://github.com/EqualFiLabs/statics",
+    "publicCommit": "47fd13054aca75f6a6d852de62e1ba239367fad4",
+    "deploymentArtifact": "deployments/robinhood-testnet-46630-statics.json",
+    "recordedDeploymentCommit": "1270247ce274ffb58ac5d0a0c71ef52afe96aeb1"
+  },
+  "generatedAt": "2026-08-02T17:09:53.264Z",
   "contracts": {
     "diamond": {
       "address": "0x69Af9C58e9E283032AE0087c38EF5E27c28E8345",

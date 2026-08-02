@@ -27,7 +27,7 @@ import type {
 } from "@/lib/dollar/deployment";
 
 /** Bump when the shape changes so an older generator cannot write a newer app. */
-export const MANIFEST_SCHEMA_VERSION = 2;
+export const MANIFEST_SCHEMA_VERSION = 3;
 
 const dollarContractNames: readonly DollarContractName[] = [
   "diamond",
@@ -59,6 +59,12 @@ export type DeploymentManifest = Readonly<{
   deploymentStartBlock: string;
   wethProfileId: string;
   protocolCommit: string;
+  source: Readonly<{
+    repository: string;
+    publicCommit: string;
+    deploymentArtifact: string;
+    recordedDeploymentCommit: string;
+  }>;
   generatedAt: string;
   contracts: Readonly<Record<string, RawEntry>>;
   liquidity?: Readonly<Record<string, RawEntry>> | null;
@@ -69,6 +75,28 @@ export type DeploymentManifest = Readonly<{
   }> | null;
   faucet?: RawEntry | null;
 }>;
+
+function readSource(chainId: number, manifest: DeploymentManifest) {
+  let repository: URL;
+  try {
+    repository = new URL(manifest.source?.repository);
+  } catch {
+    return fail(chainId, "source.repository must be an absolute URL.");
+  }
+  if (repository.protocol !== "https:" || repository.username || repository.password) {
+    fail(chainId, "source.repository must be a credential-free HTTPS URL.");
+  }
+  if (!/^[a-f0-9]{40}$/i.test(manifest.source?.publicCommit ?? "")) {
+    fail(chainId, "source.publicCommit must be a full Git commit.");
+  }
+  if (manifest.source?.recordedDeploymentCommit !== manifest.protocolCommit) {
+    fail(chainId, "source.recordedDeploymentCommit must match protocolCommit.");
+  }
+  const artifact = manifest.source?.deploymentArtifact ?? "";
+  if (!/^deployments\/[a-z0-9][a-z0-9._/-]*\.json$/i.test(artifact) || artifact.includes("..")) {
+    fail(chainId, "source.deploymentArtifact must be a repository-relative deployment JSON path.");
+  }
+}
 
 function fail(chainId: number | string, reason: string): never {
   throw new Error(`Deployment manifest for chain ${chainId} is invalid: ${reason}`);
@@ -115,6 +143,7 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
   if (!/^[a-f0-9]{40}$/i.test(manifest.protocolCommit ?? "")) {
     fail(chainId, "protocolCommit must be a full Git commit.");
   }
+  readSource(chainId, manifest);
 
   const contracts: Record<string, Address> = {};
   const runtimeCodeHashes: Record<string, Hex> = {};

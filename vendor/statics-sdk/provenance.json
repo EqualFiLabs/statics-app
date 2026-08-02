@@ -1,6 +1,9 @@
 {
-  "protocolCommit": "e38f91be981c8849d80ed57e17484760654b3e28",
-  "source": "sdk",
+  "protocolCommit": "47fd13054aca75f6a6d852de62e1ba239367fad4",
+  "source": {
+    "repository": "https://github.com/EqualFiLabs/statics",
+    "path": "sdk"
+  },
   "sdkTreeState": "clean",
   "sourceChecksums": {
     "src/index.ts": "8c818c36718c1bb437246e85a214382cca88216301545b7a9ffb5c736c0aba68",
