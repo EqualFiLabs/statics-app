@@ -29,3 +29,11 @@ cache/
 
 # TypeScript
 *.tsbuildinfo
+
+# Local contributor and publication working files
+/AGENTS.md
+/.agents/
+/.codex/
+/STATICS-DAPP-BUILD-PLAN.md
+/WALLET-DOLLAR-REHEARSAL.md
+/mockup.png
