@@ -96,6 +96,8 @@ export function WalletPage() {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
   const network = getFundingNetwork(wallet.fundingChainId);
+  const nftChainId =
+    deploymentState.status === "configured" ? deploymentState.deployment.chainId : null;
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
   const [modal, setModalState] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
@@ -335,7 +337,6 @@ export function WalletPage() {
 
           {tab === "nfts" ? (
             <WalletNftPanel
-              fundingChainId={wallet.fundingChainId}
               onAddCollection={() => setModal("add-nft")}
               onTransfer={(nft) => {
                 setTransferNft(nft);
@@ -408,9 +409,9 @@ export function WalletPage() {
         </div>
       </section>
 
-      {modal === "add-nft" && (
+      {modal === "add-nft" && nftChainId !== null && (
         <WalletDialog label={t("addNft")} onClose={() => setModal(null)}>
-          <AddNftCollectionForm chainId={wallet.fundingChainId} onDone={() => setModal(null)} />
+          <AddNftCollectionForm chainId={nftChainId} onDone={() => setModal(null)} />
         </WalletDialog>
       )}
       {modal === "nft" && transferNft && (
