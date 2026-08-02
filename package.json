@@ -2,6 +2,7 @@
   "name": "statics-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "engines": {
     "node": ">=22.13.0",
     "npm": ">=10.0.0"
@@ -72,6 +73,12 @@
   },
   "overrides": {
     "axios": "1.18.1",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.17"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "5.0.8"
+    },
     "postcss": "8.5.22",
     "sharp": "0.35.0",
     "ws": "8.21.1"
