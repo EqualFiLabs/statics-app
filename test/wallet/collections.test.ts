@@ -31,9 +31,7 @@ describe("added collections", () => {
     );
     window.localStorage.setItem(
       nftCollectionStorageKey(42_161),
-      JSON.stringify([
-        { address, name: "Other chain", symbol: "OTHER", standard: "erc721" },
-      ])
+      JSON.stringify([{ address, name: "Other chain", symbol: "OTHER", standard: "erc721" }])
     );
 
     expect(loadNftCollections(8_453)).toEqual([

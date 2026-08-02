@@ -164,11 +164,7 @@ export function WalletNftPanel({
           Liquidity positions could not be read on this network, so only positions are listed.
         </p>
       )}
-      <WalletNftList
-        nfts={catalog.data.nfts}
-        chainId={collectionChainId}
-        onTransfer={onTransfer}
-      />
+      <WalletNftList nfts={catalog.data.nfts} chainId={collectionChainId} onTransfer={onTransfer} />
     </>
   );
 }

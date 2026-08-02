@@ -16,12 +16,9 @@ export function useWalletNftCollections(chainId: number | null) {
   );
 
   useEffect(() => {
-    if (chainId === null) {
-      setCollections([]);
-      return;
-    }
-    const refresh = () => setCollections(loadNftCollections(chainId));
+    const refresh = () => setCollections(chainId === null ? [] : loadNftCollections(chainId));
     refresh();
+    if (chainId === null) return;
     return subscribeNftCollections(refresh);
   }, [chainId]);
 
