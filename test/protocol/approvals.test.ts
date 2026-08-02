@@ -12,6 +12,7 @@ import {
   MAX_ERC20_ALLOWANCE,
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
+  approvalClockTimestamp,
   approvalStatusLabel,
   hasUsablePermit2Allowance,
   operatorApprovalAbi,
@@ -38,6 +39,10 @@ function record(overrides: Partial<ApprovalRecord> = {}): ApprovalRecord {
 }
 
 describe("application approval policy", () => {
+  it("evaluates expiring approvals against the current clock", () => {
+    expect(approvalClockTimestamp(new Date("2026-08-02T17:00:00.999Z"))).toBe(1_785_690_000);
+  });
+
   it("recognizes maximum, custom, and revoked authority", () => {
     expect(approvalStatusLabel("erc20", 0n)).toBe("Revoked");
     expect(approvalStatusLabel("erc20", 5n)).toBe("Custom");

@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useNow, useTranslations } from "next-intl";
 
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
@@ -19,11 +19,12 @@ import {
   readApprovalState,
   type ApprovalRecord,
 } from "@/lib/protocol/approval-inventory";
-import { approvalStatusLabel } from "@/lib/protocol/approvals";
+import { approvalClockTimestamp, approvalStatusLabel } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
+const APPROVAL_REFRESH_INTERVAL_MS = 60_000;
 
 function approvalKindLabel(kind: ApprovalRecord["kind"]): string {
   if (kind === "permit2") return "Permit2 allowance";
@@ -56,6 +57,7 @@ function ApprovalToolsRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const now = useNow({ updateInterval: APPROVAL_REFRESH_INTERVAL_MS });
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -79,6 +81,9 @@ function ApprovalToolsRuntime() {
       walletState.status === "ready" &&
       walletState.isTargetChain,
     placeholderData: keepPreviousData,
+    staleTime: APPROVAL_REFRESH_INTERVAL_MS,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     queryFn: async () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -127,7 +132,7 @@ function ApprovalToolsRuntime() {
   }
 
   const records = approvals.data ?? [];
-  const currentTimestamp = Math.floor(approvals.dataUpdatedAt / 1_000);
+  const currentTimestamp = approvalClockTimestamp(now);
   const active = records.filter(
     (approval) =>
       approvalStatusLabel(

@@ -1,6 +1,10 @@
 import { maxUint48, maxUint160, maxUint256, parseAbi } from "viem";
 
 export const MAX_ERC20_ALLOWANCE = maxUint256;
+
+export function approvalClockTimestamp(now: Date): number {
+  return Math.floor(now.getTime() / 1_000);
+}
 export const MAX_PERMIT2_ALLOWANCE = maxUint160;
 export const MAX_PERMIT2_EXPIRATION = Number(maxUint48);
 export const operatorApprovalAbi = parseAbi([

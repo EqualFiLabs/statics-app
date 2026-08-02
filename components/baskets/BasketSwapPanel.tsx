@@ -18,6 +18,7 @@ import {
 
 import {
   canonicalSwapPoolKey,
+  buildSwapTokenApproval,
   isCurrentCanonicalSwapQuote,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
@@ -36,7 +37,6 @@ import {
 } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
-  MAX_ERC20_ALLOWANCE,
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
   hasUsablePermit2Allowance,
@@ -239,13 +239,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           chainId: deploymentState.deployment.chainId,
           kind: "approve-swap",
           label: `Enable ${inputToken.symbol} swaps`,
-          amount: `${display(freshBalance, inputToken.decimals)} ${inputToken.symbol}`,
+          amount: `${display(amount, inputToken.decimals)} ${inputToken.symbol}`,
           to: inputToken.address,
-          data: encodeFunctionData({
-            abi: basketTokenAbi,
-            functionName: "approve",
-            args: [liquidity.contracts.permit2, MAX_ERC20_ALLOWANCE],
-          }),
+          data: buildSwapTokenApproval(liquidity.contracts.permit2, amount),
           sendTransaction: ({ to, data, value }) =>
             walletClient.data!.sendTransaction({
               account: wallet,
