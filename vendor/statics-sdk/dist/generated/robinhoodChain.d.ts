@@ -12,9 +12,6 @@ export declare const robinhoodChain: {
         readonly hookPermissionMask: "0x10cc";
         readonly canonicalLpFeePips: 0;
         readonly canonicalTickSpacing: 10;
-        readonly poolWarmupSeconds: 3600;
-        readonly referenceWindowSeconds: 1800;
-        readonly maximumDeviationBps: 100;
         readonly polShareBps: 1000;
         readonly liquidityProviderShareBps: 2500;
         readonly basketStakerShareBps: 2500;

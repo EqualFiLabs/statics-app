@@ -36,6 +36,10 @@ function manifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManife
       weth: entry("6", "6"),
       oracle: entry("7", "7"),
     },
+    positionMetadata: {
+      renderer: entry("8", "8"),
+      avatarSvg: entry("9", "9"),
+    },
     liquidity: null,
     pegged: null,
     ...overrides,
@@ -53,6 +57,7 @@ describe("deployment manifest", () => {
     expect(deployment.source).toBe("checked-in-manifest");
     expect(deployment.contracts.diamond).toBe(address("1"));
     expect(deployment.runtimeCodeHashes.diamond).toBe(hash("1"));
+    expect(deployment.positionMetadata?.renderer).toBe(address("8"));
   });
 
   it("refuses a manifest written against a different schema", () => {
@@ -128,7 +133,7 @@ describe("deployment manifest", () => {
           },
         })
       )
-    ).toThrow("repository-relative deployment JSON path");
+    ).toThrow("public deployment record");
     expect(() =>
       parseDeploymentManifest(
         manifest({
@@ -141,6 +146,18 @@ describe("deployment manifest", () => {
         })
       )
     ).toThrow("must match protocolCommit");
+  });
+
+  it("requires both code-bound Position metadata contracts", () => {
+    const broken = manifest();
+    expect(() =>
+      parseDeploymentManifest({
+        ...broken,
+        positionMetadata: {
+          renderer: broken.positionMetadata.renderer,
+        } as DeploymentManifest["positionMetadata"],
+      })
+    ).toThrow(/positionMetadata\.avatarSvg is missing/);
   });
 
   it("requires every liquidity contract once liquidity is present", () => {

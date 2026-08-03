@@ -35,6 +35,13 @@ export type LiquidityDeployment = Readonly<{
   >;
 }>;
 
+export type PositionMetadataDeployment = Readonly<{
+  renderer: Address;
+  avatarSvg: Address;
+  rendererCodeHash: Hex;
+  avatarSvgCodeHash: Hex;
+}>;
+
 export type DollarDeployment = Readonly<{
   chainId: number;
   deploymentStartBlock: bigint;
@@ -47,6 +54,7 @@ export type DollarDeployment = Readonly<{
   source: "development-environment" | "checked-in-manifest";
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
+  positionMetadata?: PositionMetadataDeployment | null;
   liquidity?: LiquidityDeployment | null;
   pegged?: Readonly<{
     collateral: Address;
@@ -102,6 +110,13 @@ const liquidityHashVariables: Readonly<Record<LocalLiquidityContractName, string
   liquidityManager: "NEXT_PUBLIC_STATICS_LIQUIDITY_MANAGER_CODE_HASH",
   stateView: "NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH",
 };
+
+const positionMetadataVariables = {
+  renderer: "NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS",
+  avatarSvg: "NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS",
+  rendererCodeHash: "NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH",
+  avatarSvgCodeHash: "NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH",
+} as const;
 
 function parseAddress(value: string | undefined, variable: string): Address {
   if (!value) throw new Error(`${variable} is required when a Dollar deployment is configured.`);
@@ -207,6 +222,33 @@ export function readDollarDeployment(
       ) as Record<LocalLiquidityContractName, Hex>,
     };
   }
+  const positionMetadataValues = Object.values(positionMetadataVariables).map(
+    (variable) => environment[variable]
+  );
+  let positionMetadata: PositionMetadataDeployment | null = null;
+  if (positionMetadataValues.some(Boolean)) {
+    if (!positionMetadataValues.every(Boolean)) {
+      throw new Error("Position metadata deployment configuration must be complete or omitted.");
+    }
+    positionMetadata = {
+      renderer: parseAddress(
+        environment[positionMetadataVariables.renderer],
+        positionMetadataVariables.renderer
+      ),
+      avatarSvg: parseAddress(
+        environment[positionMetadataVariables.avatarSvg],
+        positionMetadataVariables.avatarSvg
+      ),
+      rendererCodeHash: parseHash(
+        environment[positionMetadataVariables.rendererCodeHash],
+        positionMetadataVariables.rendererCodeHash
+      ),
+      avatarSvgCodeHash: parseHash(
+        environment[positionMetadataVariables.avatarSvgCodeHash],
+        positionMetadataVariables.avatarSvgCodeHash
+      ),
+    };
+  }
   const peggedValues = [
     environment.NEXT_PUBLIC_STATICS_USDG_ADDRESS,
     environment.NEXT_PUBLIC_STATICS_USDG_ORACLE_ADDRESS,
@@ -254,6 +296,7 @@ export function readDollarDeployment(
       source: "development-environment",
       contracts,
       runtimeCodeHashes,
+      positionMetadata,
       liquidity,
       pegged,
     },
@@ -289,6 +332,12 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_WETH_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_WETH_CODE_HASH,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH,
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS:
+      process.env.NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS,
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH:
+      process.env.NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH,
     NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: process.env.NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS,
     NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS:
       process.env.NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS,
@@ -336,6 +385,44 @@ export async function verifyDollarDeployment(
       }
     })
   );
+  if (deployment.positionMetadata) {
+    const positionMetadataAbi = parseAbi([
+      "function positionRenderer() view returns (address)",
+      "function avatarSVG() view returns (address)",
+    ]);
+    const [rendererCode, avatarSvgCode, configuredRenderer, configuredAvatarSvg] =
+      await Promise.all([
+        publicClient.getCode({ address: deployment.positionMetadata.renderer }),
+        publicClient.getCode({ address: deployment.positionMetadata.avatarSvg }),
+        publicClient.readContract({
+          address: deployment.contracts.diamond,
+          abi: positionMetadataAbi,
+          functionName: "positionRenderer",
+        }),
+        publicClient.readContract({
+          address: deployment.positionMetadata.renderer,
+          abi: positionMetadataAbi,
+          functionName: "avatarSVG",
+        }),
+      ]);
+    if (!rendererCode || rendererCode === "0x" || !avatarSvgCode || avatarSvgCode === "0x") {
+      throw new Error("Position metadata deployment has missing runtime code.");
+    }
+    if (
+      keccak256(rendererCode).toLowerCase() !==
+        deployment.positionMetadata.rendererCodeHash.toLowerCase() ||
+      keccak256(avatarSvgCode).toLowerCase() !==
+        deployment.positionMetadata.avatarSvgCodeHash.toLowerCase()
+    ) {
+      throw new Error("Position metadata runtime code does not match the deployment manifest.");
+    }
+    if (getAddress(configuredRenderer) !== getAddress(deployment.positionMetadata.renderer)) {
+      throw new Error("Statics is bound to a different Position renderer.");
+    }
+    if (getAddress(configuredAvatarSvg) !== getAddress(deployment.positionMetadata.avatarSvg)) {
+      throw new Error("Position renderer is bound to a different Avatar SVG contract.");
+    }
+  }
   if (deployment.pegged) {
     const [collateralCode, oracleCode] = await Promise.all([
       publicClient.getCode({ address: deployment.pegged.collateral }),
