@@ -1,10 +1,18 @@
-import { getAddress, type Address } from "viem";
+import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 
-import type { V4PoolKey } from "@statics-protocol/sdk";
+import { basketTokenAbi, type V4PoolKey } from "@statics-protocol/sdk";
 
 export const SWAP_PERMIT_TTL_SECONDS = 20n * 60n;
 
 export type CanonicalSwapDirection = "asset-in" | "basket-in";
+
+export function buildSwapTokenApproval(permit2: Address, amount: bigint): Hex {
+  return encodeFunctionData({
+    abi: basketTokenAbi,
+    functionName: "approve",
+    args: [permit2, amount],
+  });
+}
 
 export function isCurrentCanonicalSwapQuote(
   quote:

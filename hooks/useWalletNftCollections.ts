@@ -10,19 +10,21 @@ import {
 } from "@/lib/wallet/nft-contracts";
 
 /** Mirrors useWalletTokens, so added NFT collections behave like added tokens. */
-export function useWalletNftCollections(chainId: number) {
+export function useWalletNftCollections(chainId: number | null) {
   const [collections, setCollections] = useState<NftCollection[]>(() =>
-    loadNftCollections(chainId)
+    chainId === null ? [] : loadNftCollections(chainId)
   );
 
   useEffect(() => {
-    const refresh = () => setCollections(loadNftCollections(chainId));
+    const refresh = () => setCollections(chainId === null ? [] : loadNftCollections(chainId));
     refresh();
+    if (chainId === null) return;
     return subscribeNftCollections(refresh);
   }, [chainId]);
 
   const addCollection = useCallback(
     (collection: NftCollection) => {
+      if (chainId === null) return;
       const current = loadNftCollections(chainId);
       if (
         current.some(
@@ -38,6 +40,7 @@ export function useWalletNftCollections(chainId: number) {
 
   const removeCollection = useCallback(
     (address: string) => {
+      if (chainId === null) return;
       const current = loadNftCollections(chainId);
       saveNftCollections(
         chainId,

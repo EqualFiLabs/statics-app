@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Address } from "viem";
+import { decodeFunctionData, type Address } from "viem";
+
+import { basketTokenAbi } from "@statics-protocol/sdk";
 
 import {
   canonicalSwapPoolKey,
+  buildSwapTokenApproval,
   isCurrentCanonicalSwapQuote,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
@@ -36,5 +39,11 @@ describe("canonical basket swaps", () => {
     expect(isCurrentCanonicalSwapQuote(quote, 25n, token1, "asset-in")).toBe(false);
     expect(isCurrentCanonicalSwapQuote(quote, 25n, token0, "basket-in")).toBe(false);
     expect(isCurrentCanonicalSwapQuote(quote, 26n, token0, "asset-in")).toBe(false);
+  });
+
+  it("bounds the token approval to the reviewed swap amount", () => {
+    expect(
+      decodeFunctionData({ abi: basketTokenAbi, data: buildSwapTokenApproval(token1, 25n) })
+    ).toMatchObject({ functionName: "approve", args: [token1, 25n] });
   });
 });

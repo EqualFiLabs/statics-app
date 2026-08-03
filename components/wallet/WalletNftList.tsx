@@ -42,7 +42,10 @@ export function WalletNftList({
   return (
     <div className="wallet-nft-rows">
       {nfts.map((nft) => (
-        <article className="wallet-nft-row" key={`${nft.kind}:${nft.tokenId}`}>
+        <article
+          className="wallet-nft-row"
+          key={`${chainId}:${nft.contract.toLowerCase()}:${nft.tokenId}`}
+        >
           <div className="wallet-nft-top">
             <div className="wallet-nft-detail">
               <strong>{nft.name}</strong>

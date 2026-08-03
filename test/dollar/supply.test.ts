@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   deriveSupplyStep,
   deriveWithdrawStep,
   emptyDollarSupplyState,
   hasClaimableProceeds,
+  loadDollarSupplyState,
   preferredSupplyPosition,
   type DollarSupplyState,
 } from "@/lib/dollar/supply";
@@ -25,6 +26,55 @@ describe("Risk supply Position selection", () => {
   it("opens a new Position only when explicitly selected or none exists", () => {
     expect(preferredSupplyPosition(null, [8n], "new")).toBeNull();
     expect(preferredSupplyPosition(null, [], null)).toBeNull();
+  });
+
+  it("finds series liquidity beyond the newest 25 Positions", async () => {
+    const wallet = "0x1111111111111111111111111111111111111111" as const;
+    const diamond = "0x2222222222222222222222222222222222222222" as const;
+    const periphery = "0x3333333333333333333333333333333333333333" as const;
+    const risk = "0x4444444444444444444444444444444444444444" as const;
+    const readContract = vi.fn(
+      async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+        if (functionName === "balanceOf") return 10n;
+        if (functionName === "isApprovedForAll") return true;
+        if (functionName === "positionCreationFee") return 1n;
+        if (functionName === "ownerOf") return wallet;
+        if (functionName === "riskLiquidity") {
+          return {
+            exists: args?.[0] === 5n,
+            effectiveShares: 9n,
+            claimableCollateral: 0n,
+            claimableStaticsDollar: 0n,
+            claimableStatics: 0n,
+          };
+        }
+        throw new Error(`Unexpected read: ${functionName}`);
+      }
+    );
+    const publicClient = {
+      readContract,
+      getContractEvents: vi
+        .fn()
+        .mockResolvedValue(
+          Array.from({ length: 30 }, (_, index) => ({ args: { tokenId: BigInt(index + 1) } }))
+        ),
+    } as never;
+
+    const loaded = await loadDollarSupplyState(
+      publicClient,
+      diamond,
+      periphery,
+      risk,
+      wallet,
+      2n,
+      1n
+    );
+
+    expect(loaded.positionId).toBe(5n);
+    expect(loaded.ownedPositionIds).toHaveLength(30);
+    expect(
+      readContract.mock.calls.filter(([request]) => request.functionName === "riskLiquidity")
+    ).toHaveLength(26);
   });
 });
 

@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { describeCollectionNfts } from "@/lib/wallet/nfts";
+import { loadNftCollections, nftCollectionStorageKey } from "@/lib/wallet/nft-contracts";
 import type { NftCollectionHoldings } from "@/lib/wallet/nft-contracts";
 
 const address = "0x5555555555555555555555555555555555555555" as const;
@@ -16,6 +17,46 @@ function holdings(overrides: Partial<NftCollectionHoldings> = {}): NftCollection
 }
 
 describe("added collections", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("loads only complete collections stored for the selected chain", () => {
+    window.localStorage.setItem(
+      nftCollectionStorageKey(8_453),
+      JSON.stringify([
+        { address, name: "Test Collection", symbol: "TEST", standard: "erc721" },
+        { address, name: "Editions", symbol: "ED", standard: "erc1155", tokenId: "7" },
+        { address, name: "Missing standard", symbol: "BAD" },
+        { address, name: "Missing token id", symbol: "BAD", standard: "erc1155" },
+      ])
+    );
+    window.localStorage.setItem(
+      nftCollectionStorageKey(42_161),
+      JSON.stringify([{ address, name: "Other chain", symbol: "OTHER", standard: "erc721" }])
+    );
+
+    expect(loadNftCollections(8_453)).toEqual([
+      { address, name: "Test Collection", symbol: "TEST", standard: "erc721" },
+      { address, name: "Editions", symbol: "ED", standard: "erc1155", tokenId: "7" },
+    ]);
+  });
+
+  it("rejects stored ERC-1155 token ids outside uint256", () => {
+    window.localStorage.setItem(
+      nftCollectionStorageKey(8_453),
+      JSON.stringify([
+        {
+          address,
+          name: "Editions",
+          symbol: "ED",
+          standard: "erc1155",
+          tokenId: (1n << 256n).toString(),
+        },
+      ])
+    );
+
+    expect(loadNftCollections(8_453)).toEqual([]);
+  });
+
   it("lists one entry per token when the contract can enumerate", () => {
     const nfts = describeCollectionNfts(holdings());
     expect(nfts.map((nft) => nft.name)).toEqual(["Test Collection #1", "Test Collection #2"]);

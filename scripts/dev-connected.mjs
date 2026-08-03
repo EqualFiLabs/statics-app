@@ -51,10 +51,8 @@ const rpcPort = 8_545;
 const rpcUrl = `http://127.0.0.1:${rpcPort}`;
 let appPort;
 let appUrl;
-const sourcePath = resolve(
-  siteRoot,
-  process.env.EVES_MARKET_ENV_PATH || "../market-ui/eves-market-ui/.env.local"
-);
+const configuredPrivySource = process.env.EVES_MARKET_ENV_PATH?.trim();
+const sourcePath = configuredPrivySource ? resolve(siteRoot, configuredPrivySource) : null;
 const erc20TransferAbi = [
   {
     type: "function",
@@ -696,10 +694,17 @@ writeFileSync(
   { mode: 0o600 }
 );
 
-importPublicPrivyConfig({ sourcePath, targetPath: environmentPath });
-const importedEnvironment = readFileSync(environmentPath, "utf8");
+if (sourcePath) importPublicPrivyConfig({ sourcePath, targetPath: environmentPath });
+let importedEnvironment = "";
+try {
+  importedEnvironment = readFileSync(environmentPath, "utf8");
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
 if (!/^NEXT_PUBLIC_PRIVY_APP_ID=.+$/mu.test(importedEnvironment)) {
-  throw new Error("The connected DApp requires the shared public Privy App ID.");
+  throw new Error(
+    "The connected DApp requires NEXT_PUBLIC_PRIVY_APP_ID in .env.local or an explicit EVES_MARKET_ENV_PATH."
+  );
 }
 
 const anvil = spawn(

@@ -20,6 +20,12 @@ function manifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManife
     deploymentStartBlock: "1234",
     wethProfileId: "1",
     protocolCommit: "a".repeat(40),
+    source: {
+      repository: "https://github.com/EqualFiLabs/statics",
+      publicCommit: "b".repeat(40),
+      deploymentArtifact: "deployments/robinhood-testnet-46630-statics.json",
+      recordedDeploymentCommit: "a".repeat(40),
+    },
     generatedAt: "2026-07-27T00:00:00.000Z",
     contracts: {
       diamond: entry("1", "1"),
@@ -96,6 +102,45 @@ describe("deployment manifest", () => {
     expect(() => parseDeploymentManifest(manifest({ protocolCommit: "abc123" }))).toThrow(
       /full Git commit/
     );
+  });
+
+  it("requires reachable public provenance without changing deployed identity", () => {
+    expect(() =>
+      parseDeploymentManifest(
+        manifest({
+          source: {
+            repository: "https://user:secret@example.test/statics",
+            publicCommit: "b".repeat(40),
+            deploymentArtifact: "deployments/robinhood-testnet-46630-statics.json",
+            recordedDeploymentCommit: "a".repeat(40),
+          },
+        })
+      )
+    ).toThrow("credential-free HTTPS URL");
+    expect(() =>
+      parseDeploymentManifest(
+        manifest({
+          source: {
+            repository: "https://github.com/EqualFiLabs/statics",
+            publicCommit: "b".repeat(40),
+            deploymentArtifact: "../private/deployment.json",
+            recordedDeploymentCommit: "a".repeat(40),
+          },
+        })
+      )
+    ).toThrow("repository-relative deployment JSON path");
+    expect(() =>
+      parseDeploymentManifest(
+        manifest({
+          source: {
+            repository: "https://github.com/EqualFiLabs/statics",
+            publicCommit: "b".repeat(40),
+            deploymentArtifact: "deployments/robinhood-testnet-46630-statics.json",
+            recordedDeploymentCommit: "c".repeat(40),
+          },
+        })
+      )
+    ).toThrow("must match protocolCommit");
   });
 
   it("requires every liquidity contract once liquidity is present", () => {

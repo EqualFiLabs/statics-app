@@ -2,7 +2,9 @@
 
 Each public network is described by a reviewed manifest in this directory,
 `<chainId>.json`, binding every contract address to the runtime code hash that
-was deployed at it and to the protocol commit it was built from.
+was deployed at it and to the recorded deployment commit. The `source` block
+also names the reachable public Statics commit and canonical deployment artifact
+that preserve the public provenance record without relabeling deployed bytecode.
 
 Robinhood Chain Testnet is recorded in `46630.json`. It binds the unified Statics
 deployment, USDG profile, and Robinhood Uniswap v4 dependencies to their runtime
@@ -16,8 +18,11 @@ Manifests are generated from a live deployment, then committed:
 ```
 npm run deployment:manifest -- \
   --rpc https://rpc.testnet.chain.robinhood.com \
-  --addresses ../statics/deployments/robinhood-testnet-46630-statics.json \
-  --commit <40-character protocol commit> \
+  --addresses /path/to/statics/deployments/robinhood-testnet-46630-statics.json \
+  --commit <40-character recorded deployment commit> \
+  --public-commit <40-character public Statics commit> \
+  --source-repository https://github.com/EqualFiLabs/statics \
+  --deployment-artifact deployments/robinhood-testnet-46630-statics.json \
   --network "Robinhood Chain Testnet" \
   --start-block <block the diamond was deployed in> \
   --weth-profile 1 \
@@ -28,6 +33,10 @@ Addresses come from the protocol's own deploy artifact and every runtime code
 hash is read from the chain, so the file records what is deployed rather than
 what was intended. An address with no code at it fails the generation instead of
 producing a manifest that points at nothing.
+
+The recorded deployment commit remains the identity used by the application for
+cache separation. It may predate a public repository snapshot. The public commit
+and deployment artifact make that relationship explicit and reviewable.
 
 The command writes `<chainId>.json` and rewrites `manifests.ts` to match this
 directory. Commit both. Do not hand-edit either: rerun the generator so the

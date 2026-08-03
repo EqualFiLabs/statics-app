@@ -6,7 +6,11 @@ import {
   type Hex,
 } from "viem";
 
-import { staticsAbi, staticsDollarErrorAbi } from "@statics-protocol/sdk";
+import {
+  staticsAbi,
+  staticsDollarErrorAbi,
+  staticsDollarPeripheryErrorAbi,
+} from "@statics-protocol/sdk";
 
 import { describeTransportFailure } from "@/lib/protocol/errors";
 
@@ -62,7 +66,7 @@ export function validateRecombinationSimulation(
 
 const errorMessages: Readonly<Record<string, string>> = {
   ZeroAmount: "Enter an amount greater than zero.",
-  NoOptInLiquidity:
+  NoRiskLiquidity:
     "Nobody has opted Risk shares in for this series yet, so there is nothing to redeem against.",
   FillBelowMinimum:
     "The redeemable amount fell below your tolerance while confirming. Review the new quote.",
@@ -102,7 +106,10 @@ export function describeDollarError(error: unknown): string {
   const data = findHexData(error);
   if (data) {
     try {
-      const decoded = decodeErrorResult({ abi: staticsDollarErrorAbi, data });
+      const decoded = decodeErrorResult({
+        abi: [...staticsDollarErrorAbi, ...staticsDollarPeripheryErrorAbi],
+        data,
+      });
       const description = errorMessages[decoded.errorName] ?? "The protocol rejected this action.";
       return `${description} (${decoded.errorName})`;
     } catch {

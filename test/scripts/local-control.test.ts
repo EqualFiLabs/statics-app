@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { parseLocalControlCommand } from "../../scripts/lib/local-control.mjs";
+import { defaultProtocolRoot } from "../../scripts/lib/local-dollar.mjs";
 
 describe("connected local fixture commands", () => {
+  it("requires an explicitly selected public protocol checkout", () => {
+    expect(
+      defaultProtocolRoot("/workspace/statics-app", {
+        STATICS_PROTOCOL_REPOSITORY: "/workspace/statics",
+      })
+    ).toBe("/workspace/statics");
+    expect(() => defaultProtocolRoot("/workspace/statics-app", {})).toThrow(
+      "STATICS_PROTOCOL_REPOSITORY"
+    );
+  });
+
   it("accepts only exact bounded wallet funding", () => {
     expect(
       parseLocalControlCommand("fund-wallet", [

@@ -7,6 +7,9 @@
  *     --rpc https://rpc.testnet.chain.robinhood.com \
  *     --addresses ../statics/deployments/robinhood-testnet.json \
  *     --commit <40-char protocol commit> \
+ *     --public-commit <40-char public repository commit> \
+ *     --source-repository https://github.com/EqualFiLabs/statics \
+ *     --deployment-artifact deployments/robinhood-testnet-46630-statics.json \
  *     --network "Robinhood Chain Testnet" \
  *     --start-block 12345 \
  *     --weth-profile 1
@@ -29,7 +32,7 @@ import { createPublicClient, http, getAddress, keccak256 } from "viem";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deploymentsDir = resolve(siteRoot, "deployments");
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const DOLLAR = ["diamond", "core", "gateway", "dollar", "risk", "weth", "oracle"];
 const LIQUIDITY = [
@@ -127,13 +130,31 @@ async function main() {
   const rpcUrl = arg("rpc");
   const addressesPath = arg("addresses");
   const commit = arg("commit");
+  const publicCommit = arg("public-commit");
+  const sourceRepository = arg("source-repository");
+  const deploymentArtifact = arg("deployment-artifact");
   const network = arg("network");
   const startBlock = arg("start-block");
   const wethProfile = arg("weth-profile");
   const peggedProfile = arg("pegged-profile", { required: false });
 
-  if (!/^[a-f0-9]{40}$/i.test(commit)) {
-    throw new Error("--commit must be a full 40-character Git commit.");
+  for (const [flag, value] of [
+    ["commit", commit],
+    ["public-commit", publicCommit],
+  ]) {
+    if (!/^[a-f0-9]{40}$/i.test(value)) {
+      throw new Error(`--${flag} must be a full 40-character Git commit.`);
+    }
+  }
+  const sourceUrl = new URL(sourceRepository);
+  if (sourceUrl.protocol !== "https:" || sourceUrl.username || sourceUrl.password) {
+    throw new Error("--source-repository must be a credential-free HTTPS URL.");
+  }
+  if (
+    !/^deployments\/[a-z0-9][a-z0-9._/-]*\.json$/i.test(deploymentArtifact) ||
+    deploymentArtifact.includes("..")
+  ) {
+    throw new Error("--deployment-artifact must be a repository-relative deployment JSON path.");
   }
   for (const [flag, value] of [
     ["start-block", startBlock],
@@ -201,6 +222,12 @@ async function main() {
     deploymentStartBlock: startBlock,
     wethProfileId: wethProfile,
     protocolCommit: commit.toLowerCase(),
+    source: {
+      repository: sourceUrl.toString().replace(/\/$/u, ""),
+      publicCommit: publicCommit.toLowerCase(),
+      deploymentArtifact,
+      recordedDeploymentCommit: commit.toLowerCase(),
+    },
     generatedAt: new Date().toISOString(),
     contracts,
     liquidity,

@@ -5,10 +5,17 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const protocolRoot = resolve(
-  repositoryRoot,
-  process.env.STATICS_PROTOCOL_REPOSITORY || "../statics"
-);
+const configuredProtocolRoot = process.env.STATICS_PROTOCOL_REPOSITORY?.trim();
+if (!configuredProtocolRoot) {
+  throw new Error("STATICS_PROTOCOL_REPOSITORY must name a clean public Statics checkout.");
+}
+const protocolRoot = resolve(repositoryRoot, configuredProtocolRoot);
+const sourceRepository =
+  process.env.STATICS_PROTOCOL_SOURCE_URL?.trim() || "https://github.com/EqualFiLabs/statics";
+const sourceUrl = new URL(sourceRepository);
+if (sourceUrl.protocol !== "https:" || sourceUrl.username || sourceUrl.password) {
+  throw new Error("STATICS_PROTOCOL_SOURCE_URL must be a credential-free HTTPS URL.");
+}
 const sdkRoot = resolve(protocolRoot, "sdk");
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
 
@@ -73,7 +80,10 @@ writeFileSync(
   `${JSON.stringify(
     {
       protocolCommit,
-      source: "sdk",
+      source: {
+        repository: sourceUrl.toString().replace(/\/$/u, ""),
+        path: "sdk",
+      },
       sdkTreeState,
       sourceChecksums,
       checksums,

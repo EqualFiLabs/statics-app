@@ -1,11 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import path from "node:path";
-
 import { getAddress, isAddress } from "viem";
 
 const UNISWAP_API_BASE = "https://trade-api.gateway.uniswap.org/v1";
-const LOCAL_API_KEY_FILE = path.join(homedir(), ".openclaw", "workspace", ".uniswap");
 
 type ServerEnvironment = Record<string, string | undefined>;
 
@@ -35,17 +30,11 @@ export function getUniswapUniversalRouterVersion(body: unknown): "2.0" | "2.1.1"
 }
 
 export async function resolveUniswapApiKey(
-  environment: ServerEnvironment = process.env,
-  readTextFile: typeof readFile = readFile
+  environment: ServerEnvironment = process.env
 ): Promise<string> {
   const configured = environment.UNISWAP_API_KEY?.trim();
   if (configured) return configured;
-  if ((environment.NEXT_PUBLIC_APP_ENV ?? "development") !== "development") {
-    throw new Error("UNISWAP_API_KEY is required outside development.");
-  }
-  const local = await readTextFile(LOCAL_API_KEY_FILE, "utf8").catch(() => "");
-  if (!local.trim()) throw new Error("UNISWAP_API_KEY is not configured.");
-  return local.trim();
+  throw new Error("UNISWAP_API_KEY is not configured in the server environment.");
 }
 
 export function readUniswapIntegratorFee(environment: ServerEnvironment = process.env): {

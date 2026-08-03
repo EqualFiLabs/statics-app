@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { mergePublicPrivyConfig, readPublicPrivyConfig } from "../../scripts/lib/local-privy.mjs";
+import {
+  mergePublicPrivyConfig,
+  readPublicPrivyConfig,
+  requirePublicPrivySource,
+} from "../../scripts/lib/local-privy.mjs";
 
 describe("local Privy public configuration", () => {
+  it("requires callers to name the source environment explicitly", () => {
+    expect(requirePublicPrivySource(" /tmp/public.env ")).toBe("/tmp/public.env");
+    expect(() => requirePublicPrivySource(undefined)).toThrow("EVES_MARKET_ENV_PATH");
+  });
+
   it("reads only the approved public identifiers", () => {
     expect(
       readPublicPrivyConfig(`

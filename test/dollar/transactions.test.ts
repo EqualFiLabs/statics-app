@@ -1,7 +1,11 @@
-import { encodeErrorResult, encodeFunctionResult } from "viem";
+import { ContractFunctionRevertedError, encodeErrorResult, encodeFunctionResult } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { staticsAbi, staticsDollarErrorAbi } from "@statics-protocol/sdk";
+import {
+  staticsAbi,
+  staticsDollarErrorAbi,
+  staticsDollarPeripheryErrorAbi,
+} from "@statics-protocol/sdk";
 import {
   describeDollarError,
   isOnchainRevert,
@@ -25,6 +29,22 @@ describe("Dollar transaction bounds", () => {
     });
     expect(describeDollarError(new Error(`execution reverted: SharesAboveMaximum ${data}`))).toBe(
       "The required Risk shares moved above your 0.50% tolerance. Review the new quote. (SharesAboveMaximum)"
+    );
+  });
+
+  it("decodes periphery reverts returned as raw contract errors", () => {
+    const data = encodeErrorResult({
+      abi: staticsDollarPeripheryErrorAbi,
+      errorName: "NoRiskLiquidity",
+    });
+    const error = new ContractFunctionRevertedError({
+      abi: staticsDollarErrorAbi,
+      data,
+      functionName: "redeemDollar",
+    });
+
+    expect(describeDollarError(error)).toBe(
+      "Nobody has opted Risk shares in for this series yet, so there is nothing to redeem against. (NoRiskLiquidity)"
     );
   });
 

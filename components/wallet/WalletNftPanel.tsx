@@ -30,11 +30,9 @@ const deploymentState = readClientDollarDeployment();
  */
 export function WalletNftPanel({
   onTransfer,
-  fundingChainId,
   onAddCollection,
 }: {
   onTransfer: (nft: WalletNft) => void;
-  fundingChainId: number;
   onAddCollection: () => void;
 }) {
   const wallet = useWalletState();
@@ -46,7 +44,9 @@ export function WalletNftPanel({
 
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
-  const { collections, removeCollection } = useWalletNftCollections(fundingChainId);
+  const collectionChainId =
+    deploymentState.status === "configured" ? deploymentState.deployment.chainId : null;
+  const { collections, removeCollection } = useWalletNftCollections(collectionChainId);
 
   const catalog = useQuery({
     queryKey: ["wallet-nfts", walletAddress, collections.map((c) => c.address).join(",")],
@@ -126,13 +126,18 @@ export function WalletNftPanel({
           </span>
         ))}
       </div>
-      <button type="button" className="wallet-nft-add" onClick={onAddCollection}>
+      <button
+        type="button"
+        className="wallet-nft-add"
+        onClick={onAddCollection}
+        disabled={collectionChainId === null}
+      >
         Add collection
       </button>
     </div>
   );
 
-  if (!catalog.data || !isSurfaceReady(state)) {
+  if (collectionChainId === null || !catalog.data || !isSurfaceReady(state)) {
     return (
       <>
         {header}
@@ -159,15 +164,7 @@ export function WalletNftPanel({
           Liquidity positions could not be read on this network, so only positions are listed.
         </p>
       )}
-      <WalletNftList
-        nfts={catalog.data.nfts}
-        chainId={
-          deploymentState.status === "configured"
-            ? deploymentState.deployment.chainId
-            : fundingChainId
-        }
-        onTransfer={onTransfer}
-      />
+      <WalletNftList nfts={catalog.data.nfts} chainId={collectionChainId} onTransfer={onTransfer} />
     </>
   );
 }

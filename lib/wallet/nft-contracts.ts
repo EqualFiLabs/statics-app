@@ -69,6 +69,42 @@ export type NftCollectionHoldings = Readonly<{
 }>;
 
 const storageEvent = "statics-wallet-nfts-changed";
+const MAX_UINT256 = (1n << 256n) - 1n;
+
+function isUint256TokenId(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return false;
+  try {
+    return BigInt(value) <= MAX_UINT256;
+  } catch {
+    return false;
+  }
+}
+
+function parseStoredCollection(entry: unknown): NftCollection | null {
+  if (typeof entry !== "object" || entry === null) return null;
+  const candidate = entry as Record<string, unknown>;
+  if (
+    typeof candidate.address !== "string" ||
+    !isAddress(candidate.address) ||
+    typeof candidate.name !== "string" ||
+    candidate.name.trim().length === 0 ||
+    typeof candidate.symbol !== "string" ||
+    candidate.symbol.trim().length === 0
+  ) {
+    return null;
+  }
+
+  const base = {
+    address: getAddress(candidate.address),
+    name: candidate.name,
+    symbol: candidate.symbol,
+  } as const;
+  if (candidate.standard === "erc721") return { ...base, standard: "erc721" };
+  if (candidate.standard === "erc1155" && isUint256TokenId(candidate.tokenId)) {
+    return { ...base, standard: "erc1155", tokenId: candidate.tokenId };
+  }
+  return null;
+}
 
 export function nftCollectionStorageKey(chainId: number) {
   return `statics:wallet:nfts:${chainId}`;
@@ -81,13 +117,10 @@ export function loadNftCollections(chainId: number): NftCollection[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is NftCollection =>
-        typeof entry === "object" &&
-        entry !== null &&
-        typeof (entry as NftCollection).address === "string" &&
-        isAddress((entry as NftCollection).address)
-    );
+    return parsed.flatMap((entry) => {
+      const collection = parseStoredCollection(entry);
+      return collection ? [collection] : [];
+    });
   } catch {
     return [];
   }
@@ -148,7 +181,7 @@ export async function readNftCollection(
   if (isErc1155 && !isErc721) {
     // Without an id there is nothing to read: balanceOf takes one, and the
     // standard cannot tell us which ids an address holds.
-    if (!tokenId || !/^\d+$/.test(tokenId.trim())) {
+    if (!isUint256TokenId(tokenId?.trim())) {
       throw new Error("This is an ERC-1155. Enter the token id you hold as well.");
     }
     const [name, symbol] = await Promise.all([
