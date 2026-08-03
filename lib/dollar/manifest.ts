@@ -27,7 +27,7 @@ import type {
 } from "@/lib/dollar/deployment";
 
 /** Bump when the shape changes so an older generator cannot write a newer app. */
-export const MANIFEST_SCHEMA_VERSION = 1;
+export const MANIFEST_SCHEMA_VERSION = 2;
 
 const dollarContractNames: readonly DollarContractName[] = [
   "diamond",
@@ -46,6 +46,8 @@ const liquidityContractNames: readonly LiquidityContractName[] = [
   "swapFeeHook",
   "liquidityManager",
   "stateView",
+  "quoter",
+  "universalRouter",
 ];
 
 type RawEntry = Readonly<{ address: string; runtimeCodeHash: string }>;
@@ -65,6 +67,7 @@ export type DeploymentManifest = Readonly<{
     collateral: RawEntry;
     oracle: RawEntry;
   }> | null;
+  faucet?: RawEntry | null;
 }>;
 
 function fail(chainId: number | string, reason: string): never {
@@ -150,6 +153,12 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     };
   }
 
+  let faucet: DollarDeployment["faucet"] = null;
+  if (manifest.faucet) {
+    const entry = readEntry(chainId, "faucet", manifest.faucet);
+    faucet = { address: entry.address, runtimeCodeHash: entry.runtimeCodeHash };
+  }
+
   return {
     chainId,
     deploymentStartBlock: readDigits(
@@ -166,5 +175,6 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     runtimeCodeHashes: runtimeCodeHashes as Record<DollarContractName, Hex>,
     liquidity,
     pegged,
+    faucet,
   };
 }

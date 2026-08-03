@@ -6,7 +6,8 @@ The Statics marketing site and DApp foundation are built with Next.js 16 and Rea
 
 - `/` — static marketing landing page with no wallet runtime.
 - `/app` — Dollar overview and route-scoped Privy/Wagmi wallet runtime.
-- `/app/wallet` — EVM and Solana assets, token management, sends, receives, and Portal access.
+- `/app/wallet` — EVM and Solana assets, sends, receives, Portal access, and the public testnet
+  fixture faucet.
 - `/app/portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and Statics Dollar.
 - `/app/dollar` — ETH/WETH deposits and recombination against verified deployments.
 - `/app/activity` — wallet-scoped EVM, Solana, swap, bridge, and protocol activity.
@@ -39,12 +40,16 @@ The Portal implements the following reviewed transaction flows:
 - Jupiter Swap V2 order/sign/execute for Solana swaps.
 - Across chain/token discovery, exact-input funding quotes, origin execution, and deposit-status
   recovery.
-- Code-hash-bound USDG mint and redemption through the configured Statics Dollar gateway.
+- Code-hash-bound USDG mint and redemption through the configured Statics Dollar gateway, using
+  native EIP-2612 permits so the reviewed wrapper action is one transaction.
+- Canonical TPA1 basket-underlying swaps through Robinhood Uniswap v4, with a bounded ERC-20
+  approval to Permit2 and exact short-lived swap signatures thereafter.
 
 Uniswap, Jupiter, and Across credentials stay server-only. Across funding remains unavailable until
-a checked-in verified Robinhood mainnet deployment manifest identifies the destination USDG and
-gateway contracts. The current generated deployment profile is intentionally restricted to local
-Anvil and cannot activate production bridging.
+the selected destination has a checked-in verified deployment manifest. Robinhood testnet is
+bound by `deployments/46630.json`; its Statics gateway, USDG profile, canonical liquidity
+dependencies, and optional faucet are verified by runtime code hash before a transaction path is
+offered.
 
 Primary integration references: [Uniswap Swapping API](https://developers.uniswap.org/docs/trading/swapping-api/integration-guide),
 [Jupiter Swap V2 order and execute](https://developers.jup.ag/docs/swap/order-and-execute), and
@@ -110,8 +115,31 @@ PRIVATE_KEY=... npm run deploy:dollar:local
 ```
 
 The helper accepts only chain `31337`, never writes the key, and updates ignored `.env.local` with
-public addresses, the protocol commit, and runtime code hashes. There is no configured public
-Statics deployment.
+public addresses, the protocol commit, and runtime code hashes. It does not replace the checked-in
+Robinhood testnet manifest.
+
+## Robinhood testnet build
+
+The public beta reads protocol addresses only from `deployments/46630.json`. Do not copy contract
+addresses into the build environment. Configure the public app and dedicated RPC, then build:
+
+```bash
+export NEXT_PUBLIC_APP_ENV=production
+export NEXT_PUBLIC_SITE_URL=https://your-statics-site.example
+export NEXT_PUBLIC_APP_NETWORK=robinhood-testnet
+export NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=https://your-dedicated-robinhood-testnet-rpc
+export NEXT_PUBLIC_PRIVY_APP_ID=your-public-privy-app-id
+export NEXT_PUBLIC_STATICS_CHAIN_ID=46630
+
+npm run build
+npm start
+```
+
+Only the chain ID selects the checked-in public manifest; do not configure public contract
+addresses in the environment. `npm start` serves the existing build. Re-run `npm run build` after changing any
+`NEXT_PUBLIC_*` value because Next.js embeds public values at build time. The canonical swap tab
+enables only after the corresponding pool reaches `Active`. The faucet card enables only when its
+deployed address and runtime hash are present in the checked-in manifest.
 
 ## Verification
 

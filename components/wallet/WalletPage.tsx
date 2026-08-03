@@ -22,6 +22,7 @@ import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
 import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
+import { TestnetFaucetCard } from "@/components/wallet/TestnetFaucetCard";
 import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { readNftCollection } from "@/lib/wallet/nft-contracts";
 import { loadRiskShareBalances, type RiskShareBalance } from "@/lib/wallet/risk-shares";
@@ -260,6 +261,8 @@ export function WalletPage() {
             Receive
           </button>
         </div>
+
+        <TestnetFaucetCard />
 
         <div className="wallet-assets">
           {/* Tabs over the holdings, with activity linking to its own route

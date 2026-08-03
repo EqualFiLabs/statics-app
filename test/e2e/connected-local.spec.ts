@@ -12,7 +12,7 @@ const routes: readonly (readonly [string, string | RegExp])[] = [
   ["/app/dollar", /Dollar$/],
   ["/app/baskets", "Statics baskets"],
   ["/app/baskets/0", /\S/],
-  ["/app/create", "Create a static basket"],
+  ["/app/create", "Basket launches are steward-controlled"],
   ["/app/positions", "Your positions"],
   ["/app/loans", "Your loans"],
   ["/app/rewards", "Create and stake"],
@@ -43,7 +43,6 @@ test("renders every connected route without sample fallback", async ({ page }) =
     await expect(page.getByText("Design preview", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Sample data only", { exact: true })).toHaveCount(0);
     if (route === "/app/baskets") {
-      await expect(page.getByRole("link", { name: "Create basket →" })).toBeVisible();
       await expect(page.getByText("2 discovered", { exact: true })).toBeVisible();
     }
     await page.waitForLoadState("networkidle");

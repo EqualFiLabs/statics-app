@@ -133,16 +133,16 @@
   cursor: not-allowed;
 }
 
-.ui-button--primary {
+.dapp-shell .ui-button--primary {
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-.ui-button--primary:hover:not(:disabled) {
+.dapp-shell .ui-button--primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-.ui-button--primary:active:not(:disabled) {
+.dapp-shell .ui-button--primary:active:not(:disabled) {
   background: var(--accent-press);
 }
 
@@ -1280,6 +1280,43 @@
   display: inline-block;
   margin-right: 0.65rem;
   color: var(--accent);
+}
+
+.testnet-faucet {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+  padding: 1.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-raised);
+}
+
+.testnet-faucet h2,
+.testnet-faucet p {
+  margin: 0;
+}
+
+.testnet-faucet ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.testnet-faucet li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.testnet-faucet li strong {
+  color: var(--app-text);
 }
 
 .wallet-assets {

@@ -9,6 +9,7 @@ describe("funding network registry", () => {
     expect(new Set(chainIds).size).toBe(chainIds.length);
     expect(getFundingNetwork(8_453)?.label).toBe("Base");
     expect(getFundingNetwork(4_663)?.label).toBe("Robinhood Chain");
+    expect(getFundingNetwork(46_630)?.label).toBe("Robinhood Testnet");
   });
 
   it("offers local Anvil in development, so the wallet can reach the local stack", () => {
@@ -24,6 +25,11 @@ describe("funding network registry", () => {
     // nothing about a local chain, so offering it would fail like a bug in the
     // app rather than like an unsupported network.
     expect(getFundingNetwork(31_337)?.supportsUniswap).toBe(false);
+  });
+
+  it("offers testnet funding without claiming Trading API routes", () => {
+    expect(isFundingChainId(46_630)).toBe(true);
+    expect(getFundingNetwork(46_630)?.supportsUniswap).toBe(false);
   });
 
   it("lists Anvil first, where someone running the local stack will look", () => {

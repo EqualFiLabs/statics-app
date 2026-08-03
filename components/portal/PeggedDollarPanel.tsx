@@ -5,15 +5,15 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
-  encodeFunctionData,
   formatUnits,
   getAddress,
   parseUnits,
 } from "viem";
 import {
   basketTokenAbi,
-  buildMintPeggedCall,
-  buildRedeemPeggedCall,
+  buildErc20PermitTypedData,
+  buildMintPeggedWithPermitCall,
+  buildRedeemPeggedWithPermitCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
 
@@ -27,6 +27,11 @@ import {
   maximumWithTolerance,
   minimumWithTolerance,
 } from "@/lib/dollar/transactions";
+import {
+  decodePermitSignature,
+  exactPeggedMintPermitValue,
+  permitDeadline,
+} from "@/lib/dollar/permit";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -49,8 +54,6 @@ type PeggedQuote =
 type Snapshot = {
   collateralBalance: bigint;
   dollarBalance: bigint;
-  collateralAllowance: bigint;
-  dollarAllowance: bigint;
 };
 
 function deploymentState() {
@@ -108,34 +111,21 @@ export function PeggedDollarPanel() {
       return null;
     const { account, publicClient } = await walletClients(wallet);
     await verifyDollarDeployment(publicClient, deployment);
-    const [collateralBalance, dollarBalance, collateralAllowance, dollarAllowance] =
-      await Promise.all([
-        publicClient.readContract({
-          address: deployment.pegged.collateral,
-          abi: basketTokenAbi,
-          functionName: "balanceOf",
-          args: [account],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.dollar,
-          abi: basketTokenAbi,
-          functionName: "balanceOf",
-          args: [account],
-        }),
-        publicClient.readContract({
-          address: deployment.pegged.collateral,
-          abi: basketTokenAbi,
-          functionName: "allowance",
-          args: [account, deployment.contracts.gateway],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.dollar,
-          abi: basketTokenAbi,
-          functionName: "allowance",
-          args: [account, deployment.contracts.gateway],
-        }),
-      ]);
-    const next = { collateralBalance, dollarBalance, collateralAllowance, dollarAllowance };
+    const [collateralBalance, dollarBalance] = await Promise.all([
+      publicClient.readContract({
+        address: deployment.pegged.collateral,
+        abi: basketTokenAbi,
+        functionName: "balanceOf",
+        args: [account],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.dollar,
+        abi: basketTokenAbi,
+        functionName: "balanceOf",
+        args: [account],
+      }),
+    ]);
+    const next = { collateralBalance, dollarBalance };
     setSnapshot(next);
     return next;
   }, [deployment, wallet]);
@@ -218,7 +208,7 @@ export function PeggedDollarPanel() {
   }, [amount, deployment, direction, readQuote, wallet.address, wallet.chainId]);
 
   const send = async (
-    kind: "approve-pegged-collateral" | "approve-dollar" | "mint-pegged" | "redeem-pegged",
+    kind: "mint-pegged" | "redeem-pegged",
     label: string,
     activityAmount: string,
     target: `0x${string}`,
@@ -249,59 +239,45 @@ export function PeggedDollarPanel() {
     });
   };
 
+  const signPermit = async (token: `0x${string}`, value: bigint) => {
+    if (!deployment) throw new Error("No Dollar deployment is configured.");
+    const { account, publicClient, walletClient } = await walletClients(wallet);
+    const [tokenName, nonce, block] = await Promise.all([
+      publicClient.readContract({
+        address: token,
+        abi: basketTokenAbi,
+        functionName: "name",
+      }),
+      publicClient.readContract({
+        address: token,
+        abi: basketTokenAbi,
+        functionName: "nonces",
+        args: [account],
+      }),
+      publicClient.getBlock(),
+    ]);
+    const deadline = permitDeadline(block.timestamp);
+    const signature = await walletClient.signTypedData({
+      account,
+      ...buildErc20PermitTypedData({
+        tokenName,
+        chainId: deployment.chainId,
+        token,
+        owner: account,
+        spender: deployment.contracts.gateway,
+        value,
+        nonce,
+        deadline,
+      }),
+    });
+    return decodePermitSignature(deadline, signature);
+  };
+
   const nextAction = async () => {
     if (!deployment?.pegged || !quote || !snapshot || pending) return;
     setPending(true);
     setError(null);
     try {
-      if (quote.direction === "mint") {
-        const maximum = maximumWithTolerance(quote.totalCollateralIn);
-        if (snapshot.collateralAllowance < maximum) {
-          await send(
-            "approve-pegged-collateral",
-            "Approve bounded USDG",
-            display(maximum, 6, "USDG"),
-            deployment.pegged.collateral,
-            encodeFunctionData({
-              abi: basketTokenAbi,
-              functionName: "approve",
-              args: [deployment.contracts.gateway, maximum],
-            }),
-            {
-              verifyConfirmation: async () => {
-                const fresh = await readSnapshot();
-                if (!fresh || fresh.collateralAllowance < maximum) {
-                  throw new Error("The confirmed USDG allowance is below the reviewed bound.");
-                }
-              },
-            }
-          );
-          await readSnapshot();
-          return;
-        }
-      } else if (snapshot.dollarAllowance < quote.amount) {
-        await send(
-          "approve-dollar",
-          "Approve exact Statics Dollar",
-          display(quote.amount, 18, "sUSD"),
-          deployment.contracts.dollar,
-          encodeFunctionData({
-            abi: basketTokenAbi,
-            functionName: "approve",
-            args: [deployment.contracts.gateway, quote.amount],
-          }),
-          {
-            verifyConfirmation: async () => {
-              const fresh = await readSnapshot();
-              if (!fresh || fresh.dollarAllowance < quote.amount) {
-                throw new Error("The confirmed Dollar allowance is below the reviewed amount.");
-              }
-            },
-          }
-        );
-        await readSnapshot();
-        return;
-      }
       setReviewing(true);
     } catch (cause) {
       setError(describeDollarError(cause));
@@ -319,21 +295,26 @@ export function PeggedDollarPanel() {
       const before = snapshot;
       if (quote.direction === "mint" && fresh.direction === "mint") {
         const maximum = maximumWithTolerance(quote.totalCollateralIn);
-        if (fresh.totalCollateralIn > maximum) {
+        let permitValue: bigint;
+        try {
+          permitValue = exactPeggedMintPermitValue(fresh.totalCollateralIn, maximum);
+        } catch (cause) {
           setQuote(fresh);
           setReviewing(false);
-          throw new Error("The required USDG moved above the reviewed maximum.");
+          throw cause;
         }
+        const permit = await signPermit(deployment.pegged.collateral, permitValue);
         await send(
           "mint-pegged",
           "Mint Statics Dollar with USDG",
-          display(quote.amount, 18, "sUSD"),
+          display(quote.amount, 18, "USDstx"),
           deployment.contracts.gateway,
-          buildMintPeggedCall(
+          buildMintPeggedWithPermitCall(
             deployment.pegged.profileId,
             quote.amount,
             maximum,
-            getAddress(wallet.address!)
+            getAddress(wallet.address!),
+            permit
           ),
           {
             validateSimulation: (result) => void validatePeggedMintSimulation(result),
@@ -354,16 +335,18 @@ export function PeggedDollarPanel() {
           setReviewing(false);
           throw new Error("The USDG output moved below the reviewed minimum.");
         }
+        const permit = await signPermit(deployment.contracts.dollar, quote.amount);
         await send(
           "redeem-pegged",
           "Redeem Statics Dollar for USDG",
-          display(quote.amount, 18, "sUSD"),
+          display(quote.amount, 18, "USDstx"),
           deployment.contracts.gateway,
-          buildRedeemPeggedCall(
+          buildRedeemPeggedWithPermitCall(
             deployment.pegged.profileId,
             quote.amount,
             minimum,
-            getAddress(wallet.address!)
+            getAddress(wallet.address!),
+            permit
           ),
           {
             validateSimulation: (result) => void validatePeggedRedemptionSimulation(result),
@@ -393,16 +376,6 @@ export function PeggedDollarPanel() {
     }
   };
 
-  const requiredApproval =
-    quote?.direction === "mint" ? maximumWithTolerance(quote.totalCollateralIn) : quote?.amount;
-  const needsApproval =
-    quote?.direction === "mint"
-      ? snapshot !== null &&
-        requiredApproval !== undefined &&
-        snapshot.collateralAllowance < requiredApproval
-      : snapshot !== null &&
-        requiredApproval !== undefined &&
-        snapshot.dollarAllowance < requiredApproval;
   const balanceInsufficient =
     quote?.direction === "mint"
       ? snapshot !== null && snapshot.collateralBalance < quote.totalCollateralIn
@@ -411,28 +384,30 @@ export function PeggedDollarPanel() {
         : false;
 
   const primary = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (wallet.status === "signed-out" || wallet.status === "error") return wallet.login();
+    if (wallet.status === "wallet-missing") return void wallet.createWallet();
+    if (wallet.status !== "ready") return;
     if (deployment && wallet.chainId !== deployment.chainId) return void wallet.switchNetwork();
     return void nextAction();
   };
   const label =
-    wallet.status === "signed-out"
+    wallet.status === "signed-out" || wallet.status === "error"
       ? "Connect wallet"
-      : deployment && wallet.chainId !== deployment.chainId
-        ? `Switch to ${wallet.networkName}`
-        : pending
-          ? needsApproval
-            ? "Approving…"
-            : "Preparing…"
-          : quoteLoading
-            ? "Reading quote…"
-            : balanceInsufficient
-              ? `Insufficient ${direction === "mint" ? "USDG" : "sUSD"}`
-              : needsApproval
-                ? `Approve ${direction === "mint" ? "USDG" : "sUSD"}`
-                : direction === "mint"
-                  ? "Review mint"
-                  : "Review redemption";
+      : wallet.status === "wallet-missing"
+        ? "Create embedded wallet"
+        : wallet.status !== "ready"
+          ? "Wallet loading…"
+          : deployment && wallet.chainId !== deployment.chainId
+            ? `Switch to ${wallet.networkName}`
+            : pending
+              ? "Preparing…"
+              : quoteLoading
+                ? "Reading quote…"
+                : balanceInsufficient
+                  ? `Insufficient ${direction === "mint" ? "USDG" : "USDstx"}`
+                  : direction === "mint"
+                    ? "Review mint"
+                    : "Review redemption";
 
   return (
     <div className="portal-panel" role="tabpanel">
@@ -448,6 +423,7 @@ export function PeggedDollarPanel() {
               setQuote(null);
               setReviewing(false);
             }}
+            disabled={pending}
           >
             {item === "mint" ? "Mint" : "Redeem"}
           </button>
@@ -468,10 +444,13 @@ export function PeggedDollarPanel() {
               setReviewing(false);
               setError(null);
             }}
+            disabled={pending}
           />
-          <button type="button">sUSD</button>
+          <button type="button" disabled={pending}>
+            USDstx
+          </button>
         </div>
-        <small>Balance {display(snapshot?.dollarBalance, 18, "sUSD")}</small>
+        <small>Balance {display(snapshot?.dollarBalance, 18, "USDstx")}</small>
       </label>
       <dl className="portal-quote-grid">
         <div>
@@ -503,12 +482,12 @@ export function PeggedDollarPanel() {
                     6,
                     "USDG"
                   )
-                : `${amountInput} sUSD`}
+                : `${amountInput} USDstx`}
             </span>
             <strong>→</strong>
             <span>
               {direction === "mint"
-                ? `${amountInput} sUSD`
+                ? `${amountInput} USDstx`
                 : display(
                     quote.direction === "redeem" ? quote.collateralOut : undefined,
                     6,
@@ -544,10 +523,13 @@ export function PeggedDollarPanel() {
           type="button"
           disabled={
             pending ||
-            balanceInsufficient ||
-            wallet.status === "unconfigured" ||
             (wallet.status !== "signed-out" &&
-              (!deployment?.pegged ||
+              wallet.status !== "error" &&
+              wallet.status !== "wallet-missing" &&
+              wallet.status !== "ready") ||
+            (wallet.status === "ready" &&
+              (balanceInsufficient ||
+                !deployment?.pegged ||
                 (wallet.chainId === deployment.chainId && (!quote || !snapshot))))
           }
           onClick={primary}

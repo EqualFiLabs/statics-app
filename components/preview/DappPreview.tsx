@@ -184,7 +184,6 @@ export function BasketListPreview() {
           </div>
           <div className="basket-section-actions">
             <span>{unavailable} discovered</span>
-            <Link href="/app/create">Create basket →</Link>
           </div>
         </div>
         <div className="basket-grid">
