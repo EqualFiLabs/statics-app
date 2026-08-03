@@ -1,14 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import {
-  createPublicClient,
-  createWalletClient,
-  custom,
-  formatUnits,
-  getAddress,
-  parseUnits,
-} from "viem";
+import { useTranslations } from "next-intl";
+import { createPublicClient, createWalletClient, custom, formatUnits, getAddress } from "viem";
 
 import {
   SlippageInlineControl,
@@ -38,6 +32,8 @@ import { decodeJupiterTransaction } from "@/lib/portal/solana";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { SOLANA_MAINNET_CHAIN } from "@/lib/solana-wallet";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 type QuotePayload = {
   quote?: {
@@ -122,6 +118,8 @@ export function defaultDestinationToken(
 }
 
 export function AcrossBridgePanel() {
+  const t = useTranslations("portal");
+  const locale = useAppLocale();
   const wallet = useWalletState();
   const solana = useSolanaAssets();
   const slippage = usePortalSlippage();
@@ -179,7 +177,7 @@ export function AcrossBridgePanel() {
 
   let rawAmount = 0n;
   try {
-    rawAmount = selectedToken && amount ? parseUnits(amount, selectedToken.decimals) : 0n;
+    rawAmount = selectedToken ? parseLocalizedUnits(amount, selectedToken.decimals, locale) : 0n;
   } catch {
     rawAmount = 0n;
   }
@@ -532,15 +530,17 @@ export function AcrossBridgePanel() {
   };
   const primaryLabel =
     wallet.status === "signed-out"
-      ? "Connect wallet"
+      ? t("connectWallet")
       : originIsSolana && !solana.wallet
-        ? "Create Solana wallet"
+        ? t("createSolanaWallet")
         : !originIsSolana &&
             (wallet.fundingChainId !== originChainId || !wallet.fundingWalletOnSelectedChain)
-          ? `Switch to ${chains.find((chain) => chain.chainId === originChainId)?.name ?? "origin"}`
+          ? t("switchTo", {
+              network: chains.find((chain) => chain.chainId === originChainId)?.name ?? t("origin"),
+            })
           : loadingQuote
-            ? "Finding route…"
-            : "Review bridge";
+            ? t("findingRoute")
+            : t("reviewBridge");
   const actionReady = Boolean(
     selectedToken &&
     selectedDestinationToken &&
@@ -554,7 +554,7 @@ export function AcrossBridgePanel() {
     <div className="portal-panel" role="tabpanel">
       <div className="portal-bridge-networks">
         <label className="portal-field">
-          <span>From</span>
+          <span>{t("from")}</span>
           <select
             value={originChainId}
             onChange={(event) => {
@@ -578,7 +578,7 @@ export function AcrossBridgePanel() {
           </select>
         </label>
         <label className="portal-field">
-          <span>To</span>
+          <span>{t("to")}</span>
           <select
             value={destinationChainId}
             onChange={(event) => {
@@ -603,14 +603,14 @@ export function AcrossBridgePanel() {
           card and a button inside a label would also activate the amount input. */}
       <div className="portal-field portal-asset-field">
         <div className="portal-asset-field-head">
-          <span>You send</span>
+          <span>{t("youSend")}</span>
           <SlippageInlineControl value={slippage} onEdit={() => setSettingsOpen(true)} />
         </div>
         <div>
           <input
             inputMode="decimal"
             value={amount}
-            aria-label="You send amount"
+            aria-label={t("youSendAmount")}
             placeholder="0.00"
             onChange={(event) => {
               setAmount(event.target.value);
@@ -620,7 +620,7 @@ export function AcrossBridgePanel() {
             }}
           />
           <select
-            aria-label="Bridge asset"
+            aria-label={t("bridgeAsset")}
             value={selectedToken?.address ?? ""}
             onChange={(event) => {
               setTokenAddress(event.target.value);
@@ -640,9 +640,9 @@ export function AcrossBridgePanel() {
       </div>
 
       <label className="portal-field">
-        <span>You receive on {destinationChainName}</span>
+        <span>{t("youReceiveOn", { network: destinationChainName })}</span>
         <select
-          aria-label="Destination asset"
+          aria-label={t("destinationAsset")}
           value={selectedDestinationToken?.address ?? ""}
           onChange={(event) => {
             setDestinationTokenAddress(event.target.value);
@@ -662,15 +662,15 @@ export function AcrossBridgePanel() {
 
       <dl className="portal-quote-grid">
         <div>
-          <dt>Expected on {destinationChainName}</dt>
+          <dt>{t("expectedOn", { network: destinationChainName })}</dt>
           <dd>{output}</dd>
         </div>
         <div>
-          <dt>Bridge fee</dt>
+          <dt>{t("bridgeFee")}</dt>
           <dd>{fee}</dd>
         </div>
         <div>
-          <dt>Estimated time</dt>
+          <dt>{t("estimatedTime")}</dt>
           <dd>{quote?.quote?.expectedFillTime ? `${quote.quote.expectedFillTime}s` : "--"}</dd>
         </div>
       </dl>
@@ -695,10 +695,10 @@ export function AcrossBridgePanel() {
       )}
       {recentBridgeActivity && (
         <div className="portal-bridge-status">
-          <span>Latest bridge</span>
+          <span>{t("latestBridge")}</span>
           <strong>{recentBridgeActivity.status}</strong>
           <button type="button" onClick={() => void refreshBridgeActivity(recentBridgeActivity)}>
-            Refresh
+            {t("refresh")}
           </button>
         </div>
       )}
@@ -714,7 +714,7 @@ export function AcrossBridgePanel() {
           disabled={submitting}
           onClick={() => void execute()}
         >
-          {submitting ? "Bridging…" : "Confirm bridge"}
+          {submitting ? t("bridging") : t("confirmBridge")}
         </button>
       ) : (
         <button

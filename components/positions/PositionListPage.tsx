@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { decodeFunctionResult, formatUnits, getAddress } from "viem";
+import { decodeFunctionResult, formatEther, formatUnits, getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
@@ -27,12 +28,14 @@ function displayAmount(value: bigint, decimals = 18): string {
 }
 
 export function PositionListPage() {
+  const t = useTranslations("positions");
   const wallet = useWalletState();
-  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Positions" />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
   return <PositionListRuntime />;
 }
 
 function PositionListRuntime() {
+  const t = useTranslations("positions");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -64,12 +67,21 @@ function PositionListRuntime() {
   });
 
   const createPosition = async () => {
-    if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
+    if (
+      !wallet ||
+      !publicClient ||
+      !walletClient.data ||
+      !catalog.data ||
+      deploymentState.status !== "configured"
+    ) {
       return;
     }
     setPending(true);
     setActionError(null);
     try {
+      const refreshed = await catalog.refetch();
+      if (!refreshed.data) throw new Error("The current Position fee is unavailable.");
+      const creationFee = refreshed.data.positionCreationFee;
       const data = buildCreatePositionCall(wallet);
       await executeProtocolTransaction({
         publicClient,
@@ -77,9 +89,10 @@ function PositionListRuntime() {
         chainId: deploymentState.deployment.chainId,
         kind: "create-position",
         label: "Create position",
-        amount: "1 position",
+        amount: `${formatEther(creationFee)} ETH account fee`,
         to: deploymentState.deployment.contracts.diamond,
         data,
+        value: creationFee,
         sendTransaction: ({ to, data: transactionData, value }) =>
           walletClient.data.sendTransaction({
             account: wallet,
@@ -111,8 +124,8 @@ function PositionListRuntime() {
     return (
       <SurfaceEmptyState
         state="unconfigured"
-        subject="positions"
-        empty={{ title: "Positions unavailable", description: "No deployment is configured." }}
+        subject={t("subject")}
+        empty={{ title: t("emptyTitle"), description: t("emptyDescription") }}
       />
     );
   }
@@ -126,19 +139,19 @@ function PositionListRuntime() {
     hasData: Boolean(catalog.data),
   });
 
-  let primaryLabel = "Create position";
+  let primaryLabel = t("create");
   let primaryAction: (() => void) | null = () => void createPosition();
   if (walletState.status === "signed-out" || walletState.status === "error") {
-    primaryLabel = "Sign in to continue";
+    primaryLabel = t("signIn");
     primaryAction = walletState.login;
   } else if (walletState.status === "wallet-missing") {
-    primaryLabel = "Create embedded wallet";
+    primaryLabel = t("createWallet");
     primaryAction = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
-    primaryLabel = `Switch to ${walletState.networkName}`;
+    primaryLabel = t("switchNetwork", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();
   } else if (walletState.status !== "ready") {
-    primaryLabel = "Wallet loading…";
+    primaryLabel = t("walletLoading");
     primaryAction = null;
   }
 
@@ -146,12 +159,14 @@ function PositionListRuntime() {
     <section className="position-catalog" aria-labelledby="position-catalog-title">
       <div className="position-section-heading">
         <div>
-          <p className="dapp-section-label">Positions</p>
-          <h2 id="position-catalog-title">Your positions</h2>
-          <p>
-            A position holds your collateral, staking, rewards, loans, and liquidity together. Move
-            the position and everything inside it moves with it.
-          </p>
+          <p className="dapp-section-label">{t("subject")}</p>
+          <h2 id="position-catalog-title">{t("title")}</h2>
+          <p>{t("description")}</p>
+          {catalog.data && (
+            <small>
+              {t("creationFee", { fee: formatEther(catalog.data.positionCreationFee) })}
+            </small>
+          )}
         </div>
         <button
           className="dollar-submit"
@@ -159,7 +174,7 @@ function PositionListRuntime() {
           onClick={primaryAction ?? undefined}
           disabled={pending || primaryAction === null}
         >
-          {pending ? "Creating position…" : primaryLabel}
+          {pending ? t("creatingPosition") : primaryLabel}
         </button>
       </div>
 
@@ -171,24 +186,23 @@ function PositionListRuntime() {
 
       {catalog.isError && catalog.data && (
         <p className="dollar-warning" role="status">
-          Position data is temporarily unavailable. Showing the last received state.
+          {t("stale")}
         </p>
       )}
       {!catalog.data || !isSurfaceReady(surfaceState) ? (
         <SurfaceEmptyState
           state={surfaceState}
-          subject="positions"
+          subject={t("subject")}
           onRetry={() => void catalog.refetch()}
           empty={{
-            title: "You do not have any positions yet",
-            description:
-              "A position is where your baskets, loans, and Dollar live together. Create an empty one to start, or one will be created for you the first time you deposit.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
             action: {
-              label: pending ? "Creating…" : "Create position",
+              label: pending ? t("creating") : t("create"),
               onClick: () => void createPosition(),
               disabled: pending,
             },
-            secondary: { label: "Browse baskets", href: "/app/baskets" },
+            secondary: { label: t("browseBaskets"), href: "/app/baskets" },
           }}
         />
       ) : (
@@ -197,14 +211,14 @@ function PositionListRuntime() {
             <article className="position-card" key={position.positionId.toString()}>
               <div>
                 <Link href={`/app/positions/${position.positionId.toString()}`}>
-                  Position #{position.positionId.toString()}
+                  {t("positionNumber", { id: position.positionId.toString() })}
                 </Link>
-                <span>{position.activeLegCount.toString()} active legs</span>
+                <span>{t("activeLegs", { count: position.activeLegCount.toString() })}</span>
               </div>
               <AddressDisplay
                 address={position.owner}
                 chainId={deploymentState.deployment.chainId}
-                label="Owner"
+                label={t("owner")}
               />
               <PositionCollateralSummary
                 collateral={position.collateral}
@@ -213,18 +227,18 @@ function PositionListRuntime() {
               />
               <dl>
                 <div>
-                  <dt>Basket legs</dt>
+                  <dt>{t("basketLegs")}</dt>
                   <dd>{position.collateral.length}</dd>
                 </div>
                 <div>
-                  <dt>Global stake</dt>
+                  <dt>{t("globalStake")}</dt>
                   <dd>
                     {displayAmount(position.stakedBalance, catalog.data.stakingToken.decimals)}{" "}
                     {catalog.data.stakingToken.symbol}
                   </dd>
                 </div>
                 <div>
-                  <dt>Reward selections</dt>
+                  <dt>{t("rewardSelections")}</dt>
                   <dd>{position.selectedRewardAssets.length}</dd>
                 </div>
               </dl>
@@ -232,7 +246,7 @@ function PositionListRuntime() {
                 className="position-card-link"
                 href={`/app/positions/${position.positionId.toString()}`}
               >
-                Manage position →
+                {t("manage")} →
               </Link>
             </article>
           ))}

@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits } from "viem";
 import { ArrowDownUp, Download, Send } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useSolanaAssets, type SolanaAsset } from "@/hooks/useSolanaAssets";
@@ -16,6 +17,8 @@ import {
 } from "@/lib/solana-wallet";
 import { validSolanaPublicKey, type SolanaToken } from "@/lib/solana-tokens";
 import { updateSolanaActivity, writeSolanaActivity } from "@/lib/portal/solana-activity";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 type SolanaModal = "send" | "receive" | "tokens" | null;
 
@@ -28,6 +31,7 @@ function displayBalance(value: bigint | null, decimals: number) {
 }
 
 export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
+  const t = useTranslations("wallet");
   const wallet = useSolanaAssets();
   const [modal, setModal] = useState<SolanaModal>(null);
   const [removingTokens, setRemovingTokens] = useState(false);
@@ -38,9 +42,9 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
       <section className="wallet-surface">
         <div className="wallet-network-row">
           <label>
-            <span>Network</span>
+            <span>{t("network")}</span>
             <select value="solana:mainnet" disabled>
-              <option>Solana Mainnet</option>
+              <option>{t("solanaMainnet")}</option>
             </select>
           </label>
           <button
@@ -48,12 +52,12 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
             onClick={() => void wallet.refresh()}
             disabled={wallet.refreshing || !wallet.wallet}
           >
-            {wallet.refreshing ? "Refreshing…" : "Refresh"}
+            {wallet.refreshing ? t("refreshing") : t("refresh")}
           </button>
         </div>
 
         <div className="wallet-balance-hero">
-          <span>Solana Mainnet</span>
+          <span>{t("solanaMainnet")}</span>
           <strong>{displayBalance(native?.balance ?? null, 9)}</strong>
           <small>SOL</small>
         </div>
@@ -61,27 +65,27 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
         <div className="wallet-quick-actions">
           <button type="button" onClick={onPortal}>
             <ArrowDownUp size={16} aria-hidden="true" />
-            Portal
+            {t("portal")}
           </button>
           <button type="button" onClick={() => setModal("send")}>
             <Send size={16} aria-hidden="true" />
-            Send
+            {t("send")}
           </button>
           <button type="button" onClick={() => setModal("receive")}>
             <Download size={16} aria-hidden="true" />
-            Receive
+            {t("receive")}
           </button>
         </div>
 
         <div className="wallet-assets">
           <div className="wallet-section-heading">
             <div>
-              <span>{"// Assets"}</span>
-              <h2>Tokens</h2>
+              <span>{`// ${t("assets")}`}</span>
+              <h2>{t("tokens")}</h2>
             </div>
             <div className="wallet-asset-actions">
               <button type="button" onClick={() => setModal("tokens")}>
-                Add token
+                {t("addToken")}
               </button>
               <button
                 type="button"
@@ -89,7 +93,7 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
                 disabled={!hasAddedTokens && !removingTokens}
                 onClick={() => setRemovingTokens((current) => !current)}
               >
-                {removingTokens ? "Done" : "Remove"}
+                {removingTokens ? t("done") : t("remove")}
               </button>
             </div>
           </div>
@@ -109,13 +113,13 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
                     <button
                       className="wallet-remove-token"
                       type="button"
-                      aria-label={`Remove ${asset.symbol}`}
+                      aria-label={t("removeToken", { symbol: asset.symbol })}
                       onClick={() => wallet.removeToken(asset.mint)}
                     >
-                      Remove
+                      {t("remove")}
                     </button>
                   ) : (
-                    <span>{asset.mint === SOL_MINT ? "Native" : "Token"}</span>
+                    <span>{asset.mint === SOL_MINT ? t("native") : t("token")}</span>
                   )}
                 </div>
               </div>
@@ -125,10 +129,10 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
       </section>
 
       {modal === "receive" && (
-        <SolanaDialog label="Receive on Solana" onClose={() => setModal(null)}>
+        <SolanaDialog label={t("receiveOnSolana")} onClose={() => setModal(null)}>
           <div className="wallet-dialog-content">
-            <span>{"// Receive"}</span>
-            <h2>Solana Mainnet</h2>
+            <span>{`// ${t("receive")}`}</span>
+            <h2>{t("solanaMainnet")}</h2>
             <code>{wallet.wallet?.address ?? "--"}</code>
             <button
               className="portal-primary-action"
@@ -138,7 +142,7 @@ export function SolanaWalletPanel({ onPortal }: { onPortal: () => void }) {
                 wallet.wallet && void navigator.clipboard.writeText(wallet.wallet.address)
               }
             >
-              Copy address
+              {t("copyAddress")}
             </button>
           </div>
         </SolanaDialog>
@@ -166,6 +170,7 @@ function SolanaDialog({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("wallet");
   useEffect(() => {
     const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     window.addEventListener("keydown", close);
@@ -180,7 +185,12 @@ function SolanaDialog({
         aria-label={label}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="wallet-dialog-close" type="button" onClick={onClose} aria-label="Close">
+        <button
+          className="wallet-dialog-close"
+          type="button"
+          onClick={onClose}
+          aria-label={t("close")}
+        >
           ×
         </button>
         {children}
@@ -206,6 +216,7 @@ function SolanaTokenBrowser({
   onAdd: (token: SolanaToken) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("wallet");
   const [query, setQuery] = useState("");
   const [tokens, setTokens] = useState<JupiterToken[]>([]);
   const [loading, setLoading] = useState(false);
@@ -220,7 +231,7 @@ function SolanaTokenBrowser({
       })
         .then(async (response) => {
           const payload: unknown = await response.json();
-          if (!response.ok || !Array.isArray(payload)) throw new Error("Token search failed.");
+          if (!response.ok || !Array.isArray(payload)) throw new Error(t("tokenSearchFailed"));
           setTokens(
             payload.filter((token): token is JupiterToken =>
               Boolean(
@@ -234,7 +245,7 @@ function SolanaTokenBrowser({
         })
         .catch((cause) => {
           if (!controller.signal.aborted) {
-            setError(cause instanceof Error ? cause.message : "Token search failed.");
+            setError(cause instanceof Error ? cause.message : t("tokenSearchFailed"));
           }
         })
         .finally(() => {
@@ -245,18 +256,18 @@ function SolanaTokenBrowser({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [query]);
+  }, [query, t]);
   const existingMints = useMemo(() => new Set(existing.map((token) => token.mint)), [existing]);
   return (
-    <SolanaDialog label="Browse Solana tokens" wide onClose={onClose}>
+    <SolanaDialog label={t("browseSolanaTokens")} wide onClose={onClose}>
       <div className="wallet-dialog-content wallet-token-browser">
-        <span>{"// Jupiter token list"}</span>
-        <h2>Browse tokens</h2>
+        <span>{`// ${t("jupiterTokenList")}`}</span>
+        <h2>{t("browseTokens")}</h2>
         <input
           autoFocus
-          aria-label="Search Solana tokens"
+          aria-label={t("searchSolanaTokens")}
           value={query}
-          placeholder="Symbol, name, or mint"
+          placeholder={t("searchSolanaPlaceholder")}
           onChange={(event) => setQuery(event.target.value)}
         />
         <div className="wallet-catalog-list">
@@ -306,6 +317,8 @@ function SolanaSendDialog({
   wallet: ReturnType<typeof useSolanaAssets>;
   onClose: () => void;
 }) {
+  const t = useTranslations("wallet");
+  const locale = useAppLocale();
   const [assetMint, setAssetMint] = useState(wallet.assets[0]?.mint ?? SOL_MINT);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -315,7 +328,7 @@ function SolanaSendDialog({
   const asset = wallet.assets.find((candidate) => candidate.mint === assetMint);
   let rawAmount = 0n;
   try {
-    rawAmount = asset && amount ? parseUnits(amount, asset.decimals) : 0n;
+    rawAmount = asset ? parseLocalizedUnits(amount, asset.decimals, locale) : 0n;
   } catch {
     rawAmount = 0n;
   }
@@ -409,12 +422,12 @@ function SolanaSendDialog({
   };
 
   return (
-    <SolanaDialog label="Send on Solana" onClose={onClose}>
+    <SolanaDialog label={t("sendOnSolana")} onClose={onClose}>
       <div className="wallet-dialog-content">
-        <span>{"// Send"}</span>
-        <h2>Send asset</h2>
+        <span>{`// ${t("send")}`}</span>
+        <h2>{t("sendAsset")}</h2>
         <label className="portal-field">
-          <span>Asset</span>
+          <span>{t("asset")}</span>
           <select
             value={assetMint}
             onChange={(event) => {
@@ -430,10 +443,10 @@ function SolanaSendDialog({
           </select>
         </label>
         <label className="portal-field">
-          <span>Recipient</span>
+          <span>{t("recipient")}</span>
           <input
             value={recipient}
-            placeholder="Solana address"
+            placeholder={t("solanaAddress")}
             onChange={(event) => {
               setRecipient(event.target.value.trim());
               setReviewing(false);
@@ -441,7 +454,7 @@ function SolanaSendDialog({
           />
         </label>
         <label className="portal-field">
-          <span>Amount</span>
+          <span>{t("amount")}</span>
           <input
             inputMode="decimal"
             value={amount}
@@ -475,7 +488,7 @@ function SolanaSendDialog({
             disabled={!wallet.runtime.configured || !wallet.runtime.ready}
             onClick={() => void wallet.runtime.createWallet()}
           >
-            Create Solana wallet
+            {t("createSolanaWallet")}
           </button>
         ) : reviewing ? (
           <button
@@ -484,7 +497,7 @@ function SolanaSendDialog({
             disabled={pending}
             onClick={() => void confirm()}
           >
-            {pending ? "Sending…" : "Confirm send"}
+            {pending ? t("sending") : t("confirmSend")}
           </button>
         ) : (
           <button
@@ -493,7 +506,7 @@ function SolanaSendDialog({
             disabled={!valid}
             onClick={() => setReviewing(true)}
           >
-            Review send
+            {t("reviewSend")}
           </button>
         )}
       </div>

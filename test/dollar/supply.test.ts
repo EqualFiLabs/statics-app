@@ -5,6 +5,7 @@ import {
   deriveWithdrawStep,
   emptyDollarSupplyState,
   hasClaimableProceeds,
+  preferredSupplyPosition,
   type DollarSupplyState,
 } from "@/lib/dollar/supply";
 
@@ -13,6 +14,18 @@ const state = (overrides: Partial<DollarSupplyState> = {}): DollarSupplyState =>
   positionId: 6n,
   riskApprovedForPeriphery: true,
   ...overrides,
+});
+
+describe("Risk supply Position selection", () => {
+  it("keeps an existing series leg, otherwise defaults to the newest owned Position", () => {
+    expect(preferredSupplyPosition(9n, [8n, 7n], "7")).toBe(9n);
+    expect(preferredSupplyPosition(null, [8n, 7n], null)).toBe(8n);
+  });
+
+  it("opens a new Position only when explicitly selected or none exists", () => {
+    expect(preferredSupplyPosition(null, [8n], "new")).toBeNull();
+    expect(preferredSupplyPosition(null, [], null)).toBeNull();
+  });
 });
 
 describe("supplying Risk Shares as redemption liquidity", () => {

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   buildDepositETHTransaction,
@@ -17,9 +18,9 @@ import {
 } from "@statics-protocol/sdk";
 import {
   encodeFunctionData,
+  formatEther,
   formatUnits,
   getAddress,
-  parseUnits,
   zeroAddress,
   type Address,
   type Hex,
@@ -43,6 +44,7 @@ import {
   hasClaimableProceeds,
   emptyDollarSupplyState,
   loadDollarSupplyState,
+  preferredSupplyPosition,
   supplyActionAvailability,
 } from "@/lib/dollar/supply";
 import {
@@ -59,6 +61,8 @@ import {
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
@@ -72,14 +76,6 @@ import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 
 const deploymentState = readClientDollarDeployment();
-
-const modeLabels: Record<DollarActionMode, string> = {
-  deposit: "Deposit",
-  recombine: "Recombine",
-  redeem: "Redeem",
-  supply: "Supply",
-  unsupply: "Withdraw",
-};
 
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
@@ -107,6 +103,7 @@ export function DollarProfilePills({
   disabled: boolean;
   onChange: (choice: DollarProfileChoice) => void;
 }) {
+  const t = useTranslations("dollar");
   const choices: readonly DollarProfileChoice[] = peggedAvailable
     ? ["ETH", "WETH", "USDG"]
     : ["ETH", "WETH"];
@@ -114,7 +111,7 @@ export function DollarProfilePills({
     <fieldset
       className={`dollar-asset-choice dollar-profile-choice${peggedAvailable ? " has-pegged" : ""}`}
     >
-      <legend>Collateral profile</legend>
+      <legend>{t("collateralProfile")}</legend>
       {choices.map((choice) => (
         <button
           key={choice}
@@ -140,6 +137,10 @@ function displayAmount(value: bigint, decimals = 18, precision = 4): string {
   const formatted = formatUnits(value, decimals);
   const [whole, fraction = ""] = formatted.split(".");
   return fraction ? `${whole}.${fraction.slice(0, precision)}`.replace(/\.$/, "") : whole;
+}
+
+function currentTimestamp(): number {
+  return Date.now();
 }
 
 function profileModeLabel(mode: number): string {
@@ -317,6 +318,7 @@ function DollarOverviewConnected({
   deployment: DollarDeployment;
   wallet: Address;
 }) {
+  const t = useTranslations("dollar");
   const snapshot = useDollarSnapshot(deployment, wallet);
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
     return (
@@ -332,7 +334,7 @@ function DollarOverviewConnected({
   return (
     <section className="dollar-overview-card" aria-labelledby="dollar-overview-title">
       <div>
-        <p className="dapp-section-label">Statics Dollar</p>
+        <p className="dapp-section-label">{t("staticsDollar")}</p>
         <h2 id="dollar-overview-title">{displayAmount(data.dollarBalance)} Dollar</h2>
         <p>
           Series {data.seriesId.toString()} · {displayAmount(data.riskBalance)} active Risk
@@ -341,10 +343,10 @@ function DollarOverviewConnected({
       <div className="dollar-overview-health">
         <span>{data.solvency.healthy ? "Healthy" : "Impaired"}</span>
         <strong>${displayAmount(data.priceWad)}</strong>
-        <small>WETH oracle</small>
+        <small>{t("wethOracle")}</small>
       </div>
       <Link className="dollar-primary-link" href="/app/dollar">
-        Open Dollar
+        {t("openDollar")}
       </Link>
     </section>
   );
@@ -368,6 +370,7 @@ function DollarOverviewConnected({
  * those assets, rather than being a count of claims buried in a tile.
  */
 function OverviewPortfolio({ wallet }: { wallet: Address }) {
+  const t = useTranslations("dollar");
   const publicClient = usePublicClient();
 
   // loadLoanCatalog loads the position catalog internally, so one read covers
@@ -419,10 +422,10 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
   if (hasNothing) {
     return (
       <EmptyState
-        title="Nothing here yet"
-        description="Buy a basket and it starts earning more of the assets it holds. Or get Statics Dollar and stake it to earn in whichever assets you choose."
-        action={{ label: "Browse baskets", href: "/app/baskets" }}
-        secondary={{ label: "Get Statics Dollar", href: "/app/dollar" }}
+        title={t("nothingHere")}
+        description={t("nothingHereDescription")}
+        action={{ label: t("browseBaskets"), href: "/app/baskets" }}
+        secondary={{ label: t("getDollar"), href: "/app/dollar" }}
       />
     );
   }
@@ -432,7 +435,7 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
       {earned.length > 0 && (
         <section className="overview-earned" aria-labelledby="overview-earned-title">
           <div>
-            <p className="dapp-section-label">Earned by your baskets</p>
+            <p className="dapp-section-label">{t("earnedByBaskets")}</p>
             <h2 id="overview-earned-title">
               {earned
                 .map(
@@ -441,10 +444,10 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
                 )
                 .join(" + ")}
             </h2>
-            <p>Paid in the assets your baskets hold. Claim it whenever you like.</p>
+            <p>{t("basketRewardDescription")}</p>
           </div>
           <Link className="dollar-primary-link" href="/app/rewards">
-            Claim
+            {t("claim")}
           </Link>
         </section>
       )}
@@ -528,6 +531,8 @@ function DollarActionPanel({
   wallet: Address;
   initialProfile: DollarProfileChoice;
 }) {
+  const t = useTranslations("dollar");
+  const locale = useAppLocale();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
   const snapshot = useDollarSnapshot(deployment, wallet);
@@ -538,16 +543,16 @@ function DollarActionPanel({
   const [peggedSelected, setPeggedSelected] = useState(initialProfile === "USDG");
   const [peggedPending, setPeggedPending] = useState(false);
   const [amountInput, setAmountInput] = useState("");
+  const [supplyPositionOverride, setSupplyPositionOverride] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const amount = useMemo(() => {
-    try {
-      return amountInput ? parseUnits(amountInput, 18) : 0n;
-    } catch {
-      return 0n;
-    }
-  }, [amountInput]);
+  let amount = 0n;
+  try {
+    amount = parseLocalizedUnits(amountInput, 18, locale);
+  } catch {
+    amount = 0n;
+  }
 
   const quote = useQuery({
     queryKey: dollarQuoteQueryKey({
@@ -574,7 +579,7 @@ function DollarActionPanel({
           mode: "deposit" as const,
           amount,
           seriesId: snapshot.data.seriesId,
-          quotedAt: Date.now(),
+          quotedAt: currentTimestamp(),
           preview,
         };
       }
@@ -592,7 +597,7 @@ function DollarActionPanel({
           mode: "redeem" as const,
           amount,
           seriesId: snapshot.data.seriesId,
-          quotedAt: Date.now(),
+          quotedAt: currentTimestamp(),
           preview,
         };
       }
@@ -606,7 +611,7 @@ function DollarActionPanel({
         mode: "recombine" as const,
         amount,
         seriesId: snapshot.data.seriesId,
-        quotedAt: Date.now(),
+        quotedAt: currentTimestamp(),
         preview,
       };
     },
@@ -721,13 +726,32 @@ function DollarActionPanel({
             data: buildApproveRiskForPeripheryCall(periphery),
           });
         } else if (actionAvailability.kind === "stake") {
+          const refreshedSupply = await supplyState.refetch();
+          if (!refreshedSupply.data) throw new Error("The current Position state is unavailable.");
+          if (
+            refreshedSupply.data.positionId === null &&
+            supplyPositionOverride !== null &&
+            supplyPositionOverride !== "new" &&
+            !refreshedSupply.data.ownedPositionIds.includes(BigInt(supplyPositionOverride))
+          ) {
+            throw new Error("The selected position is no longer owned by this wallet.");
+          }
+          const freshTargetPositionId = preferredSupplyPosition(
+            refreshedSupply.data.positionId,
+            refreshedSupply.data.ownedPositionIds,
+            supplyPositionOverride
+          );
           // Staking is supplying -- the shares are consumable the moment this
           // confirms, so there is no follow-up step.
           await recordAndSend({
             kind: "supply-risk",
-            label: supply.positionId === null ? "Create position and supply Risk" : "Supply Risk",
+            label:
+              freshTargetPositionId === null
+                ? "Create position and supply Risk"
+                : `Supply Risk in Position #${freshTargetPositionId.toString()}`,
             to: periphery,
-            data: buildStakeRiskCall(supply.positionId, state.seriesId, moves, wallet),
+            data: buildStakeRiskCall(freshTargetPositionId, state.seriesId, moves, wallet),
+            value: freshTargetPositionId === null ? refreshedSupply.data.positionCreationFee : 0n,
           });
           setAmountInput("");
         } else if (actionAvailability.kind === "unstake") {
@@ -955,6 +979,11 @@ function DollarActionPanel({
     },
   });
   const supply = supplyState.data ?? emptyDollarSupplyState;
+  const supplyTargetPositionId = preferredSupplyPosition(
+    supply.positionId,
+    supply.ownedPositionIds,
+    supplyPositionOverride
+  );
 
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
     return (
@@ -1104,7 +1133,7 @@ function DollarActionPanel({
                         }}
                         disabled={anyPending}
                       >
-                        {modeLabels[choice]}
+                        {t(choice)}
                       </button>
                     )
                   )}
@@ -1131,7 +1160,7 @@ function DollarActionPanel({
                       }}
                       disabled={anyPending || (mode === "deposit" && asset === "ETH")}
                     >
-                      {mode === "deposit" && asset === "ETH" ? "Keep gas" : "Max"}
+                      {mode === "deposit" && asset === "ETH" ? t("keepGas") : t("max")}
                     </button>
                   </div>
                   <small>
@@ -1143,7 +1172,7 @@ function DollarActionPanel({
                   </small>
                 </div>
                 <div className="dollar-quote">
-                  <span>{isSupplyMode(mode) ? "Your Risk shares" : previewLabel}</span>
+                  <span>{isSupplyMode(mode) ? t("yourRiskShares") : previewLabel}</span>
                   <strong>{supplyOutput ?? output}</strong>
                   {preview && (
                     <small>
@@ -1164,12 +1193,34 @@ function DollarActionPanel({
             </p>
           )}
           {!peggedSelected && mode === "supply" && (
-            <p className="dollar-note">
-              Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
-              shares become redeemable the moment this confirms, and you earn only where a
-              redemption actually consumes them -- nothing accrues for sitting idle. Unconsumed
-              shares stay withdrawable.
-            </p>
+            <>
+              {supply.positionId === null && (
+                <label className="basket-field">
+                  <span>Supply through</span>
+                  <select
+                    value={supplyTargetPositionId?.toString() ?? "new"}
+                    onChange={(event) => setSupplyPositionOverride(event.target.value)}
+                    disabled={anyPending}
+                  >
+                    {supply.ownedPositionIds.map((positionId) => (
+                      <option key={positionId.toString()} value={positionId.toString()}>
+                        Position #{positionId.toString()}
+                      </option>
+                    ))}
+                    <option value="new">
+                      Open new Position — {formatEther(supply.positionCreationFee)} ETH fee
+                    </option>
+                  </select>
+                  <small>Reusing a Position you own avoids the account-opening fee.</small>
+                </label>
+              )}
+              <p className="dollar-note">
+                Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
+                shares become redeemable the moment this confirms, and you earn only where a
+                redemption actually consumes them -- nothing accrues for sitting idle. Unconsumed
+                shares stay withdrawable.
+              </p>
+            </>
           )}
           {!peggedSelected && mode === "unsupply" && (
             <p className="dollar-note">
@@ -1183,7 +1234,7 @@ function DollarActionPanel({
             supply.positionId !== null && (
               <div className="dollar-claim-row">
                 <div>
-                  <span>Proceeds to claim</span>
+                  <span>{t("proceedsToClaim")}</span>
                   <strong>
                     {[
                       [supply.claimableCollateral, asset] as const,
@@ -1196,7 +1247,7 @@ function DollarActionPanel({
                   </strong>
                 </div>
                 <button type="button" disabled={anyPending} onClick={() => void claimProceeds()}>
-                  {pendingAction === "claim" ? "Waiting for confirmation…" : "Claim"}
+                  {pendingAction === "claim" ? t("waiting") : t("claim")}
                 </button>
               </div>
             )}
@@ -1235,26 +1286,26 @@ function DollarActionPanel({
 
         {peggedSelected && (
           <aside className="dollar-protocol-card">
-            <p className="dapp-section-label">USDG profile</p>
+            <p className="dapp-section-label">{t("usdgProfile")}</p>
             <dl>
               <div>
-                <dt>Profile</dt>
+                <dt>{t("profile")}</dt>
                 <dd>#{deployment.pegged?.profileId.toString()}</dd>
               </div>
               <div>
-                <dt>Collateral</dt>
+                <dt>{t("collateral")}</dt>
                 <dd>USDG</dd>
               </div>
               <div>
-                <dt>Dollar received</dt>
+                <dt>{t("dollarReceived")}</dt>
                 <dd>USDstx</dd>
               </div>
               <div>
-                <dt>Risk shares</dt>
-                <dd>None</dd>
+                <dt>{t("riskShares")}</dt>
+                <dd>{t("none")}</dd>
               </div>
               <div>
-                <dt>Gateway</dt>
+                <dt>{t("gateway")}</dt>
                 <dd title={deployment.contracts.gateway}>
                   {shortAddress(deployment.contracts.gateway)}
                 </dd>
@@ -1273,7 +1324,7 @@ function DollarActionPanel({
             </p>
             <dl>
               <div>
-                <dt>Health</dt>
+                <dt>{t("health")}</dt>
                 <dd>
                   {!state.solvency.oracleAvailable
                     ? "Oracle unavailable"
@@ -1283,39 +1334,39 @@ function DollarActionPanel({
                 </dd>
               </div>
               <div>
-                <dt>Price feed</dt>
+                <dt>{t("priceFeed")}</dt>
                 <dd>${displayAmount(state.priceWad)}</dd>
               </div>
               <div>
-                <dt>Collateral ratio</dt>
+                <dt>{t("collateralRatio")}</dt>
                 <dd>{Number(state.profile.collateralRatioBps) / 100}%</dd>
               </div>
               <div>
-                <dt>Debt</dt>
+                <dt>{t("debt")}</dt>
                 <dd>{displayAmount(state.profile.seniorOutstanding)} Dollar</dd>
               </div>
               <div>
-                <dt>Borrow limit</dt>
+                <dt>{t("borrowLimit")}</dt>
                 <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
               </div>
               <div>
-                <dt>Profile mode</dt>
+                <dt>{t("profileMode")}</dt>
                 <dd>{profileModeLabel(state.profile.mode)}</dd>
               </div>
               <div>
-                <dt>Series state</dt>
+                <dt>{t("seriesState")}</dt>
                 <dd>{seriesStatusLabel(state.series.status)}</dd>
               </div>
               <div>
-                <dt>Paused mask</dt>
+                <dt>{t("pausedMask")}</dt>
                 <dd>{state.pausedOperations.toString()}</dd>
               </div>
               <div>
-                <dt>Status</dt>
+                <dt>{t("status")}</dt>
                 <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
               </div>
               <div>
-                <dt>Gateway</dt>
+                <dt>{t("gateway")}</dt>
                 <dd title={deployment.contracts.gateway}>
                   {shortAddress(deployment.contracts.gateway)}
                 </dd>

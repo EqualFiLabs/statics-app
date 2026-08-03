@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Address } from "viem";
+import { useTranslations } from "next-intl";
 
 import type { TokenMetadata } from "@/lib/baskets/baskets";
 import { VISIBLE_REWARD_CANDIDATES, rankRewardCandidates } from "@/lib/positions/staking";
@@ -36,6 +37,7 @@ export function RewardAssetPicker({
   disabled?: boolean;
   onToggle: (asset: Address) => void;
 }>) {
+  const t = useTranslations("rewardsPicker");
   const [showAll, setShowAll] = useState(false);
 
   const ranked = rankRewardCandidates(candidates);
@@ -45,16 +47,10 @@ export function RewardAssetPicker({
   return (
     <fieldset className="reward-selector" disabled={disabled}>
       <legend>
-        What do you want to earn?{" "}
-        <small>
-          {selected.length} of {maximum.toString()} chosen
-        </small>
+        {t("question")}{" "}
+        <small>{t("chosen", { selected: selected.length, maximum: maximum.toString() })}</small>
       </legend>
-      <p className="reward-selector-note">
-        You are paid in whichever assets you pick. Each one starts earning about a day after you
-        choose it, and only from that point on — choosing an asset later does not earn you a share
-        of fees collected before then.
-      </p>
+      <p className="reward-selector-note">{t("note")}</p>
       {visible.map((candidate) => {
         const isSelected = selected.includes(candidate.token.address);
         return (
@@ -77,7 +73,7 @@ export function RewardAssetPicker({
           type="button"
           onClick={() => setShowAll((current) => !current)}
         >
-          {showAll ? "Show fewer" : `Show all ${candidates.length} assets`}
+          {showAll ? t("showFewer") : t("showAll", { count: candidates.length })}
         </button>
       )}
     </fieldset>

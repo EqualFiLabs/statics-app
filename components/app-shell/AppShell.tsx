@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
-import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
+import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
+import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -17,11 +19,12 @@ function formatAddress(address: string): string {
 function WalletHeaderControls() {
   const wallet = useWalletState();
   const [accountOpen, setAccountOpen] = useState(false);
+  const t = useTranslations("shell");
 
   if (wallet.status === "unconfigured") {
     return (
       <button className="dapp-wallet-button" type="button" disabled>
-        Wallet unavailable
+        {t("walletUnavailable")}
       </button>
     );
   }
@@ -29,7 +32,7 @@ function WalletHeaderControls() {
   if (wallet.status === "loading") {
     return (
       <button className="dapp-wallet-button" type="button" disabled>
-        Loading wallet…
+        {t("loadingWallet")}
       </button>
     );
   }
@@ -38,10 +41,10 @@ function WalletHeaderControls() {
     return (
       <div className="dapp-wallet-actions">
         <button className="dapp-wallet-link" type="button" onClick={wallet.connectWallet}>
-          Connect wallet
+          {t("connectWallet")}
         </button>
         <button className="dapp-wallet-button" type="button" onClick={wallet.login}>
-          Sign in
+          {t("signIn")}
         </button>
       </div>
     );
@@ -55,7 +58,7 @@ function WalletHeaderControls() {
         onClick={() => void wallet.createWallet()}
         disabled={wallet.busyAction !== null}
       >
-        {wallet.busyAction === "create" ? "Creating…" : "Create wallet"}
+        {wallet.busyAction === "create" ? t("creating") : t("createWallet")}
       </button>
     );
   }
@@ -63,7 +66,7 @@ function WalletHeaderControls() {
   if (wallet.status === "error") {
     return (
       <button className="dapp-wallet-button" type="button" onClick={wallet.login}>
-        Retry sign in
+        {t("retrySignIn")}
       </button>
     );
   }
@@ -76,9 +79,9 @@ function WalletHeaderControls() {
         onClick={() => setAccountOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={accountOpen}
-        title="Account details"
+        title={t("accountDetails")}
       >
-        {wallet.address ? formatAddress(wallet.address) : "Wallet ready"}
+        {wallet.address ? formatAddress(wallet.address) : t("walletReady")}
       </button>
       {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
     </div>
@@ -95,6 +98,7 @@ function WalletHeaderControls() {
  */
 function NetworkIndicator() {
   const wallet = useWalletState();
+  const t = useTranslations("shell");
 
   if (wallet.status !== "ready") {
     return (
@@ -109,7 +113,7 @@ function NetworkIndicator() {
     return (
       <div className="dapp-network is-wrong">
         <span className="dapp-network-dot" aria-hidden="true" />
-        {wallet.chainId === null ? "Network unknown" : `Chain ${wallet.chainId}`}
+        {wallet.chainId === null ? t("networkUnknown") : t("chain", { chainId: wallet.chainId })}
       </div>
     );
   }
@@ -129,14 +133,19 @@ function NetworkIndicator() {
  */
 function WrongNetworkBar() {
   const wallet = useWalletState();
+  const t = useTranslations("shell");
   if (wallet.status !== "ready" || wallet.isTargetChain) return null;
 
   return (
     <div className="dapp-network-bar" role="status">
       <p>
-        <strong>You are on the wrong network.</strong> Statics data will not load until you switch
-        to {wallet.networkName}
-        {wallet.targetChainId ? ` (chain ${wallet.targetChainId})` : ""}.
+        <strong>{t("wrongNetworkTitle")}</strong>{" "}
+        {wallet.targetChainId
+          ? t("wrongNetworkBodyWithChain", {
+              network: wallet.networkName,
+              chainId: wallet.targetChainId,
+            })
+          : t("wrongNetworkBody", { network: wallet.networkName })}
       </p>
       <button
         className="dapp-network-bar-action"
@@ -144,7 +153,7 @@ function WrongNetworkBar() {
         onClick={() => void wallet.switchNetwork()}
         disabled={wallet.busyAction !== null}
       >
-        {wallet.busyAction === "switch" ? "Switching…" : `Switch network`}
+        {wallet.busyAction === "switch" ? t("switching") : t("switchNetwork")}
       </button>
     </div>
   );
@@ -154,11 +163,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
+  const tCommon = useTranslations("common");
+  const tNavigation = useTranslations("navigation");
+  const tGroups = useTranslations("navigation.groups");
+  const tItems = useTranslations("navigation.items");
+  const tRoutes = useTranslations("routes");
+  const tShell = useTranslations("shell");
   const [openNavigationPath, setOpenNavigationPath] = useState<string | null>(null);
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
-  const routeCopy = getDappRoutePresentation(currentPath);
+  const routeId = getDappRouteId(currentPath);
+  const routeCopy = {
+    label: tRoutes(`${routeId}.label`),
+    title: tRoutes(`${routeId}.title`),
+    description: tRoutes(`${routeId}.description`),
+  };
   const showOverviewSummary = isDappOverviewPath(currentPath);
 
   const closeNavigation = (restoreFocus = true) => {
@@ -193,11 +213,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dapp-shell">
       <a className="dapp-skip-link" href="#dapp-content">
-        Skip to application content
+        {tCommon("skipToApplication")}
       </a>
 
       <header className="dapp-header">
-        <Link className="dapp-brand" href="/" aria-label="Return to Statics Protocol landing page">
+        <Link className="dapp-brand" href="/" aria-label={tNavigation("returnLanding")}>
           <Image
             src="/assets/statics-lockup.png"
             alt="Statics Protocol"
@@ -208,8 +228,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <NetworkIndicator />
         <div className="dapp-header-actions">
+          <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
           <Link className="dapp-return" href="/">
-            Site <span aria-hidden="true">↗</span>
+            {tNavigation("site")} <span aria-hidden="true">↗</span>
           </Link>
           <WalletHeaderControls />
         </div>
@@ -218,16 +239,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="dapp-layout">
         <aside
           className={`dapp-sidebar${navigationOpen ? " is-open" : ""}`}
-          aria-label="DApp navigation"
+          aria-label={tNavigation("dapp")}
         >
           <div className="dapp-nav-panel" id="dapp-navigation-panel">
             <div className="dapp-nav-panel-heading">
               <div>
                 <span>Statics DApp</span>
-                <strong>Application navigation</strong>
+                <strong>{tNavigation("application")}</strong>
               </div>
               <button type="button" onClick={() => closeNavigation()}>
-                Close ×
+                {tCommon("close")} ×
               </button>
             </div>
             {/* One <nav> per group, each labelled, so the grouping is structure
@@ -236,9 +257,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <nav
                 key={group.label ?? "home"}
                 className="dapp-nav-group"
-                aria-label={group.label ?? "Overview"}
+                aria-label={group.messageKey ? tGroups(group.messageKey) : tGroups("overview")}
               >
-                {group.label && <p className="dapp-nav-label">{group.label}</p>}
+                {group.messageKey && <p className="dapp-nav-label">{tGroups(group.messageKey)}</p>}
                 {group.items.map((item, itemIndex) => {
                   const active =
                     item.href === currentPath ||
@@ -253,20 +274,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       aria-current={active ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
-                      {item.label}
+                      {tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                      {item.label}
-                      <small>Planned</small>
+                      {tItems(item.messageKey)}
+                      <small>{tCommon("planned")}</small>
                     </span>
                   );
                 })}
               </nav>
             ))}
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
-              Return to site <span aria-hidden="true">↗</span>
+              {tNavigation("returnSite")} <span aria-hidden="true">↗</span>
             </Link>
+            <LocaleSwitcher className="locale-switcher locale-switcher--dapp-mobile" />
           </div>
         </aside>
 
@@ -275,7 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {showOverviewSummary && (
             <section className="dapp-intro">
-              <p className="dapp-eyebrow">Statics application</p>
+              <p className="dapp-eyebrow">{tShell("application")}</p>
               <h1>{routeCopy.title}</h1>
               <p>{routeCopy.description}</p>
             </section>
@@ -291,7 +313,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <nav className="dapp-tabbar" aria-label="Primary">
+      <nav className="dapp-tabbar" aria-label={tShell("primary")}>
         {appTabNavigation.map((item) => {
           const active =
             item.href === currentPath ||
@@ -303,7 +325,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={active ? "page" : undefined}
             >
-              {item.tabLabel}
+              {tItems(item.messageKey)}
             </Link>
           );
         })}
@@ -311,7 +333,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ref={navigationToggleRef}
           className="dapp-tab dapp-nav-toggle"
           type="button"
-          aria-label={`Application menu. Current route: ${routeCopy.label}`}
+          aria-label={tNavigation("mobileMenu", { route: routeCopy.label })}
           aria-expanded={navigationOpen}
           aria-controls="dapp-navigation-panel"
           onClick={navigationOpen ? () => closeNavigation() : openNavigation}

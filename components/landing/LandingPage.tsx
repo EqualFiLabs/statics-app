@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-
-import { protocolStatus } from "@/lib/site-config";
+import { getTranslations } from "next-intl/server";
 
 import { PlaceholderLink } from "./PlaceholderLink";
 import { SiteHeader } from "./SiteHeader";
@@ -18,11 +17,17 @@ function Corners() {
   );
 }
 
-export function LandingPage() {
+export async function LandingPage() {
+  const [t, tCommon, tNavigation] = await Promise.all([
+    getTranslations("landing"),
+    getTranslations("common"),
+    getTranslations("navigation"),
+  ]);
+
   return (
     <div id="top" className="landing-page">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {tCommon("skipToContent")}
       </a>
 
       <SiteHeader />
@@ -33,41 +38,37 @@ export function LandingPage() {
 
           <div className="hero-copy">
             <p className="eyebrow">
-              <span aria-hidden="true">&gt;</span> The anchor is fixed. The market is not.
+              <span aria-hidden="true">&gt;</span> {t("eyebrow")}
             </p>
             <h1 id="hero-title">
-              <span>Static assets.</span>
-              <span>Static rules.</span>
-              <span>Dynamic markets.</span>
+              <span>{t("heroLine1")}</span>
+              <span>{t("heroLine2")}</span>
+              <span>{t("heroLine3")}</span>
             </h1>
-            <p className="hero-description">
-              Every basket is a fixed bundle, always redeemable for exactly what is inside it. No
-              manager, no rebalancing, no liquidations. Markets move around that anchor — Statics
-              pays the people who hold it steady.
-            </p>
+            <p className="hero-description">{t("heroDescription")}</p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/app">
-                Launch app <span aria-hidden="true">→</span>
+                {tNavigation("launchApp")} <span aria-hidden="true">→</span>
               </Link>
               <a className="button button-ghost" href="#protocol-glance">
-                What&apos;s fixed{" "}
+                {t("whatsFixed")}{" "}
                 <span className="doc-icon" aria-hidden="true">
                   ↓
                 </span>
               </a>
             </div>
-            <div className="build-notes" aria-label="Protocol foundations">
-              <span>Fixed bundles</span>
-              <span>In-kind redemption</span>
-              <span>Open source</span>
+            <div className="build-notes" aria-label={t("foundations")}>
+              <span>{t("fixedBundles")}</span>
+              <span>{t("inKindRedemption")}</span>
+              <span>{t("openSource")}</span>
             </div>
           </div>
 
-          <div className="hero-visual" aria-label="Digital marble statue of Robin Hood">
+          <div className="hero-visual" aria-label={t("heroVisual")}>
             <Image
               className="hero-figure"
               src="/assets/robin-hood-hero.png"
-              alt="A fragmented digital marble statue of Robin Hood wearing a feathered cap and goatee"
+              alt={t("heroAlt")}
               width={1024}
               height={1536}
               priority
@@ -82,29 +83,29 @@ export function LandingPage() {
               height={717}
               priority
             />
-            <div className="system-readout" aria-label="System status">
+            <div className="system-readout" aria-label={t("systemStatus")}>
               <p>
-                <span>&gt;</span> System status: <strong>{protocolStatus.system}</strong>
+                <span>&gt;</span> {t("systemStatus")}: <strong>{t("status.system")}</strong>
               </p>
               <p>
-                <span>&gt;</span> Network: {protocolStatus.network}
+                <span>&gt;</span> {t("network")}: {t("status.network")}
               </p>
               <p>
-                <span>&gt;</span> Deployment: {protocolStatus.deployment}
+                <span>&gt;</span> {t("deployment")}: {t("status.deployment")}
               </p>
               <p>
-                <span>&gt;</span> Time: <UtcClock suffix />
+                <span>&gt;</span> {t("time")}: <UtcClock suffix />
               </p>
             </div>
             <p className="version">
-              Statics protocol
+              {t("protocol")}
               <br />
-              Public testnet beta
+              {t("publicBeta")}
             </p>
           </div>
         </section>
 
-        <section className="economy-grid" aria-label="Protocol economies">
+        <section className="economy-grid" aria-label={t("economies")}>
           <article id="baskets" className="panel economy-card">
             <div className="panel-heading">
               <div className="heading-group">
@@ -114,28 +115,21 @@ export function LandingPage() {
                     <path d="m7 13 17 10 17-10M24 23v22M15 18l18 10v9l-9 5-9-5V18Z" />
                   </svg>
                 </span>
-                <h2>Statics baskets</h2>
+                <h2>{t("basketsTitle")}</h2>
               </div>
-              <a
-                className="arrow-link"
-                href="#protocol-glance"
-                aria-label="How Statics baskets work"
-              >
+              <a className="arrow-link" href="#protocol-glance" aria-label={t("basketsHow")}>
                 →
               </a>
             </div>
-            <p>
-              A fixed bundle of 1–16 assets, held as a single token. Redeem it any time for exactly
-              what is inside — the same amounts, forever. No manager, no rebalancing, no discretion.
-            </p>
-            <ul className="token-list" aria-label="Supported asset examples">
-              <li title="Ether">◆</li>
-              <li title="Bitcoin">₿</li>
-              <li title="Dollar assets">＄</li>
-              <li title="Stable assets">◒</li>
-              <li title="Additional assets">◉</li>
-              <li title="Governed assets">⬡</li>
-              <li className="more">+ More</li>
+            <p>{t("basketsDescription")}</p>
+            <ul className="token-list" aria-label={t("assetExamples")}>
+              <li title={t("ether")}>◆</li>
+              <li title={t("bitcoin")}>₿</li>
+              <li title={t("dollarAssets")}>＄</li>
+              <li title={t("stableAssets")}>◒</li>
+              <li title={t("additionalAssets")}>◉</li>
+              <li title={t("governedAssets")}>⬡</li>
+              <li className="more">{t("more")}</li>
             </ul>
           </article>
 
@@ -145,36 +139,29 @@ export function LandingPage() {
                 <span className="line-icon coin-icon" aria-hidden="true">
                   $
                 </span>
-                <h2>Statics dollar</h2>
+                <h2>{t("dollarTitle")}</h2>
               </div>
-              <a
-                className="arrow-link"
-                href="#protocol-glance"
-                aria-label="How the Statics dollar works"
-              >
+              <a className="arrow-link" href="#protocol-glance" aria-label={t("dollarHow")}>
                 →
               </a>
             </div>
-            <p>
-              A dollar backed by collateral anyone can verify on-chain. Risk shares take losses
-              first, so the dollar stays whole.
-            </p>
-            <ul className="dollar-modes" aria-label="Statics dollar capabilities">
+            <p>{t("dollarDescription")}</p>
+            <ul className="dollar-modes" aria-label={t("dollarCapabilities")}>
               <li>
                 <strong>USDstx</strong>
-                <span>Dollar</span>
+                <span>{t("dollar")}</span>
               </li>
               <li>
                 <strong>ethLEV</strong>
-                <span>Shares</span>
+                <span>{t("shares")}</span>
               </li>
               <li>
-                <strong>Redeem</strong>
-                <span>When healthy</span>
+                <strong>{t("redeem")}</strong>
+                <span>{t("whenHealthy")}</span>
               </li>
               <li>
-                <strong>Permit</strong>
-                <span>One signature</span>
+                <strong>{t("permit")}</strong>
+                <span>{t("oneSignature")}</span>
               </li>
             </ul>
           </article>
@@ -183,38 +170,38 @@ export function LandingPage() {
         <section id="protocol-glance" className="stats-panel frame" aria-labelledby="glance-title">
           <Corners />
           <h2 id="glance-title">
-            <span aria-hidden="true">{"///"}</span> What&apos;s fixed
+            <span aria-hidden="true">{"///"}</span> {t("whatsFixed")}
           </h2>
           <dl className="stat-grid">
             <div>
-              <dt>Assets per basket</dt>
+              <dt>{t("assetsPerBasket")}</dt>
               <dd>1–16</dd>
-              <dd className="stat-note">Chosen once, at creation</dd>
+              <dd className="stat-note">{t("chosenOnce")}</dd>
             </div>
             <div>
-              <dt>Redemption</dt>
-              <dd>In kind</dd>
-              <dd className="stat-note">Exactly what is inside</dd>
+              <dt>{t("redemption")}</dt>
+              <dd>{t("inKind")}</dd>
+              <dd className="stat-note">{t("exactlyInside")}</dd>
             </div>
             <div>
-              <dt>Rebalancing</dt>
-              <dd>Never</dd>
-              <dd className="stat-note">Weights never change</dd>
+              <dt>{t("rebalancing")}</dt>
+              <dd>{t("never")}</dd>
+              <dd className="stat-note">{t("weightsNeverChange")}</dd>
             </div>
             <div>
-              <dt>Liquidations</dt>
-              <dd>None</dd>
-              <dd className="stat-note">Debt matches collateral</dd>
+              <dt>{t("liquidations")}</dt>
+              <dd>{t("none")}</dd>
+              <dd className="stat-note">{t("debtMatches")}</dd>
             </div>
             <div>
-              <dt>Reward assets</dt>
-              <dd>Up to 64</dd>
-              <dd className="stat-note">Per staked position</dd>
+              <dt>{t("rewardAssets")}</dt>
+              <dd>{t("upTo64")}</dd>
+              <dd className="stat-note">{t("perPosition")}</dd>
             </div>
           </dl>
         </section>
 
-        <section id="liquidity" className="features panel" aria-label="Protocol features">
+        <section id="liquidity" className="features panel" aria-label={t("features")}>
           <article>
             <span className="line-icon" aria-hidden="true">
               <svg viewBox="0 0 48 48">
@@ -222,11 +209,8 @@ export function LandingPage() {
                 <path d="M20 28h8v8h-8zM24 28v-4" />
               </svg>
             </span>
-            <h2>Own your position</h2>
-            <p>
-              Baskets, loans, and dollar series live in one position you can hold, transfer, or sell
-              as a single asset.
-            </p>
+            <h2>{t("ownPosition")}</h2>
+            <p>{t("ownPositionDescription")}</p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -235,11 +219,8 @@ export function LandingPage() {
                 <path d="m7 22 17 9 17-9M7 31l17 9 17-9" />
               </svg>
             </span>
-            <h2>No liquidations</h2>
-            <p>
-              Debt is denominated in the same assets as the collateral, so a price crash moves both
-              sides together. There is nothing to liquidate.
-            </p>
+            <h2>{t("noLiquidations")}</h2>
+            <p>{t("noLiquidationsDescription")}</p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -248,11 +229,8 @@ export function LandingPage() {
                 <path d="M24 2v12M24 34v12M2 24h12M34 24h12M20 20h8v8h-8z" />
               </svg>
             </span>
-            <h2>Liquidity that deepens</h2>
-            <p>
-              A share of every swap becomes permanent protocol-owned liquidity. Pools get deeper the
-              more they trade, and that depth cannot be withdrawn.
-            </p>
+            <h2>{t("deepLiquidity")}</h2>
+            <p>{t("deepLiquidityDescription")}</p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -261,11 +239,8 @@ export function LandingPage() {
                 <circle cx="37" cy="9" r="5" />
               </svg>
             </span>
-            <h2>Stake and earn</h2>
-            <p>
-              Stake and opt into up to 64 reward assets. Rewards are swap fees paid in kind — real
-              revenue, not emissions.
-            </p>
+            <h2>{t("stakeEarn")}</h2>
+            <p>{t("stakeEarnDescription")}</p>
           </article>
         </section>
 
@@ -277,30 +252,31 @@ export function LandingPage() {
               width={1259}
               height={304}
             />
-            <p id="launch-title">Fixed assets. Fixed rules. Everything else is free to move.</p>
+            <p id="launch-title">{t("tagline")}</p>
           </div>
-          <div className="terminal" aria-label="Protocol principles" tabIndex={0}>
+          <div className="terminal" aria-label={t("principles")} tabIndex={0}>
             <p>
-              <UtcClock /> <span>&gt;</span> The bundle never changes
+              <UtcClock /> <span>&gt;</span> {t("bundleNeverChanges")}
             </p>
             <p>
-              <UtcClock /> <span>&gt;</span> Redeem for exactly what is inside
+              <UtcClock /> <span>&gt;</span> {t("redeemExactly")}
             </p>
             <p>
-              <UtcClock /> <span>&gt;</span> No KYC <i>|</i> No permission <i>|</i> No middlemen
+              <UtcClock /> <span>&gt;</span> {t("noKyc")} <i>|</i> {t("noPermission")} <i>|</i>{" "}
+              {t("noMiddlemen")}
             </p>
             <p>
-              <UtcClock /> <span>&gt;</span> Static assets <i>|</i> Dynamic markets
+              <UtcClock /> <span>&gt;</span> {t("staticAssets")} <i>|</i> {t("dynamicMarkets")}
             </p>
           </div>
           <dl className="deployment-status">
             <div>
-              <dt>Audit status</dt>
-              <dd>{protocolStatus.audit}</dd>
+              <dt>{t("auditStatus")}</dt>
+              <dd>{t("status.audit")}</dd>
             </div>
             <div>
-              <dt>Deployment</dt>
-              <dd>{protocolStatus.deployment}</dd>
+              <dt>{t("deployment")}</dt>
+              <dd>{t("status.deployment")}</dd>
             </div>
           </dl>
         </section>
@@ -308,14 +284,14 @@ export function LandingPage() {
 
       <footer className="site-footer">
         <p>© {new Date().getUTCFullYear()} Statics Protocol</p>
-        <nav aria-label="Project links">
-          {["Docs", "GitHub", "Discord", "X / Twitter"].map((label) => (
-            <PlaceholderLink key={label} label={label} />
+        <nav aria-label={t("projectLinks")}>
+          {(["docs", "github", "discord", "twitter"] as const).map((key) => (
+            <PlaceholderLink key={key} label={t(key)} />
           ))}
         </nav>
-        <nav aria-label="Legal links">
-          {["Terms", "Privacy", "Security"].map((label) => (
-            <PlaceholderLink key={label} label={label} />
+        <nav aria-label={t("legalLinks")}>
+          {(["terms", "privacy", "security"] as const).map((key) => (
+            <PlaceholderLink key={key} label={t(key)} />
           ))}
         </nav>
       </footer>

@@ -63,6 +63,7 @@ describe("PositionNFT catalog discovery", () => {
         if (functionName === "stakingToken") return Promise.resolve(weth);
         if (functionName === "totalStaked") return Promise.resolve(0n);
         if (functionName === "maxRewardAssetsPerPosition") return Promise.resolve(64n);
+        if (functionName === "positionCreationFee") return Promise.resolve(123n);
         if (functionName === "balanceOf" || functionName === "allowance") {
           return Promise.resolve(0n);
         }
@@ -82,6 +83,7 @@ describe("PositionNFT catalog discovery", () => {
     expect(catalog.currentBlock).toBe(50n);
     expect(catalog.currentTimestamp).toBe(1_000n);
     expect(catalog.maximumRewardAssets).toBe(64n);
+    expect(catalog.positionCreationFee).toBe(123n);
     expect(catalog.positions[0]?.selectedRewardAssets).toEqual([]);
     expect(catalog.positions[0]?.rewards).toEqual([
       expect.objectContaining({

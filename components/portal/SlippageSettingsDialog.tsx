@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   MAX_PORTAL_SLIPPAGE_PERCENT,
@@ -17,15 +18,16 @@ import {
  * would look for it before entering an amount.
  */
 export function SlippageInlineControl({ value, onEdit }: { value: number; onEdit: () => void }) {
+  const t = useTranslations("portal");
   return (
     <div className="portal-slippage-inline">
       <button
         className="portal-quote-edit"
         type="button"
-        aria-label={`Edit slippage, currently ${value}%`}
+        aria-label={t("editSlippage", { value })}
         onClick={onEdit}
       >
-        <span>Slippage {value}%</span>
+        <span>{t("slippageValue", { value })}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z" />
         </svg>
@@ -51,6 +53,7 @@ export function SlippageSettingsDialog({
   onApply: (percent: number) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("portal");
   const [custom, setCustom] = useState(String(value));
   const parsed = parseSlippagePercent(custom);
 
@@ -80,15 +83,13 @@ export function SlippageSettingsDialog({
           className="wallet-dialog-close"
           type="button"
           onClick={onClose}
-          aria-label="Close slippage settings"
+          aria-label={t("closeSlippage")}
         >
           ×
         </button>
         <div className="wallet-dialog-content">
-          <h2 id="portal-slippage-title">Slippage</h2>
-          <p className="portal-slippage-help">
-            The most the price may move against you before the trade is cancelled.
-          </p>
+          <h2 id="portal-slippage-title">{t("slippage")}</h2>
+          <p className="portal-slippage-help">{t("slippageHelp")}</p>
 
           <div className="portal-slippage-presets">
             {PORTAL_SLIPPAGE_PRESETS.map((preset) => (
@@ -104,12 +105,12 @@ export function SlippageSettingsDialog({
           </div>
 
           <label className="portal-field">
-            <span>Custom</span>
+            <span>{t("custom")}</span>
             <div className="portal-slippage-custom">
               <input
                 inputMode="decimal"
                 value={custom}
-                aria-label="Custom slippage percent"
+                aria-label={t("customSlippage")}
                 aria-invalid={parsed === null}
                 onChange={(event) => setCustom(event.target.value.replace(/[^\d.]/g, ""))}
               />
@@ -119,20 +120,22 @@ export function SlippageSettingsDialog({
 
           {parsed === null ? (
             <p className="portal-error" role="alert">
-              Enter a value between {MIN_PORTAL_SLIPPAGE_PERCENT}% and {MAX_PORTAL_SLIPPAGE_PERCENT}
-              %.
+              {t("slippageRange", {
+                minimum: MIN_PORTAL_SLIPPAGE_PERCENT,
+                maximum: MAX_PORTAL_SLIPPAGE_PERCENT,
+              })}
             </p>
           ) : (
             parsed > 2 && (
               <p className="portal-slippage-warning" role="status">
-                A high tolerance can fill at a noticeably worse price.
+                {t("highSlippage")}
               </p>
             )
           )}
 
           <div className="portal-slippage-actions">
             <button type="button" onClick={onClose}>
-              Cancel
+              {t("cancel")}
             </button>
             <button
               type="button"
@@ -140,7 +143,7 @@ export function SlippageSettingsDialog({
               disabled={parsed === null}
               onClick={() => parsed !== null && apply(parsed)}
             >
-              Apply
+              {t("apply")}
             </button>
           </div>
         </div>

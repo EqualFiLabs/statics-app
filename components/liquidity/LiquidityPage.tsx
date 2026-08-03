@@ -9,7 +9,6 @@ import {
   formatUnits,
   getAddress,
   parseEventLogs,
-  parseUnits,
   type Address,
   type Hex,
   type TransactionReceipt,
@@ -54,6 +53,8 @@ import {
   operatorApprovalAbi,
 } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
+import { useAppLocale } from "@/i18n/client";
+import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
 const deploymentState = readClientDollarDeployment();
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
@@ -98,6 +99,7 @@ export function LiquidityPage() {
 }
 
 function LiquidityRuntime() {
+  const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -156,7 +158,8 @@ function LiquidityRuntime() {
     if (!tokens) return false;
     try {
       return (
-        parseUnits(amount0, tokens[0].decimals) > 0n && parseUnits(amount1, tokens[1].decimals) > 0n
+        parseLocalizedUnits(amount0, tokens[0].decimals, locale) > 0n &&
+        parseLocalizedUnits(amount1, tokens[1].decimals, locale) > 0n
       );
     } catch {
       return false;
@@ -220,8 +223,8 @@ function LiquidityRuntime() {
     if (selectedPool.status !== 2 || selectedPool.decommissioned || !selectedPool.managerSynced)
       throw new Error("The pool must be active, available, and manager-synced.");
     const maximums = [
-      parseUnits(amount0, tokens[0].decimals),
-      parseUnits(amount1, tokens[1].decimals),
+      parseLocalizedUnits(amount0, tokens[0].decimals, locale),
+      parseLocalizedUnits(amount1, tokens[1].decimals, locale),
     ] as const;
     const [lower, upper] = canonicalFullRange(selectedPool.key.tickSpacing);
     const liquidity =
@@ -644,8 +647,8 @@ function LiquidityRuntime() {
       if (pool.status !== 2 || pool.decommissioned || !pool.managerSynced)
         throw new Error("The pool is not available for an increase.");
       const maximums = [
-        parseUnits(amount0, tokens[0].decimals),
-        parseUnits(amount1, tokens[1].decimals),
+        parseLocalizedUnits(amount0, tokens[0].decimals, locale),
+        parseLocalizedUnits(amount1, tokens[1].decimals, locale),
       ] as const;
       const [lower, upper] = canonicalFullRange(pool.key.tickSpacing);
       const delta =

@@ -1,8 +1,8 @@
 export type AppEnvironment = "development" | "staging" | "production";
 
 export type SiteNavigationItem =
-  | { label: string; kind: "anchor" | "route"; href: string }
-  | { label: string; kind: "placeholder" };
+  | { label: string; messageKey: string; kind: "anchor" | "route"; href: string }
+  | { label: string; messageKey: string; kind: "placeholder" };
 
 function parseAppEnvironment(value: string | undefined): AppEnvironment {
   if (!value) return "development";
@@ -52,12 +52,12 @@ export function readPublicEnvironment(
 }
 
 export const primaryNavigation: readonly SiteNavigationItem[] = [
-  { label: "Protocol", kind: "anchor", href: "#protocol" },
-  { label: "Baskets", kind: "anchor", href: "#baskets" },
-  { label: "Dollar", kind: "anchor", href: "#dollar" },
-  { label: "Liquidity", kind: "anchor", href: "#liquidity" },
-  { label: "Docs", kind: "placeholder" },
-  { label: "Dev", kind: "placeholder" },
+  { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
+  { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
+  { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
+  { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
+  { label: "Docs", messageKey: "docs", kind: "placeholder" },
+  { label: "Dev", messageKey: "dev", kind: "placeholder" },
 ] as const;
 
 export const protocolStatus = {
@@ -69,6 +69,7 @@ export const protocolStatus = {
 
 export type AppNavigationItem = Readonly<{
   label: string;
+  messageKey: string;
   enabled: boolean;
   href: string;
   /**
@@ -85,6 +86,7 @@ export type AppNavigationItem = Readonly<{
 export type AppNavigationGroup = Readonly<{
   /** Null for the first group, which needs no heading above the home link. */
   label: string | null;
+  messageKey: string | null;
   items: readonly AppNavigationItem[];
 }>;
 
@@ -102,36 +104,65 @@ export type AppNavigationGroup = Readonly<{
 export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: null,
-    items: [{ label: "Overview", enabled: true, href: "/app" }],
+    messageKey: null,
+    items: [{ label: "Overview", messageKey: "overview", enabled: true, href: "/app" }],
   },
   {
     label: "Earn",
+    messageKey: "earn",
     items: [
-      { label: "Earn", enabled: true, href: "/app/rewards", tabLabel: "Earn" },
-      { label: "Liquidity", enabled: true, href: "/app/liquidity" },
+      {
+        label: "Earn",
+        messageKey: "earn",
+        enabled: true,
+        href: "/app/rewards",
+        tabLabel: "Earn",
+      },
+      { label: "Liquidity", messageKey: "liquidity", enabled: true, href: "/app/liquidity" },
     ],
   },
   {
     label: "Assets",
+    messageKey: "assets",
     items: [
-      { label: "Baskets", enabled: true, href: "/app/baskets", tabLabel: "Baskets" },
-      { label: "Dollar", enabled: true, href: "/app/dollar", tabLabel: "Dollar" },
+      {
+        label: "Baskets",
+        messageKey: "baskets",
+        enabled: true,
+        href: "/app/baskets",
+        tabLabel: "Baskets",
+      },
+      {
+        label: "Dollar",
+        messageKey: "dollar",
+        enabled: true,
+        href: "/app/dollar",
+        tabLabel: "Dollar",
+      },
     ],
   },
   {
     label: "Manage",
+    messageKey: "manage",
     items: [
-      { label: "Positions", enabled: true, href: "/app/positions" },
-      { label: "Loans", enabled: true, href: "/app/loans" },
+      { label: "Positions", messageKey: "positions", enabled: true, href: "/app/positions" },
+      { label: "Loans", messageKey: "loans", enabled: true, href: "/app/loans" },
     ],
   },
   {
     label: "Account",
+    messageKey: "account",
     items: [
-      { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
-      { label: "Faucet", enabled: true, href: "/app/faucet" },
-      { label: "Activity", enabled: true, href: "/app/activity" },
-      { label: "Tools", enabled: true, href: "/app/tools" },
+      {
+        label: "Wallet",
+        messageKey: "wallet",
+        enabled: true,
+        href: "/app/wallet",
+        tabLabel: "Wallet",
+      },
+      { label: "Faucet", messageKey: "faucet", enabled: true, href: "/app/faucet" },
+      { label: "Activity", messageKey: "activity", enabled: true, href: "/app/activity" },
+      { label: "Tools", messageKey: "tools", enabled: true, href: "/app/tools" },
     ],
   },
 ];

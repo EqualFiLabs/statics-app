@@ -1,14 +1,23 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@/test/render";
+import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/app-shell/AppShell";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
+import english from "@/messages/en.json";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/app",
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 function renderWithWallet(ui: React.ReactNode, overrides: Partial<WalletState> = {}) {
   return render(
-    <WalletContext.Provider value={{ ...defaultWalletState, ...overrides }}>
-      {ui}
-    </WalletContext.Provider>
+    <NextIntlClientProvider locale="en" messages={english}>
+      <WalletContext.Provider value={{ ...defaultWalletState, ...overrides }}>
+        {ui}
+      </WalletContext.Provider>
+    </NextIntlClientProvider>
   );
 }
 
@@ -95,7 +104,7 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText("Solana")).toBeInTheDocument();
     expect(screen.getByText(address)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Ethereum address" })).toBeInTheDocument();
-    expect(within(dialog).getByText("embedded")).toBeInTheDocument();
+    expect(within(dialog).getByText("Embedded wallet")).toBeInTheDocument();
     expect(within(dialog).getByText("Anvil")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /view ethereum account/i })).toHaveAttribute(
       "rel",

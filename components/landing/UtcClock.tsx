@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale } from "next-intl";
 
-function utcTime(date: Date) {
-  return new Intl.DateTimeFormat("en-GB", {
+function utcTime(date: Date, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: "UTC",
     hour: "2-digit",
     minute: "2-digit",
@@ -14,6 +15,7 @@ function utcTime(date: Date) {
 
 export function UtcClock({ suffix = false }: { suffix?: boolean }) {
   const [now, setNow] = useState<Date | null>(null);
+  const locale = useLocale();
 
   useEffect(() => {
     const initial = window.setTimeout(() => setNow(new Date()), 0);
@@ -24,7 +26,7 @@ export function UtcClock({ suffix = false }: { suffix?: boolean }) {
     };
   }, []);
 
-  const value = now ? utcTime(now) : "--:--:--";
+  const value = now ? utcTime(now, locale) : "--:--:--";
   return (
     <time dateTime={now?.toISOString()} suppressHydrationWarning>
       {value}

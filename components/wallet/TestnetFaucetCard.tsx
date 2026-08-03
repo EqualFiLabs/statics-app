@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   createPublicClient,
   createWalletClient,
@@ -58,6 +59,8 @@ export function faucetWalletTokens(assets: readonly FaucetAsset[]): WalletToken[
 }
 
 export function TestnetFaucetCard() {
+  const t = useTranslations("faucet");
+  const format = useFormatter();
   const wallet = useWalletState();
   const deployment = deploymentState.status === "configured" ? deploymentState.deployment : null;
   const faucet = deployment?.faucet;
@@ -253,32 +256,32 @@ export function TestnetFaucetCard() {
     addTokens(faucetWalletTokens(snapshot.assets));
   };
   const claimLabel = !wallet.address
-    ? "Sign in to claim"
+    ? t("signIn")
     : !onFundingChain
-      ? "Switch to Robinhood testnet"
+      ? t("switchNetwork")
       : pending
-        ? "Claiming…"
-        : "Claim testnet assets";
+        ? t("claiming")
+        : t("claimAssets");
 
   return (
     <section className="testnet-faucet" aria-labelledby="testnet-faucet-title">
       <div>
-        <p className="dapp-section-label">Robinhood testnet</p>
-        <h2 id="testnet-faucet-title">Testnet asset faucet</h2>
-        <p>Claim the USDG, STATICS, and stock-token fixtures needed to exercise the beta.</p>
+        <p className="dapp-section-label">{t("network")}</p>
+        <h2 id="testnet-faucet-title">{t("title")}</h2>
+        <p>{t("description")}</p>
         <p className="testnet-faucet-help">
-          Need more testnet ETH or stock tokens?{" "}
+          {t("needMore")}{" "}
           <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noreferrer">
-            Open the Robinhood Chain faucet ↗
+            {t("openExternal")} ↗
           </a>
         </p>
       </div>
       {!faucet ? (
-        <p className="dollar-action-reason">Faucet deployment has not been recorded yet.</p>
+        <p className="dollar-action-reason">{t("notRecorded")}</p>
       ) : !wallet.address ? (
-        <p>Sign in to read the Statics faucet inventory.</p>
+        <p>{t("signInInventory")}</p>
       ) : !onFundingChain ? (
-        <p>Switch to Robinhood Chain Testnet to read the faucet inventory.</p>
+        <p>{t("switchInventory")}</p>
       ) : snapshot ? (
         <ul>
           {snapshot.assets.map((asset) => (
@@ -289,16 +292,21 @@ export function TestnetFaucetCard() {
           ))}
         </ul>
       ) : (
-        <p>{loading ? "Reading faucet inventory…" : "Connect to read faucet inventory."}</p>
+        <p>{loading ? t("reading") : t("connectInventory")}</p>
       )}
       {coolingDown && snapshot && (
         <p className="dollar-action-reason">
-          Next claim after {new Date(Number(snapshot.nextClaimAt) * 1_000).toLocaleString()}.
+          {t("nextClaim", {
+            time: format.dateTime(new Date(Number(snapshot.nextClaimAt) * 1_000), {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }),
+          })}
         </p>
       )}
       {underfunded && (
         <p className="dapp-inline-error" role="alert">
-          The faucet needs a complete refill before another claim.
+          {t("refill")}
         </p>
       )}
       {error && (
@@ -323,9 +331,7 @@ export function TestnetFaucetCard() {
           onClick={addAllFaucetTokens}
           disabled={!snapshot || missingFaucetTokens.length === 0}
         >
-          {snapshot && missingFaucetTokens.length === 0
-            ? "Faucet tokens added"
-            : "Add all to Wallet"}
+          {snapshot && missingFaucetTokens.length === 0 ? t("tokensAdded") : t("addAll")}
         </button>
       </div>
     </section>

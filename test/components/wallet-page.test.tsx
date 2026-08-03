@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WalletPage } from "@/components/wallet/WalletPage";
