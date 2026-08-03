@@ -7,12 +7,12 @@ import { decodeFunctionResult, encodeFunctionData, formatUnits, getAddress } fro
 import { usePublicClient, useWalletClient } from "wagmi";
 
 import {
-  CanonicalPoolStatus,
   basketTokenAbi,
   buildQuoteV4ExactInputSingleCall,
   buildV4ExactInputSingleSwap,
   permit2AllowanceAbi,
   staticsAbi,
+  staticsSwapFeeHookAbi,
   v4QuoterAbi,
 } from "@statics-protocol/sdk";
 
@@ -90,12 +90,26 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       }
       await verifyDollarDeployment(publicClient, deploymentState.deployment);
       await verifyLiquidityDeployment(publicClient, deploymentState.deployment);
-      return publicClient.readContract({
+      const configured = await publicClient.readContract({
         address: deploymentState.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "canonicalPool",
         args: [basket.basketId, constituent.token.address],
       });
+      const liquidity = deploymentState.deployment.liquidity;
+      if (
+        !liquidity ||
+        getAddress(configured.hook) !== getAddress(liquidity.contracts.swapFeeHook)
+      ) {
+        throw new Error("Canonical pool is bound to an unexpected hook.");
+      }
+      const decommissioned = await publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "poolDecommissioned",
+        args: [configured.poolId],
+      });
+      return { ...configured, decommissioned };
     },
   });
 
@@ -111,7 +125,8 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       Boolean(publicClient) &&
       deploymentState.status === "configured" &&
       Boolean(deploymentState.deployment.liquidity?.contracts.quoter) &&
-      pool.data?.status === CanonicalPoolStatus.Active &&
+      Boolean(pool.data) &&
+      !pool.data?.decommissioned &&
       amount > 0n,
     queryFn: async () => {
       if (
@@ -383,7 +398,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
     }
   };
 
-  const poolActive = pool.data?.status === CanonicalPoolStatus.Active;
+  const poolAvailable = Boolean(pool.data) && !pool.data?.decommissioned;
   const readError = pool.error ?? quote.error;
   let label = t("reviewSwap");
   let action: (() => void) | null = () => void submit();
@@ -399,8 +414,8 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   } else if (walletState.status !== "ready") {
     label = t("walletLoading");
     action = null;
-  } else if (!poolActive) {
-    label = pool.isPending ? t("readingPool") : t("poolWarming");
+  } else if (!poolAvailable) {
+    label = pool.isPending ? t("readingPool") : t("poolUnavailable");
   } else if (permit2Approval.isFetching) {
     label = t("readingAllowance");
   } else if ((permit2Approval.data ?? 0n) < amount) {
@@ -504,7 +519,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           </small>
         )}
       </div>
-      {!poolActive && !pool.isPending && (
+      {!poolAvailable && !pool.isPending && (
         <p className="dollar-action-reason">{t("poolInactive")}</p>
       )}
       {readError && (
@@ -526,7 +541,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           action === null ||
           (walletState.status === "ready" &&
             walletState.isTargetChain &&
-            (!poolActive ||
+            (!poolAvailable ||
               permit2Approval.isFetching ||
               quote.isFetching ||
               !currentQuote ||

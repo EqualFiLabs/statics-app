@@ -44,8 +44,10 @@ export type PositionReward = Readonly<{
 export type PositionRecord = Readonly<{
   positionId: bigint;
   owner: Address;
+  stateNonce: bigint;
   activeLegCount: bigint;
-  initializing: boolean;
+  unresolvedObligationCount: bigint;
+  closable: boolean;
   collateral: readonly PositionCollateral[];
   stakedBalance: bigint;
   claimAssetCount: bigint;
@@ -111,17 +113,17 @@ async function readOwnedPosition(
     .catch(() => null);
   if (!owner || getAddress(owner) !== wallet) return null;
 
-  const [activeLegCount, initializing, stake, selectedRewardAssets] = await Promise.all([
+  const [state, closable, stake, selectedRewardAssets] = await Promise.all([
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
-      functionName: "activeLegCount",
+      functionName: "positionState",
       args: [positionId],
     }),
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
-      functionName: "positionInitializing",
+      functionName: "isPositionClosable",
       args: [positionId],
     }),
     publicClient.readContract({
@@ -139,6 +141,7 @@ async function readOwnedPosition(
       args: [positionId],
     }),
   ]);
+  if (!state.exists) return null;
 
   const rewardAssets = [
     ...new Set([...selectedRewardAssets, ...knownRewardAssets].map((asset) => getAddress(asset))),
@@ -176,8 +179,10 @@ async function readOwnedPosition(
   return {
     positionId,
     owner: wallet,
-    activeLegCount,
-    initializing,
+    stateNonce: state.stateNonce,
+    activeLegCount: state.activeLegCount,
+    unresolvedObligationCount: state.unresolvedObligationCount,
+    closable,
     collateral: collateral.filter((item): item is PositionCollateral => item !== null),
     stakedBalance: stake.stakedBalance,
     claimAssetCount: stake.claimAssetCount,
@@ -387,7 +392,12 @@ const positionErrorMessages: Readonly<Record<string, string>> = {
   PositionCreationFeeTransferFailed:
     "The protocol could not forward the Position account fee to treasury.",
   PositionHasActiveLegs: "Remove every active position leg before closing this PositionNFT.",
+  PositionHasUnresolvedObligations:
+    "Resolve every outstanding position obligation before closing this PositionNFT.",
   NotPositionOwnerOrApproved: "This wallet is not authorized to manage the PositionNFT.",
+  InvalidModuleAuthority: "The protocol module reporting this position state is not authorized.",
+  InvalidModuleType: "The protocol module reported an invalid position leg type.",
+  NoUnresolvedPositionObligation: "This position has no unresolved obligation to clear.",
   ERC721NonexistentToken: "This PositionNFT no longer exists.",
   PositionSharesLocked: "Loan-locked basket collateral cannot be removed.",
   PositionDepositTooRecent: "Basket collateral becomes withdrawable in the next block.",
@@ -443,8 +453,6 @@ export function unlockedCollateral(collateral: PositionCollateral): bigint {
   return collateral.depositedShares - collateral.lockedShares;
 }
 
-export function canClosePosition(
-  position: Pick<PositionRecord, "activeLegCount" | "initializing">
-) {
-  return !position.initializing && position.activeLegCount === 0n;
+export function canClosePosition(position: Pick<PositionRecord, "closable">) {
+  return position.closable;
 }

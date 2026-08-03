@@ -12,9 +12,9 @@ import type { WalletNft } from "@/lib/wallet/nfts";
  * The artwork in the corner of an NFT card.
  *
  * Resolves per card rather than in the list query, so a slow gateway or a
- * collection with no metadata delays nothing else. Statics positions return an
- * empty tokenURI, which means the placeholder is the ordinary outcome here --
- * so it is a typed mark rather than a broken-image frame.
+ * collection with no metadata delays nothing else. Statics PositionNFTs expose
+ * self-contained artwork, while the placeholder remains the ordinary fallback
+ * for collections that do not.
  */
 export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }) {
   const publicClient = usePublicClient({ chainId });

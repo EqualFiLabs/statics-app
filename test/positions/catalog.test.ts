@@ -49,8 +49,15 @@ describe("PositionNFT catalog discovery", () => {
           if (args[0] === 2n) return Promise.resolve(otherWallet);
           return Promise.reject(new Error("burned"));
         }
-        if (functionName === "activeLegCount") return Promise.resolve(0n);
-        if (functionName === "positionInitializing") return Promise.resolve(false);
+        if (functionName === "positionState") {
+          return Promise.resolve({
+            exists: true,
+            stateNonce: 3n,
+            activeLegCount: 0n,
+            unresolvedObligationCount: 0n,
+          });
+        }
+        if (functionName === "isPositionClosable") return Promise.resolve(true);
         if (functionName === "stakePosition") {
           return Promise.resolve({
             stakedBalance: 0n,
@@ -85,6 +92,8 @@ describe("PositionNFT catalog discovery", () => {
     expect(catalog.maximumRewardAssets).toBe(64n);
     expect(catalog.positionCreationFee).toBe(123n);
     expect(catalog.positions[0]?.selectedRewardAssets).toEqual([]);
+    expect(catalog.positions[0]?.stateNonce).toBe(3n);
+    expect(catalog.positions[0]?.closable).toBe(true);
     expect(catalog.positions[0]?.rewards).toEqual([
       expect.objectContaining({
         pending: 5n,

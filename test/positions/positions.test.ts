@@ -83,20 +83,24 @@ describe("position action guards", () => {
     );
   });
 
-  it("computes unlocked collateral and blocks close while any leg is active", () => {
+  it("computes unlocked collateral and follows authoritative closability", () => {
     const collateral = {
       depositedShares: 15n,
       lockedShares: 4n,
     } as PositionCollateral;
     expect(unlockedCollateral(collateral)).toBe(11n);
-    expect(canClosePosition({ activeLegCount: 0n, initializing: false })).toBe(true);
-    expect(canClosePosition({ activeLegCount: 1n, initializing: false })).toBe(false);
-    expect(canClosePosition({ activeLegCount: 0n, initializing: true })).toBe(false);
+    expect(canClosePosition({ closable: true })).toBe(true);
+    expect(canClosePosition({ closable: false })).toBe(false);
   });
 
   it("keeps protocol error names in actionable messages", () => {
     expect(describePositionError(new Error("execution reverted: PositionHasActiveLegs"))).toBe(
       "Remove every active position leg before closing this PositionNFT. (PositionHasActiveLegs)"
+    );
+    expect(
+      describePositionError(new Error("execution reverted: PositionHasUnresolvedObligations"))
+    ).toBe(
+      "Resolve every outstanding position obligation before closing this PositionNFT. (PositionHasUnresolvedObligations)"
     );
     expect(describePositionError(new Error("User denied transaction signature"))).toBe(
       "The wallet request was rejected."

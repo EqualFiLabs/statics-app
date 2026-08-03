@@ -35,7 +35,7 @@ import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canonicalFullRange,
-  canonicalStatusLabel,
+  canonicalPoolLabel,
   liquidityActivationWait,
   liquidityPositionActions,
   loadLiquidityCatalog,
@@ -65,8 +65,8 @@ export function lpStakeEligibility(
 ): string | null {
   if (!pool || position.poolId !== pool.poolId)
     return "Select the pool for this liquidity position.";
-  if (pool.status !== 2 || pool.decommissioned || !pool.managerSynced)
-    return "The pool must be active, available, and manager-synced.";
+  if (pool.decommissioned || !pool.managerSynced)
+    return "The pool must be live and manager-synced.";
   const [lower, upper] = canonicalFullRange(pool.key.tickSpacing);
   if (position.hasSubscriber) return "Subscribed liquidity positions cannot be staked.";
   if (position.tickLower !== lower || position.tickUpper !== upper)
@@ -220,8 +220,8 @@ function LiquidityRuntime() {
       !deploymentState.deployment.liquidity
     )
       return;
-    if (selectedPool.status !== 2 || selectedPool.decommissioned || !selectedPool.managerSynced)
-      throw new Error("The pool must be active, available, and manager-synced.");
+    if (selectedPool.decommissioned || !selectedPool.managerSynced)
+      throw new Error("The pool must be live and manager-synced.");
     const maximums = [
       parseLocalizedUnits(amount0, tokens[0].decimals, locale),
       parseLocalizedUnits(amount1, tokens[1].decimals, locale),
@@ -644,7 +644,7 @@ function LiquidityRuntime() {
       if (!pool || !tokens) throw new Error("Select the pool for this liquidity position.");
       if (position.poolId !== pool.poolId)
         throw new Error("The selected liquidity position does not belong to the selected pool.");
-      if (pool.status !== 2 || pool.decommissioned || !pool.managerSynced)
+      if (pool.decommissioned || !pool.managerSynced)
         throw new Error("The pool is not available for an increase.");
       const maximums = [
         parseLocalizedUnits(amount0, tokens[0].decimals, locale),
@@ -854,8 +854,8 @@ function LiquidityRuntime() {
     resolvedMode === "create"
       ? !pool
         ? "Select a canonical pool."
-        : pool.status !== 2 || pool.decommissioned || !pool.managerSynced
-          ? "The selected pool is not active and synced."
+        : pool.decommissioned || !pool.managerSynced
+          ? "The selected pool is not live and synced."
           : !amountInputsReady
             ? "Enter a positive maximum amount for both tokens."
             : null
@@ -943,13 +943,8 @@ function LiquidityRuntime() {
                   setError(null);
                 }}
               >
-                <span
-                  className={`remaining-status is-${canonicalStatusLabel(
-                    item.status,
-                    item.decommissioned
-                  )}`}
-                >
-                  {canonicalStatusLabel(item.status, item.decommissioned)}
+                <span className={`remaining-status is-${canonicalPoolLabel(item.decommissioned)}`}>
+                  {canonicalPoolLabel(item.decommissioned)}
                 </span>
                 <h4>
                   {item.basketSymbol} / {item.asset.symbol}
@@ -970,8 +965,8 @@ function LiquidityRuntime() {
                     </dd>
                   </div>
                   <div>
-                    <dt>Observation</dt>
-                    <dd>{item.observationCardinality} observations</dd>
+                    <dt>Lifecycle</dt>
+                    <dd>{item.decommissioned ? "Exit only" : "Live from creation"}</dd>
                   </div>
                   <div>
                     <dt>Manager</dt>

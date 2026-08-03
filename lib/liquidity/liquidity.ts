@@ -12,7 +12,6 @@ import {
 
 import {
   BasketStatus,
-  CanonicalPoolStatus,
   decodePositionInfo,
   staticsAbi,
   staticsLiquidityManagerAbi,
@@ -45,12 +44,6 @@ export type CanonicalPoolRecord = Readonly<{
   basketToken: TokenMetadata;
   poolId: Hex;
   key: V4PoolKey;
-  status: number;
-  initializedAt: number;
-  activatedAt: number;
-  referenceTick: number;
-  spotTick: number;
-  observationCardinality: number;
   decommissioned: boolean;
   managerSynced: boolean;
   sqrtPriceX96: bigint;
@@ -107,19 +100,9 @@ export function borrowedLiquidityReadiness(
   if (!basket || pools.length !== basket.constituents.length) {
     return "Every basket underlying needs a canonical pool.";
   }
-  const unavailable = pools.some((pool) => {
-    const deviation = pool.spotTick - pool.referenceTick;
-    return (
-      pool.status !== CanonicalPoolStatus.Active ||
-      pool.decommissioned ||
-      !pool.managerSynced ||
-      pool.observationCardinality < 2 ||
-      deviation < -100 ||
-      deviation > 99
-    );
-  });
+  const unavailable = pools.some((pool) => pool.decommissioned || !pool.managerSynced);
   if (unavailable) {
-    return "Every canonical pool must be active, observed, synced, and within its price bound.";
+    return "Every canonical pool must be live and synced to the liquidity manager.";
   }
   const invalidInput = pools.some((pool) => {
     const input = rawLiquidity[pool.poolId] ?? "";
@@ -294,12 +277,6 @@ async function loadPool(
     basketToken: basket.token,
     poolId: configured.poolId,
     key,
-    status: configured.status,
-    initializedAt: configured.initializedAt,
-    activatedAt: configured.activatedAt,
-    referenceTick: configured.referenceTick,
-    spotTick: configured.spotTick,
-    observationCardinality: configured.observationCardinality,
     decommissioned,
     managerSynced: managerHash === configured.poolId,
     sqrtPriceX96: slot0[0],
@@ -468,9 +445,6 @@ export async function loadLiquidityCatalog(
   };
 }
 
-export function canonicalStatusLabel(status: number, decommissioned = false): string {
-  if (decommissioned) return "exit-only";
-  if (status === CanonicalPoolStatus.Active) return "active";
-  if (status === CanonicalPoolStatus.Warming) return "warmup";
-  return "unconfigured";
+export function canonicalPoolLabel(decommissioned: boolean): "active" | "exit-only" {
+  return decommissioned ? "exit-only" : "active";
 }

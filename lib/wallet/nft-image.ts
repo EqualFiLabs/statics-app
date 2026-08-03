@@ -5,10 +5,9 @@ import { parseAbi, type Address, type PublicClient } from "viem";
 /**
  * Resolves the artwork for an NFT, when it has any.
  *
- * Statics positions return an empty tokenURI, so for them the placeholder is
- * the ordinary case rather than a failure. That shapes everything here: no step
- * throws, every failure resolves to null, and the caller renders a deliberate
- * placeholder rather than a broken image.
+ * Statics positions return self-contained onchain JSON and SVG metadata. Other
+ * collections can still omit metadata or depend on an unavailable gateway, so
+ * no resolution step throws and callers retain a deliberate placeholder.
  *
  * Metadata can arrive three ways and all three are common:
  *   data:  -- encoded inline, typical of fully onchain collections
@@ -74,7 +73,7 @@ export async function resolveNftImage(
     return null;
   }
 
-  // Statics positions return this, so it is the common path and must be cheap.
+  // Missing metadata is valid for arbitrary user-added collections.
   if (!uri || !uri.trim()) return null;
 
   if (uri.startsWith("data:")) return imageFromMetadata(decodeDataUri(uri));

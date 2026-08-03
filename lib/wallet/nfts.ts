@@ -49,8 +49,8 @@ export type WalletNft = Readonly<{
   blockedReason: string | null;
 }>;
 
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`;
+function plural(count: number | bigint, one: string, many = `${one}s`): string {
+  return `${count.toString()} ${count === 1 || count === 1n ? one : many}`;
 }
 
 /**
@@ -68,6 +68,9 @@ export function describePositionNft(position: PositionRecord, diamond: Address):
   if (position.stakedBalance > 0n) carries.push("staked Statics");
   const claimable = position.rewards.filter((reward) => reward.pending > 0n).length;
   if (claimable > 0) carries.push(`${plural(claimable, "unclaimed reward")}`);
+  if (position.unresolvedObligationCount > 0n) {
+    carries.push(plural(position.unresolvedObligationCount, "unresolved obligation"));
+  }
 
   return {
     kind: "position",
@@ -76,12 +79,12 @@ export function describePositionNft(position: PositionRecord, diamond: Address):
     name: `Position #${position.positionId.toString()}`,
     summary:
       position.activeLegCount > 0n
-        ? `${plural(Number(position.activeLegCount), "active leg")}`
-        : "Empty position",
+        ? `${plural(position.activeLegCount, "active leg")}`
+        : position.unresolvedObligationCount > 0n
+          ? `${plural(position.unresolvedObligationCount, "unresolved obligation")}`
+          : "Empty position",
     carries,
-    blockedReason: position.initializing
-      ? "This position is still being created. It can be moved once that finishes."
-      : null,
+    blockedReason: null,
   };
 }
 
