@@ -468,30 +468,6 @@
   align-items: center;
 }
 
-/* Account plumbing lives here on desktop so the sidebar keeps only places you
- * go to do something. */
-.dapp-header-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--control-height-sm);
-  padding: 0 0.75rem;
-  border-radius: var(--radius-md);
-  color: var(--app-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.dapp-header-link:hover {
-  background: var(--app-raised);
-  color: var(--app-text);
-}
-
-.dapp-header-link.active {
-  background: var(--accent-wash);
-  color: var(--accent);
-  font-weight: 600;
-}
-
 .dapp-return {
   display: inline-flex;
   align-items: center;
@@ -676,14 +652,6 @@
  * without it the labels read as decoration rather than structure. */
 .dapp-nav-group + .dapp-nav-group {
   margin-top: 1.5rem;
-}
-
-.dapp-nav-item.is-secondary {
-  display: none;
-}
-
-.dapp-nav-group.is-detail-only {
-  display: none;
 }
 
 .dapp-nav-item {
@@ -998,6 +966,258 @@
   cursor: not-allowed;
 }
 
+/* Holdings tabs. Activity links out to its own route rather than being
+ * duplicated inside this page. */
+.wallet-tabs {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.wallet-tabs-list {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.wallet-tabs button {
+  min-height: var(--control-height);
+  padding: 0 0.875rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.wallet-tabs-activity {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 0.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.wallet-tabs-activity:hover {
+  color: var(--app-text);
+}
+
+/* Added collections and the way to add more. Statics NFTs need no chip: they
+ * are always listed, so only user-added collections are removable here. */
+.wallet-nft-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.wallet-nft-collections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.wallet-nft-chip {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.25rem 0.5rem 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.wallet-nft-chip button {
+  border: 0;
+  background: none;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wallet-nft-chip button:hover {
+  color: var(--negative);
+}
+
+.wallet-nft-add {
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-nft-add:hover {
+  background: var(--app-raised);
+}
+
+.wallet-add-nft-note {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* One column by default, three where there is room. Declared mobile-first so
+ * the stacked case needs no rule and cannot be overridden by anything later.
+ *
+ * Rows are equal height so a card carrying a transfer warning does not tower
+ * over one that carries nothing. Cards differ a lot in how much they have to
+ * say, and a ragged grid reads as broken rather than as varied. */
+.wallet-nft-rows {
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 0.625rem;
+}
+
+/* A card rather than a row, so the same shape works at a third of the width
+ * and at full width. Send sits at the foot, aligned across cards of uneven
+ * height. */
+.wallet-nft-row {
+  display: flex;
+  /* Floor for the sparsest card -- an entry with only a name and a summary
+   * still occupies a card rather than a strip. */
+  min-height: 150px;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+
+/* Artwork sits top-right of the card. Statics positions carry no tokenURI, so
+ * the placeholder is the ordinary state and reads as a typed mark rather than
+ * as a failed image. */
+.wallet-nft-top {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  /* Absorbs the card's spare height so the button below lands on the bottom
+   * edge, level across every card in the row. */
+  flex: 1;
+}
+
+.wallet-nft-art {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--app-raised);
+}
+
+.wallet-nft-art.is-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-text-muted);
+}
+
+.wallet-nft-detail {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+  /* Takes the slack so Send lands on the card's bottom edge regardless of how
+   * much the entry has to say. */
+  flex: 1;
+}
+
+.wallet-nft-detail strong {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.wallet-nft-detail span {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* What leaves with the token. Warning-toned because transferring a position
+ * hands over its collateral, staking and rewards, and that is not obvious. */
+.wallet-nft-carries {
+  margin: 0.375rem 0 0;
+  color: var(--warning);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.wallet-nft-blocked {
+  margin: 0.375rem 0 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.wallet-nft-send {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  /* Belt and braces with the flex above: pinned to the foot whatever the card
+   * has to say above it. */
+  margin-top: auto;
+  min-height: var(--control-height-sm);
+  padding: 0 0.875rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-nft-send:hover:not(:disabled) {
+  background: var(--app-raised);
+}
+
+.wallet-nft-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wallet-nft-transfer {
+  display: grid;
+  gap: 1rem;
+}
+
+.wallet-nft-transfer-warning {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
 .wallet-balance-hero {
   display: grid;
   gap: 0.5rem;
@@ -1025,23 +1245,28 @@
   line-height: 1;
 }
 
+/* Three stacked cards rather than a divided strip, matching the market app's
+ * wallet so the two read as one product. */
 .wallet-quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--app-border);
-  border-bottom: 1px solid var(--app-border);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.625rem;
+  padding: 1.25rem 0 0;
 }
 
 .wallet-quick-actions button {
-  min-height: 76px;
+  display: flex;
+  min-height: 72px;
+  flex-direction: column;
+  gap: 0.375rem;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-right: 1px solid var(--app-border);
-  background: transparent;
-  border-radius: var(--radius-md);
-}
-
-.wallet-quick-actions button:last-child {
-  border-right: 0;
+  border-radius: var(--radius-lg);
+  background: var(--app-raised);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .wallet-quick-actions button:hover,
@@ -1231,12 +1456,12 @@
 
 .portal-asset-field > div {
   display: grid;
+  gap: 0.6rem;
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .portal-asset-field input {
   min-width: 0;
-  border-right: 0;
   font-size: var(--text-lg);
 }
 
@@ -2039,6 +2264,30 @@
   grid-column: 1 / -1;
   color: var(--app-text-muted);
   overflow-wrap: anywhere;
+}
+
+/* No explorer for this chain, so the hash is a copy control rather than a
+ * link. Sized and coloured like the link it replaces so the row does not
+ * change shape depending on which chain the activity happened on. */
+.activity-hash.is-copy {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.activity-hash.is-copy span {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.activity-hash.is-copy:hover span {
+  color: var(--accent);
 }
 
 .activity-hash {
@@ -3527,6 +3776,170 @@
   border-radius: 0;
 }
 
+/* Mode tabs and the settings gear share a row, so the gear stays reachable
+ * whichever panel is open rather than being repeated inside each one. */
+.portal-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.portal-header .portal-mode-tabs {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.portal-settings-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  margin-right: 0.35rem;
+  color: var(--app-text-muted);
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.portal-settings-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.portal-settings-button:hover {
+  color: var(--app-text);
+  border-color: var(--app-border-strong);
+  background: var(--app-raised);
+}
+
+.portal-slippage-dialog {
+  width: min(400px, 100%);
+}
+
+.portal-slippage-help {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.portal-slippage-presets button {
+  height: var(--control-height);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-raised);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.portal-slippage-presets button[aria-pressed="true"] {
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.portal-slippage-custom {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.portal-slippage-custom input {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-slippage-custom span {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-warning {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+
+.portal-slippage-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.portal-slippage-actions button {
+  min-width: 96px;
+  height: var(--control-height);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-raised);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* Sits on the field's own label row, right-aligned. Deliberately unboxed: it
+ * is a readout you can edit, not another control competing with the amount. */
+.portal-asset-field-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.portal-slippage-inline {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+}
+
+.portal-quote-edit {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.portal-quote-edit:hover {
+  color: var(--app-text);
+}
+
+.portal-quote-edit svg {
+  width: 13px;
+  height: 13px;
+  color: var(--app-text-muted);
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.portal-quote-edit:hover svg {
+  color: var(--app-text);
+}
+
 /* ===================================================================
  * RESPONSIVE OVERRIDES
  *
@@ -3675,19 +4088,9 @@
 
   /* The mobile header cannot hold these, and this panel is a full-height
    * sheet, so the sidebar is where they belong at this width. */
-  .dapp-nav-item.is-secondary {
-    display: flex;
-  }
-
-  .dapp-nav-group.is-detail-only {
-    display: block;
-  }
 
   /* The panel already lists these at this width, and the mobile header has to
    * hold the brand, the network state and the wallet control. */
-  .dapp-header-link {
-    display: none;
-  }
 
   .dapp-tabbar {
     position: fixed;
@@ -3843,6 +4246,10 @@
 }
 
 @media (min-width: 901px) {
+  .wallet-nft-rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .rewards-page .position-panel.is-wide .reward-position-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

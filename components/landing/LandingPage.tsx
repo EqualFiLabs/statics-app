@@ -33,33 +33,33 @@ export function LandingPage() {
 
           <div className="hero-copy">
             <p className="eyebrow">
-              <span aria-hidden="true">&gt;</span> One protocol. Two economies. Zero compromise.
+              <span aria-hidden="true">&gt;</span> The anchor is fixed. The market is not.
             </p>
             <h1 id="hero-title">
               <span>Static assets.</span>
               <span>Static rules.</span>
               <span>Dynamic markets.</span>
-              <span>Own your position.</span>
             </h1>
             <p className="hero-description">
-              Statics unifies static multi-asset baskets, position-owned finance, and protocol-owned
-              liquidity with a native dollar.
+              Every basket is a fixed bundle, always redeemable for exactly what is inside it. No
+              manager, no rebalancing, no liquidations. Markets move around that anchor — Statics
+              pays the people who hold it steady.
             </p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/app">
-                Launch dapp <span aria-hidden="true">→</span>
+                Launch app <span aria-hidden="true">→</span>
               </Link>
-              <span className="button button-ghost placeholder-link" aria-disabled="true">
-                Read docs{" "}
+              <a className="button button-ghost" href="#protocol-glance">
+                What&apos;s fixed{" "}
                 <span className="doc-icon" aria-hidden="true">
-                  ▣
+                  ↓
                 </span>
-              </span>
+              </a>
             </div>
             <div className="build-notes" aria-label="Protocol foundations">
-              <span>Built on Uniswap v4</span>
-              <span>EIP-2535 Diamond</span>
-              <span>Timelocked governance</span>
+              <span>Fixed bundles</span>
+              <span>In-kind redemption</span>
+              <span>Open source</span>
             </div>
           </div>
 
@@ -119,14 +119,14 @@ export function LandingPage() {
               <a
                 className="arrow-link"
                 href="#protocol-glance"
-                aria-label="Explore Statics baskets"
+                aria-label="How Statics baskets work"
               >
                 →
               </a>
             </div>
             <p>
-              Permissionless static baskets of 1–16 assets. Tiered fees. Indexed rewards.
-              Position-owned loans. Canonical Uniswap v4 liquidity.
+              A fixed bundle of 1–16 assets, held as a single token. Redeem it any time for exactly
+              what is inside — the same amounts, forever. No manager, no rebalancing, no discretion.
             </p>
             <ul className="token-list" aria-label="Supported asset examples">
               <li title="Ether">◆</li>
@@ -150,14 +150,14 @@ export function LandingPage() {
               <a
                 className="arrow-link"
                 href="#protocol-glance"
-                aria-label="Explore the Statics dollar"
+                aria-label="How the Statics dollar works"
               >
                 →
               </a>
             </div>
             <p>
-              A native dollar issued by overcollateralized profiles. Volatile with risk shares or
-              pegged collateral wrappers.
+              A dollar backed by collateral anyone can verify on-chain. Risk shares take losses
+              first, so the dollar stays whole.
             </p>
             <ul className="dollar-modes" aria-label="Statics dollar capabilities">
               <li>
@@ -169,8 +169,8 @@ export function LandingPage() {
                 <span>Shares</span>
               </li>
               <li>
-                <strong>Pegged</strong>
-                <span>Profiles</span>
+                <strong>Redeem</strong>
+                <span>Any time</span>
               </li>
               <li>
                 <strong>Stake</strong>
@@ -183,33 +183,33 @@ export function LandingPage() {
         <section id="protocol-glance" className="stats-panel frame" aria-labelledby="glance-title">
           <Corners />
           <h2 id="glance-title">
-            <span aria-hidden="true">{"///"}</span> Protocol at a glance
+            <span aria-hidden="true">{"///"}</span> What&apos;s fixed
           </h2>
           <dl className="stat-grid">
             <div>
-              <dt>Total value locked</dt>
-              <dd className="unavailable-value">—</dd>
-              <dd className="stat-note">Pre-launch</dd>
+              <dt>Assets per basket</dt>
+              <dd>1–16</dd>
+              <dd className="stat-note">Chosen once, at creation</dd>
             </div>
             <div>
-              <dt>Baskets created</dt>
-              <dd className="unavailable-value">—</dd>
-              <dd className="stat-note">Pre-launch</dd>
+              <dt>Redemption</dt>
+              <dd>In kind</dd>
+              <dd className="stat-note">Exactly what is inside</dd>
             </div>
             <div>
-              <dt>Dollar supply</dt>
-              <dd className="unavailable-value">—</dd>
-              <dd className="stat-note">Pre-launch</dd>
+              <dt>Rebalancing</dt>
+              <dd>Never</dd>
+              <dd className="stat-note">Weights never change</dd>
             </div>
             <div>
-              <dt>Active positions</dt>
-              <dd className="unavailable-value">—</dd>
-              <dd className="stat-note">Pre-launch</dd>
+              <dt>Liquidations</dt>
+              <dd>None</dd>
+              <dd className="stat-note">Debt matches collateral</dd>
             </div>
             <div>
-              <dt>Pools deployed</dt>
-              <dd className="unavailable-value">—</dd>
-              <dd className="stat-note">Pre-launch</dd>
+              <dt>Reward assets</dt>
+              <dd>Up to 64</dd>
+              <dd className="stat-note">Per staked position</dd>
             </div>
           </dl>
         </section>
@@ -222,9 +222,10 @@ export function LandingPage() {
                 <path d="M20 28h8v8h-8zM24 28v-4" />
               </svg>
             </span>
-            <h2>Position ownership</h2>
+            <h2>Own your position</h2>
             <p>
-              Your PositionNFT holds baskets, loans, and dollar series in one transferable asset.
+              Baskets, loans, and dollar series live in one position you can hold, transfer, or sell
+              as a single asset.
             </p>
           </article>
           <article>
@@ -234,8 +235,11 @@ export function LandingPage() {
                 <path d="m7 22 17 9 17-9M7 31l17 9 17-9" />
               </svg>
             </span>
-            <h2>Isolated accounting</h2>
-            <p>Separate solvency domains. Measured custody. Explicit reservations.</p>
+            <h2>No liquidations</h2>
+            <p>
+              Debt is denominated in the same assets as the collateral, so a price crash moves both
+              sides together. There is nothing to liquidate.
+            </p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -244,8 +248,11 @@ export function LandingPage() {
                 <path d="M24 2v12M24 34v12M2 24h12M34 24h12M20 20h8v8h-8z" />
               </svg>
             </span>
-            <h2>Market native</h2>
-            <p>Built for Uniswap v4. Protocol-owned liquidity compounds for the protocol.</p>
+            <h2>Liquidity that deepens</h2>
+            <p>
+              A share of every swap becomes permanent protocol-owned liquidity. Pools get deeper the
+              more they trade, and that depth cannot be withdrawn.
+            </p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -254,9 +261,10 @@ export function LandingPage() {
                 <circle cx="37" cy="9" r="5" />
               </svg>
             </span>
-            <h2>Cypherpunk infra</h2>
+            <h2>Stake and earn</h2>
             <p>
-              Open source. Timelocked upgrades. Permissionless maintenance. No centralized admins.
+              Stake and opt into up to 64 reward assets. Rewards are swap fees paid in kind — real
+              revenue, not emissions.
             </p>
           </article>
         </section>
@@ -269,22 +277,20 @@ export function LandingPage() {
               width={1259}
               height={304}
             />
-            <p id="launch-title">
-              Infrastructure for static assets, position-owned finance, and a native dollar.
-            </p>
+            <p id="launch-title">Fixed assets. Fixed rules. Everything else is free to move.</p>
           </div>
           <div className="terminal" aria-label="Protocol principles" tabIndex={0}>
             <p>
-              <UtcClock /> <span>&gt;</span> DApp integration follows the foundation phase
+              <UtcClock /> <span>&gt;</span> The bundle never changes
+            </p>
+            <p>
+              <UtcClock /> <span>&gt;</span> Redeem for exactly what is inside
             </p>
             <p>
               <UtcClock /> <span>&gt;</span> No KYC <i>|</i> No permission <i>|</i> No middlemen
             </p>
             <p>
-              <UtcClock /> <span>&gt;</span> Code is law <i>|</i> Numbers don&apos;t lie
-            </p>
-            <p>
-              <UtcClock /> <span>&gt;</span> Own your position
+              <UtcClock /> <span>&gt;</span> Static assets <i>|</i> Dynamic markets
             </p>
           </div>
           <dl className="deployment-status">

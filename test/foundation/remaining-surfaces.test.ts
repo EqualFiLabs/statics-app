@@ -43,8 +43,8 @@ describe("remaining DApp preview fixtures", () => {
 
     expect(validatePreviewBasketDraft(invalidDraft)).toEqual(
       expect.arrayContaining([
-        "Constituent addresses must be unique.",
-        "Every constituent requires a positive bundle amount.",
+        "Underlying addresses must be unique.",
+        "Every underlying requires a positive bundle amount.",
         "Loan duration must be positive.",
         "LTV cannot exceed 95%.",
       ])

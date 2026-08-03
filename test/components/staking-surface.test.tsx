@@ -104,7 +104,7 @@ describe("stake maturity", () => {
 describe("reward asset picker", () => {
   const many = Array.from({ length: 12 }, (_, index) => ({
     token: token(`TK${index}`, `${index}`),
-    sources: ["MAJ constituent"],
+    sources: ["MAJ underlying"],
   }));
 
   it("asks what you want to earn rather than labelling a field", () => {
@@ -133,7 +133,7 @@ describe("reward asset picker", () => {
     const candidates = [
       ...Array.from({ length: 8 }, (_, index) => ({
         token: token(`FILL${index}`, `a${index}`),
-        sources: ["MAJ constituent"],
+        sources: ["MAJ underlying"],
       })),
       { token: wbtc, sources: ["Fee history"] },
     ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Connection } from "@solana/web3.js";
 import { getAddress, isAddress } from "viem";
 
@@ -10,6 +10,7 @@ import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   readProtocolActivityAcrossChains,
+  readActivityChainIds,
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
@@ -84,6 +85,49 @@ function evmExplorerUrl(chainId: number, hash: string): string | null {
   if (known) return known;
   const explorer = getFundingNetwork(chainId)?.chain.blockExplorers?.default.url;
   return explorer ? `${explorer}/tx/${hash}` : null;
+}
+
+/**
+ * A transaction hash with no explorer behind it.
+ *
+ * Chains without a block explorer -- local Anvil above all -- have nothing to
+ * link to, so the hash rendered as inert text and there was no way to get at
+ * it: the full value only existed in a tooltip. Copying is the thing anyone
+ * actually wants with a hash they cannot open.
+ */
+function CopyableReference({
+  reference,
+  label,
+}: {
+  reference: string;
+  // Derived from the reference, so non-null whenever this renders, but the
+  // compiler cannot see the two are tied together.
+  label: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      className="activity-hash is-copy"
+      type="button"
+      // Content reads as "0x1111…1111Copy", which is not a usable name. The
+      // label states the action and the full hash instead.
+      aria-label={`Copy transaction ${reference}`}
+      title={reference}
+      onClick={() => {
+        void navigator.clipboard?.writeText(reference).then(
+          () => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          },
+          () => undefined
+        );
+      }}
+    >
+      <code>{label}</code>
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
+  );
 }
 
 function protocolItem(activity: ProtocolActivity): UnifiedActivity {
@@ -172,7 +216,12 @@ export function ActivityPage() {
   const protocolActivity = useSyncExternalStore(
     subscribeProtocolActivity,
     () =>
-      evmAddress ? readProtocolActivityAcrossChains(evmAddress, chainIds) : emptyProtocolActivity,
+      evmAddress
+        ? readProtocolActivityAcrossChains(evmAddress, [
+            ...chainIds,
+            ...readActivityChainIds(evmAddress),
+          ])
+        : emptyProtocolActivity,
     () => emptyProtocolActivity
   );
   const allBridgeActivity = useSyncExternalStore(
@@ -259,7 +308,10 @@ export function ActivityPage() {
   // "have you done anything yet".
   const activityState = deriveSurfaceState({
     walletStatus: wallet.status,
-    isTargetChain: wallet.isTargetChain,
+    // Not network-scoped. Every row already names the chain it happened on, and
+    // the point of this page is seeing a bridge that started somewhere else --
+    // gating it on the connected network hides exactly what it exists to show.
+    isTargetChain: true,
     isLoading: false,
     isError: false,
     isEmpty: activity.length === 0,
@@ -326,7 +378,7 @@ function ActivityItem({ activity }: { activity: UnifiedActivity }) {
             {referenceLabel} ↗
           </a>
         ) : (
-          <code title={activity.reference}>{referenceLabel}</code>
+          <CopyableReference reference={activity.reference} label={referenceLabel} />
         ))}
       {activity.originalReference && (
         <p>

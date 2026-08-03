@@ -97,7 +97,7 @@ describe("Dollar activity page", () => {
     expect(screen.getByText(/Original transaction 0x11111111/)).toBeInTheDocument();
   });
 
-  it("keeps local Anvil hashes inert", () => {
+  it("offers a local Anvil hash for copying rather than linking it", () => {
     writeDollarActivity({
       id: "local",
       wallet,
@@ -111,8 +111,14 @@ describe("Dollar activity page", () => {
     });
 
     renderActivity(31_337);
-    expect(screen.getByTitle(originalHash).tagName).toBe("CODE");
+    // Anvil has no block explorer, so this must never become a link -- that is
+    // the part of the original assertion worth keeping.
     expect(screen.queryByRole("link", { name: /0x11111111/i })).not.toBeInTheDocument();
+    // But an unlinkable hash was previously unreachable: the full value existed
+    // only in a tooltip, so there was no way to get it out of the page.
+    expect(
+      screen.getByRole("button", { name: `Copy transaction ${originalHash}` })
+    ).toBeInTheDocument();
   });
 
   it("shows confirmed transactions whose resulting state still needs verification", () => {
@@ -132,5 +138,84 @@ describe("Dollar activity page", () => {
     renderActivity(31_337);
     expect(screen.getByText("Confirmed · refresh required")).toBeInTheDocument();
     expect(screen.getByText("Refresh before another action.")).toBeInTheDocument();
+  });
+});
+
+describe("Dollar activity page across networks", () => {
+  beforeEach(() => {
+    previewMode.enabled = true;
+    window.localStorage.clear();
+  });
+
+  // Activity is a local record of what this wallet did, not a read scoped to a
+  // chain. Being on the wrong network used to replace the whole list with a
+  // switch-network prompt.
+  it("renders while connected to a network the deployment does not target", () => {
+    writeDollarActivity({
+      id: "settled",
+      wallet,
+      chainId: 8_453,
+      kind: "approve-weth",
+      label: "Approve exact WETH",
+      amount: "1",
+      status: "confirmed",
+      createdAt: 1,
+    });
+
+    previewMode.enabled = false;
+    render(
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          status: "ready",
+          authenticated: true,
+          address: wallet,
+          walletKind: "embedded",
+          chainId: 1,
+          targetChainId: 31_337,
+          isTargetChain: false,
+        }}
+      >
+        <ActivityPage />
+      </WalletContext.Provider>
+    );
+
+    expect(screen.getByText("Approve exact WETH")).toBeInTheDocument();
+    expect(screen.queryByText(/switch/i)).not.toBeInTheDocument();
+  });
+
+  // The chain is discovered from the storage key, so a record survives the
+  // network being unconfigured rather than vanishing with it.
+  it("shows a record from a chain that is not in the wallet's network list", () => {
+    writeDollarActivity({
+      id: "elsewhere",
+      wallet,
+      chainId: 42_161,
+      kind: "approve-weth",
+      label: "Arbitrum approval",
+      amount: "1",
+      status: "confirmed",
+      createdAt: 2,
+    });
+
+    previewMode.enabled = false;
+    render(
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          status: "ready",
+          authenticated: true,
+          address: wallet,
+          walletKind: "embedded",
+          chainId: 31_337,
+          targetChainId: 31_337,
+          isTargetChain: true,
+        }}
+      >
+        <ActivityPage />
+      </WalletContext.Provider>
+    );
+
+    expect(screen.getByText("Arbitrum approval")).toBeInTheDocument();
   });
 });

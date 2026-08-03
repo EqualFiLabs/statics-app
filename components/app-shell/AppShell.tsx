@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { appHeaderNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -203,16 +203,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <NetworkIndicator />
         <div className="dapp-header-actions">
-          {appHeaderNavigation.map((item) => (
-            <Link
-              key={item.href}
-              className={`dapp-header-link${currentPath.startsWith(item.href) ? " active" : ""}`}
-              href={item.href}
-              aria-current={currentPath.startsWith(item.href) ? "page" : undefined}
-            >
-              {item.label}
-            </Link>
-          ))}
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
           </Link>
@@ -240,21 +230,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {appNavigationGroups.map((group, groupIndex) => (
               <nav
                 key={group.label ?? "home"}
-                // A group whose every item is hidden on desktop would otherwise
-                // leave its heading stranded above nothing.
-                className={`dapp-nav-group${
-                  group.items.every((item) => (item.placement ?? "primary") !== "primary")
-                    ? " is-detail-only"
-                    : ""
-                }`}
+                className="dapp-nav-group"
                 aria-label={group.label ?? "Overview"}
               >
                 {group.label && <p className="dapp-nav-label">{group.label}</p>}
                 {group.items.map((item, itemIndex) => {
-                  // Anything not primary is hidden from the desktop sidebar by
-                  // CSS rather than dropped, so the mobile panel keeps it.
-                  const secondaryClass =
-                    (item.placement ?? "primary") === "primary" ? "" : " is-secondary";
                   const active =
                     item.href === currentPath ||
                     (item.href !== "/app" &&
@@ -263,7 +243,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <Link
                       ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
                       key={item.label}
-                      className={`dapp-nav-item${active ? " active" : ""}${secondaryClass}`}
+                      className={`dapp-nav-item${active ? " active" : ""}`}
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       onClick={() => closeNavigation()}
@@ -271,11 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </Link>
                   ) : (
-                    <span
-                      key={item.label}
-                      className={`dapp-nav-item${secondaryClass}`}
-                      aria-disabled="true"
-                    >
+                    <span key={item.label} className="dapp-nav-item" aria-disabled="true">
                       {item.label}
                       <small>Planned</small>
                     </span>

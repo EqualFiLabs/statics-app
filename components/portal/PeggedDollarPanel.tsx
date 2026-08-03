@@ -449,7 +449,7 @@ export function PeggedDollarPanel() {
               setReviewing(false);
             }}
           >
-            {item}
+            {item === "mint" ? "Mint" : "Redeem"}
           </button>
         ))}
       </div>

@@ -120,14 +120,14 @@ function BasketCreateRuntime() {
   const issues = useMemo(() => {
     const next: string[] = [];
     if (!name.trim() || !symbol.trim()) next.push("Name and symbol are required.");
-    if (assets.length < 1 || assets.length > 16) next.push("Use between 1 and 16 constituents.");
+    if (assets.length < 1 || assets.length > 16) next.push("Use between 1 and 16 underlyings.");
     if (assets.some((asset) => !isAddress(asset.address)))
-      next.push("Every constituent needs a valid address.");
+      next.push("Every underlying needs a valid address.");
     const normalized = assets
       .filter((asset) => isAddress(asset.address))
       .map((asset) => asset.address.toLowerCase());
     if (new Set(normalized).size !== normalized.length)
-      next.push("Constituent addresses must be unique.");
+      next.push("Underlying addresses must be unique.");
     if (assets.some((asset) => !asset.amount || Number(asset.amount) <= 0))
       next.push("Bundle amounts must be positive.");
     const bps = [fees.flash, fees.origination, fees.extension, fees.ltv, fees.recoveryPenalty].map(
@@ -426,13 +426,13 @@ function BasketCreateRuntime() {
             </div>
             <div className="creation-assets">
               <div className="remaining-section-heading">
-                <h3>Constituents · {assets.length}/16</h3>
+                <h3>Underlyings · {assets.length}/16</h3>
                 <button
                   type="button"
                   disabled={assets.length >= 16}
                   onClick={() => setAssets((current) => [...current, { address: "", amount: "" }])}
                 >
-                  Add constituent
+                  Add underlying
                 </button>
               </div>
               {assets.map((asset, index) => (
@@ -513,7 +513,7 @@ function BasketCreateRuntime() {
                   issues.map((issue) => <li key={issue}>{issue}</li>)
                 ) : (
                   <>
-                    <li>{assets.length} unique ERC-20 constituents</li>
+                    <li>{assets.length} unique ERC-20 underlyings</li>
                     <li>Bounded fees, LTV, and duration</li>
                     <li>Ascending mint and redemption tiers</li>
                   </>

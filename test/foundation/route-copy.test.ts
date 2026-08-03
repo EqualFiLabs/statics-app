@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import {
-  appHeaderNavigation,
-  appNavigation,
-  appNavigationGroups,
-  appPrimaryNavigation,
-  appTabNavigation,
-} from "@/lib/site-config";
+import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -32,6 +26,7 @@ const implementationVocabulary = [
   "atomic",
   "wallet-scoped",
   "onchain",
+  "constituent",
 ];
 
 const routes: readonly string[] = [
@@ -117,18 +112,11 @@ describe("dapp navigation grouping", () => {
   });
 });
 
-describe("secondary navigation", () => {
-  it("keeps account plumbing out of the primary destinations", () => {
-    expect(appHeaderNavigation.map((item) => item.href)).toEqual([
-      "/app/activity",
-      "/app/settings",
-    ]);
-  });
-
-  it("keeps every destination a person navigates to in the sidebar", () => {
-    // The sidebar is not the constrained surface -- the tab bar is. Only account
-    // plumbing is withheld from it.
-    expect(appPrimaryNavigation.map((item) => item.label)).toEqual([
+describe("sidebar completeness", () => {
+  it("lists every destination, because the sidebar is not the constrained surface", () => {
+    // Holding things out of the menu was tried twice and was wrong twice. The
+    // tab bar is the surface with a hard limit; the sidebar shows everything.
+    expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
       "Earn",
       "Liquidity",
@@ -137,24 +125,18 @@ describe("secondary navigation", () => {
       "Positions",
       "Loans",
       "Wallet",
+      "Activity",
+      "Settings",
     ]);
   });
 
-  it("withholds only account plumbing from the sidebar", () => {
-    // Anything hidden from the menu has to be reachable another way, and only
-    // Activity and Settings qualify -- the header carries both.
-    const withheld = appNavigation.filter((item) => (item.placement ?? "primary") !== "primary");
-    expect(withheld.map((item) => item.href)).toEqual(["/app/activity", "/app/settings"]);
-    for (const item of withheld) {
-      expect(appHeaderNavigation).toContain(item);
-    }
-  });
-
-  it("never moves a route to the header without leaving it navigable", () => {
-    // Header items are still in the groups, so the mobile panel lists them.
-    for (const item of appHeaderNavigation) {
-      expect(appNavigation.some((candidate) => candidate.href === item.href)).toBe(true);
-    }
+  it("keeps account plumbing grouped rather than promoted", () => {
+    const account = appNavigationGroups.find((group) => group.label === "Account");
+    expect(account?.items.map((item) => item.href)).toEqual([
+      "/app/wallet",
+      "/app/activity",
+      "/app/settings",
+    ]);
   });
 });
 
@@ -184,7 +166,7 @@ describe("mobile tab bar", () => {
     // A tab for something not in the sidebar would be the only way to reach it,
     // which is exactly the trap the panel exists to avoid.
     for (const item of appTabNavigation) {
-      expect(appPrimaryNavigation).toContain(item);
+      expect(appNavigation).toContain(item);
     }
   });
 

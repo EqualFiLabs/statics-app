@@ -160,10 +160,10 @@ export function BasketCreatePreview() {
               <div className="remaining-section-heading">
                 <div>
                   <p className="dapp-section-label">Bundle</p>
-                  <h3>Constituents · {unavailable}/16</h3>
+                  <h3>Underlyings · {unavailable}/16</h3>
                 </div>
                 <button type="button" disabled>
-                  Add constituent
+                  Add underlying
                 </button>
               </div>
               {["01", "02", "03", "04"].map((row) => (

@@ -30,7 +30,7 @@ describe("basket action safety", () => {
     expect(parseSlippageBps("5.01")).toBeNull();
   });
 
-  it("presents constituent approvals sequentially", () => {
+  it("presents underlying approvals sequentially", () => {
     const availability = deriveBasketActionAvailability({
       mode: "mint",
       amount: 1n,
@@ -78,14 +78,14 @@ describe("basket action safety", () => {
     ).toMatchObject({ kind: "execute", label: "Redeem basket" });
   });
 
-  it("rejects successful simulations with zero constituent results", () => {
+  it("rejects successful simulations with zero underlying results", () => {
     const result = encodeFunctionResult({
       abi: staticsAbi,
       functionName: "redeem",
       result: [0n],
     });
     expect(() => validateBasketSimulation("redeem", result, 1)).toThrow(
-      "invalid constituent amounts"
+      "invalid underlying amounts"
     );
   });
 
@@ -121,7 +121,7 @@ describe("basket action safety", () => {
       result: [0n],
     });
     expect(() => validateBasketCollateralSimulation("mintBasketCollateral", result, 1)).toThrow(
-      "invalid constituent amounts"
+      "invalid underlying amounts"
     );
   });
 

@@ -1,5 +1,8 @@
 import { getAddress, isHash, keccak256, type Address, type Hex, type PublicClient } from "viem";
 
+import { deploymentManifests } from "@/deployments/manifests";
+import { parseDeploymentManifest } from "@/lib/dollar/manifest";
+
 export type DollarContractName =
   "diamond" | "core" | "gateway" | "dollar" | "risk" | "weth" | "oracle";
 export type LiquidityContractName =
@@ -15,7 +18,11 @@ export type DollarDeployment = Readonly<{
   deploymentStartBlock: bigint;
   wethProfileId: bigint;
   protocolCommit: string;
-  source: "development-environment";
+  /**
+   * Where these addresses came from. The environment path is restricted to
+   * local Anvil; every other chain must come from a reviewed manifest.
+   */
+  source: "development-environment" | "checked-in-manifest";
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
   liquidity?: LiquidityDeployment | null;
@@ -104,18 +111,23 @@ export function readDollarDeployment(
   }
 
   const appEnvironment = environment.NEXT_PUBLIC_APP_ENV || "development";
-  if (appEnvironment !== "development") {
-    throw new Error(
-      "Staging and production Dollar deployments must come from a checked-in verified manifest."
-    );
-  }
-
   const chainId = Number(environment.NEXT_PUBLIC_STATICS_CHAIN_ID);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) {
     throw new Error("NEXT_PUBLIC_STATICS_CHAIN_ID must be a positive integer.");
   }
-  if (chainId !== 31_337) {
-    throw new Error("Environment-generated Dollar deployments are restricted to local Anvil.");
+
+  // Anything that is not local Anvil comes from a reviewed manifest rather than
+  // from environment variables, so the addresses a build ships with are a diff
+  // somebody approved and not state on a build machine.
+  if (appEnvironment !== "development" || chainId !== 31_337) {
+    const manifest = deploymentManifests[chainId];
+    if (!manifest) {
+      return {
+        status: "unavailable",
+        reason: `No reviewed Statics deployment manifest is checked in for chain ${chainId}.`,
+      };
+    }
+    return { status: "configured", deployment: parseDeploymentManifest(manifest) };
   }
 
   const profile = environment.NEXT_PUBLIC_STATICS_WETH_PROFILE_ID;
