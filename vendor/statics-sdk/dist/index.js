@@ -16,11 +16,6 @@ export const BasketStatus = {
     Quarantined: 1,
     ExitOnly: 2,
 };
-export const CanonicalPoolStatus = {
-    Unconfigured: 0,
-    Warming: 1,
-    Active: 2,
-};
 export function mulDivDown(value, multiplier, denominator) {
     if (denominator === 0n)
         throw new Error("division by zero");
@@ -449,12 +444,15 @@ export const staticsAbi = parseAbi([
     "function createPosition(address receiver) payable returns (uint256 positionId)",
     "function positionCreationFee() view returns (uint256 amount)",
     "function setPositionCreationFee(uint256 amount)",
+    "function positionRenderer() view returns (address renderer)",
+    "function setPositionRenderer(address newRenderer)",
     "function closePosition(uint256 positionId)",
     "function nextPositionId() view returns (uint256)",
     "function activeLegCount(uint256 positionId) view returns (uint256)",
     "function positionInitializing(uint256 positionId) view returns (bool)",
-    "function isPositionLegActive(uint256 positionId,bytes32 legKey) view returns (bool)",
-    "function positionKey(uint256 positionId) view returns (bytes32)",
+    "function positionState(uint256 tokenId) view returns ((bool exists,uint256 stateNonce,uint256 activeLegCount,uint256 unresolvedObligationCount) state)",
+    "function isLegActive(uint256 tokenId,bytes32 legKey) view returns (bool)",
+    "function isPositionClosable(uint256 tokenId) view returns (bool)",
     "function quarantineBasket(uint256 basketId)",
     "function releaseBasketQuarantine(uint256 basketId)",
     "function decommissionBasket(uint256 basketId)",
@@ -482,11 +480,8 @@ export const staticsAbi = parseAbi([
     "function peggedProtocolRevenue(uint256 profileId,address token) view returns (uint256 amount)",
     "function claimPeggedProtocolRevenue(uint256 profileId,uint256 amount,address receiver) returns (uint256 spent,uint256 received)",
     "function installCanonicalPoolIntegration(address poolManager,address hook)",
-    "function checkpointCanonicalPool(uint256 basketId,address asset) returns (bool observationStored)",
-    "function activateCanonicalPool(uint256 basketId,address asset) returns (int24 referenceTick,int24 spotTick)",
-    "function canonicalPool(uint256 basketId,address asset) view returns ((bytes32 poolId,address basketToken,address asset,address currency0,address currency1,address hook,uint24 lpFee,int24 tickSpacing,uint8 status,uint40 initializedAt,uint40 activatedAt,int24 spotTick,int24 referenceTick,uint8 observationCardinality,bool referenceAvailable) pool)",
+    "function canonicalPool(uint256 basketId,address asset) view returns ((bytes32 poolId,address basketToken,address asset,address currency0,address currency1,address hook,uint24 lpFee,int24 tickSpacing,int24 spotTick) pool)",
     "function liquidityIntegration() view returns (address poolManager,address hook,bool installed)",
-    "function liquiditySafetyParameters() pure returns (uint24 lpFee,int24 tickSpacing,uint40 warmup,uint32 referenceWindow,uint16 maxDeviationBps)",
     "function installLiquidityManager(address manager)",
     "function setSwapFeeConfiguration((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
     "function swapFeeConfiguration() view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
@@ -522,8 +517,10 @@ export const staticsAbi = parseAbi([
     "event PositionClosed(uint256 indexed positionId)",
     "event PositionCreationFeeSet(uint256 previousAmount,uint256 newAmount)",
     "event PositionCreationFeePaid(uint256 indexed positionId,address indexed treasury,uint256 amount)",
-    "event PositionLegActivated(uint256 indexed positionId,bytes32 indexed legKey)",
-    "event PositionLegDeactivated(uint256 indexed positionId,bytes32 indexed legKey)",
+    "event PositionRendererSet(address indexed previousRenderer,address indexed newRenderer)",
+    "event PositionLegAttached(uint256 indexed tokenId,bytes32 indexed legKey,address indexed moduleAuthority,bytes32 moduleType,bytes32 localPositionId,uint256 stateNonce)",
+    "event PositionLegDetached(uint256 indexed tokenId,bytes32 indexed legKey,uint256 stateNonce)",
+    "event PositionStateChanged(uint256 indexed tokenId,uint256 stateNonce,uint256 activeLegCount,uint256 unresolvedObligationCount)",
     "event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)",
     "event BasketCollateralDeposited(uint256 indexed positionId,uint256 indexed basketId,address indexed payer,uint256 shares)",
     "event BasketCollateralWithdrawn(uint256 indexed positionId,uint256 indexed basketId,address indexed receiver,uint256 shares)",
@@ -549,8 +546,6 @@ export const staticsAbi = parseAbi([
     "event PositionRewardSettled(uint256 indexed positionId,address indexed asset,uint256 amount)",
     "event LiquidityIntegrationInstalled(address indexed poolManager,address indexed hook)",
     "event CanonicalPoolInitialized(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,address currency0,address currency1,uint160 sqrtPriceX96,int24 tick)",
-    "event CanonicalPoolCheckpointed(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,bool observationStored)",
-    "event CanonicalPoolActivated(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,int24 referenceTick,int24 spotTick)",
     "event LiquidityManagerInstalled(address indexed manager)",
     "event CanonicalPoolSyncedToManager(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,address manager)",
     "event SwapFeeConfigurationChanged((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
@@ -589,10 +584,6 @@ export const staticsSwapFeeHookAbi = parseAbi([
     "function lockedLiquidity(bytes32 poolId) view returns (uint128 liquidity)",
     "function compoundPermanentLiquidity((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key) returns (uint128 liquidityAdded)",
     "function releasePermanentLiquidity((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,address receiver) returns (uint256 amount0,uint256 amount1)",
-    "function checkpoint((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key) returns (bool observationStored)",
-    "function oracleState(bytes32 poolId) view returns ((uint40 initializedAt,uint40 lastCheckpointAt,uint40 latestObservationAt,int24 lastTick,int56 tickCumulative,uint8 observationIndex,uint8 observationCardinality) state)",
-    "function observationAt(bytes32 poolId,uint8 index) view returns (uint40 timestamp,int56 tickCumulative)",
-    "function consult(bytes32 poolId,uint32 window) view returns (int24 referenceTick,int24 spotTick,uint40 oldestObservationAt)",
     "event PoolRegistered(bytes32 indexed poolId,address indexed currency0,address indexed currency1)",
     "event SwapLegFeeAccrued(bytes32 indexed poolId,address indexed currency,bool indexed specifiedLeg,uint256 realizedAmount,uint256 chargedAmount,uint256 polAmount,uint256 liquidityProviderAmount,uint256 basketStakerAmount,uint256 staticsStakerAmount,uint256 treasuryAmount)",
     "event PermanentLiquidityAdded(bytes32 indexed poolId,uint128 liquidity,uint256 amount0,uint256 amount1,uint256 pending0,uint256 pending1)",
@@ -602,7 +593,6 @@ export const staticsSwapFeeHookAbi = parseAbi([
     "event FeeConfigurationSet(uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
     "event PoolFeeConfigurationSet(bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
     "event PoolFeeConfigurationCleared(bytes32 indexed poolId)",
-    "event TickObservationRecorded(bytes32 indexed poolId,uint40 indexed timestamp,int24 tick,int56 tickCumulative,uint8 cardinality)",
 ]);
 export const staticsLiquidityManagerAbi = parseAbi([
     "function staticsDiamond() view returns (address)",
@@ -610,29 +600,10 @@ export const staticsLiquidityManagerAbi = parseAbi([
     "function poolManager() view returns (address)",
     "function permit2() view returns (address)",
     "function registerCanonicalPool(uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key)",
-    "function creditProtocolInventory(uint256 basketId,address token,uint256 amount)",
-    "function mintProtocolPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement)",
-    "function increaseProtocolPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement)",
-    "function collectProtocolPosition(uint256 basketId,address asset,uint256 deadline) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement)",
-    "function removeProtocolLiquidity(uint256 basketId,address asset,uint256 liquidity,uint256 amount0Min,uint256 amount1Min,uint256 deadline) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement)",
-    "function burnProtocolPosition(uint256 basketId,address asset,uint256 amount0Min,uint256 amount1Min,uint256 deadline) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement)",
-    "function returnProtocolInventory(uint256 basketId,address token,uint256 amount) returns (uint256 spent,uint256 received)",
-    "function transferProtocolPosition(uint256 basketId,address asset,address receiver) returns (uint256 tokenId)",
     "function mintUserPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,address recipient,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
     "function increaseUserPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,uint256 tokenId,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
     "function canonicalPoolHash(uint256 basketId,address asset) view returns (bytes32)",
-    "function protocolInventory(uint256 basketId,address token) view returns (uint256 amount)",
-    "function totalProtocolInventory(address token) view returns (uint256 amount)",
-    "function protocolPositionId(uint256 basketId,address asset) view returns (uint256 tokenId)",
     "event CanonicalPoolRegistered(uint256 indexed basketId,address indexed asset,bytes32 indexed poolKeyHash)",
-    "event ProtocolInventoryCredited(uint256 indexed basketId,address indexed token,uint256 amount)",
-    "event ProtocolInventoryReturned(uint256 indexed basketId,address indexed token,uint256 spent,uint256 received)",
-    "event ProtocolPositionMinted(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,uint256 liquidity,uint256 spent0,uint256 spent1)",
-    "event ProtocolPositionIncreased(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,uint256 liquidity,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1)",
-    "event ProtocolPositionCollected(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,uint256 received0,uint256 received1)",
-    "event ProtocolPositionReduced(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,uint256 liquidity,uint256 received0,uint256 received1)",
-    "event ProtocolPositionTransferred(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,address receiver)",
-    "event ProtocolPositionBurned(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,uint256 received0,uint256 received1)",
     "event UserPositionMinted(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,address recipient,address refundRecipient,uint256 spent0,uint256 spent1,uint256 refund0,uint256 refund1)",
 ]);
 export const v4PositionManagerReadAbi = parseAbi([
@@ -719,12 +690,15 @@ export const staticsPositionErrorAbi = parseAbi([
     "error PositionCreationFeeTransferFailed(address treasury,uint256 amount)",
     "error PositionInitializing(uint256 positionId)",
     "error PositionHasActiveLegs(uint256 positionId,uint256 activeLegCount)",
+    "error PositionHasUnresolvedObligations(uint256 positionId,uint256 unresolvedObligationCount)",
     "error AlreadyInitialized()",
     "error NotInitialized()",
     "error NotPositionOwnerOrApproved(uint256 positionId,address caller)",
-    "error ZeroLegKey()",
+    "error InvalidModuleAuthority()",
+    "error InvalidModuleType()",
     "error PositionLegAlreadyActive(uint256 positionId,bytes32 legKey)",
     "error PositionLegNotActive(uint256 positionId,bytes32 legKey)",
+    "error NoUnresolvedPositionObligation(uint256 positionId)",
     "error ERC721InvalidOwner(address owner)",
     "error ERC721NonexistentToken(uint256 tokenId)",
     "error ERC721IncorrectOwner(address sender,uint256 tokenId,address owner)",
@@ -1218,6 +1192,9 @@ export function buildCreatePositionCall(receiver) {
 export function buildSetPositionCreationFeeCall(amount) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "setPositionCreationFee", args: [amount] });
 }
+export function buildSetPositionRendererCall(newRenderer) {
+    return encodeFunctionData({ abi: staticsAbi, functionName: "setPositionRenderer", args: [newRenderer] });
+}
 export function buildClosePositionCall(positionId) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "closePosition", args: [positionId] });
 }
@@ -1229,20 +1206,6 @@ export function buildReleaseBasketQuarantineCall(basketId) {
 }
 export function buildDecommissionBasketCall(basketId) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "decommissionBasket", args: [basketId] });
-}
-export function buildCheckpointCanonicalPoolCall(basketId, asset) {
-    return encodeFunctionData({
-        abi: staticsAbi,
-        functionName: "checkpointCanonicalPool",
-        args: [basketId, asset],
-    });
-}
-export function buildActivateCanonicalPoolCall(basketId, asset) {
-    return encodeFunctionData({
-        abi: staticsAbi,
-        functionName: "activateCanonicalPool",
-        args: [basketId, asset],
-    });
 }
 export function buildSetSwapFeeConfigurationCall(configuration) {
     const uint16 = (value, field) => {

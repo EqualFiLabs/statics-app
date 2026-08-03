@@ -7,9 +7,9 @@ also names the reachable public Statics commit and canonical deployment artifact
 that preserve the public provenance record without relabeling deployed bytecode.
 
 Robinhood Chain Testnet is recorded in `46630.json`. It binds the unified Statics
-deployment, USDG profile, and Robinhood Uniswap v4 dependencies to their runtime
-code hashes. The faucet entry is optional until its separately authorized live
-deployment is recorded.
+deployment, Position renderer and avatar, USDG profile, and Robinhood Uniswap v4
+dependencies to their runtime code hashes. The faucet entry is optional until
+its separately authorized live deployment is recorded.
 
 ## Generating one
 
@@ -18,21 +18,24 @@ Manifests are generated from a live deployment, then committed:
 ```
 npm run deployment:manifest -- \
   --rpc https://rpc.testnet.chain.robinhood.com \
-  --addresses /path/to/statics/deployments/robinhood-testnet-46630-statics.json \
+  --addresses /path/to/current-deployment-addresses.json \
   --commit <40-character recorded deployment commit> \
   --public-commit <40-character public Statics commit> \
   --source-repository https://github.com/EqualFiLabs/statics \
-  --deployment-artifact deployments/robinhood-testnet-46630-statics.json \
+  --deployment-artifact deployment.md \
   --network "Robinhood Chain Testnet" \
   --start-block <block the diamond was deployed in> \
   --weth-profile 1 \
   --pegged-profile 2        # optional, only where USDG is deployed
 ```
 
-Addresses come from the protocol's own deploy artifact and every runtime code
-hash is read from the chain, so the file records what is deployed rather than
-what was intended. An address with no code at it fails the generation instead of
-producing a manifest that points at nothing.
+The address input is the operator's current deployment record. The public
+deployment artifact is the reviewed provenance record in the Statics repository;
+it can be either `deployment.md` or a JSON record under `deployments/`. Every
+runtime code hash is read from the chain. The Position renderer is also read from
+the diamond and the avatar contract from the renderer, so a stale or inconsistent
+binding fails generation rather than producing a manifest that points at the
+wrong metadata stack.
 
 The recorded deployment commit remains the identity used by the application for
 cache separation. It may predate a public repository snapshot. The public commit

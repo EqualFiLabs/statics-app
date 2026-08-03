@@ -428,17 +428,8 @@ function LoansRuntime({
           pool.asset.address === constituent.token.address
       );
       if (!matching) throw new Error(`No canonical pool exists for ${constituent.token.symbol}.`);
-      if (
-        matching.status !== 2 ||
-        matching.decommissioned ||
-        !matching.managerSynced ||
-        matching.observationCardinality < 2
-      ) {
+      if (matching.decommissioned || !matching.managerSynced) {
         throw new Error(`${constituent.token.symbol} pool is not ready for borrowed liquidity.`);
-      }
-      const deviation = matching.spotTick - matching.referenceTick;
-      if (deviation < -100 || deviation > 99) {
-        throw new Error(`${constituent.token.symbol} pool is outside its observed price bound.`);
       }
       return matching;
     });

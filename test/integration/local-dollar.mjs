@@ -7,12 +7,10 @@ import { fileURLToPath } from "node:url";
 import {
   BasketStatus,
   basketTokenAbi,
-  buildActivateCanonicalPoolCall,
   buildActivateLiquidityPositionCall,
   buildApproveV4PositionCall,
   buildBorrowCall,
   buildBorrowAndProvideLiquidityCall,
-  buildCheckpointCanonicalPoolCall,
   buildClaimLiquidityRewardsCall,
   buildClaimRewardsCall,
   buildClosePositionCall,
@@ -1017,25 +1015,12 @@ try {
     );
   }
 
-  await publicClient.request({ method: "evm_increaseTime", params: [3_600] });
-  await publicClient.request({ method: "evm_mine" });
-  await send(
-    deployment.contracts.diamond,
-    buildCheckpointCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar)
-  );
-  await send(
-    deployment.contracts.diamond,
-    buildActivateCanonicalPoolCall(fixture.basketId, deployment.contracts.dollar)
-  );
   const canonicalPool = await publicClient.readContract({
     address: deployment.contracts.diamond,
     abi: staticsAbi,
     functionName: "canonicalPool",
     args: [fixture.basketId, deployment.contracts.dollar],
   });
-  if (canonicalPool.status !== 2) {
-    throw new Error("Local canonical pool did not complete its real warmup and activation.");
-  }
   const poolKey = {
     currency0: canonicalPool.currency0,
     currency1: canonicalPool.currency1,

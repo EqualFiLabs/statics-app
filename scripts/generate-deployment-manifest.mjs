@@ -32,7 +32,7 @@ import { createPublicClient, http, getAddress, keccak256 } from "viem";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deploymentsDir = resolve(siteRoot, "deployments");
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const DOLLAR = ["diamond", "core", "gateway", "dollar", "risk", "weth", "oracle"];
 const LIQUIDITY = [
@@ -151,10 +151,10 @@ async function main() {
     throw new Error("--source-repository must be a credential-free HTTPS URL.");
   }
   if (
-    !/^deployments\/[a-z0-9][a-z0-9._/-]*\.json$/i.test(deploymentArtifact) ||
+    !/^(?:deployments\/[a-z0-9][a-z0-9._/-]*\.json|deployment\.md)$/i.test(deploymentArtifact) ||
     deploymentArtifact.includes("..")
   ) {
-    throw new Error("--deployment-artifact must be a repository-relative deployment JSON path.");
+    throw new Error("--deployment-artifact must name a public deployment record.");
   }
   for (const [flag, value] of [
     ["start-block", startBlock],
@@ -187,6 +187,37 @@ async function main() {
   for (const name of DOLLAR) {
     contracts[name] = await entryFor(client, name, pick(contractsSource, name));
   }
+
+  const positionMetadataAbi = [
+    {
+      type: "function",
+      name: "positionRenderer",
+      stateMutability: "view",
+      inputs: [],
+      outputs: [{ name: "renderer", type: "address" }],
+    },
+    {
+      type: "function",
+      name: "avatarSVG",
+      stateMutability: "view",
+      inputs: [],
+      outputs: [{ name: "avatarSvg", type: "address" }],
+    },
+  ];
+  const rendererAddress = await client.readContract({
+    address: contracts.diamond.address,
+    abi: positionMetadataAbi,
+    functionName: "positionRenderer",
+  });
+  const avatarSvgAddress = await client.readContract({
+    address: rendererAddress,
+    abi: positionMetadataAbi,
+    functionName: "avatarSVG",
+  });
+  const positionMetadata = {
+    renderer: await entryFor(client, "positionRenderer", rendererAddress),
+    avatarSvg: await entryFor(client, "avatarSvg", avatarSvgAddress),
+  };
 
   const liquiditySource = {
     poolManager: artifact.externalDependencies?.poolManager,
@@ -230,6 +261,7 @@ async function main() {
     },
     generatedAt: new Date().toISOString(),
     contracts,
+    positionMetadata,
     liquidity,
     pegged,
     faucet,

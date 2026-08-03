@@ -411,6 +411,14 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
         </dl>
       </section>
 
+      {position.unresolvedObligationCount > 0n && (
+        <p className="dollar-warning">
+          {t("unresolvedObligations", {
+            count: position.unresolvedObligationCount.toString(),
+          })}
+        </p>
+      )}
+
       <p className="dollar-warning">{t("transferWarning")}</p>
 
       <PositionCollateralSummary
@@ -663,7 +671,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           <p>
             {closeReady
               ? t("closeReady")
-              : t("closeBlocked", { count: position.activeLegCount.toString() })}
+              : t("closeBlocked", {
+                  legs: position.activeLegCount.toString(),
+                  obligations: position.unresolvedObligationCount.toString(),
+                })}
           </p>
         </div>
         <button

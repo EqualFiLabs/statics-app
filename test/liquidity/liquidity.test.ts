@@ -6,7 +6,7 @@ import {
   borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
   canonicalFullRange,
-  canonicalStatusLabel,
+  canonicalPoolLabel,
   liquidityActivationWait,
   liquidityPositionActions,
   recommendedLiquidityAction,
@@ -33,21 +33,18 @@ describe("canonical liquidity identifiers", () => {
     expect(v4PoolId({ ...key, tickSpacing: 20 })).not.toBe(v4PoolId(key));
   });
 
-  it("keeps warmup and active pool states distinct", () => {
-    expect(canonicalStatusLabel(1)).toBe("warmup");
-    expect(canonicalStatusLabel(2)).toBe("active");
-    expect(canonicalStatusLabel(0)).toBe("unconfigured");
-    expect(canonicalStatusLabel(2, true)).toBe("exit-only");
+  it("marks canonical pools live unless they have been decommissioned", () => {
+    expect(canonicalPoolLabel(false)).toBe("active");
+    expect(canonicalPoolLabel(true)).toBe("exit-only");
   });
 
   it("requires an active unsubscribed full-range NFT before staking", () => {
     const pool = {
       poolId: `0x${"11".repeat(32)}`,
-      status: 2,
       decommissioned: false,
       managerSynced: true,
       key: { tickSpacing: 10 },
-    } as CanonicalPoolRecord;
+    } as unknown as CanonicalPoolRecord;
     const [tickLower, tickUpper] = canonicalFullRange(10);
     const position = {
       poolId: pool.poolId,
@@ -61,7 +58,7 @@ describe("canonical liquidity identifiers", () => {
     expect(lpStakeEligibility({ ...position, tickLower: tickLower + 10 }, pool)).toMatch(
       /full-range/
     );
-    expect(lpStakeEligibility(position, { ...pool, decommissioned: true })).toMatch(/available/);
+    expect(lpStakeEligibility(position, { ...pool, decommissioned: true })).toMatch(/live/);
   });
 
   it("derives defaults and keeps management on the selected NFT's pool", () => {
@@ -124,12 +121,8 @@ describe("canonical liquidity identifiers", () => {
     } as unknown as BasketRecord;
     const readyPool = {
       poolId: `0x${"11".repeat(32)}`,
-      status: 2,
       decommissioned: false,
       managerSynced: true,
-      observationCardinality: 2,
-      spotTick: 99,
-      referenceTick: 0,
     } as CanonicalPoolRecord;
     const secondPool = {
       ...readyPool,
@@ -144,11 +137,11 @@ describe("canonical liquidity identifiers", () => {
       })
     ).toMatch(/positive raw liquidity/);
     expect(
-      borrowedLiquidityReadiness(basket, [{ ...readyPool, spotTick: 100 }, secondPool], {
+      borrowedLiquidityReadiness(basket, [{ ...readyPool, managerSynced: false }, secondPool], {
         [readyPool.poolId]: "1",
         [secondPool.poolId]: "1",
       })
-    ).toMatch(/price bound/);
+    ).toMatch(/live and synced/);
     expect(
       borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
         [readyPool.poolId]: "1",

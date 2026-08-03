@@ -18,8 +18,10 @@ function position(overrides: Partial<PositionRecord> = {}): PositionRecord {
   return {
     positionId: 7n,
     owner: wallet,
+    stateNonce: 1n,
     activeLegCount: 0n,
-    initializing: false,
+    unresolvedObligationCount: 0n,
+    closable: true,
     collateral: [],
     stakedBalance: 0n,
     unstakeAvailableAt: 0n,
@@ -75,9 +77,11 @@ describe("position NFT description", () => {
     expect(nft.blockedReason).toBeNull();
   });
 
-  it("blocks a position that is still being created", () => {
-    const nft = describePositionNft(position({ initializing: true }), diamond);
-    expect(nft.blockedReason).toMatch(/still being created/);
+  it("warns when unresolved obligations transfer with a position", () => {
+    const nft = describePositionNft(position({ unresolvedObligationCount: 2n }), diamond);
+    expect(nft.carries).toContain("2 unresolved obligations");
+    expect(nft.summary).toBe("2 unresolved obligations");
+    expect(nft.blockedReason).toBeNull();
   });
 
   it("addresses the diamond, where the position ERC-721 lives", () => {

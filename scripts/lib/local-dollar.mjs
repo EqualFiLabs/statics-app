@@ -41,6 +41,10 @@ const peggedLabels = {
   oracle: "STATICS_DOLLAR_USDG_ORACLE_ADDRESS",
   profileId: "STATICS_DOLLAR_USDG_PROFILE_ID",
 };
+const positionMetadataLabels = {
+  renderer: "STATICS_POSITION_RENDERER_ADDRESS",
+  avatarSvg: "STATICS_AVATAR_SVG_ADDRESS",
+};
 
 export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quiet = false }) {
   if (!privateKey) {
@@ -93,6 +97,12 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     if (!match) throw new Error(`Forge output did not include ${label}.`);
     pegged[name] = match[1];
   }
+  const positionMetadata = {};
+  for (const [name, label] of Object.entries(positionMetadataLabels)) {
+    const match = output.match(new RegExp(`${label}\\s+(0x[a-fA-F0-9]{40})`));
+    if (!match) throw new Error(`Forge output did not include ${label}.`);
+    positionMetadata[name] = match[1];
+  }
 
   const runtimeCodeHashes = {};
   for (const [name, address] of Object.entries(contracts)) {
@@ -111,6 +121,13 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     if (!code || code === "0x") throw new Error(`${name} has no runtime code after deployment.`);
     pegged[`${name}CodeHash`] = keccak256(code);
   }
+  for (const name of ["renderer", "avatarSvg"]) {
+    const code = await client.getCode({ address: positionMetadata[name] });
+    if (!code || code === "0x") {
+      throw new Error(`${name} has no runtime code after deployment.`);
+    }
+    positionMetadata[`${name}CodeHash`] = keccak256(code);
+  }
 
   const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: protocolRoot,
@@ -121,6 +138,7 @@ export async function deployLocalDollar({ protocolRoot, rpcUrl, privateKey, quie
     deploymentStartBlock,
     contracts,
     runtimeCodeHashes,
+    positionMetadata,
     liquidity: {
       contracts: liquidityContracts,
       runtimeCodeHashes: liquidityRuntimeCodeHashes,
@@ -310,6 +328,10 @@ export function writeLocalEnvironment(path, deployment, rpcUrl) {
     NEXT_PUBLIC_STATICS_DOLLAR_RISK_CODE_HASH: deployment.runtimeCodeHashes.risk,
     NEXT_PUBLIC_STATICS_WETH_CODE_HASH: deployment.runtimeCodeHashes.weth,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH: deployment.runtimeCodeHashes.oracle,
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS: deployment.positionMetadata.renderer,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: deployment.positionMetadata.avatarSvg,
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: deployment.positionMetadata.rendererCodeHash,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: deployment.positionMetadata.avatarSvgCodeHash,
     NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: deployment.liquidity.contracts.poolManager,
     NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS: deployment.liquidity.contracts.positionManager,
     NEXT_PUBLIC_STATICS_PERMIT2_ADDRESS: deployment.liquidity.contracts.permit2,

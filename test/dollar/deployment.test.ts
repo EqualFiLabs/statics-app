@@ -1,7 +1,11 @@
 import { keccak256 } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { readDollarDeployment, verifyLiquidityDeployment } from "@/lib/dollar/deployment";
+import {
+  readDollarDeployment,
+  verifyDollarDeployment,
+  verifyLiquidityDeployment,
+} from "@/lib/dollar/deployment";
 
 const address = "0x0000000000000000000000000000000000000001";
 const hash = `0x${"11".repeat(32)}`;
@@ -47,6 +51,15 @@ function liquidityDeploymentEnvironment() {
   };
 }
 
+function positionMetadataEnvironment() {
+  return {
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: hash,
+  };
+}
+
 describe("Dollar deployment configuration", () => {
   it("is honestly unavailable when no deployment exists", () => {
     expect(readDollarDeployment({})).toEqual({
@@ -59,6 +72,7 @@ describe("Dollar deployment configuration", () => {
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
       ...liquidityDeploymentEnvironment(),
+      ...positionMetadataEnvironment(),
     });
     expect(state.status).toBe("configured");
     if (state.status === "configured") {
@@ -67,7 +81,17 @@ describe("Dollar deployment configuration", () => {
       expect(state.deployment.wethProfileId).toBe(1n);
       expect(state.deployment.runtimeCodeHashes.gateway).toBe(hash);
       expect(state.deployment.liquidity?.contracts.stateView).toBe(address);
+      expect(state.deployment.positionMetadata?.renderer).toBe(address);
     }
+  });
+
+  it("rejects partial Position metadata configuration", () => {
+    expect(() =>
+      readDollarDeployment({
+        ...localDeploymentEnvironment(),
+        NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS: address,
+      })
+    ).toThrow("Position metadata deployment configuration must be complete or omitted.");
   });
 
   it("rejects a partial liquidity deployment", () => {
@@ -114,6 +138,61 @@ describe("Dollar deployment configuration", () => {
     await expect(
       verifyLiquidityDeployment(publicClient as never, state.deployment)
     ).rejects.toThrow("runtime code does not match");
+  });
+
+  it("verifies Position metadata runtime code and on-chain bindings", async () => {
+    const runtimeCodeHash = keccak256("0x6000");
+    const runtimeHashes = Object.fromEntries(
+      Object.keys(localDeploymentEnvironment())
+        .filter((key) => key.endsWith("_CODE_HASH"))
+        .map((key) => [key, runtimeCodeHash])
+    );
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      ...positionMetadataEnvironment(),
+      ...runtimeHashes,
+      NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
+    });
+    if (state.status !== "configured") throw new Error("expected configured deployment");
+
+    const publicClient = {
+      getChainId: async () => 31_337,
+      getCode: async () => "0x6000",
+      readContract: async () => address,
+    };
+
+    await expect(verifyDollarDeployment(publicClient as never, state.deployment)).resolves.toBe(
+      undefined
+    );
+  });
+
+  it("rejects a Position renderer bound to a different avatar contract", async () => {
+    const runtimeCodeHash = keccak256("0x6000");
+    const runtimeHashes = Object.fromEntries(
+      Object.keys(localDeploymentEnvironment())
+        .filter((key) => key.endsWith("_CODE_HASH"))
+        .map((key) => [key, runtimeCodeHash])
+    );
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      ...positionMetadataEnvironment(),
+      ...runtimeHashes,
+      NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
+    });
+    if (state.status !== "configured") throw new Error("expected configured deployment");
+
+    const publicClient = {
+      getChainId: async () => 31_337,
+      getCode: async () => "0x6000",
+      readContract: async ({ functionName }: { functionName: string }) =>
+        functionName === "avatarSVG" ? "0x0000000000000000000000000000000000000002" : address,
+    };
+
+    await expect(verifyDollarDeployment(publicClient as never, state.deployment)).rejects.toThrow(
+      "different Avatar SVG contract"
+    );
   });
 
   it("rejects liquidity contracts bound to a different PoolManager", async () => {

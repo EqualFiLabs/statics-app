@@ -27,7 +27,7 @@ import type {
 } from "@/lib/dollar/deployment";
 
 /** Bump when the shape changes so an older generator cannot write a newer app. */
-export const MANIFEST_SCHEMA_VERSION = 3;
+export const MANIFEST_SCHEMA_VERSION = 4;
 
 const dollarContractNames: readonly DollarContractName[] = [
   "diamond",
@@ -67,6 +67,10 @@ export type DeploymentManifest = Readonly<{
   }>;
   generatedAt: string;
   contracts: Readonly<Record<string, RawEntry>>;
+  positionMetadata: Readonly<{
+    renderer: RawEntry;
+    avatarSvg: RawEntry;
+  }>;
   liquidity?: Readonly<Record<string, RawEntry>> | null;
   pegged?: Readonly<{
     profileId: string;
@@ -93,8 +97,11 @@ function readSource(chainId: number, manifest: DeploymentManifest) {
     fail(chainId, "source.recordedDeploymentCommit must match protocolCommit.");
   }
   const artifact = manifest.source?.deploymentArtifact ?? "";
-  if (!/^deployments\/[a-z0-9][a-z0-9._/-]*\.json$/i.test(artifact) || artifact.includes("..")) {
-    fail(chainId, "source.deploymentArtifact must be a repository-relative deployment JSON path.");
+  if (
+    !/^(?:deployments\/[a-z0-9][a-z0-9._/-]*\.json|deployment\.md)$/i.test(artifact) ||
+    artifact.includes("..")
+  ) {
+    fail(chainId, "source.deploymentArtifact must name a public deployment record.");
   }
 }
 
@@ -153,6 +160,23 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     runtimeCodeHashes[name] = entry.runtimeCodeHash;
   }
 
+  const renderer = readEntry(
+    chainId,
+    "positionMetadata.renderer",
+    manifest.positionMetadata?.renderer
+  );
+  const avatarSvg = readEntry(
+    chainId,
+    "positionMetadata.avatarSvg",
+    manifest.positionMetadata?.avatarSvg
+  );
+  const positionMetadata: NonNullable<DollarDeployment["positionMetadata"]> = {
+    renderer: renderer.address,
+    avatarSvg: avatarSvg.address,
+    rendererCodeHash: renderer.runtimeCodeHash,
+    avatarSvgCodeHash: avatarSvg.runtimeCodeHash,
+  };
+
   let liquidity: DollarDeployment["liquidity"] = null;
   if (manifest.liquidity) {
     const addresses: Record<string, Address> = {};
@@ -202,6 +226,7 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     source: "checked-in-manifest",
     contracts: contracts as Record<DollarContractName, Address>,
     runtimeCodeHashes: runtimeCodeHashes as Record<DollarContractName, Hex>,
+    positionMetadata,
     liquidity,
     pegged,
     faucet,
