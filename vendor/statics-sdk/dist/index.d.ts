@@ -115,6 +115,7 @@ export type GlobalRewardSelection = {
     eligibleAt: bigint;
 };
 export type PermitSignature = {
+    value: bigint;
     deadline: bigint;
     v: number;
     r: Hex;
@@ -1585,6 +1586,9 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint256";
+            readonly name: "value";
+        }, {
+            readonly type: "uint256";
             readonly name: "deadline";
         }, {
             readonly type: "uint8";
@@ -1654,6 +1658,9 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "value";
+        }, {
             readonly type: "uint256";
             readonly name: "deadline";
         }, {
@@ -1793,6 +1800,9 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint256";
+            readonly name: "value";
+        }, {
+            readonly type: "uint256";
             readonly name: "deadline";
         }, {
             readonly type: "uint8";
@@ -1927,6 +1937,9 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint256";
+            readonly name: "value";
+        }, {
+            readonly type: "uint256";
             readonly name: "deadline";
         }, {
             readonly type: "uint8";
@@ -2030,6 +2043,9 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "tuple";
         readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "value";
+        }, {
             readonly type: "uint256";
             readonly name: "deadline";
         }, {

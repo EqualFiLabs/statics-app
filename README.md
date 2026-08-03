@@ -8,8 +8,11 @@ The Statics marketing site and DApp foundation are built with Next.js 16 and Rea
 - `/app` — Dollar overview and route-scoped Privy/Wagmi wallet runtime.
 - `/app/wallet` — EVM and Solana assets, sends, receives, Portal access, and the public testnet
   fixture faucet.
-- `/app/portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and Statics Dollar.
-- `/app/dollar` — ETH/WETH deposits and recombination against verified deployments.
+- `/app/wallet?modal=portal` — canonical Uniswap EVM swaps, Jupiter Solana swaps, and Across
+  funding.
+- `/app/portal` — compatibility redirect to the canonical wallet Portal URL.
+- `/app/dollar?profile=USDG` — direct entry to the pegged Statics Dollar profile.
+- `/app/dollar` — ETH/WETH deposits, recombination, and Risk supply against verified deployments.
 - `/app/activity` — wallet-scoped EVM, Solana, swap, bridge, and protocol activity.
 
 Statics and Eves Market intentionally keep separate login sessions. Configure Statics with the
@@ -25,10 +28,9 @@ npm run dev
 
 Copy `.env.example` to `.env.local` only when environment overrides are needed. Do not commit
 environment files or credentials. Normal development uses the configured runtime, including local
-Anvil when selected. Every DApp route keeps its complete layout visible when wallet, deployment, or
-RPC data is unavailable; affected values render as `--` and dependent actions remain disabled.
-Use `npm run dev:preview` to render the labelled deterministic sample states used for visual
-regression work.
+Anvil when selected. Unavailable, disconnected, wrong-network, loading, empty, and failed reads
+render through the same components used by the connected application. The DApp does not maintain
+a parallel sample-data application.
 
 The wallet imports the generated EVM token catalog and icons used by Eves Market, supports custom
 ERC-20s, discovers SPL and Token-2022 balances, and uses Jupiter's token catalog for adding Solana

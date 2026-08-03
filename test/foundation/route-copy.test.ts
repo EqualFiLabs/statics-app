@@ -113,9 +113,7 @@ describe("dapp navigation grouping", () => {
 });
 
 describe("sidebar completeness", () => {
-  it("lists every destination, because the sidebar is not the constrained surface", () => {
-    // Holding things out of the menu was tried twice and was wrong twice. The
-    // tab bar is the surface with a hard limit; the sidebar shows everything.
+  it("keeps the primary menu focused on destination surfaces", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
       "Earn",
@@ -125,18 +123,23 @@ describe("sidebar completeness", () => {
       "Positions",
       "Loans",
       "Wallet",
+      "Faucet",
       "Activity",
-      "Settings",
       "Tools",
     ]);
+  });
+
+  it("keeps position management directly discoverable", () => {
+    const manage = appNavigationGroups.find((group) => group.label === "Manage");
+    expect(manage?.items.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
   });
 
   it("keeps account plumbing grouped rather than promoted", () => {
     const account = appNavigationGroups.find((group) => group.label === "Account");
     expect(account?.items.map((item) => item.href)).toEqual([
       "/app/wallet",
+      "/app/faucet",
       "/app/activity",
-      "/app/settings",
       "/app/tools",
     ]);
   });

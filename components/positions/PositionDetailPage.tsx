@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
-  decodeFunctionResult,
   encodeFunctionData,
   formatUnits,
   getAddress,
-  parseEventLogs,
   parseUnits,
   type Address,
   type Hex,
@@ -18,45 +16,35 @@ import { useMemo, useState } from "react";
 
 import {
   basketTokenAbi,
-  buildClaimRewardsCall,
   buildClosePositionCall,
   buildDepositBasketCollateralCall,
-  buildMintBasketCollateralCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
-  buildRedeemBasketCollateralCall,
   buildStakeCall,
   buildUnstakeCall,
   buildWithdrawBasketCollateralCall,
-  staticsAbi,
 } from "@statics-protocol/sdk";
 
-import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
-  maximumWithSlippage,
-  minimumWithSlippage,
-  parseSlippageBps,
-} from "@/lib/baskets/baskets";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canClosePosition,
-  claimablePositionRewards,
   describePositionError,
   loadPositionCatalog,
   unlockedCollateral,
   validateCustomRewardAsset,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
-import { PositionDetailPreview } from "@/components/preview/DappPreview";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import { deriveSurfaceState } from "@/lib/surface-state";
 
 const deploymentState = readClientDollarDeployment();
 
-type CollateralMode = "deposit" | "mint" | "withdraw" | "redeem";
+type CollateralMode = "deposit" | "withdraw";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -74,10 +62,7 @@ function parseAmount(value: string, decimals: number): bigint {
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <PositionDetailPreview positionId={positionId} />;
-  }
-  if (wallet.status === "unconfigured") return <PositionDetailPreview positionId={positionId} />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Position" />;
   return <PositionDetailRuntime positionId={positionId} />;
 }
 
@@ -92,21 +77,17 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const [collateralMode, setCollateralMode] = useState<CollateralMode>("deposit");
   const [basketIdInput, setBasketIdInput] = useState("0");
   const [collateralAmountInput, setCollateralAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [stakeMode, setStakeMode] = useState<"stake" | "unstake">("stake");
   const [stakeAmountInput, setStakeAmountInput] = useState("");
   const [customRewardAddress, setCustomRewardAddress] = useState("");
 
   const catalog = useQuery({
-    queryKey: [
-      "position-catalog",
+    queryKey: protocolQueryKeys.positionCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -137,8 +118,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     () => parseAmount(stakeAmountInput, catalog.data?.stakingToken.decimals ?? 18),
     [stakeAmountInput, catalog.data?.stakingToken.decimals]
   );
-  const slippageBps = parseSlippageBps(slippageInput);
-
   const sendTransaction = async ({
     kind,
     label,
@@ -198,104 +177,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     }
   };
 
-  const claimRewards = async () => {
-    if (!wallet || !publicClient || !position || deploymentState.status !== "configured") {
-      throw new Error("The connected position is unavailable.");
-    }
-    const refreshed = await catalog.refetch();
-    const current = refreshed.data?.positions.find(
-      (candidate) => candidate.positionId === position.positionId
-    );
-    if (!current) throw new Error("This position is no longer owned by the connected wallet.");
-    const rewards = claimablePositionRewards(current.rewards);
-    if (!rewards.length) throw new Error("This position has no rewards to claim.");
-    const assets = rewards.map((reward) => reward.token.address);
-    const minimums = rewards.map((reward) => reward.pending);
-    const balancesBefore = await Promise.all(
-      rewards.map((reward) =>
-        publicClient.readContract({
-          address: reward.token.address,
-          abi: basketTokenAbi,
-          functionName: "balanceOf",
-          args: [wallet],
-        })
-      )
-    );
-
-    await sendTransaction({
-      kind: "claim-rewards",
-      label: `Claim rewards from Position #${current.positionId.toString()}`,
-      amount: rewards
-        .map(
-          (reward) =>
-            `${displayAmount(reward.pending, reward.token.decimals)} ${reward.token.symbol}`
-        )
-        .join(" + "),
-      to: deploymentState.deployment.contracts.diamond,
-      data: buildClaimRewardsCall(current.positionId, assets, wallet, minimums),
-      validateSimulation: (result) => {
-        if (!result) throw new Error("The reward claim simulation returned no amounts.");
-        const amounts = decodeFunctionResult({
-          abi: staticsAbi,
-          functionName: "claimRewards",
-          data: result,
-        });
-        if (amounts.some((amount, index) => amount < (minimums[index] ?? 0n))) {
-          throw new Error("The reward claim simulation fell below the reviewed minimum.");
-        }
-      },
-      verifyConfirmation: async (receipt) => {
-        const events = parseEventLogs({
-          abi: staticsAbi,
-          eventName: "RewardClaimed",
-          logs: receipt.logs,
-          strict: true,
-        }).filter((event) => event.args.positionId === current.positionId);
-        if (
-          assets.some(
-            (asset) =>
-              !events.some(
-                (event) =>
-                  getAddress(event.args.asset) === asset &&
-                  getAddress(event.args.receiver) === wallet
-              )
-          )
-        ) {
-          throw new Error("The receipt did not contain every reviewed reward claim.");
-        }
-        const [pendingAfter, balancesAfter] = await Promise.all([
-          publicClient.readContract({
-            account: wallet,
-            address: deploymentState.deployment.contracts.diamond,
-            abi: staticsAbi,
-            functionName: "pendingRewards",
-            args: [current.positionId, assets],
-          }),
-          Promise.all(
-            rewards.map((reward) =>
-              publicClient.readContract({
-                address: reward.token.address,
-                abi: basketTokenAbi,
-                functionName: "balanceOf",
-                args: [wallet],
-              })
-            )
-          ),
-        ]);
-        if (pendingAfter.some((amount) => amount !== 0n)) {
-          throw new Error("Claimed rewards remain pending after confirmation.");
-        }
-        if (
-          balancesAfter.some(
-            (balance, index) => balance - (balancesBefore[index] ?? 0n) < (minimums[index] ?? 0n)
-          )
-        ) {
-          throw new Error("The wallet did not receive every reviewed reward amount.");
-        }
-      },
-    });
-  };
-
   const executeCollateralAction = async () => {
     if (
       !position ||
@@ -345,72 +226,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       return;
     }
 
-    if (collateralMode === "mint") {
-      if (slippageBps === null) throw new Error("Slippage must be between 0% and 5%.");
-      const quote = await publicClient.readContract({
-        address: diamond,
-        abi: staticsAbi,
-        functionName: "quoteMint",
-        args: [basket.basketId, collateralAmount],
-      });
-      const maximums = quote.map((amount) => maximumWithSlippage(amount, slippageBps));
-      const approvalIndex = basket.constituents.findIndex(
-        (constituent, index) =>
-          constituent.walletBalance < (maximums[index] ?? 0n) ||
-          constituent.allowance < (maximums[index] ?? 0n)
-      );
-      if (approvalIndex >= 0) {
-        const constituent = basket.constituents[approvalIndex];
-        const maximum = maximums[approvalIndex];
-        if (!constituent || maximum === undefined) {
-          throw new Error("The underlying quote is incomplete.");
-        }
-        if (constituent.walletBalance < maximum) {
-          throw new Error(`The wallet does not hold enough ${constituent.token.symbol}.`);
-        }
-        await sendTransaction({
-          kind: "approve-basket-asset",
-          label: `Approve ${constituent.token.symbol}`,
-          amount: `${displayAmount(maximum, constituent.token.decimals)} ${constituent.token.symbol}`,
-          to: constituent.token.address,
-          data: encodeFunctionData({
-            abi: basketTokenAbi,
-            functionName: "approve",
-            args: [diamond, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-        return;
-      }
-      await sendTransaction({
-        kind: "mint-basket-collateral",
-        label: `Mint ${basket.symbol} into collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildMintBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          maximums
-        ),
-        validateSimulation: (result) => {
-          if (!result) throw new Error("The collateral mint simulation returned no result.");
-          const amounts = decodeFunctionResult({
-            abi: staticsAbi,
-            functionName: "mintBasketCollateral",
-            data: result,
-          });
-          if (
-            amounts.length !== basket.constituents.length ||
-            amounts.some((amount) => amount <= 0n)
-          ) {
-            throw new Error("The collateral mint simulation returned invalid inputs.");
-          }
-        },
-      });
-      setCollateralAmountInput("");
-      return;
-    }
-
     if (!existingCollateral || unlockedCollateral(existingCollateral) < collateralAmount) {
       throw new Error("The position does not have enough unlocked basket collateral.");
     }
@@ -418,56 +233,18 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       throw new Error("Basket collateral becomes removable in the next block.");
     }
 
-    if (collateralMode === "withdraw") {
-      await sendTransaction({
-        kind: "withdraw-basket-collateral",
-        label: `Withdraw ${basket.symbol} collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildWithdrawBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          wallet
-        ),
-      });
-    } else {
-      if (slippageBps === null) throw new Error("Slippage must be between 0% and 5%.");
-      const quote = await publicClient.readContract({
-        address: diamond,
-        abi: staticsAbi,
-        functionName: "quoteRedeem",
-        args: [basket.basketId, collateralAmount],
-      });
-      const minimums = quote.map((amount) => minimumWithSlippage(amount, slippageBps));
-      await sendTransaction({
-        kind: "redeem-basket-collateral",
-        label: `Redeem ${basket.symbol} collateral`,
-        amount: amountLabel,
-        to: diamond,
-        data: buildRedeemBasketCollateralCall(
-          position.positionId,
-          basket.basketId,
-          collateralAmount,
-          wallet,
-          minimums
-        ),
-        validateSimulation: (result) => {
-          if (!result) throw new Error("The collateral redemption simulation returned no result.");
-          const amounts = decodeFunctionResult({
-            abi: staticsAbi,
-            functionName: "redeemBasketCollateral",
-            data: result,
-          });
-          if (
-            amounts.length !== basket.constituents.length ||
-            amounts.some((amount) => amount <= 0n)
-          ) {
-            throw new Error("The collateral redemption simulation returned invalid outputs.");
-          }
-        },
-      });
-    }
+    await sendTransaction({
+      kind: "withdraw-basket-collateral",
+      label: `Withdraw ${basket.symbol} collateral`,
+      amount: amountLabel,
+      to: diamond,
+      data: buildWithdrawBasketCollateralCall(
+        position.positionId,
+        basket.basketId,
+        collateralAmount,
+        wallet
+      ),
+    });
     setCollateralAmountInput("");
   };
 
@@ -557,17 +334,41 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     setCustomRewardAddress("");
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    walletState.status !== "ready" ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
-    return <PositionDetailPreview positionId={positionId} />;
+  if (deploymentState.status === "unavailable") {
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="position"
+        empty={{ title: "Position unavailable", description: "No deployment is configured." }}
+      />
+    );
+  }
+  const detailState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: false,
+    hasData: Boolean(catalog.data),
+  });
+  if (detailState !== "ready") {
+    return (
+      <SurfaceEmptyState
+        state={detailState}
+        subject="position"
+        onRetry={() => void catalog.refetch()}
+        empty={{ title: "Position unavailable", description: "No position data is available." }}
+      />
+    );
   }
   if (!position || !catalog.data) {
-    return <PositionDetailPreview positionId={positionId} />;
+    return (
+      <EmptyState
+        title="Position not found"
+        description={`Position #${positionId.toString()} is not owned by the connected wallet.`}
+        action={{ label: "View your positions", href: "/app/positions" }}
+      />
+    );
   }
 
   const closeReady = canClosePosition(position);
@@ -621,7 +422,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           <p className="dapp-section-label">Basket collateral</p>
           <h3>Manage collateral legs</h3>
           <div className="dollar-tabs" aria-label="Collateral action">
-            {(["deposit", "mint", "withdraw", "redeem"] as const).map((mode) => (
+            {(["deposit", "withdraw"] as const).map((mode) => (
               <button
                 type="button"
                 key={mode}
@@ -667,21 +468,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               {existingCollateral ? displayAmount(unlockedCollateral(existingCollateral)) : "0"}
             </small>
           </label>
-          {(collateralMode === "mint" || collateralMode === "redeem") && (
-            <label className="basket-field">
-              <span>Slippage tolerance</span>
-              <div>
-                <input
-                  value={slippageInput}
-                  onChange={(event) => setSlippageInput(event.target.value)}
-                  inputMode="decimal"
-                  disabled={pendingAction !== null}
-                />
-                <strong>%</strong>
-              </div>
-              <small>Allowed range 0–5%. Fresh bounds are read immediately before signing.</small>
-            </label>
-          )}
           <button
             className="dollar-submit"
             type="button"
@@ -692,12 +478,24 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               ? "Waiting for confirmation…"
               : collateralMode === "deposit"
                 ? "Approve or deposit BasketToken"
-                : collateralMode === "mint"
-                  ? "Approve or mint into collateral"
-                  : collateralMode === "withdraw"
-                    ? "Withdraw BasketToken"
-                    : "Redeem collateral to underlyings"}
+                : "Withdraw BasketToken"}
           </button>
+          {basket && (
+            <div className="position-action-links">
+              <Link
+                className="dollar-primary-link"
+                href={`/app/baskets/${basket.basketId.toString()}?action=mint&positionId=${position.positionId.toString()}`}
+              >
+                Mint {basket.symbol} into this position →
+              </Link>
+              <Link
+                className="dollar-primary-link"
+                href={`/app/baskets/${basket.basketId.toString()}?action=redeem&positionId=${position.positionId.toString()}`}
+              >
+                Redeem this position&apos;s {basket.symbol} →
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="position-panel">
@@ -848,19 +646,15 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           </button>
         </div>
         <p className="dollar-warning">
-          Claims use the fresh pending amounts shown above as per-asset minimums. Selecting an asset
-          never grants historical rewards.
+          Selecting an asset never grants historical rewards. Pending balances are claimed from the
+          Earn page, where every reward source is shown together.
         </p>
-        <button
-          className="dollar-submit"
-          type="button"
-          disabled={
-            pendingAction !== null || claimablePositionRewards(position.rewards).length === 0
-          }
-          onClick={() => void runAction("claim-rewards", claimRewards)}
+        <Link
+          className="dollar-primary-link"
+          href={`/app/rewards?positionId=${position.positionId.toString()}`}
         >
-          {pendingAction === "claim-rewards" ? "Claiming rewards…" : "Claim all pending rewards"}
-        </button>
+          View and claim rewards →
+        </Link>
       </section>
 
       {actionError && (

@@ -319,7 +319,7 @@ export function PeggedDollarPanel({
           ...permit,
         }),
     });
-    return decodePermitSignature(deadline, signature);
+    return decodePermitSignature(value, deadline, signature);
   };
 
   const nextAction = async () => {

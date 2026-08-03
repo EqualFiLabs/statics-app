@@ -489,9 +489,7 @@
  * is signed in, so it gets the accent. Once connected it drops back to
  * a neutral chip — a connected wallet is a status, not a call to act. */
 .dapp-wallet-button,
-.dapp-wallet-link,
-.dapp-settings button,
-.dapp-settings-actions a {
+.dapp-wallet-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -513,15 +511,12 @@
     color 120ms ease;
 }
 
-.dapp-wallet-button:hover:not(:disabled),
-.dapp-settings button:hover:not(:disabled),
-.dapp-settings-actions a:hover {
+.dapp-wallet-button:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
 .dapp-wallet-button:disabled,
-.dapp-wallet-link:disabled,
-.dapp-settings button:disabled {
+.dapp-wallet-link:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -799,101 +794,6 @@
   margin-right: 0.6rem;
   color: var(--accent);
   content: ">";
-}
-
-.dapp-settings {
-  margin-top: 10px;
-  padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
-  border-radius: var(--radius-lg);
-}
-
-.dapp-settings-heading {
-  max-width: 680px;
-}
-
-.dapp-settings-heading h2,
-.dapp-export-warning h3 {
-  margin: 0.8rem 0;
-  font-weight: 500;
-}
-
-.dapp-settings-heading h2 {
-  font-size: var(--text-2xl);
-}
-
-.dapp-settings-heading > p:last-child,
-.dapp-export-warning p {
-  color: var(--app-text-muted);
-  font-size: var(--text-base);
-  line-height: 1.7;
-}
-
-.dapp-wallet-details {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin: 2rem 0 0;
-  background: var(--app-border);
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.dapp-wallet-details > div {
-  min-width: 0;
-  padding: 1rem;
-  background: var(--app-surface);
-  border-radius: var(--radius-lg);
-}
-
-.dapp-wallet-details dt {
-  color: var(--app-text-muted);
-  font-size: var(--text-caption);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.dapp-wallet-details dd {
-  margin: 1rem 0 0;
-  color: var(--app-text);
-  font-size: var(--text-base);
-  text-transform: capitalize;
-  overflow-wrap: anywhere;
-}
-
-.dapp-settings-actions {
-  display: flex;
-  gap: 0.65rem;
-  margin-top: 1rem;
-}
-
-.dapp-settings-actions a {
-  display: inline-flex;
-  align-items: center;
-}
-
-.dapp-export-warning {
-  max-width: 720px;
-  margin-top: 2rem;
-  padding: 1.25rem;
-  border: 1px solid var(--warning);
-  background: var(--warning-wash);
-  border-radius: var(--radius-lg);
-}
-
-.dapp-export-warning h3 {
-  color: var(--warning);
-  font-size: var(--text-base);
-}
-
-.dapp-logout {
-  margin-top: 2rem;
-  border-color: var(--negative) !important;
-  background: var(--negative-wash) !important;
-  color: var(--negative) !important;
 }
 
 .approval-tools {
@@ -1443,9 +1343,7 @@
   color: var(--accent);
 }
 
-.wallet-quick-actions span {
-  display: inline-block;
-  margin-right: 0.65rem;
+.wallet-quick-actions svg {
   color: var(--accent);
 }
 
@@ -1462,6 +1360,53 @@
 .testnet-faucet h2,
 .testnet-faucet p {
   margin: 0;
+}
+
+.testnet-faucet .testnet-faucet-help {
+  margin-top: 0.65rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.testnet-faucet-help a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.testnet-faucet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.testnet-faucet-actions button {
+  min-height: 44px;
+}
+
+.testnet-faucet-actions .dollar-submit {
+  margin-top: 0;
+}
+
+.testnet-faucet-add {
+  border: 1px solid var(--app-border-strong);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+}
+
+.testnet-faucet-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.testnet-faucet-add:disabled {
+  border-color: var(--app-border);
+  color: var(--app-text-muted);
+  cursor: not-allowed;
 }
 
 .testnet-faucet ul {
@@ -1484,6 +1429,12 @@
 
 .testnet-faucet li strong {
   color: var(--app-text);
+}
+
+@media (width <= 560px) {
+  .testnet-faucet-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .wallet-assets {
@@ -1607,7 +1558,7 @@
 .portal-direction-tabs,
 .portal-chain-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   padding: 0.6rem;
   border-bottom: 1px solid var(--app-border);
 }
@@ -1839,6 +1790,25 @@
   margin: 0;
   padding: 0 2rem 1.5rem;
   text-align: center;
+}
+
+.portal-dollar-route {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2rem 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-lg);
+}
+
+.portal-dollar-route a {
+  flex: none;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* Typography is restated rather than inherited, because a dialog may be
@@ -2346,7 +2316,36 @@
 }
 
 .account-dialog {
-  width: min(440px, 100%);
+  width: min(520px, 100%);
+}
+
+.account-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--app-border);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.account-details > div {
+  padding: 0.8rem;
+  background: var(--app-raised);
+}
+
+.account-details dt {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+
+.account-details dd {
+  margin: 0.35rem 0 0;
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
 }
 
 /* The address wraps rather than truncates: a person checking they are about to
@@ -2416,7 +2415,48 @@
   border-color: var(--app-text-muted);
 }
 
-.account-disconnect {
+.account-explorer {
+  color: var(--accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.account-explorer:hover {
+  text-decoration: underline;
+}
+
+.account-export-warning {
+  padding: 0.9rem;
+  border: 1px solid var(--warning);
+  background: var(--warning-wash);
+  border-radius: var(--radius-md);
+}
+
+.account-export-warning strong {
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+
+.account-export-warning p {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.account-export-warning button {
+  min-height: var(--control-height);
+  padding: 0 0.9rem;
+  border: 1px solid var(--warning);
+  background: transparent;
+  color: var(--warning);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.account-signout {
   width: 100%;
   height: var(--control-height);
   color: var(--warning);
@@ -2428,12 +2468,13 @@
   cursor: pointer;
 }
 
-.account-disconnect:hover:not(:disabled) {
+.account-signout:hover:not(:disabled) {
   color: var(--app-bg);
   background: var(--warning);
 }
 
-.account-disconnect:disabled {
+.account-signout:disabled,
+.account-export-warning button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -3183,6 +3224,11 @@
   padding: 1rem;
   border: 1px solid var(--app-border);
   border-radius: var(--radius-lg);
+}
+
+.reward-position-list article.is-focused {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .reward-position-list h3 {
@@ -4077,10 +4123,41 @@
   border-radius: var(--radius-lg);
 }
 
-.pool-grid article > div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+.pool-grid article.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.pool-select {
+  display: grid;
+  width: 100%;
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pool-select > span:last-child {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+.pool-grid details,
+.liquidity-position-diagnostics {
+  margin-top: 1rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+.pool-grid summary,
+.liquidity-position-diagnostics summary {
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .pool-grid code {
@@ -4132,8 +4209,64 @@
   overflow: hidden;
 }
 
+.liquidity-entry-actions {
+  display: flex;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+
+.liquidity-entry-actions button,
+.liquidity-entry-actions a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: var(--text-caption);
+  text-decoration: none;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+}
+
+.liquidity-entry-actions button.active,
+.liquidity-entry-actions button:hover,
+.liquidity-entry-actions a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .liquidity-tabs {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  margin: 1rem 0;
+}
+
+.liquidity-position-diagnostics dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0.75rem 0 0;
+  background: var(--app-border);
+}
+
+.liquidity-position-diagnostics dl > div {
+  padding: 0.75rem;
+  background: var(--app-surface);
+}
+
+.liquidity-position-diagnostics dt {
+  text-transform: uppercase;
+}
+
+.liquidity-position-diagnostics dd {
+  margin: 0.35rem 0 0;
+  color: var(--app-text);
+  overflow-wrap: anywhere;
 }
 
 .pol-boundary {
@@ -4211,7 +4344,6 @@
 /* Hairline-divider containers clip their own corners, so their cells must
  * stay square -- a rounded cell lets the divider colour bleed through as a
  * notch. Class is doubled to outrank the per-page cell rules. */
-.dapp-wallet-details.dapp-wallet-details > *,
 .portal-quote-grid.portal-quote-grid > *,
 .dollar-metrics.dollar-metrics > *,
 .dollar-tabs.dollar-tabs > *,
@@ -4416,14 +4548,22 @@
 }
 
 @media (max-width: 720px) {
-  .wallet-quick-actions,
   .portal-quote-grid {
     grid-template-columns: 1fr;
   }
 
+  .wallet-quick-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding-top: 0.75rem;
+  }
+
   .wallet-quick-actions button {
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
+    min-height: 44px;
+    flex-direction: row;
+    gap: 0.25rem;
+    padding: 0.45rem 0.25rem;
+    font-size: var(--text-caption);
   }
 
   .wallet-network-row {
@@ -4601,10 +4741,6 @@
     grid-template-columns: 1fr;
   }
 
-  .dapp-wallet-details {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .dollar-overview-card,
   .dollar-workspace {
     grid-template-columns: 1fr;
@@ -4671,15 +4807,6 @@
   .dapp-intro > p:last-child {
     font-size: var(--text-base);
     line-height: 1.6;
-  }
-
-  .dapp-wallet-details {
-    grid-template-columns: 1fr;
-  }
-
-  .dapp-settings-actions {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .dollar-metrics {

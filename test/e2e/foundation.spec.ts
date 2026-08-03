@@ -23,10 +23,8 @@ async function navigateDapp(page: Page, href: string) {
     await headerLink.click();
     return;
   }
-  // Detail destinations have no menu entry on desktop by design. They are
-  // reached from the overview's portfolio grid, so that is the path to assert.
-  await page.goto("/app");
-  await page.locator(`.preview-overview-grid a[href="${href}"]`).click();
+  // Contextual and retired destinations have no primary menu entry.
+  await page.goto(href);
 }
 
 test.describe("landing foundation", () => {
@@ -113,17 +111,18 @@ test.describe("Dollar DApp foundation", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Funding Portal" })).toHaveCount(0);
 
+    await page.goto("/app/portal");
+    await expect(page).toHaveURL(/\/app\/wallet\?modal=portal$/);
+    await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
 
     await navigateDapp(page, "/app/baskets");
     await expect(page).toHaveURL(/\/app\/baskets$/);
-    await page
-      .getByRole("link", { name: /inspect basket/i })
-      .first()
-      .click();
+    await page.goto("/app/baskets/0");
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
-    await page.getByRole("link", { name: /all baskets/i }).click();
     await page.goto("/app/create");
     await expect(
       page.getByRole("heading", { name: "Basket launches are steward-controlled" })
@@ -131,10 +130,7 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
-    await page
-      .getByRole("link", { name: /manage position/i })
-      .first()
-      .click();
+    await page.goto("/app/positions/0");
     await expect(page).toHaveURL(/\/app\/positions\/0$/);
 
     await navigateDapp(page, "/app/loans");
@@ -149,11 +145,11 @@ test.describe("Dollar DApp foundation", () => {
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
 
+    await navigateDapp(page, "/app/faucet");
+    await expect(page).toHaveURL(/\/app\/faucet$/);
+
     await navigateDapp(page, "/app/tools");
     await expect(page).toHaveURL(/\/app\/tools$/);
-
-    await navigateDapp(page, "/app/settings");
-    await expect(page).toHaveURL(/\/app\/settings$/);
   });
 
   test("provides an accessible responsive application menu", async ({ page }, testInfo) => {
@@ -228,6 +224,7 @@ test.describe("Dollar DApp foundation", () => {
       "/app/loans",
       "/app/rewards",
       "/app/liquidity",
+      "/app/faucet",
       "/app/tools",
     ]) {
       await page.goto(route);

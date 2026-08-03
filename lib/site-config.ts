@@ -91,11 +91,9 @@ export type AppNavigationGroup = Readonly<{
 /**
  * Application navigation, grouped by what someone is trying to do.
  *
- * Ten flat peers described the protocol's facets rather than any intent, and
- * gave no clue that Positions is the container the others sit inside. Grouping
- * is deliberately the first step and changes no routes: it buys most of the
- * apparent simplification, and it can be reverted or re-cut without touching a
- * single page.
+ * Flat peers described the protocol's facets rather than any intent. Positions
+ * remain reachable from the portfolio and the workflows that use them, while
+ * account configuration lives in the account dialog instead of a second page.
  *
  * Earn leads because staking is the one part of this protocol that reads as an
  * ordinary savings product -- deposit, choose what you are paid in, get paid.
@@ -121,10 +119,6 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     ],
   },
   {
-    // These stay in the sidebar. Positions being the container the others sit
-    // inside is an argument about the data model, not about how people navigate:
-    // a position is something you go and look at. The overview's portfolio grid
-    // is an additional route to them, not a replacement for a menu entry.
     label: "Manage",
     items: [
       { label: "Positions", enabled: true, href: "/app/positions" },
@@ -135,8 +129,8 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     label: "Account",
     items: [
       { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
+      { label: "Faucet", enabled: true, href: "/app/faucet" },
       { label: "Activity", enabled: true, href: "/app/activity" },
-      { label: "Settings", enabled: true, href: "/app/settings" },
       { label: "Tools", enabled: true, href: "/app/tools" },
     ],
   },

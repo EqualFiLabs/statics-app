@@ -26,14 +26,7 @@ import {
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 
-import {
-  activityTimestamp,
-  updateDollarActivity,
-  writeDollarActivity,
-  type DollarActivityKind,
-  type DollarActivityStatus,
-  type DollarReplacementReason,
-} from "@/lib/dollar/activity";
+import type { DollarActivityKind } from "@/lib/dollar/activity";
 import {
   DOLLAR_PAIRING_FILL_PAUSE,
   deriveDollarActionAvailability,
@@ -59,8 +52,6 @@ import {
 } from "@/lib/dollar/deployment";
 import {
   describeDollarError,
-  isOnchainRevert,
-  isWalletRejection,
   WAD,
   redeemDeadline,
   maximumWithTolerance,
@@ -68,9 +59,7 @@ import {
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
-import { DollarOverviewPreview, DollarPagePreview } from "@/components/preview/DappPreview";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
 import { loadLoanCatalog } from "@/lib/loans/loans";
@@ -78,7 +67,9 @@ import { loadBasketRewardSummary, totalRewardsByAsset } from "@/lib/baskets/rewa
 import { readEvesMarketUrl } from "@/lib/site-config";
 import { overviewTiles } from "@/lib/overview";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
+import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -93,8 +84,6 @@ const modeLabels: Record<DollarActionMode, string> = {
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
   mode === "supply" || mode === "unsupply";
-type DollarProfileChoice = DollarCollateralChoice | "USDG";
-
 export function DollarProfileContent({
   profile,
   volatile,
@@ -330,7 +319,14 @@ function DollarOverviewConnected({
 }) {
   const snapshot = useDollarSnapshot(deployment, wallet);
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
-    return <DollarOverviewPreview />;
+    return (
+      <SurfaceEmptyState
+        state={snapshot.isPending ? "loading" : "error"}
+        subject="Dollar portfolio"
+        onRetry={() => void snapshot.refetch()}
+        empty={{ title: "No Dollar position", description: "No Dollar position is available." }}
+      />
+    );
   }
   const data = snapshot.data!;
   return (
@@ -476,11 +472,17 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
 
 export function DollarOverview() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <DollarOverviewPreview />;
-  }
   if (deploymentState.status === "unavailable") {
-    return <DollarOverviewPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="portfolio"
+        empty={{
+          title: "Your portfolio is empty",
+          description: "Add funds to begin using Statics.",
+        }}
+      />
+    );
   }
   // The overview is the app's front door. Six cards of em dashes told a
   // first-time visitor nothing about why they were empty or what to do.
@@ -520,16 +522,20 @@ export function DollarOverview() {
 function DollarActionPanel({
   deployment,
   wallet,
+  initialProfile,
 }: {
   deployment: DollarDeployment;
   wallet: Address;
+  initialProfile: DollarProfileChoice;
 }) {
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
   const snapshot = useDollarSnapshot(deployment, wallet);
   const [mode, setMode] = useState<DollarActionMode>("deposit");
-  const [asset, setAsset] = useState<DollarCollateralChoice>("ETH");
-  const [peggedSelected, setPeggedSelected] = useState(false);
+  const [asset, setAsset] = useState<DollarCollateralChoice>(
+    initialProfile === "WETH" ? "WETH" : "ETH"
+  );
+  const [peggedSelected, setPeggedSelected] = useState(initialProfile === "USDG");
   const [peggedPending, setPeggedPending] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
@@ -638,75 +644,31 @@ function DollarActionPanel({
   }) => {
     if (!publicClient || !walletClient.data)
       throw new Error("The connected wallet is unavailable.");
-    const id = crypto.randomUUID();
-    let stage: "simulating" | "signing" | "submitted" | "finished" = "simulating";
-    let replacementReason: DollarReplacementReason | undefined;
-    writeDollarActivity({
-      id,
+    await executeProtocolTransaction({
+      publicClient,
       wallet,
       chainId: deployment.chainId,
       kind,
       label,
       amount: amountInput || "0",
-      status: "simulating",
-      createdAt: activityTimestamp(),
+      to,
+      data,
+      value,
+      sendTransaction: ({
+        to: transactionTarget,
+        data: transactionData,
+        value: transactionValue,
+      }) =>
+        walletClient.data!.sendTransaction({
+          account: wallet,
+          chain: walletClient.data!.chain,
+          to: transactionTarget,
+          data: transactionData,
+          value: transactionValue,
+        }),
+      describeError: describeDollarError,
+      validateSimulation,
     });
-    try {
-      const simulation = await publicClient.call({ account: wallet, to, data, value });
-      validateSimulation?.(simulation.data);
-      stage = "signing";
-      updateDollarActivity(wallet, deployment.chainId, id, { status: "signing" });
-      const hash = await walletClient.data.sendTransaction({
-        account: wallet,
-        chain: walletClient.data.chain,
-        to,
-        data,
-        value,
-      });
-      stage = "submitted";
-      updateDollarActivity(wallet, deployment.chainId, id, { hash, status: "submitted" });
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        confirmations: 1,
-        onReplaced: (replacement) => {
-          replacementReason = replacement.reason;
-          updateDollarActivity(wallet, deployment.chainId, id, {
-            status: "replaced",
-            replacementHash: replacement.transaction.hash,
-            replacementReason,
-          });
-        },
-      });
-      if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
-      if (replacementReason === "cancelled" || replacementReason === "replaced") {
-        const message =
-          replacementReason === "cancelled"
-            ? "The submitted transaction was cancelled in the wallet."
-            : "The submitted transaction was replaced by a different wallet transaction.";
-        stage = "finished";
-        updateDollarActivity(wallet, deployment.chainId, id, {
-          status: "replaced",
-          confirmedHash: receipt.transactionHash,
-          error: message,
-        });
-        throw new Error(message);
-      }
-      stage = "finished";
-      updateDollarActivity(wallet, deployment.chainId, id, {
-        confirmedHash: receipt.transactionHash,
-        status: "confirmed",
-      });
-    } catch (error) {
-      if (stage === "finished") throw error;
-      let status: DollarActivityStatus = "failed";
-      if (isWalletRejection(error)) status = "rejected";
-      else if (stage === "submitted" && isOnchainRevert(error)) status = "reverted";
-      updateDollarActivity(wallet, deployment.chainId, id, {
-        status,
-        error: describeDollarError(error),
-      });
-      throw error;
-    }
   };
 
   const claimProceeds = async () => {
@@ -995,7 +957,14 @@ function DollarActionPanel({
   const supply = supplyState.data ?? emptyDollarSupplyState;
 
   if ((snapshot.isPending || snapshot.isError) && !snapshot.data) {
-    return <DollarPagePreview />;
+    return (
+      <SurfaceEmptyState
+        state={snapshot.isPending ? "loading" : "error"}
+        subject="Dollar state"
+        onRetry={() => void snapshot.refetch()}
+        empty={{ title: "Dollar unavailable", description: "No Dollar state is available." }}
+      />
+    );
   }
 
   const state = snapshot.data!;
@@ -1377,22 +1346,43 @@ function DollarActionPanel({
   );
 }
 
-export function DollarPage() {
+export function DollarPage({ initialProfile = "ETH" }: { initialProfile?: DollarProfileChoice }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <DollarPagePreview />;
-  }
   if (deploymentState.status === "unavailable") {
-    return <DollarPagePreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="Dollar"
+        empty={{ title: "Dollar unavailable", description: "No Dollar deployment is configured." }}
+      />
+    );
   }
-  if (wallet.status !== "ready" || !wallet.address) return <DollarPagePreview />;
-  if (!wallet.isTargetChain) {
-    return <DollarPagePreview />;
+  const surfaceState = deriveSurfaceState({
+    walletStatus: wallet.status,
+    isTargetChain: wallet.isTargetChain,
+    isLoading: false,
+    isError: false,
+    isEmpty: false,
+    hasData: false,
+  });
+  if (surfaceState !== "ready" || !wallet.address) {
+    return (
+      <SurfaceEmptyState
+        state={surfaceState}
+        subject="Dollar"
+        empty={{
+          title: "No Dollar position",
+          description: "Deposit collateral to get Statics Dollar.",
+          action: { label: "Add funds", href: "/app/wallet?modal=portal" },
+        }}
+      />
+    );
   }
   return (
     <DollarActionPanel
       deployment={deploymentState.deployment}
       wallet={getAddress(wallet.address)}
+      initialProfile={initialProfile}
     />
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   loadWalletTokens,
+  mergeWalletTokens,
   saveWalletTokens,
   subscribeWalletTokens,
   type WalletToken,
@@ -18,18 +19,18 @@ export function useWalletTokens(chainId: number) {
     return subscribeWalletTokens(refresh);
   }, [chainId]);
 
-  const addToken = useCallback(
-    (token: WalletToken) => {
+  const addTokens = useCallback(
+    (nextTokens: readonly WalletToken[]) => {
       const current = loadWalletTokens(chainId);
-      if (
-        current.some((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase())
-      ) {
-        return;
+      const next = mergeWalletTokens(current, nextTokens);
+      if (next.length > current.length) {
+        saveWalletTokens(chainId, next);
       }
-      saveWalletTokens(chainId, [...current, token]);
     },
     [chainId]
   );
+
+  const addToken = useCallback((token: WalletToken) => addTokens([token]), [addTokens]);
 
   const removeToken = useCallback(
     (address: string) => {
@@ -44,5 +45,5 @@ export function useWalletTokens(chainId: number) {
     [chainId]
   );
 
-  return { tokens, addToken, removeToken };
+  return { tokens, addToken, addTokens, removeToken };
 }

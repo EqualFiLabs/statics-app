@@ -9,8 +9,6 @@
   "scripts": {
     "dev": "next dev",
     "dev:connected": "node scripts/dev-connected.mjs",
-    "dev:preview": "NEXT_PUBLIC_APP_ENV=development NEXT_PUBLIC_DAPP_PREVIEW=true next dev",
-    "build:preview": "NEXT_PUBLIC_APP_ENV=development NEXT_PUBLIC_DAPP_PREVIEW=true next build",
     "config:privy:local": "node scripts/import-local-privy.mjs",
     "deploy:protocol:local": "node scripts/deploy-local-dollar.mjs",
     "deploy:dollar:local": "node scripts/deploy-local-dollar.mjs",
@@ -31,15 +29,15 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build:preview && playwright test",
+    "test:e2e": "npm run build && playwright test",
     "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
-    "verify": "npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:e2e"
+    "verify": "npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
   },
   "dependencies": {
     "@privy-io/react-auth": "3.35.1",
     "@privy-io/wagmi": "4.0.14",
-    "@solana-program/memo": "^0.8.0",
+    "@solana-program/memo": "^0.10.0",
     "@solana/web3.js": "^1.98.4",
     "@statics-protocol/sdk": "file:vendor/statics-sdk",
     "@tanstack/react-query": "5.101.4",
@@ -68,7 +66,7 @@
     "prettier": "3.9.6",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "6.0.3",
+    "typescript": "5.9.3",
     "vitest": "4.1.10"
   },
   "overrides": {

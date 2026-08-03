@@ -16,20 +16,30 @@ import {
 import { usePublicClient, useWalletClient } from "wagmi";
 
 import {
+  BasketStatus,
   basketTokenAbi,
+  buildBorrowAndProvideLiquidityCall,
   buildBorrowCall,
   buildExtendCall,
   buildRecoverCall,
   buildRepayCall,
+  quoteBorrowAndProvideLiquidity,
   staticsAbi,
+  v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
-import { LoansPreview } from "@/components/preview/RemainingSurfacesPreview";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import {
+  basketLiquiditySnapshot,
+  borrowedLiquidityDeadline,
+  borrowedLiquidityReadiness,
+  canonicalFullRange,
+  loadLiquidityCatalog,
+  type CanonicalPoolRecord,
+} from "@/lib/liquidity/liquidity";
 import {
   borrowableCollateral,
   deriveLoanActionAvailability,
@@ -43,6 +53,7 @@ import {
   loadLoanCatalog,
   validateExtensionGrossAmounts,
   type BorrowQuote,
+  type BorrowDestination,
   type ExtensionQuote,
   type LoanMode,
   type LoanRecord,
@@ -93,16 +104,21 @@ function parseGrossAmounts(
   return amounts.some((amount) => amount === null) ? null : (amounts as readonly bigint[]);
 }
 
-export function LoansPage() {
+export function LoansPage({
+  initialBorrowDestination = "wallet",
+}: {
+  initialBorrowDestination?: BorrowDestination;
+}) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <LoansPreview />;
-  }
-  if (wallet.status === "unconfigured") return <LoansPreview />;
-  return <LoansRuntime />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
+  return <LoansRuntime initialBorrowDestination={initialBorrowDestination} />;
 }
 
-function LoansRuntime() {
+function LoansRuntime({
+  initialBorrowDestination,
+}: {
+  initialBorrowDestination: BorrowDestination;
+}) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
@@ -113,6 +129,9 @@ function LoansRuntime() {
   const [selectedPositionId, setSelectedPositionId] = useState("");
   const [selectedBasketId, setSelectedBasketId] = useState("");
   const [sharesInput, setSharesInput] = useState("");
+  const [borrowDestination, setBorrowDestination] =
+    useState<BorrowDestination>(initialBorrowDestination);
+  const [borrowPoolLiquidity, setBorrowPoolLiquidity] = useState<Record<string, string>>({});
   const [grossInputs, setGrossInputs] = useState<Record<string, readonly string[]>>({});
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -141,6 +160,25 @@ function LoansRuntime() {
       return loadLoanCatalog(publicClient, deploymentState.deployment, wallet);
     },
   });
+  const liquidityCatalog = useQuery({
+    queryKey: ["liquidity-catalog", wallet],
+    enabled:
+      mode === "borrow" &&
+      borrowDestination === "liquidity" &&
+      deploymentState.status === "configured" &&
+      Boolean(deploymentState.deployment.liquidity) &&
+      Boolean(publicClient) &&
+      Boolean(wallet) &&
+      walletState.status === "ready" &&
+      walletState.isTargetChain,
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      if (!publicClient || !wallet || deploymentState.status !== "configured") {
+        throw new Error("No verified liquidity deployment is configured.");
+      }
+      return loadLiquidityCatalog(publicClient, deploymentState.deployment, wallet);
+    },
+  });
 
   const position =
     catalog.data?.positions.find((item) => item.positionId.toString() === selectedPositionId) ??
@@ -150,6 +188,25 @@ function LoansRuntime() {
     position?.collateral[0];
   const basket = positionCollateral?.basket;
   const shares = basket ? (parseAmountInput(sharesInput, basket.token.decimals) ?? 0n) : 0n;
+  const borrowPools =
+    basket?.constituents
+      .map((constituent) =>
+        liquidityCatalog.data?.pools.find(
+          (pool) =>
+            pool.basketId === basket.basketId && pool.asset.address === constituent.token.address
+        )
+      )
+      .filter((pool): pool is CanonicalPoolRecord => pool !== undefined) ?? [];
+  const borrowLiquidityReason =
+    mode !== "borrow" || borrowDestination !== "liquidity"
+      ? null
+      : deploymentState.status !== "configured" || !deploymentState.deployment.liquidity
+        ? "Borrow-to-liquidity is not configured on this deployment."
+        : liquidityCatalog.isError
+          ? "Canonical pool state is unavailable."
+          : !liquidityCatalog.data
+            ? "Loading canonical pool state…"
+            : borrowedLiquidityReadiness(basket, borrowPools, borrowPoolLiquidity);
 
   const ownedLoans = catalog.data?.ownedLoans ?? [];
   const recoveryLoans = [
@@ -224,7 +281,7 @@ function LoansRuntime() {
       : mode === "extend"
         ? (parsedGross ?? undefined)
         : undefined;
-  const action =
+  const baseAction =
     selectedLoan || mode === "borrow"
       ? deriveLoanActionAvailability({
           mode,
@@ -266,6 +323,15 @@ function LoansRuntime() {
               : "This wallet does not own an open loan.",
           executable: false,
         };
+  const action =
+    mode === "borrow" && borrowDestination === "liquidity" && borrowLiquidityReason
+      ? {
+          kind: "blocked" as const,
+          label: "Borrow to liquidity unavailable",
+          reason: borrowLiquidityReason,
+          executable: false,
+        }
+      : baseAction;
 
   const clearInteractionError = () => {
     if (!verificationBlocked) setActionError(null);
@@ -318,6 +384,243 @@ function LoansRuntime() {
     throw new Error(`Loan #${loanId.toString()} still exists after confirmation.`);
   };
 
+  const borrowIntoLiquidity = async (
+    freshPosition: NonNullable<typeof position>,
+    freshBasket: NonNullable<typeof basket>,
+    freshCollateral: NonNullable<typeof positionCollateral>,
+    standardQuote: BorrowQuote
+  ) => {
+    if (
+      !wallet ||
+      !publicClient ||
+      deploymentState.status !== "configured" ||
+      !deploymentState.deployment.liquidity
+    ) {
+      throw new Error("Borrow-to-liquidity is not configured on this deployment.");
+    }
+    const refreshedLiquidity = await liquidityCatalog.refetch();
+    const liquidityState = refreshedLiquidity.data;
+    if (!liquidityState) {
+      throw refreshedLiquidity.error ?? new Error("Fresh canonical pool state is unavailable.");
+    }
+    if (
+      !liquidityState.positionRecords.some(
+        (candidate) => candidate.positionId === freshPosition.positionId
+      )
+    ) {
+      throw new Error("The selected position is not available to the connected wallet.");
+    }
+    const liquidityBasket = liquidityState.baskets.find(
+      (candidate) => candidate.basketId === freshBasket.basketId
+    );
+    if (!liquidityBasket) throw new Error("The selected basket is unavailable to liquidity.");
+    if (liquidityBasket.status !== BasketStatus.Active) {
+      throw new Error("The selected basket is not active.");
+    }
+    const basketPools = liquidityBasket.constituents.map((constituent) => {
+      const matching = liquidityState.pools.find(
+        (pool) =>
+          pool.basketId === liquidityBasket.basketId &&
+          pool.asset.address === constituent.token.address
+      );
+      if (!matching) throw new Error(`No canonical pool exists for ${constituent.token.symbol}.`);
+      if (
+        matching.status !== 2 ||
+        matching.decommissioned ||
+        !matching.managerSynced ||
+        matching.observationCardinality < 2
+      ) {
+        throw new Error(`${constituent.token.symbol} pool is not ready for borrowed liquidity.`);
+      }
+      const deviation = matching.spotTick - matching.referenceTick;
+      if (deviation < -100 || deviation > 99) {
+        throw new Error(`${constituent.token.symbol} pool is outside its observed price bound.`);
+      }
+      return matching;
+    });
+    const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+    const deadline = borrowedLiquidityDeadline(latestBlock.timestamp);
+    const poolInputs = basketPools.map((pool) => {
+      const raw = borrowPoolLiquidity[pool.poolId] ?? "";
+      if (!/^\d+$/.test(raw) || BigInt(raw) <= 0n) {
+        throw new Error(`Enter positive raw liquidity for ${pool.asset.symbol}.`);
+      }
+      if (BigInt(raw) > (1n << 128n) - 1n) {
+        throw new Error(`${pool.asset.symbol} liquidity exceeds the uint128 limit.`);
+      }
+      const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
+      return {
+        asset: pool.asset.address,
+        currency0: pool.key.currency0,
+        currency1: pool.key.currency1,
+        sqrtPriceX96: pool.sqrtPriceX96,
+        tickLower,
+        tickUpper,
+        liquidity: BigInt(raw),
+        deadline,
+      };
+    });
+    const quote = quoteBorrowAndProvideLiquidity(
+      basketLiquiditySnapshot(liquidityBasket),
+      shares,
+      poolInputs,
+      50n
+    );
+    if (
+      quote.borrow.feeShares !== standardQuote.feeShares ||
+      quote.borrow.collateralShares !== standardQuote.collateralShares ||
+      !sameVector(
+        quote.borrow.principals.map((principal) => principal.amount),
+        standardQuote.principals
+      )
+    ) {
+      throw new Error("The liquidity quote does not match the current loan quote.");
+    }
+
+    let simulatedLoanId: bigint | null = null;
+    let simulatedTokenIds: readonly bigint[] = [];
+    const diamond = deploymentState.deployment.contracts.diamond;
+    const positionManager = deploymentState.deployment.liquidity.contracts.positionManager;
+    await executeProtocolTransaction({
+      publicClient,
+      wallet,
+      chainId: deploymentState.deployment.chainId,
+      kind: "borrow-liquidity",
+      label: `Borrow against Position #${freshPosition.positionId.toString()} into liquidity`,
+      amount: `${displayAmount(shares, freshBasket.token.decimals)} ${freshBasket.symbol}`,
+      to: diamond,
+      data: buildBorrowAndProvideLiquidityCall(
+        freshPosition.positionId,
+        freshBasket.basketId,
+        shares,
+        quote.pools,
+        wallet
+      ),
+      sendTransaction: ({ to, data, value }) => send(to, data, value),
+      describeError: describeLoanError,
+      validateSimulation: (result) => {
+        if (!result) throw new Error("The borrowed-liquidity simulation returned no result.");
+        const simulated = decodeFunctionResult({
+          abi: staticsAbi,
+          functionName: "borrowAndProvideLiquidity",
+          data: result,
+        });
+        if (simulated[1].length !== basketPools.length) {
+          throw new Error("The simulation did not create one liquidity position per underlying.");
+        }
+        simulatedLoanId = simulated[0];
+        simulatedTokenIds = simulated[1];
+      },
+      verifyConfirmation: async (receipt) => {
+        if (simulatedLoanId === null || simulatedTokenIds.length !== basketPools.length) {
+          throw new Error("The simulated loan identity is unavailable.");
+        }
+        const originated = parseEventLogs({
+          abi: staticsAbi,
+          eventName: "LoanOriginated",
+          logs: receipt.logs.filter((log) => getAddress(log.address) === diamond),
+          strict: true,
+        }).find(
+          (event) =>
+            event.args.loanId === simulatedLoanId &&
+            event.args.positionId === freshPosition.positionId &&
+            event.args.basketId === freshBasket.basketId &&
+            event.args.sharesIn === shares &&
+            event.args.feeShares === quote.borrow.feeShares &&
+            event.args.collateralShares === quote.borrow.collateralShares &&
+            getAddress(event.args.receiver) === wallet
+        );
+        const provided = parseEventLogs({
+          abi: staticsAbi,
+          eventName: "BorrowedLiquidityProvided",
+          logs: receipt.logs.filter((log) => getAddress(log.address) === diamond),
+          strict: true,
+        }).find(
+          (event) =>
+            event.args.loanId === simulatedLoanId &&
+            event.args.positionId === freshPosition.positionId &&
+            event.args.basketId === freshBasket.basketId &&
+            getAddress(event.args.lpRecipient) === wallet &&
+            event.args.sharesIn === shares &&
+            event.args.basketSharesMinted === quote.basketSharesMinted
+        );
+        const minted = parseEventLogs({
+          abi: staticsAbi,
+          eventName: "BorrowedLiquidityPositionMinted",
+          logs: receipt.logs.filter((log) => getAddress(log.address) === diamond),
+          strict: true,
+        }).filter((event) => event.args.loanId === simulatedLoanId);
+        const [loan, collateralAfter, nftState] = await Promise.all([
+          publicClient.readContract({
+            address: diamond,
+            abi: staticsAbi,
+            functionName: "loan",
+            args: [simulatedLoanId],
+          }),
+          publicClient.readContract({
+            address: diamond,
+            abi: staticsAbi,
+            functionName: "basketCollateralPosition",
+            args: [freshPosition.positionId, freshBasket.basketId],
+          }),
+          Promise.all(
+            simulatedTokenIds.map(async (tokenId) => ({
+              owner: await publicClient.readContract({
+                address: positionManager,
+                abi: v4PositionManagerReadAbi,
+                functionName: "ownerOf",
+                args: [tokenId],
+              }),
+              liquidity: await publicClient.readContract({
+                address: positionManager,
+                abi: v4PositionManagerReadAbi,
+                functionName: "getPositionLiquidity",
+                args: [tokenId],
+              }),
+            }))
+          ),
+        ]);
+        if (
+          !originated ||
+          !provided ||
+          provided.args.v4TokenIds.length !== simulatedTokenIds.length ||
+          provided.args.v4TokenIds.some((tokenId, index) => tokenId !== simulatedTokenIds[index]) ||
+          minted.length !== basketPools.length ||
+          basketPools.some(
+            (pool, index) =>
+              !minted.some(
+                (event) =>
+                  getAddress(event.args.asset) === pool.asset.address &&
+                  event.args.v4TokenId === simulatedTokenIds[index] &&
+                  getAddress(event.args.recipient) === wallet &&
+                  event.args.liquidity === quote.pools[index]?.liquidity
+              )
+          ) ||
+          loan.positionId !== freshPosition.positionId ||
+          loan.basketId !== freshBasket.basketId ||
+          loan.collateralShares !== quote.borrow.collateralShares ||
+          loan.feeShares !== quote.borrow.feeShares ||
+          loan.principals.length !== quote.borrow.principals.length ||
+          loan.principals.some(
+            (principal, index) => principal !== quote.borrow.principals[index]?.amount
+          ) ||
+          collateralAfter.depositedShares !==
+            freshCollateral.depositedShares - quote.borrow.feeShares ||
+          collateralAfter.lockedShares !==
+            freshCollateral.lockedShares + quote.borrow.collateralShares ||
+          nftState.some(
+            (item, index) =>
+              getAddress(item.owner) !== wallet || item.liquidity !== quote.pools[index]?.liquidity
+          )
+        ) {
+          throw new Error(
+            "The confirmed loan and liquidity positions do not match the reviewed quote."
+          );
+        }
+      },
+    });
+  };
+
   const runAction = async () => {
     if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
       return;
@@ -358,6 +661,11 @@ function LoansRuntime() {
           basket.basketId,
           shares
         );
+        if (borrowDestination === "liquidity") {
+          await borrowIntoLiquidity(freshPosition, freshCollateral.basket, freshCollateral, quote);
+          await Promise.all([catalog.refetch(), liquidityCatalog.refetch(), borrowQuote.refetch()]);
+          return;
+        }
         const data = buildBorrowCall(freshPosition.positionId, basket.basketId, shares, wallet);
         await executeProtocolTransaction({
           publicClient,
@@ -647,7 +955,13 @@ function LoansRuntime() {
   };
 
   if (deploymentState.status === "unavailable") {
-    return <LoansPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="loans"
+        empty={{ title: "Loans unavailable", description: "No deployment is configured." }}
+      />
+    );
   }
 
   const surfaceState = deriveSurfaceState({
@@ -822,6 +1136,10 @@ function LoansRuntime() {
               wallet={wallet}
               chainId={deploymentState.deployment.chainId}
               quote={currentBorrowQuote}
+              destination={borrowDestination}
+              liquidityAvailable={Boolean(deploymentState.deployment.liquidity)}
+              liquidityPools={borrowPools}
+              poolLiquidity={borrowPoolLiquidity}
               onPosition={(value) => {
                 setSelectedPositionId(value);
                 setSelectedBasketId("");
@@ -833,6 +1151,14 @@ function LoansRuntime() {
               }}
               onShares={(value) => {
                 setSharesInput(value);
+                clearInteractionError();
+              }}
+              onDestination={(value) => {
+                setBorrowDestination(value);
+                clearInteractionError();
+              }}
+              onPoolLiquidity={(poolId, value) => {
+                setBorrowPoolLiquidity((current) => ({ ...current, [poolId]: value }));
                 clearInteractionError();
               }}
             />
@@ -925,9 +1251,15 @@ function BorrowFields({
   wallet,
   chainId,
   quote,
+  destination,
+  liquidityAvailable,
+  liquidityPools,
+  poolLiquidity,
   onPosition,
   onBasket,
   onShares,
+  onDestination,
+  onPoolLiquidity,
 }: {
   catalog: Awaited<ReturnType<typeof loadLoanCatalog>> | undefined;
   positionId: string;
@@ -936,9 +1268,15 @@ function BorrowFields({
   wallet: Address | null;
   chainId: number;
   quote: BorrowQuote | undefined;
+  destination: BorrowDestination;
+  liquidityAvailable: boolean;
+  liquidityPools: readonly CanonicalPoolRecord[];
+  poolLiquidity: Readonly<Record<string, string>>;
   onPosition: (value: string) => void;
   onBasket: (value: string) => void;
   onShares: (value: string) => void;
+  onDestination: (value: BorrowDestination) => void;
+  onPoolLiquidity: (poolId: string, value: string) => void;
 }) {
   const position = catalog?.positions.find((item) => item.positionId.toString() === positionId);
   const collateral =
@@ -946,6 +1284,23 @@ function BorrowFields({
     position?.collateral[0];
   return (
     <>
+      <label className="basket-field">
+        <span>Receive borrowed liquidity</span>
+        <select
+          value={destination}
+          onChange={(event) => onDestination(event.target.value as BorrowDestination)}
+        >
+          <option value="wallet">In my wallet</option>
+          {liquidityAvailable && (
+            <option value="liquidity">As canonical Uniswap v4 liquidity</option>
+          )}
+        </select>
+        <small>
+          {destination === "wallet"
+            ? "Receive every borrowed underlying directly in your wallet."
+            : "Atomically pair the borrowed underlyings with newly minted basket shares and receive one LP NFT per underlying."}
+        </small>
+      </label>
       <div className="remaining-form-grid">
         <label className="basket-field">
           <span>Position</span>
@@ -991,7 +1346,7 @@ function BorrowFields({
           </small>
         </label>
         <div className="basket-field">
-          <span>Principal receiver</span>
+          <span>{destination === "wallet" ? "Principal receiver" : "LP recipient"}</span>
           {wallet ? (
             <AddressDisplay address={wallet} chainId={chainId} label="Current wallet" />
           ) : (
@@ -999,6 +1354,28 @@ function BorrowFields({
           )}
         </div>
       </div>
+      {destination === "liquidity" && (
+        <>
+          <p className="dollar-warning">
+            This locks basket collateral, originates the same loan shown below, and creates the
+            canonical full-range liquidity positions atomically. Failed pool creation reverts the
+            entire loan.
+          </p>
+          <div className="remaining-form-grid">
+            {liquidityPools.map((pool) => (
+              <label className="basket-field" key={pool.poolId}>
+                <span>{pool.asset.symbol} pool raw liquidity</span>
+                <input
+                  inputMode="numeric"
+                  value={poolLiquidity[pool.poolId] ?? ""}
+                  onChange={(event) => onPoolLiquidity(pool.poolId, event.target.value)}
+                  placeholder="0"
+                />
+              </label>
+            ))}
+          </div>
+        </>
+      )}
       <dl className="remaining-quote">
         <div>
           <dt>Origination fee</dt>

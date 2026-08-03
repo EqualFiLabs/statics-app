@@ -5,9 +5,7 @@ import { Connection } from "@solana/web3.js";
 import { getAddress, isAddress } from "viem";
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
-import { ActivityPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   readProtocolActivityAcrossChains,
   readActivityChainIds,
@@ -300,8 +298,6 @@ export function ActivityPage() {
     const interval = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(interval);
   }, [evmAddress, solanaAddress]);
-
-  if (dappPreviewEnabled) return <ActivityPreview />;
 
   // Activity is assembled from local records rather than a single query, so
   // there is no read to be loading or failing -- only "who are you" and

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
+import { EmptyState, SurfaceBoundary, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
 
 function renderWithWallet(ui: React.ReactNode, overrides: Partial<WalletState> = {}) {
@@ -43,6 +43,17 @@ describe("empty state", () => {
 });
 
 describe("surface empty state", () => {
+  it("explains an unconfigured deployment instead of rendering a parallel sample screen", () => {
+    renderWithWallet(
+      <SurfaceBoundary state="unconfigured" subject="positions" empty={empty}>
+        <p>Live positions</p>
+      </SurfaceBoundary>
+    );
+
+    expect(screen.getByText("Statics is not configured")).toBeInTheDocument();
+    expect(screen.queryByText("Live positions")).not.toBeInTheDocument();
+  });
+
   it("asks a signed-out visitor to sign in rather than claiming they have nothing", () => {
     const login = vi.fn();
     renderWithWallet(<SurfaceEmptyState state="signed-out" subject="positions" empty={empty} />, {

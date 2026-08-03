@@ -6,10 +6,9 @@ import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
-import { BasketListPreview } from "@/components/preview/DappPreview";
+import { SurfaceBoundary, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -23,10 +22,7 @@ function displayAmount(value: bigint, decimals = 18): string {
 
 export function BasketListPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <BasketListPreview />;
-  }
-  if (wallet.status === "unconfigured") return <BasketListPreview />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Baskets" />;
   return <BasketListRuntime />;
 }
 
@@ -36,13 +32,12 @@ function BasketListRuntime() {
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
   const catalog = useQuery({
-    queryKey: [
-      "basket-catalog",
+    queryKey: protocolQueryKeys.basketCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      walletAddress,
-    ],
+        : undefined,
+      walletAddress
+    ),
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -53,10 +48,6 @@ function BasketListRuntime() {
       return loadBasketCatalog(publicClient, deploymentState.deployment, walletAddress);
     },
   });
-
-  if (deploymentState.status === "unavailable") {
-    return <BasketListPreview />;
-  }
 
   // The basket catalog is deployment-wide rather than wallet-scoped, so it
   // loads without a wallet. Only the read's own states apply here.
@@ -90,53 +81,53 @@ function BasketListRuntime() {
           Basket data is temporarily unavailable. Showing the last received state.
         </p>
       )}
-      {!catalog.data || !isSurfaceReady(surfaceState) ? (
-        <SurfaceEmptyState
-          state={surfaceState}
-          subject="baskets"
-          onRetry={() => void catalog.refetch()}
-          empty={{
-            title: "No baskets yet",
-            description:
-              "A basket is a fixed bundle of assets you can buy or sell as one unit. New launches are currently steward-controlled.",
-            action: { label: "View launch policy", href: "/app/create" },
-          }}
-        />
-      ) : (
-        <div className="basket-grid">
-          {catalog.data.baskets.map((basket) => (
-            <Link
-              key={basket.basketId.toString()}
-              className="basket-card"
-              href={`/app/baskets/${basket.basketId.toString()}`}
-            >
-              <div>
-                <span className={`basket-status is-${basket.status}`}>
-                  {basketStatusLabel(basket.status)}
-                </span>
-                <span>#{basket.basketId.toString()}</span>
-              </div>
-              <h3>{basket.name}</h3>
-              <p>{basket.symbol}</p>
-              <dl>
+      <SurfaceBoundary
+        state={deploymentState.status === "unavailable" ? "unconfigured" : surfaceState}
+        subject="baskets"
+        onRetry={() => void catalog.refetch()}
+        empty={{
+          title: "No baskets yet",
+          description:
+            "A basket is a fixed bundle of assets you can buy or sell as one unit. New launches are currently steward-controlled.",
+          action: { label: "View launch policy", href: "/app/create" },
+        }}
+      >
+        {catalog.data && isSurfaceReady(surfaceState) ? (
+          <div className="basket-grid">
+            {catalog.data.baskets.map((basket) => (
+              <Link
+                key={basket.basketId.toString()}
+                className="basket-card"
+                href={`/app/baskets/${basket.basketId.toString()}`}
+              >
                 <div>
-                  <dt>Underlyings</dt>
-                  <dd>{basket.constituents.length}</dd>
+                  <span className={`basket-status is-${basket.status}`}>
+                    {basketStatusLabel(basket.status)}
+                  </span>
+                  <span>#{basket.basketId.toString()}</span>
                 </div>
-                <div>
-                  <dt>Total supply</dt>
-                  <dd>{displayAmount(basket.totalSupply)}</dd>
-                </div>
-                <div>
-                  <dt>Your balance</dt>
-                  <dd>{walletAddress ? displayAmount(basket.walletBalance) : "Connect"}</dd>
-                </div>
-              </dl>
-              <span className="basket-card-link">Inspect basket →</span>
-            </Link>
-          ))}
-        </div>
-      )}
+                <h3>{basket.name}</h3>
+                <p>{basket.symbol}</p>
+                <dl>
+                  <div>
+                    <dt>Underlyings</dt>
+                    <dd>{basket.constituents.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Total supply</dt>
+                    <dd>{displayAmount(basket.totalSupply)}</dd>
+                  </div>
+                  <div>
+                    <dt>Your balance</dt>
+                    <dd>{walletAddress ? displayAmount(basket.walletBalance) : "Connect"}</dd>
+                  </div>
+                </dl>
+                <span className="basket-card-link">Inspect basket →</span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </SurfaceBoundary>
     </section>
   );
 }

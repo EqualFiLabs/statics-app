@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  canonicalFullRange,
-  lpStakeEligibility,
-  resolveLiquidityPool,
-} from "@/components/liquidity/LiquidityPage";
+import { lpStakeEligibility, resolveLiquidityPool } from "@/components/liquidity/LiquidityPage";
 import {
   basketLiquiditySnapshot,
+  borrowedLiquidityDeadline,
+  borrowedLiquidityReadiness,
+  canonicalFullRange,
   canonicalStatusLabel,
+  liquidityActivationWait,
+  liquidityPositionActions,
+  recommendedLiquidityAction,
   v4PoolId,
   type CanonicalPoolRecord,
   type LpPositionRecord,
@@ -15,6 +17,10 @@ import {
 import type { BasketRecord } from "@/lib/baskets/baskets";
 
 describe("canonical liquidity identifiers", () => {
+  it("anchors borrowed-liquidity deadlines to chain time", () => {
+    expect(borrowedLiquidityDeadline(1_000n)).toBe(2_200n);
+  });
+
   it("derives a stable pool ID from the complete canonical key", () => {
     const key = {
       currency0: "0x0000000000000000000000000000000000000001" as const,
@@ -110,5 +116,66 @@ describe("canonical liquidity identifiers", () => {
         },
       ],
     });
+  });
+
+  it("requires every canonical pool and a bounded positive liquidity input", () => {
+    const basket = {
+      constituents: [{}, {}],
+    } as unknown as BasketRecord;
+    const readyPool = {
+      poolId: `0x${"11".repeat(32)}`,
+      status: 2,
+      decommissioned: false,
+      managerSynced: true,
+      observationCardinality: 2,
+      spotTick: 99,
+      referenceTick: 0,
+    } as CanonicalPoolRecord;
+    const secondPool = {
+      ...readyPool,
+      poolId: `0x${"22".repeat(32)}`,
+    } as CanonicalPoolRecord;
+
+    expect(borrowedLiquidityReadiness(basket, [readyPool], {})).toMatch(/Every basket/);
+    expect(
+      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "0",
+      })
+    ).toMatch(/positive raw liquidity/);
+    expect(
+      borrowedLiquidityReadiness(basket, [{ ...readyPool, spotTick: 100 }, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "1",
+      })
+    ).toMatch(/price bound/);
+    expect(
+      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
+        [readyPool.poolId]: "1",
+        [secondPool.poolId]: "2",
+      })
+    ).toBeNull();
+  });
+
+  it("reveals liquidity actions from the selected NFT state", () => {
+    const walletOwned = { staked: false } as LpPositionRecord;
+    const waiting = {
+      staked: true,
+      pendingLiquidity: 10n,
+      eligibleAtBlock: 101n,
+    } as LpPositionRecord;
+    const ready = { ...waiting, eligibleAtBlock: 100n } as LpPositionRecord;
+
+    expect(liquidityPositionActions(walletOwned, 100n)).toEqual(["stake"]);
+    expect(liquidityPositionActions(waiting, 100n)).toEqual(["increase", "claim", "unstake"]);
+    expect(liquidityActivationWait(waiting, 100n)).toBe(1n);
+    expect(liquidityPositionActions(ready, 100n)).toEqual([
+      "activate",
+      "increase",
+      "claim",
+      "unstake",
+    ]);
+    expect(liquidityActivationWait(ready, 100n)).toBeNull();
+    expect(recommendedLiquidityAction(ready, 100n)).toBe("activate");
   });
 });

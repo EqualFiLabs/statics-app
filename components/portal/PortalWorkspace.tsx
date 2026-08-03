@@ -1,34 +1,35 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { AcrossBridgePanel } from "@/components/portal/AcrossBridgePanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
-import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 import { SlippageSettingsDialog } from "@/components/portal/SlippageSettingsDialog";
 import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
 
-export type PortalMode = "swap" | "bridge" | "dollar";
+export type PortalMode = "swap" | "bridge";
 
 const modeLabels: Record<PortalMode, string> = {
   swap: "Swap",
   bridge: "Bridge",
-  dollar: "Statics Dollar",
 };
 
 export function PortalWorkspace({
   initialMode = "swap",
+  initialSwapRuntime = "evm",
   compact = false,
 }: {
   initialMode?: PortalMode;
+  initialSwapRuntime?: "evm" | "solana";
   compact?: boolean;
 }) {
   const wallet = useWalletState();
   const [mode, setMode] = useState<PortalMode>(initialMode);
-  const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">("evm");
+  const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const slippage = usePortalSlippage();
 
@@ -36,7 +37,7 @@ export function PortalWorkspace({
     <section className={`portal-workspace${compact ? " is-compact" : ""}`}>
       <div className="portal-header">
         <div className="portal-mode-tabs" role="tablist" aria-label="Portal mode">
-          {(["swap", "bridge", "dollar"] as const).map((item) => (
+          {(["swap", "bridge"] as const).map((item) => (
             <button
               key={item}
               type="button"
@@ -93,7 +94,10 @@ export function PortalWorkspace({
 
       {mode === "bridge" && <AcrossBridgePanel />}
 
-      {mode === "dollar" && <PeggedDollarPanel />}
+      <div className="portal-dollar-route">
+        <span>Want to deposit USDG or manage Statics Dollar?</span>
+        <Link href="/app/dollar?profile=USDG">Open Dollar →</Link>
+      </div>
 
       <p className="portal-runtime-state" aria-live="polite">
         {wallet.status === "ready" ? wallet.fundingNetworkName : "--"}

@@ -1,8 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/app-shell/AppShell";
-import { WalletSettings } from "@/components/app-shell/WalletSettings";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
 
 function renderWithWallet(ui: React.ReactNode, overrides: Partial<WalletState> = {}) {
@@ -78,7 +77,10 @@ describe("DApp wallet shell", () => {
       address,
       walletKind: "embedded",
       chainId: 31_337,
+      networkName: "Anvil",
       isTargetChain: true,
+      explorerUrl:
+        "https://explorer.testnet.chain.robinhood.com/address/0x1234567890abcdef1234567890abcdef12345678",
       logout,
     });
 
@@ -93,8 +95,15 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText("Solana")).toBeInTheDocument();
     expect(screen.getByText(address)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Ethereum address" })).toBeInTheDocument();
+    expect(within(dialog).getByText("embedded")).toBeInTheDocument();
+    expect(within(dialog).getByText("Anvil")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view ethereum account/i })).toHaveAttribute(
+      "rel",
+      "noreferrer"
+    );
+    expect(screen.getByText(/exporting reveals recovery material/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out of Statics" }));
     expect(logout).toHaveBeenCalledOnce();
   });
 
@@ -161,13 +170,10 @@ describe("DApp wallet shell", () => {
     expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
   });
-});
 
-describe("wallet settings", () => {
-  it("warns before embedded-wallet export and exposes logout", () => {
+  it("exports embedded wallets from the account dialog", () => {
     const exportWallet = vi.fn().mockResolvedValue(undefined);
-    const logout = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<WalletSettings previewMode={false} />, {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -175,28 +181,23 @@ describe("wallet settings", () => {
       explorerUrl:
         "https://explorer.testnet.chain.robinhood.com/address/0x1234567890abcdef1234567890abcdef12345678",
       exportWallet,
-      logout,
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
     expect(screen.getByText(/exporting reveals recovery material/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Review secure export" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out of Statics" }));
     expect(exportWallet).toHaveBeenCalledOnce();
-    expect(logout).toHaveBeenCalledOnce();
-    expect(screen.getByRole("link", { name: /view on explorer/i })).toHaveAttribute(
-      "rel",
-      "noreferrer"
-    );
   });
 
   it("does not offer private-key export for an external wallet", () => {
-    renderWithWallet(<WalletSettings previewMode={false} />, {
+    renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
       address: "0x1234567890abcdef1234567890abcdef12345678",
       walletKind: "external",
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
     expect(screen.queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
   });
 });

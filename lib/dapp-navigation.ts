@@ -38,6 +38,13 @@ const routePresentations = {
     description:
       "Check your balances, add funds, send assets, and move money in and out of Statics.",
   },
+  faucet: {
+    label: "Faucet",
+    status: "Testnet",
+    title: "Get testnet assets",
+    description:
+      "Claim the fixtures used by Statics or open Robinhood's faucet for more testnet ETH and stock tokens.",
+  },
   portal: {
     label: "Add funds",
     status: "Add funds",
@@ -94,12 +101,6 @@ const routePresentations = {
     description:
       "Every action from this wallet, from the moment you confirm it to the moment it settles.",
   },
-  settings: {
-    label: "Settings",
-    status: "Settings",
-    title: "Settings",
-    description: "Your account, network, and wallet details, plus how to export your keys.",
-  },
   tools: {
     label: "Tools",
     status: "Tools",
@@ -110,6 +111,7 @@ const routePresentations = {
 
 export function getDappRoutePresentation(pathname: string): DappRoutePresentation {
   if (pathname.startsWith("/app/wallet")) return routePresentations.wallet;
+  if (pathname.startsWith("/app/faucet")) return routePresentations.faucet;
   if (pathname.startsWith("/app/portal")) return routePresentations.portal;
   if (pathname.startsWith("/app/dollar")) return routePresentations.dollar;
   if (pathname.startsWith("/app/baskets")) return routePresentations.baskets;
@@ -119,7 +121,6 @@ export function getDappRoutePresentation(pathname: string): DappRoutePresentatio
   if (pathname.startsWith("/app/rewards")) return routePresentations.rewards;
   if (pathname.startsWith("/app/liquidity")) return routePresentations.liquidity;
   if (pathname.startsWith("/app/activity")) return routePresentations.activity;
-  if (pathname.startsWith("/app/settings")) return routePresentations.settings;
   if (pathname.startsWith("/app/tools")) return routePresentations.tools;
   return routePresentations.overview;
 }

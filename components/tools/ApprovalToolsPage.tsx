@@ -5,9 +5,8 @@ import { getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 
-import { EmptyState } from "@/components/common/EmptyState";
+import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import {
   readClientDollarDeployment,
   verifyDollarDeployment,
@@ -38,18 +37,13 @@ function describeApprovalError(cause: unknown): string {
 
 export function ApprovalToolsPage() {
   const wallet = useWalletState();
-  if (dappPreviewEnabled || wallet.status === "unconfigured") {
+  if (wallet.status === "unconfigured") {
     return (
-      <section className="approval-tools">
-        <div className="approval-tools-heading">
-          <p className="dapp-section-label">Account tools</p>
-          <h2>App approvals</h2>
-          <p>
-            Connect the DApp to review and manage token, Permit2, and operator approvals for the
-            verified Statics deployment.
-          </p>
-        </div>
-      </section>
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="approvals"
+        empty={{ title: "Approvals unavailable", description: "No wallet is configured." }}
+      />
     );
   }
   return <ApprovalToolsRuntime />;

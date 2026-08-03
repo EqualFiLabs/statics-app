@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -22,7 +22,6 @@ import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
 
 import { PortalWorkspace } from "@/components/portal/PortalWorkspace";
 import { WalletNftPanel } from "@/components/wallet/WalletNftPanel";
-import { TestnetFaucetCard } from "@/components/wallet/TestnetFaucetCard";
 import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { readNftCollection } from "@/lib/wallet/nft-contracts";
 import { loadRiskShareBalances, type RiskShareBalance } from "@/lib/wallet/risk-shares";
@@ -33,6 +32,7 @@ import {
   type WalletNft,
 } from "@/lib/wallet/nfts";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
+import { portalRequested, walletPortalUrl, withoutWalletPortal } from "@/lib/portal/navigation";
 import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
@@ -94,9 +94,10 @@ export function WalletPage() {
   const wallet = useWalletState();
   const network = getFundingNetwork(wallet.fundingChainId);
   const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
-  const [modal, setModal] = useState<WalletModal>(null);
+  const [modal, setModalState] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
   const [tab, setTab] = useState<WalletTab>("tokens");
+  const [removingTokens, setRemovingTokens] = useState(false);
   const [transferNft, setTransferNft] = useState<WalletNft | null>(null);
 
   const [nativeBalance, setNativeBalance] = useState<AssetBalance>(null);
@@ -105,6 +106,36 @@ export function WalletPage() {
   const [riskShares, setRiskShares] = useState<readonly RiskShareBalance[]>([]);
   const refreshId = useRef(0);
   const tokenAddresses = useMemo(() => tokens.map((token) => token.address).join(","), [tokens]);
+
+  const setModal = useCallback((next: WalletModal) => {
+    setModalState(next);
+    if (typeof window === "undefined") return;
+    if (next === "portal") {
+      window.history.pushState(
+        null,
+        "",
+        walletPortalUrl(window.location.pathname, window.location.search)
+      );
+    } else if (portalRequested(window.location.search)) {
+      window.history.replaceState(
+        null,
+        "",
+        withoutWalletPortal(window.location.pathname, window.location.search)
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const syncPortal = () => {
+      setModalState((current) => {
+        if (portalRequested(window.location.search)) return "portal";
+        return current === "portal" ? null : current;
+      });
+    };
+    syncPortal();
+    window.addEventListener("popstate", syncPortal);
+    return () => window.removeEventListener("popstate", syncPortal);
+  }, []);
 
   const refreshBalances = async () => {
     const currentRefresh = ++refreshId.current;
@@ -206,12 +237,18 @@ export function WalletPage() {
       logoURI: undefined as string | undefined,
     })),
   ];
+  const hasAddedTokens = tokens.some((token) => !token.isDefault);
 
   if (walletMode === "solana") {
     return (
       <>
         <WalletModeSelector mode={walletMode} onChange={setWalletMode} />
-        <SolanaWalletPanel />
+        <SolanaWalletPanel onPortal={() => setModal("portal")} />
+        {modal === "portal" && (
+          <WalletDialog label="Funding Portal" wide onClose={() => setModal(null)}>
+            <PortalWorkspace compact initialSwapRuntime="solana" />
+          </WalletDialog>
+        )}
       </>
     );
   }
@@ -261,8 +298,6 @@ export function WalletPage() {
             Receive
           </button>
         </div>
-
-        <TestnetFaucetCard />
 
         <div className="wallet-assets">
           {/* Tabs over the holdings, with activity linking to its own route
@@ -317,6 +352,14 @@ export function WalletPage() {
                   <button type="button" onClick={() => setModal("custom")}>
                     Add token
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={removingTokens}
+                    disabled={!hasAddedTokens && !removingTokens}
+                    onClick={() => setRemovingTokens((current) => !current)}
+                  >
+                    {removingTokens ? "Done" : "Remove"}
+                  </button>
                 </div>
               </div>
               <div className="wallet-token-rows">
@@ -335,7 +378,7 @@ export function WalletPage() {
                     </div>
                     <div>
                       <strong>{displayBalance(asset.balance, asset.decimals)}</strong>
-                      {asset.kind === "erc20" && !asset.isDefault ? (
+                      {removingTokens && asset.kind === "erc20" && !asset.isDefault ? (
                         <button
                           className="wallet-remove-token"
                           type="button"

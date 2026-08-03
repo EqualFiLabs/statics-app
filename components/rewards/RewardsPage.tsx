@@ -21,14 +21,11 @@ import {
   staticsAbi,
 } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
-import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
 import { loadStakingSnapshot } from "@/lib/positions/staking";
-import { RewardsPreview } from "@/components/preview/DappPreview";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   claimablePositionRewards,
@@ -36,6 +33,8 @@ import {
   loadPositionCatalog,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
+import { focusRewardPositions } from "@/lib/rewards/navigation";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -55,23 +54,19 @@ function parseAmount(value: string, decimals: number): bigint {
   }
 }
 
-export function RewardsPage() {
+export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
   const wallet = useWalletState();
-  if (dappPreviewEnabled) {
-    return <RewardsPreview />;
-  }
-  if (wallet.status === "unconfigured") return <RewardsPreview />;
-  return <RewardsRuntime />;
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
+  return <RewardsRuntime initialPositionId={initialPositionId} />;
 }
 
-function RewardsRuntime() {
+function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | null }) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
-  const [selectedAssets, setSelectedAssets] = useState<readonly `0x${string}`[]>([]);
   const [pending, setPending] = useState(false);
   const [claimingBasketKey, setClaimingBasketKey] = useState<string | null>(null);
   const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
@@ -80,13 +75,12 @@ function RewardsRuntime() {
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const catalog = useQuery({
-    queryKey: [
-      "position-catalog",
+    queryKey: protocolQueryKeys.positionCatalog(
       deploymentState.status === "configured"
         ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
-      wallet,
-    ],
+        : undefined,
+      wallet
+    ),
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -232,7 +226,7 @@ function RewardsRuntime() {
           label: `Create position and stake ${token.symbol}`,
           amount: `${amountInput} ${token.symbol}`,
           to: diamond,
-          data: buildCreateAndStakeCall(amount, wallet, selectedAssets),
+          data: buildCreateAndStakeCall(amount, wallet, []),
           validateSimulation: (result) => {
             if (!result) throw new Error("The create-and-stake simulation returned no position.");
             const positionId = decodeFunctionResult({
@@ -246,7 +240,6 @@ function RewardsRuntime() {
           },
         });
         setAmountInput("");
-        setSelectedAssets([]);
       }
       await catalog.refetch();
     } catch (error) {
@@ -444,7 +437,13 @@ function RewardsRuntime() {
   };
 
   if (deploymentState.status === "unavailable") {
-    return <RewardsPreview />;
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject="rewards"
+        empty={{ title: "Rewards unavailable", description: "No deployment is configured." }}
+      />
+    );
   }
 
   const surfaceState = deriveSurfaceState({
@@ -455,6 +454,7 @@ function RewardsRuntime() {
     isEmpty: (catalog.data?.positions.length ?? 0) === 0,
     hasData: Boolean(catalog.data),
   });
+  const orderedPositions = focusRewardPositions(catalog.data?.positions ?? [], initialPositionId);
 
   let primaryLabel = "Approve or create staking position";
   let primaryAction: (() => void) | null = () => void createAndStake();
@@ -474,6 +474,11 @@ function RewardsRuntime() {
 
   return (
     <div className="rewards-page">
+      {actionError && (
+        <p className="dapp-inline-error" role="alert">
+          {actionError}
+        </p>
+      )}
       {/* Basket rewards come first because they are what a deposited basket
           earns, and they need no Statics staking at all. Someone who bought a
           basket and came here looking for their earnings previously landed on
@@ -558,11 +563,11 @@ function RewardsRuntime() {
       <section className="position-panel">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">From staking Statics</p>
-            <h2>Stake Statics to earn</h2>
+            <p className="dapp-section-label">Start earning</p>
+            <h2>Create a position and stake Statics</h2>
             <p>
-              Select only the fee assets this position should earn. New selections begin at the
-              current index and cannot capture historical rewards.
+              This creates a position and deposits your Statics. Choose which fee assets it earns
+              from the new position after confirmation.
             </p>
           </div>
           {catalog.data && (
@@ -596,25 +601,7 @@ function RewardsRuntime() {
                 {catalog.data.stakingToken.symbol}
               </small>
             </label>
-            <RewardAssetPicker
-              candidates={catalog.data.rewardCandidates}
-              selected={selectedAssets}
-              maximum={catalog.data.maximumRewardAssets}
-              disabled={pending}
-              onToggle={(asset) =>
-                setSelectedAssets((current) =>
-                  current.includes(asset)
-                    ? current.filter((item) => item !== asset)
-                    : [...current, asset]
-                )
-              }
-            />
           </>
-        )}
-        {actionError && (
-          <p className="dapp-inline-error" role="alert">
-            {actionError}
-          </p>
         )}
         <button
           className="dollar-submit"
@@ -645,19 +632,23 @@ function RewardsRuntime() {
         )}
         {catalog.data && isSurfaceReady(surfaceState) ? (
           <div className="reward-position-list">
-            {catalog.data.positions.map((position) => {
+            {orderedPositions.map((position) => {
               const key = position.positionId.toString();
               const defaults = claimablePositionRewards(position.rewards).map(
                 (reward) => reward.token.address
               );
               const selected = claimSelections[key] ?? defaults;
               return (
-                <article key={key}>
+                <article
+                  key={key}
+                  className={initialPositionId === position.positionId ? "is-focused" : undefined}
+                >
                   <div>
                     <h3>Position #{position.positionId.toString()}</h3>
                     <span>
                       {displayAmount(position.stakedBalance, catalog.data.stakingToken.decimals)}{" "}
                       {catalog.data.stakingToken.symbol} staked
+                      {initialPositionId === position.positionId ? " · selected position" : ""}
                     </span>
                   </div>
                   <StakeMaturity
@@ -695,7 +686,7 @@ function RewardsRuntime() {
                     <p>No reward assets selected.</p>
                   )}
                   <Link href={`/app/positions/${position.positionId.toString()}`}>
-                    Manage selections and stake →
+                    Configure stake and reward assets →
                   </Link>
                   <button
                     className="dollar-submit"
@@ -732,6 +723,22 @@ function RewardsRuntime() {
             }}
           />
         )}
+      </section>
+
+      <section className="position-panel">
+        <div className="position-section-heading">
+          <div>
+            <p className="dapp-section-label">From providing liquidity</p>
+            <h2>Liquidity rewards</h2>
+            <p>
+              Each active liquidity position earns its pool fees separately. Review and claim those
+              fees with the position that earned them.
+            </p>
+          </div>
+          <Link className="dollar-primary-link" href="/app/liquidity">
+            Review liquidity rewards →
+          </Link>
+        </div>
       </section>
     </div>
   );
