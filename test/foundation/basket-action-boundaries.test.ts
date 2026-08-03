@@ -32,4 +32,13 @@ describe("basket action ownership", () => {
     expect(positionDetail).toContain("?action=mint&positionId=");
     expect(positionDetail).toContain("?action=redeem&positionId=");
   });
+
+  it("describes basket creation as minting in transaction activity", () => {
+    const basketDetail = read("components/baskets/BasketDetailPage.tsx");
+
+    expect(basketDetail).toContain("`Mint ${basket.symbol}`");
+    expect(basketDetail).toContain("`Mint and deposit ${basket.symbol}`");
+    expect(basketDetail).not.toContain("`Buy ${basket.symbol}`");
+    expect(basketDetail).not.toContain("`Buy and deposit ${basket.symbol}`");
+  });
 });
