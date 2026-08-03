@@ -7056,6 +7056,1040 @@ export declare const staticsDollarCoreAbi: readonly [{
         readonly name: "seriesId";
     }];
 }];
+/**
+ * Periphery diamond: consumable Risk Share liquidity and the Dollar-only exit
+ * it backs.
+ *
+ * These live at a different address from the core pool. Read it from
+ * `staticsDollarCoreAbi`'s `periphery()` rather than configuring it separately,
+ * so the two can never disagree about which periphery is in use.
+ *
+ * The pairing vault is the reason `recombineManaged` is restricted to the
+ * periphery: it burns a redeemer's Dollar against Risk Shares supplied through
+ * a PositionNFT, which lets a holder exit without sourcing the junior tranche.
+ * Ordinary `recombine` still requires both legs.
+ */
+export declare const staticsDollarPeripheryAbi: readonly [{
+    readonly name: "createAndStakeRiskShares";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+}, {
+    readonly name: "stakeRiskShares";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "unstakeRiskShares";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "principalOut";
+    }];
+}, {
+    readonly name: "claimRiskProceeds";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "fundRiskCollateralIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "fundRiskDollarIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "fundRiskStaticsIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "riskIncentives";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "address";
+            readonly name: "collateralToken";
+        }, {
+            readonly type: "address";
+            readonly name: "staticsToken";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsDollarReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "staticsReserve";
+        }, {
+            readonly type: "uint256";
+            readonly name: "destinationSeriesId";
+        }, {
+            readonly type: "bool";
+            readonly name: "routedGlobal";
+        }, {
+            readonly type: "bool";
+            readonly name: "finalized";
+        }];
+        readonly name: "view_";
+    }];
+}, {
+    readonly name: "finalizeRiskIncentives";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "destinationSeriesId";
+    }, {
+        readonly type: "bool";
+        readonly name: "routedGlobal";
+    }];
+}, {
+    readonly name: "processSeriesTransition";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "oldSeriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "newSeriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPrincipal";
+    }];
+}, {
+    readonly name: "settleSeriesMigration";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "oldSeriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "newSeriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPrincipal";
+    }];
+}, {
+    readonly name: "closeRiskLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "riskLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "effectiveShares";
+        }, {
+            readonly type: "uint256";
+            readonly name: "claimableCollateral";
+        }, {
+            readonly type: "uint256";
+            readonly name: "claimableStaticsDollar";
+        }, {
+            readonly type: "uint256";
+            readonly name: "claimableStatics";
+        }, {
+            readonly type: "uint64";
+            readonly name: "epoch";
+        }, {
+            readonly type: "bool";
+            readonly name: "exists";
+        }];
+        readonly name: "view_";
+    }];
+}, {
+    readonly name: "totalRiskLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "effectiveShares";
+    }];
+}, {
+    readonly name: "riskLiquidityScaleRay";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "scaleRay";
+    }];
+}, {
+    readonly name: "positionSeriesCount";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "count";
+    }];
+}, {
+    readonly name: "positionSeriesAt";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "index";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "seriesMigration";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "oldSeriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "newSeriesId";
+        }, {
+            readonly type: "uint256";
+            readonly name: "oldPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingOldPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingNewPrincipal";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingStaticsDollar";
+        }, {
+            readonly type: "uint256";
+            readonly name: "remainingCollateral";
+        }, {
+            readonly type: "bool";
+            readonly name: "returned";
+        }, {
+            readonly type: "bool";
+            readonly name: "claimed";
+        }];
+        readonly name: "migration";
+    }];
+}, {
+    readonly name: "reservedBalance";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "RiskSharesStaked";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "supplier";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "RiskSharesUnstaked";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "RiskProceedsClaimed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "collateralToken";
+    }, {
+        readonly type: "address";
+        readonly name: "staticsToken";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "RiskProceedsAccrued";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint64";
+        readonly name: "epoch";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "bytes32";
+        readonly name: "source";
+    }];
+}, {
+    readonly name: "RiskProceedsSettled";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAdded";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAdded";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAdded";
+    }, {
+        readonly type: "uint256";
+        readonly name: "accruedCollateral";
+    }, {
+        readonly type: "uint256";
+        readonly name: "accruedStaticsDollar";
+    }, {
+        readonly type: "uint256";
+        readonly name: "accruedStatics";
+    }];
+}, {
+    readonly name: "RiskIncentivesFunded";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "funder";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "requestedAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "receivedAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesReleased";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint64";
+        readonly name: "epoch";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "riskSharesConsumed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesRolledOver";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "destinationSeriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "RiskIncentivesRoutedGlobal";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }];
+}, {
+    readonly name: "redeem";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minStaticsDollarRedeemed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minCollateralPerStaticsDollarWad";
+    }, {
+        readonly type: "uint256";
+        readonly name: "deadline";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarRedeemed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralOut";
+    }];
+}, {
+    readonly name: "redeemToETH";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minStaticsDollarRedeemed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minCollateralPerStaticsDollarWad";
+    }, {
+        readonly type: "uint256";
+        readonly name: "deadline";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarRedeemed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "ethOut";
+    }];
+}, {
+    readonly name: "previewRedeem";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "staticsDollarRedeemed";
+        }, {
+            readonly type: "uint256";
+            readonly name: "grossCollateral";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralToRedeemer";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralToRiskSuppliers";
+        }, {
+            readonly type: "uint256";
+            readonly name: "collateralToInsurance";
+        }, {
+            readonly type: "uint256";
+            readonly name: "seniorCollateralPerUnitWad";
+        }];
+        readonly name: "preview";
+    }];
+}, {
+    readonly name: "redeemableLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsDollarAmount";
+    }];
+}, {
+    readonly name: "redemptionParams";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "redemptionFeeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "supplierShareBps";
+    }];
+}, {
+    readonly name: "setRedemptionParams";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "redemptionFeeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "supplierShareBps";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "Redeemed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "caller";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsDollarRedeemed";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralToRedeemer";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralToRiskSuppliers";
+    }, {
+        readonly type: "uint256";
+        readonly name: "collateralToInsurance";
+    }];
+}, {
+    readonly name: "RedemptionDeferred";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "caller";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint8";
+        readonly name: "status";
+    }, {
+        readonly type: "uint256";
+        readonly name: "unhealthyProfileBitmap";
+    }];
+}, {
+    readonly name: "RedemptionParamsSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "redemptionFeeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "supplierShareBps";
+    }];
+}, {
+    readonly name: "CustodyReserved";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "bytes32";
+        readonly name: "account";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "token";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}];
+/**
+ * Reverts unique to the periphery facets above.
+ *
+ * Shared names -- ZeroAmount, ZeroAddress, SeriesNotActive,
+ * ProfileOperationPaused, InsufficientTransferReceived, UnexpectedExitStatus,
+ * NativeTransferFailed -- are already in `staticsDollarErrorAbi` with identical
+ * signatures and are deliberately not repeated, because a duplicate selector in
+ * one array makes the decode ambiguous. Decode against both.
+ */
+export declare const staticsDollarPeripheryErrorAbi: readonly [{
+    readonly name: "NotPositionOwnerOrApproved";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "address";
+        readonly name: "caller";
+    }];
+}, {
+    readonly name: "UnknownRiskLiquidity";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "InsufficientRiskLiquidity";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "requested";
+    }, {
+        readonly type: "uint256";
+        readonly name: "available";
+    }];
+}, {
+    readonly name: "NoRiskProceeds";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesNotIncentiveEligible";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesIncentivesNotFinalizable";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "RiskLiquidityHasValue";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "RiskLiquidityAmountTooSmall";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "requested";
+    }];
+}, {
+    readonly name: "NoRiskLiquidity";
+    readonly type: "error";
+    readonly inputs: readonly [];
+}, {
+    readonly name: "FillBelowMinimum";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "fill";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minimum";
+    }];
+}, {
+    readonly name: "RateBelowMinimum";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "rateWad";
+    }, {
+        readonly type: "uint256";
+        readonly name: "minimumRateWad";
+    }];
+}, {
+    readonly name: "InvalidRedemptionParams";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "feeBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "supplierShareBps";
+    }];
+}, {
+    readonly name: "SeriesTransitionPending";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "NotWETHCollateral";
+    readonly type: "error";
+    readonly inputs: readonly [];
+}, {
+    readonly name: "DeadlineExpired";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "deadline";
+    }, {
+        readonly type: "uint256";
+        readonly name: "currentTimestamp";
+    }];
+}, {
+    readonly name: "FixedAllocationExceedsGross";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "fixedSeniorCollateral";
+    }, {
+        readonly type: "uint256";
+        readonly name: "grossCollateral";
+    }];
+}, {
+    readonly name: "RiskLiquidityScaleExhausted";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "storedUnits";
+    }];
+}, {
+    readonly name: "ConsumeExceedsLiquidity";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "requested";
+    }, {
+        readonly type: "uint256";
+        readonly name: "available";
+    }];
+}, {
+    readonly name: "InsufficientUnreserved";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "requested";
+    }, {
+        readonly type: "uint256";
+        readonly name: "available";
+    }];
+}, {
+    readonly name: "GlobalReservationShortfall";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "reserved";
+    }, {
+        readonly type: "uint256";
+        readonly name: "balance";
+    }];
+}, {
+    readonly name: "DebitExceedsAuthorization";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "spent";
+    }, {
+        readonly type: "uint256";
+        readonly name: "maximum";
+    }];
+}, {
+    readonly name: "BalanceDecreasedDuringPull";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }, {
+        readonly type: "uint256";
+        readonly name: "beforeBalance";
+    }, {
+        readonly type: "uint256";
+        readonly name: "afterBalance";
+    }];
+}, {
+    readonly name: "SeriesMigrationNotReady";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "SeriesMigrationAlreadyProcessed";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "seriesId";
+    }];
+}, {
+    readonly name: "NotContractOwner";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "caller";
+    }, {
+        readonly type: "address";
+        readonly name: "owner";
+    }];
+}, {
+    readonly name: "SafeERC20FailedOperation";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "token";
+    }];
+}, {
+    readonly name: "ReentrancyGuardReentrantCall";
+    readonly type: "error";
+    readonly inputs: readonly [];
+}];
 export declare const staticsDollarErrorAbi: readonly [{
     readonly name: "ZeroAddress";
     readonly type: "error";

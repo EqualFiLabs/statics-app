@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DOLLAR_MINT_PAUSE,
   deriveDollarActionAvailability,
   dollarQuoteQueryKey,
   type DeriveDollarActionInput,
@@ -25,6 +26,9 @@ const healthySnapshot: DollarActionSnapshot = {
   wethAllowance: amount,
   dollarAllowance: amount,
   riskApproved: true,
+  peripheryDollarAllowance: 0n,
+  redeemableLiquidity: 0n,
+  pairingFillsPaused: false,
 };
 
 function derive(overrides: Partial<DeriveDollarActionInput> = {}) {
@@ -157,5 +161,67 @@ describe("Dollar action availability", () => {
         snapshot: { ...healthySnapshot, riskApproved: false },
       })
     ).toMatchObject({ kind: "approve-risk" });
+  });
+});
+
+describe("Dollar redemption against opt-in liquidity", () => {
+  const redeeming = (overrides: Partial<DollarActionSnapshot> = {}) =>
+    deriveDollarActionAvailability({
+      mode: "redeem",
+      asset: "ETH",
+      amount: 100n,
+      quoteState: "ready",
+      snapshot: {
+        ...healthySnapshot,
+        dollarBalance: 1_000n,
+        // The whole point of this route: no Risk shares held.
+        riskBalance: 0n,
+        redeemableLiquidity: 500n,
+        peripheryDollarAllowance: 100n,
+        ...overrides,
+      },
+    });
+
+  it("lets a wallet holding no Risk shares redeem", () => {
+    expect(redeeming()).toMatchObject({ kind: "execute", executable: true });
+  });
+
+  // Recombine needs both legs; redeem is the route that does not. Requiring
+  // shares here would remove the only exit this surface exists to provide.
+  it("does not require Risk shares the way recombination does", () => {
+    const recombine = deriveDollarActionAvailability({
+      mode: "recombine",
+      asset: "ETH",
+      amount: 100n,
+      quoteState: "ready",
+      snapshot: { ...healthySnapshot, dollarBalance: 1_000n, riskBalance: 0n },
+    });
+    expect(recombine.executable).toBe(false);
+    expect(redeeming().executable).toBe(true);
+  });
+
+  it("blocks with a way forward when nobody has opted in", () => {
+    const availability = redeeming({ redeemableLiquidity: 0n });
+    expect(availability.kind).toBe("blocked");
+    expect(availability.reason).toMatch(/recombine instead/i);
+  });
+
+  // The periphery pulls the Dollar, so approving the gateway would leave the
+  // redemption reverting on a transfer it cannot make.
+  it("approves the periphery rather than the gateway", () => {
+    expect(redeeming({ peripheryDollarAllowance: 0n })).toMatchObject({
+      kind: "approve-dollar-periphery",
+      executable: true,
+    });
+  });
+
+  it("honours the opt-in fill pause independently of minting", () => {
+    expect(redeeming({ pairingFillsPaused: true })).toMatchObject({ kind: "blocked" });
+    // Minting paused must not close the exit.
+    expect(redeeming({ pausedOperations: DOLLAR_MINT_PAUSE })).toMatchObject({ kind: "execute" });
+  });
+
+  it("still requires enough Dollar to spend", () => {
+    expect(redeeming({ dollarBalance: 10n }).executable).toBe(false);
   });
 });

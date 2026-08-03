@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
@@ -15,6 +16,7 @@ function formatAddress(address: string): string {
 
 function WalletHeaderControls() {
   const wallet = useWalletState();
+  const [accountOpen, setAccountOpen] = useState(false);
 
   if (wallet.status === "unconfigured") {
     return (
@@ -71,11 +73,14 @@ function WalletHeaderControls() {
       <button
         className="dapp-wallet-button is-connected"
         type="button"
-        onClick={() => void wallet.copyAddress()}
-        title="Copy wallet address"
+        onClick={() => setAccountOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={accountOpen}
+        title="Account details"
       >
         {wallet.address ? formatAddress(wallet.address) : "Wallet ready"}
       </button>
+      {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
     </div>
   );
 }

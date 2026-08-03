@@ -1637,6 +1637,10 @@
   text-align: center;
 }
 
+/* Typography is restated rather than inherited, because a dialog may be
+ * portalled out of .dapp-shell to escape the header's backdrop-filter -- which
+ * makes the header a containing block for position:fixed -- and would otherwise
+ * fall back to the global mono font. */
 .wallet-dialog-backdrop {
   position: fixed;
   z-index: 80;
@@ -1644,7 +1648,12 @@
   display: grid;
   place-items: center;
   padding: 1rem;
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   background: rgba(0, 0, 0, 0.6);
+  -webkit-font-smoothing: antialiased;
 }
 
 .wallet-dialog {
@@ -2115,6 +2124,151 @@
   padding: 0.9rem;
   border: 1px solid var(--warning);
   color: var(--warning);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  border-radius: var(--radius-lg);
+}
+
+.account-dialog {
+  width: min(440px, 100%);
+}
+
+/* The address wraps rather than truncates: a person checking they are about to
+ * paste the right one needs to see all of it, not a middle ellipsis. */
+.account-address {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.85rem;
+  border: 1px solid var(--app-border);
+  background: var(--app-raised);
+  border-radius: var(--radius-md);
+}
+
+.account-address > div {
+  min-width: 0;
+}
+
+.account-address span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+
+.account-address code {
+  display: block;
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.account-address-empty {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.account-address button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  color: var(--app-text-muted);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.account-address button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.account-address button:hover {
+  color: var(--app-text);
+  border-color: var(--app-text-muted);
+}
+
+.account-disconnect {
+  width: 100%;
+  height: var(--control-height);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: 1px solid var(--warning);
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.account-disconnect:hover:not(:disabled) {
+  color: var(--app-bg);
+  background: var(--warning);
+}
+
+.account-disconnect:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Proceeds sit outside the mode's own action, because they survive a full
+ * withdrawal -- a supplier can have nothing left supplied and still be owed. */
+.dollar-claim-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-raised);
+  border-radius: var(--radius-lg);
+}
+
+.dollar-claim-row span {
+  display: block;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+
+.dollar-claim-row strong {
+  color: var(--app-text);
+  font-size: var(--text-sm);
+}
+
+.dollar-claim-row button {
+  flex: none;
+  min-width: 104px;
+  height: var(--control-height);
+  color: var(--accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.dollar-claim-row button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Explains a route rather than warning about one, so it stays quiet. */
+.dollar-note {
+  padding: 0.9rem;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
   font-size: var(--text-sm);
   line-height: 1.6;
   border-radius: var(--radius-lg);

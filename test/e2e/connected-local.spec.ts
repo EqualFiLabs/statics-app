@@ -77,3 +77,49 @@ test("exposes a real Privy entry point without claiming identity proof", async (
   await expect(page.getByText("Continue with a wallet", { exact: true })).toBeVisible();
   expectNoBrowserFailures();
 });
+
+/**
+ * The Dollar page's five modes, driven through the actual controls.
+ *
+ * This exists because the supply and withdraw modes shipped completely
+ * non-functional and unit tests could not see it: the step logic was correct in
+ * isolation, but `executeNextAction` gated every click behind a Dollar quote
+ * that supply modes never produce, so the button threw "Wait for a fresh
+ * protocol preview." A CLI harness calling the lib functions passed. Only
+ * clicking the button finds this class of defect.
+ */
+test("every Dollar mode reaches a live action rather than a preview gate", async ({ page }) => {
+  const expectNoBrowserFailures = monitorBrowserFailures(page);
+  await page.goto("/app/dollar");
+
+  const amount = page.locator("#dollar-amount");
+  const action = page.locator("button.dollar-submit");
+
+  for (const [label, unit] of [
+    ["Deposit", /ETH|WETH/],
+    ["Recombine", /Dollar/],
+    ["Redeem", /Dollar/],
+    ["Supply", /Risk shares/],
+    ["Withdraw", /Risk shares/],
+  ] as const) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+
+    // The field has to be denominated in what the mode actually moves.
+    await expect(page.getByText(unit).first()).toBeVisible();
+
+    await amount.fill("1");
+    // Whatever the mode decides, it must resolve to a real label rather than
+    // sitting on a preview that will never arrive for this route.
+    await expect(action).not.toHaveText(/Load preview|Refreshing preview/, { timeout: 15_000 });
+
+    if (await action.isEnabled()) {
+      await action.click();
+      // The failure this guards: an enabled button that throws a quote error
+      // instead of acting. Any wallet prompt or protocol reason is acceptable;
+      // "wait for a preview" on a route that has no preview is not.
+      await expect(page.getByText(/Wait for a fresh protocol preview/)).toHaveCount(0);
+    }
+    await amount.fill("");
+  }
+  expectNoBrowserFailures();
+});
