@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { getDappRoutePresentation, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
-import { appNavigation } from "@/lib/site-config";
+import { appHeaderNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -69,18 +68,8 @@ function WalletHeaderControls() {
 
   return (
     <div className="dapp-wallet-actions">
-      {!wallet.isTargetChain && (
-        <button
-          className="dapp-wallet-link is-warning"
-          type="button"
-          onClick={() => void wallet.switchNetwork()}
-          disabled={wallet.busyAction !== null}
-        >
-          {wallet.busyAction === "switch" ? "Switching…" : "Switch network"}
-        </button>
-      )}
       <button
-        className="dapp-wallet-button"
+        className="dapp-wallet-button is-connected"
         type="button"
         onClick={() => void wallet.copyAddress()}
         title="Copy wallet address"
@@ -91,20 +80,75 @@ function WalletHeaderControls() {
   );
 }
 
-function walletStatusLabel(status: ReturnType<typeof useWalletState>["status"]): string {
-  if (status === "unconfigured") return "Not configured";
-  if (status === "loading") return "Loading";
-  if (status === "signed-out") return "Signed out";
-  if (status === "wallet-missing") return "Wallet needed";
-  if (status === "error") return "Unavailable";
-  return "Connected";
+/**
+ * Which network you are on, in the header, on every route.
+ *
+ * `networkName` is the *target* chain's name, so it only describes reality
+ * when isTargetChain is true. Anything else has to be reported as a mismatch
+ * rather than by name, because the context does not carry the name of the
+ * chain the wallet actually sits on -- only its id.
+ */
+function NetworkIndicator() {
+  const wallet = useWalletState();
+
+  if (wallet.status !== "ready") {
+    return (
+      <div className="dapp-network">
+        <span className="dapp-network-dot" aria-hidden="true" />
+        {wallet.networkName}
+      </div>
+    );
+  }
+
+  if (!wallet.isTargetChain) {
+    return (
+      <div className="dapp-network is-wrong">
+        <span className="dapp-network-dot" aria-hidden="true" />
+        {wallet.chainId === null ? "Network unknown" : `Chain ${wallet.chainId}`}
+      </div>
+    );
+  }
+
+  return (
+    <div className="dapp-network is-ready">
+      <span className="dapp-network-dot" aria-hidden="true" />
+      {wallet.networkName}
+    </div>
+  );
+}
+
+/**
+ * A wrong network means every number on the page reads as unavailable, so the
+ * fix has to be impossible to miss and reachable at any width -- not a link in
+ * the header, which is hidden under 560px.
+ */
+function WrongNetworkBar() {
+  const wallet = useWalletState();
+  if (wallet.status !== "ready" || wallet.isTargetChain) return null;
+
+  return (
+    <div className="dapp-network-bar" role="status">
+      <p>
+        <strong>You are on the wrong network.</strong> Statics data will not load until you switch
+        to {wallet.networkName}
+        {wallet.targetChainId ? ` (chain ${wallet.targetChainId})` : ""}.
+      </p>
+      <button
+        className="dapp-network-bar-action"
+        type="button"
+        onClick={() => void wallet.switchNetwork()}
+        disabled={wallet.busyAction !== null}
+      >
+        {wallet.busyAction === "switch" ? "Switching…" : `Switch network`}
+      </button>
+    </div>
+  );
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
-  const dollarDeployment = readClientDollarDeployment();
   const [openNavigationPath, setOpenNavigationPath] = useState<string | null>(null);
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
@@ -141,29 +185,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [navigationOpen]);
 
-  const statusCards = [
-    {
-      label: "DApp",
-      value: routeCopy.status,
-      ready: true,
-    },
-    {
-      label: "Wallet",
-      value: walletStatusLabel(wallet.status),
-      ready: wallet.status === "ready",
-    },
-    {
-      label: "Network",
-      value: wallet.status === "ready" && wallet.isTargetChain ? wallet.networkName : "--",
-      ready: wallet.status === "ready" && wallet.isTargetChain,
-    },
-    {
-      label: "Deployment",
-      value: dollarDeployment.status === "configured" ? "Local Anvil" : "--",
-      ready: dollarDeployment.status === "configured",
-    },
-  ] as const;
-
   return (
     <div className="dapp-shell">
       <a className="dapp-skip-link" href="#dapp-content">
@@ -180,11 +201,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             priority
           />
         </Link>
-        <div className="dapp-phase">
-          <span className="dapp-pulse" aria-hidden="true" />
-          Protocol DApp
-        </div>
+        <NetworkIndicator />
         <div className="dapp-header-actions">
+          {appHeaderNavigation.map((item) => (
+            <Link
+              key={item.href}
+              className={`dapp-header-link${currentPath.startsWith(item.href) ? " active" : ""}`}
+              href={item.href}
+              aria-current={currentPath.startsWith(item.href) ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          ))}
           <Link className="dapp-return" href="/">
             Site <span aria-hidden="true">↗</span>
           </Link>
@@ -197,60 +225,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className={`dapp-sidebar${navigationOpen ? " is-open" : ""}`}
           aria-label="DApp navigation"
         >
-          <div className="dapp-mobile-navigation">
-            <button
-              ref={navigationToggleRef}
-              className="dapp-nav-toggle"
-              type="button"
-              aria-label={`Application menu. Current route: ${routeCopy.label}`}
-              aria-expanded={navigationOpen}
-              aria-controls="dapp-navigation-panel"
-              onClick={navigationOpen ? () => closeNavigation() : openNavigation}
-            >
-              <span>Current route</span>
-              <strong>{routeCopy.label}</strong>
-              <span aria-hidden="true">{navigationOpen ? "Close ×" : "Menu +"}</span>
-            </button>
-          </div>
-
           <div className="dapp-nav-panel" id="dapp-navigation-panel">
             <div className="dapp-nav-panel-heading">
               <div>
-                <span>{"// Statics DApp"}</span>
+                <span>Statics DApp</span>
                 <strong>Application navigation</strong>
               </div>
               <button type="button" onClick={() => closeNavigation()}>
                 Close ×
               </button>
             </div>
-            <p className="dapp-nav-label">Navigation</p>
-            <nav aria-label="Application routes">
-              {appNavigation.map((item, index) => {
-                const active =
-                  item.href === currentPath ||
-                  (item.href !== "/app" &&
-                    Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
-                return item.enabled && item.href ? (
-                  <Link
-                    ref={index === 0 ? firstNavigationLinkRef : undefined}
-                    key={item.label}
-                    className={`dapp-nav-item${active ? " active" : ""}`}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => closeNavigation()}
-                  >
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    {item.label}
-                  </Link>
-                ) : (
-                  <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    {item.label}
-                    <small>Planned</small>
-                  </span>
-                );
-              })}
-            </nav>
+            {/* One <nav> per group, each labelled, so the grouping is structure
+                rather than styling and assistive tech can jump between them. */}
+            {appNavigationGroups.map((group, groupIndex) => (
+              <nav
+                key={group.label ?? "home"}
+                // A group whose every item is hidden on desktop would otherwise
+                // leave its heading stranded above nothing.
+                className={`dapp-nav-group${
+                  group.items.every((item) => (item.placement ?? "primary") !== "primary")
+                    ? " is-detail-only"
+                    : ""
+                }`}
+                aria-label={group.label ?? "Overview"}
+              >
+                {group.label && <p className="dapp-nav-label">{group.label}</p>}
+                {group.items.map((item, itemIndex) => {
+                  // Anything not primary is hidden from the desktop sidebar by
+                  // CSS rather than dropped, so the mobile panel keeps it.
+                  const secondaryClass =
+                    (item.placement ?? "primary") === "primary" ? "" : " is-secondary";
+                  const active =
+                    item.href === currentPath ||
+                    (item.href !== "/app" &&
+                      Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
+                  return item.enabled && item.href ? (
+                    <Link
+                      ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
+                      key={item.label}
+                      className={`dapp-nav-item${active ? " active" : ""}${secondaryClass}`}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => closeNavigation()}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span
+                      key={item.label}
+                      className={`dapp-nav-item${secondaryClass}`}
+                      aria-disabled="true"
+                    >
+                      {item.label}
+                      <small>Planned</small>
+                    </span>
+                  );
+                })}
+              </nav>
+            ))}
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
               Return to site <span aria-hidden="true">↗</span>
             </Link>
@@ -258,9 +290,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <main id="dapp-content" className="dapp-content">
+          <WrongNetworkBar />
+
           {showOverviewSummary && (
             <section className="dapp-intro">
-              <p className="dapp-eyebrow">{"// Statics application"}</p>
+              <p className="dapp-eyebrow">Statics application</p>
               <h1>{routeCopy.title}</h1>
               <p>{routeCopy.description}</p>
             </section>
@@ -272,20 +306,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           )}
 
-          {showOverviewSummary && (
-            <section className="dapp-status-grid" aria-label="Application readiness">
-              {statusCards.map((card) => (
-                <article key={card.label} className="dapp-status-card">
-                  <span>{card.label}</span>
-                  <strong className={card.ready ? "is-ready" : undefined}>{card.value}</strong>
-                </article>
-              ))}
-            </section>
-          )}
-
           {children}
         </main>
       </div>
+
+      <nav className="dapp-tabbar" aria-label="Primary">
+        {appTabNavigation.map((item) => {
+          const active =
+            item.href === currentPath ||
+            (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
+          return (
+            <Link
+              key={item.href}
+              className={`dapp-tab${active ? " active" : ""}`}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+            >
+              {item.tabLabel}
+            </Link>
+          );
+        })}
+        <button
+          ref={navigationToggleRef}
+          className="dapp-tab dapp-nav-toggle"
+          type="button"
+          aria-label={`Application menu. Current route: ${routeCopy.label}`}
+          aria-expanded={navigationOpen}
+          aria-controls="dapp-navigation-panel"
+          onClick={navigationOpen ? () => closeNavigation() : openNavigation}
+        >
+          {/* Glyph only. The accessible name comes from aria-label above, so
+              this carries no text of its own. */}
+          <span aria-hidden="true">{navigationOpen ? "✕" : "☰"}</span>
+        </button>
+      </nav>
     </div>
   );
 }

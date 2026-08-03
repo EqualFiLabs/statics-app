@@ -16,11 +16,18 @@ import { useState } from "react";
 import {
   basketTokenAbi,
   buildClaimRewardsCall,
+  buildClaimBasketRewardsCall,
   buildCreateAndStakeCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
 
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
+import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
+import { StakeMaturity } from "@/components/rewards/StakeMaturity";
+import { loadStakingSnapshot } from "@/lib/positions/staking";
 import { RewardsPreview } from "@/components/preview/DappPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -65,6 +72,7 @@ function RewardsRuntime() {
   const [amountInput, setAmountInput] = useState("");
   const [selectedAssets, setSelectedAssets] = useState<readonly `0x${string}`[]>([]);
   const [pending, setPending] = useState(false);
+  const [claimingBasketKey, setClaimingBasketKey] = useState<string | null>(null);
   const [claimingPositionId, setClaimingPositionId] = useState<bigint | null>(null);
   const [claimSelections, setClaimSelections] = useState<Record<string, readonly `0x${string}`[]>>(
     {}
@@ -91,6 +99,73 @@ function RewardsRuntime() {
       }
       await verifyDollarDeployment(publicClient, deploymentState.deployment);
       return loadPositionCatalog(publicClient, deploymentState.deployment, wallet);
+    },
+  });
+
+  // Which part of each stake is earning, and when the rest starts. The
+  // position catalog reports only a total, which cannot explain why rewards
+  // look lower than expected right after staking.
+  const stakingSnapshots = useQuery({
+    queryKey: [
+      "staking-snapshots",
+      wallet,
+      (catalog.data?.positions ?? [])
+        .map((position) => `${position.positionId}:${position.rewards.length}`)
+        .join(","),
+    ],
+    enabled:
+      deploymentState.status === "configured" &&
+      Boolean(publicClient) &&
+      Boolean(wallet) &&
+      Boolean(catalog.data),
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      if (!publicClient || !wallet || deploymentState.status !== "configured" || !catalog.data) {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      const entries = await Promise.all(
+        catalog.data.positions.map(
+          async (position) =>
+            [
+              position.positionId.toString(),
+              await loadStakingSnapshot(
+                publicClient,
+                deploymentState.deployment,
+                wallet,
+                position.positionId,
+                position.rewards
+              ),
+            ] as const
+        )
+      );
+      return Object.fromEntries(entries);
+    },
+  });
+
+  // What deposited baskets have earned, in the assets they hold. Separate from
+  // the Statics staking rewards below: a deposited basket earns without the
+  // Statics token being staked at all, and the two claim through different
+  // calls. Keyed off the loaded positions so it refetches when they change.
+  const basketRewards = useQuery({
+    queryKey: [
+      "basket-rewards",
+      wallet,
+      (catalog.data?.positions ?? [])
+        .map((position) => `${position.positionId}:${position.collateral.length}`)
+        .join(","),
+    ],
+    enabled:
+      deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      if (!publicClient || deploymentState.status !== "configured" || !catalog.data) {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      return loadBasketRewardSummary(
+        publicClient,
+        deploymentState.deployment,
+        catalog.data.positions
+      );
     },
   });
   const amount = parseAmount(amountInput, catalog.data?.stakingToken.decimals ?? 18);
@@ -153,7 +228,7 @@ function RewardsRuntime() {
         await executeProtocolTransaction({
           ...common,
           kind: "create-and-stake",
-          label: `Create PositionNFT and stake ${token.symbol}`,
+          label: `Create position and stake ${token.symbol}`,
           amount: `${amountInput} ${token.symbol}`,
           to: diamond,
           data: buildCreateAndStakeCall(amount, wallet, selectedAssets),
@@ -189,7 +264,7 @@ function RewardsRuntime() {
     try {
       const refreshed = await catalog.refetch();
       const position = refreshed.data?.positions.find((item) => item.positionId === positionId);
-      if (!position) throw new Error("The selected PositionNFT is no longer owned by this wallet.");
+      if (!position) throw new Error("The selected position is no longer owned by this wallet.");
       const key = positionId.toString();
       const defaultAssets = claimablePositionRewards(position.rewards).map(
         (reward) => reward.token.address
@@ -302,15 +377,83 @@ function RewardsRuntime() {
     }
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    !wallet ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
+  const claimBasketRewards = async (entry: BasketRewardEntry) => {
+    if (!wallet || !publicClient || !walletClient.data || deploymentState.status !== "configured") {
+      return;
+    }
+    const key = `${entry.positionId}:${entry.basketId}`;
+    setClaimingBasketKey(key);
+    setActionError(null);
+    try {
+      const expected = entry.amounts.filter((item) => item.amount > 0n);
+      await executeProtocolTransaction({
+        publicClient,
+        wallet,
+        chainId: deploymentState.deployment.chainId,
+        kind: "claim-basket-rewards",
+        label: `Claim ${entry.basketSymbol} rewards`,
+        amount: expected
+          .map((item) => `${displayAmount(item.amount, item.token.decimals)} ${item.token.symbol}`)
+          .join(" + "),
+        to: deploymentState.deployment.contracts.diamond,
+        data: buildClaimBasketRewardsCall(entry.positionId, entry.basketId, wallet),
+        sendTransaction: ({ to, data, value }) =>
+          walletClient.data!.sendTransaction({
+            account: wallet,
+            chain: walletClient.data!.chain,
+            to,
+            data,
+            value,
+          }),
+        describeError: describePositionError,
+        validateSimulation: (result) => {
+          if (!result) throw new Error("The basket reward claim simulation returned no amounts.");
+          const [, amounts] = decodeFunctionResult({
+            abi: staticsAbi,
+            functionName: "claimBasketRewards",
+            data: result,
+          });
+          if (amounts.every((amount) => amount === 0n)) {
+            throw new Error("The basket reward claim simulation returned nothing to claim.");
+          }
+        },
+        verifyConfirmation: async (receipt) => {
+          // Confirm the chain actually paid this position and basket, rather
+          // than trusting that a successful transaction did what was reviewed.
+          const events = parseEventLogs({
+            abi: staticsAbi,
+            eventName: "BasketRewardClaimed",
+            logs: receipt.logs,
+            strict: true,
+          }).filter(
+            (event) =>
+              event.args.positionId === entry.positionId && event.args.basketId === entry.basketId
+          );
+          if (events.length === 0) {
+            throw new Error("The receipt did not contain the reviewed basket reward claim.");
+          }
+        },
+      });
+      await Promise.all([catalog.refetch(), basketRewards.refetch()]);
+    } catch (error) {
+      setActionError(describePositionError(error));
+    } finally {
+      setClaimingBasketKey(null);
+    }
+  };
+
+  if (deploymentState.status === "unavailable") {
     return <RewardsPreview />;
   }
+
+  const surfaceState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
+    hasData: Boolean(catalog.data),
+  });
 
   let primaryLabel = "Approve or create staking position";
   let primaryAction: (() => void) | null = () => void createAndStake();
@@ -330,13 +473,94 @@ function RewardsRuntime() {
 
   return (
     <div className="rewards-page">
+      {/* Basket rewards come first because they are what a deposited basket
+          earns, and they need no Statics staking at all. Someone who bought a
+          basket and came here looking for their earnings previously landed on
+          the staking panel below and reasonably concluded it was not working. */}
       <section className="position-panel">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Atomic position creation</p>
-            <h2>Create and stake</h2>
+            <p className="dapp-section-label">From your deposited baskets</p>
+            <h2>Basket rewards</h2>
             <p>
-              Select only the fee assets this PositionNFT should earn. New selections begin at the
+              A deposited basket earns a share of the trading fees on its assets, paid in those same
+              assets. Each basket is claimed on its own.
+            </p>
+          </div>
+        </div>
+
+        {basketRewards.data && basketRewards.data.entries.length > 0 ? (
+          <div className="reward-position-list">
+            {basketRewards.data.entries.map((entry) => {
+              const key = `${entry.positionId}:${entry.basketId}`;
+              const earned = entry.amounts.filter((item) => item.amount > 0n);
+              return (
+                <article className="reward-position" key={key}>
+                  <div className="reward-position-heading">
+                    <div>
+                      <h3>{entry.basketName}</h3>
+                      <span>
+                        {displayAmount(entry.depositedShares, 18)} {entry.basketSymbol} deposited ·
+                        Position #{entry.positionId.toString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void claimBasketRewards(entry)}
+                      disabled={!entry.claimable || claimingBasketKey !== null}
+                    >
+                      {claimingBasketKey === key ? "Claiming…" : "Claim"}
+                    </button>
+                  </div>
+                  {earned.length > 0 ? (
+                    <dl>
+                      {earned.map((item) => (
+                        <div key={item.token.address}>
+                          <dt>{item.token.symbol}</dt>
+                          <dd>{displayAmount(item.amount, item.token.decimals)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="reward-position-idle">
+                      Earning in{" "}
+                      {entry.amounts.map((item) => item.token.symbol).join(", ") || "its assets"}.
+                      Nothing to claim yet.
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <SurfaceEmptyState
+            state={deriveSurfaceState({
+              walletStatus: walletState.status,
+              isTargetChain: walletState.isTargetChain,
+              isLoading: catalog.isPending || basketRewards.isPending,
+              isError: catalog.isError || basketRewards.isError,
+              isEmpty: (basketRewards.data?.entries.length ?? 0) === 0,
+              hasData: Boolean(basketRewards.data),
+            })}
+            subject="basket rewards"
+            onRetry={() => void basketRewards.refetch()}
+            empty={{
+              title: "No baskets deposited yet",
+              description:
+                "Buy a basket with depositing switched on, and it starts earning a share of the trading fees on the assets it holds.",
+              action: { label: "Browse baskets", href: "/app/baskets" },
+            }}
+          />
+        )}
+      </section>
+
+      <section className="position-panel">
+        <div className="position-section-heading">
+          <div>
+            <p className="dapp-section-label">From staking Statics</p>
+            <h2>Stake Statics to earn</h2>
+            <p>
+              Select only the fee assets this position should earn. New selections begin at the
               current index and cannot capture historical rewards.
             </p>
           </div>
@@ -371,34 +595,19 @@ function RewardsRuntime() {
                 {catalog.data.stakingToken.symbol}
               </small>
             </label>
-            <fieldset className="reward-selector" disabled={pending}>
-              <legend>
-                Initial reward selections · {selectedAssets.length}/
-                {catalog.data.maximumRewardAssets.toString()}
-              </legend>
-              {catalog.data.rewardCandidates.map((candidate) => {
-                const selected = selectedAssets.includes(candidate.token.address);
-                return (
-                  <label key={candidate.token.address}>
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() =>
-                        setSelectedAssets((current) =>
-                          selected
-                            ? current.filter((asset) => asset !== candidate.token.address)
-                            : [...current, candidate.token.address]
-                        )
-                      }
-                    />
-                    <span>
-                      <strong>{candidate.token.symbol}</strong>
-                      {candidate.sources.join(" · ")}
-                    </span>
-                  </label>
-                );
-              })}
-            </fieldset>
+            <RewardAssetPicker
+              candidates={catalog.data.rewardCandidates}
+              selected={selectedAssets}
+              maximum={catalog.data.maximumRewardAssets}
+              disabled={pending}
+              onToggle={(asset) =>
+                setSelectedAssets((current) =>
+                  current.includes(asset)
+                    ? current.filter((item) => item !== asset)
+                    : [...current, asset]
+                )
+              }
+            />
           </>
         )}
         {actionError && (
@@ -420,11 +629,11 @@ function RewardsRuntime() {
         </button>
       </section>
 
-      <section className="position-panel">
+      <section className="position-panel is-wide">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">Wallet-owned positions</p>
-            <h2>Selected rewards</h2>
+            <p className="dapp-section-label">From staking Statics</p>
+            <h2>Your staked positions</h2>
           </div>
           <span>Multi-asset claims</span>
         </div>
@@ -433,7 +642,7 @@ function RewardsRuntime() {
             Reward data is temporarily unavailable. Showing the last received state.
           </p>
         )}
-        {catalog.data?.positions.length ? (
+        {catalog.data && isSurfaceReady(surfaceState) ? (
           <div className="reward-position-list">
             {catalog.data.positions.map((position) => {
               const key = position.positionId.toString();
@@ -450,6 +659,11 @@ function RewardsRuntime() {
                       {catalog.data.stakingToken.symbol} staked
                     </span>
                   </div>
+                  <StakeMaturity
+                    snapshot={stakingSnapshots.data?.[key]}
+                    stakingToken={catalog.data.stakingToken}
+                    now={catalog.data.currentTimestamp}
+                  />
                   {position.rewards.length ? (
                     <ul>
                       {position.rewards.map((reward) => (
@@ -500,10 +714,22 @@ function RewardsRuntime() {
             })}
           </div>
         ) : (
-          <div className="position-empty">
-            <h3>No PositionNFT is owned by this wallet.</h3>
-            <p>Create and stake above to begin.</p>
-          </div>
+          <SurfaceEmptyState
+            state={surfaceState}
+            subject="rewards"
+            onRetry={() => void catalog.refetch()}
+            empty={{
+              title: "Nothing staked yet",
+              description:
+                "Stake a position to start earning a share of protocol fees. You choose which assets to earn in, and you can claim whenever you like.",
+              action: {
+                label: pending ? "Working…" : "Create and stake",
+                onClick: () => void createAndStake(),
+                disabled: pending,
+              },
+              secondary: { label: "View your positions", href: "/app/positions" },
+            }}
+          />
         )}
       </section>
     </div>

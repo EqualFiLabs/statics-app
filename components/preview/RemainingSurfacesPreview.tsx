@@ -19,7 +19,7 @@ export function LoansPreview() {
           <h2 id="preview-loans-title">Position-owned loans</h2>
         </div>
         <dl>
-          {["Open tranches", "Outstanding principal", "Next maturity"].map((label) => (
+          {["Open loans", "Outstanding principal", "Next maturity"].map((label) => (
             <div key={label}>
               <dt>{label}</dt>
               <dd>{unavailable}</dd>
@@ -28,11 +28,11 @@ export function LoansPreview() {
         </dl>
       </section>
       <div className="remaining-layout">
-        <section className="remaining-list" aria-label="Loan tranches">
+        <section className="remaining-list" aria-label="Loans">
           <div className="remaining-section-heading">
             <div>
               <p className="dapp-section-label">Loan inventory</p>
-              <h3>Independent tranches</h3>
+              <h3>Independent loans</h3>
             </div>
             <span>{unavailable} total</span>
           </div>
@@ -73,7 +73,7 @@ export function LoansPreview() {
             ))}
           </div>
           <div className="loan-detail-meta">
-            <PreviewAddress label="PositionNFT owner" />
+            <PreviewAddress label="Position owner" />
             <p>{unavailable}</p>
           </div>
           <dl className="remaining-quote">
@@ -124,7 +124,7 @@ export function BasketCreatePreview() {
       </Link>
       <section className="remaining-hero" aria-labelledby="preview-create-title">
         <div>
-          <p className="dapp-section-label">Permissionless configuration</p>
+          <p className="dapp-section-label">Basket setup</p>
           <h2 id="preview-create-title">Create a static basket</h2>
         </div>
         <span className="remaining-status">{unavailable}</span>
@@ -269,11 +269,11 @@ export function LiquidityPreview() {
       <PreviewBanner surface="Liquidity" />
       <section className="remaining-hero" aria-labelledby="preview-liquidity-title">
         <div>
-          <p className="dapp-section-label">Canonical v4 state</p>
-          <h2 id="preview-liquidity-title">Pools, POL, and user LP NFTs</h2>
+          <p className="dapp-section-label">Liquidity</p>
+          <h2 id="preview-liquidity-title">Pools and your liquidity</h2>
         </div>
         <dl>
-          {["Native LP fee", "Canonical pools", "User LP NFTs"].map((label) => (
+          {["Pool fee", "Pools", "Your liquidity"].map((label) => (
             <div key={label}>
               <dt>{label}</dt>
               <dd>{unavailable}</dd>
@@ -284,8 +284,8 @@ export function LiquidityPreview() {
       <section className="pool-catalog">
         <div className="remaining-section-heading">
           <div>
-            <p className="dapp-section-label">Canonical pools</p>
-            <h3>Canonical pool health</h3>
+            <p className="dapp-section-label">Pools</p>
+            <h3>Pool health</h3>
           </div>
           <span>{unavailable}</span>
         </div>
@@ -300,12 +300,12 @@ export function LiquidityPreview() {
               <p>{unavailable}</p>
               <dl>
                 {[
-                  "Native v4 LP fee",
-                  "Bilateral hook fees",
+                  "Pool fee",
+                  "Trading fees",
                   "Observation",
                   "Manager sync",
-                  "Pending POL",
-                  "Locked POL",
+                  "Pending protocol liquidity",
+                  "Locked protocol liquidity",
                 ].map((label) => (
                   <div key={label}>
                     <dt>{label}</dt>
@@ -320,10 +320,10 @@ export function LiquidityPreview() {
       <section className="fee-allocation">
         <div>
           <p className="dapp-section-label">Effective allocation</p>
-          <h3>Four-way bilateral fee split</h3>
+          <h3>How trading fees are split</h3>
         </div>
         <dl>
-          {["Permanent liquidity", "Canonical LP NFTs", "PositionNFT stakers", "Treasury"].map(
+          {["Permanent liquidity", "Your liquidity positions", "Position stakers", "Treasury"].map(
             (label) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -334,11 +334,11 @@ export function LiquidityPreview() {
         </dl>
       </section>
       <div className="remaining-layout liquidity-layout">
-        <section className="remaining-list" aria-label="User LP NFTs">
+        <section className="remaining-list" aria-label="Your liquidity">
           <div className="remaining-section-heading">
             <div>
               <p className="dapp-section-label">Wallet inventory</p>
-              <h3>User-owned PositionManager NFTs</h3>
+              <h3>Your liquidity positions</h3>
             </div>
           </div>
           {["01", "02", "03"].map((row) => (
@@ -349,9 +349,9 @@ export function LiquidityPreview() {
               onClick={() => setSelectedLpRow(row)}
             >
               <span className="remaining-status">{unavailable}</span>
-              <strong>LP NFT #{unavailable}</strong>
+              <strong>Liquidity position #{unavailable}</strong>
               <small>
-                PositionNFT #{unavailable} · {unavailable}
+                Position #{unavailable} · {unavailable}
               </small>
               <span>{unavailable}</span>
             </button>
@@ -361,7 +361,7 @@ export function LiquidityPreview() {
           <div className="remaining-section-heading">
             <div>
               <p className="dapp-section-label">Liquidity action</p>
-              <h3>LP NFT #{unavailable}</h3>
+              <h3>Liquidity position #{unavailable}</h3>
             </div>
             <span className="remaining-status">{unavailable}</span>
           </div>
@@ -379,7 +379,7 @@ export function LiquidityPreview() {
           </div>
           <dl className="remaining-quote">
             {[
-              "Canonical pool",
+              "Pool",
               "Range",
               "Eligible liquidity",
               "Pending liquidity",
@@ -394,14 +394,14 @@ export function LiquidityPreview() {
           </dl>
           <PreviewAction>
             {mode === "create"
-              ? "Create LP NFT"
+              ? "Create liquidity position"
               : mode === "stake"
-                ? "Stake LP NFT"
+                ? "Stake liquidity position"
                 : mode === "increase"
                   ? "Increase liquidity"
                   : mode === "claim"
                     ? "Claim rewards"
-                    : "Unstake LP NFT"}
+                    : "Unstake liquidity position"}
           </PreviewAction>
         </section>
       </div>

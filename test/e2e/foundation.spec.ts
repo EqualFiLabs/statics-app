@@ -1,12 +1,32 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * Navigates to a destination the way a person would at this viewport.
+ *
+ * Account plumbing sits in the header on desktop and in the sidebar panel on
+ * mobile, so this asserts the destination is reachable rather than that it
+ * lives in one particular place.
+ */
 async function navigateDapp(page: Page, href: string) {
   const toggle = page.locator(".dapp-nav-toggle");
   if (await toggle.isVisible()) {
     await toggle.click();
   }
-  await page.locator(`.dapp-nav-item[href="${href}"]`).click();
+  const sidebarItem = page.locator(`.dapp-nav-item[href="${href}"]`);
+  if (await sidebarItem.isVisible()) {
+    await sidebarItem.click();
+    return;
+  }
+  const headerLink = page.locator(`.dapp-header-link[href="${href}"]`);
+  if ((await headerLink.count()) > 0) {
+    await headerLink.click();
+    return;
+  }
+  // Detail destinations have no menu entry on desktop by design. They are
+  // reached from the overview's portfolio grid, so that is the path to assert.
+  await page.goto("/app");
+  await page.locator(`.preview-overview-grid a[href="${href}"]`).click();
 }
 
 test.describe("landing foundation", () => {
@@ -41,9 +61,10 @@ test.describe("landing foundation", () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
-    await expect(
-      page.getByRole("heading", { name: "Track your Statics portfolio." })
-    ).toBeVisible();
+    // Matches the overview title from lib/dapp-navigation.ts. Its exact wording
+    // is guarded by test/foundation/route-copy.test.ts; this only asserts that
+    // the destination rendered.
+    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
   });
 
   test("supports keyboard entry and responsive navigation", async ({ page }, testInfo) => {

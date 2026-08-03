@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
+import { overviewTiles } from "@/lib/overview";
+
 const unavailable = "--";
 
 export function PreviewBanner({ surface }: { surface: string }) {
@@ -63,19 +66,22 @@ export function DollarOverviewPreview() {
           Open Dollar
         </Link>
       </section>
+      <section className="overview-earned" aria-labelledby="preview-earned-title">
+        <div>
+          <p className="dapp-section-label">Earned by your baskets</p>
+          <h2 id="preview-earned-title">{unavailable}</h2>
+          <p>Paid in the assets your baskets hold. Claim it whenever you like.</p>
+        </div>
+        <Link className="dollar-primary-link" href="/app/rewards">
+          Claim
+        </Link>
+      </section>
       <section className="preview-overview-grid" aria-label="Portfolio summary">
-        {[
-          ["PositionNFTs", "/app/positions", "Review positions"],
-          ["Basket collateral", "/app/baskets", "Review baskets"],
-          ["Pending rewards", "/app/rewards", "Review rewards"],
-          ["Loan tranches", "/app/loans", "Review loans"],
-          ["Canonical LP NFTs", "/app/liquidity", "Review liquidity"],
-        ].map(([label, href, action]) => (
-          <article key={label}>
-            <span>{label}</span>
+        {overviewTiles.map((tile) => (
+          <article key={tile.id}>
+            <span>{tile.label}</span>
             <strong>{unavailable}</strong>
-            <small>{unavailable}</small>
-            <Link href={href}>{action} →</Link>
+            <Link href={tile.href}>{tile.action} →</Link>
           </article>
         ))}
       </section>
@@ -150,7 +156,7 @@ export function DollarPagePreview() {
         <aside className="dollar-protocol-card">
           <p className="dapp-section-label">Protocol state</p>
           <dl>
-            {["Profile", "Global health", "Debt ceiling", "Exit state"].map((label) => (
+            {["Profile", "Global health", "Borrow limit", "Status"].map((label) => (
               <div key={label}>
                 <dt>{label}</dt>
                 <dd>{unavailable}</dd>
@@ -294,14 +300,14 @@ export function BasketDetailPreview({ basketId }: { basketId: bigint }) {
 export function PositionListPreview() {
   return (
     <>
-      <PreviewBanner surface="PositionNFT portfolio" />
+      <PreviewBanner surface="Your positions" />
       <section className="position-catalog" aria-labelledby="preview-position-title">
         <div className="position-section-heading">
           <div>
-            <p className="dapp-section-label">PositionNFT portfolio</p>
-            <h2 id="preview-position-title">Your PositionNFTs</h2>
+            <p className="dapp-section-label">Your positions</p>
+            <h2 id="preview-position-title">Your positions</h2>
           </div>
-          <PreviewAction>Create PositionNFT</PreviewAction>
+          <PreviewAction>Create position</PreviewAction>
         </div>
         <div className="position-grid">
           {placeholderRouteIds.map((routeId) => (
@@ -335,13 +341,13 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
   const [stakeMode, setStakeMode] = useState("stake");
   return (
     <>
-      <PreviewBanner surface="PositionNFT" />
+      <PreviewBanner surface="Position" />
       <Link className="basket-back" href="/app/positions">
         ← All positions
       </Link>
       <section className="position-hero">
         <div>
-          <p className="dapp-section-label">PositionNFT</p>
+          <p className="dapp-section-label">Position</p>
           <h2>Position #{positionId.toString()}</h2>
           <PreviewAddress label="Owner" />
         </div>
@@ -458,15 +464,32 @@ export function PositionDetailPreview({ positionId }: { positionId: bigint }) {
       <section className="position-close">
         <div>
           <p className="dapp-section-label">Terminal action</p>
-          <h3>Close PositionNFT</h3>
+          <h3>Close position</h3>
         </div>
         <button type="button" disabled>
-          Close PositionNFT
+          Close position
         </button>
       </section>
     </>
   );
 }
+
+/**
+ * Reward assets shaped for the picker, so the preview drives the real
+ * component instead of restating its markup. The hand-copied version of this
+ * page had already drifted: it still showed section headings and a legend that
+ * were renamed in the app.
+ */
+const previewRewardCandidates = ["01", "02", "03", "04", "05", "06", "07", "08"].map((row) => ({
+  token: {
+    address: `0x${row.padStart(40, "0")}` as `0x${string}`,
+    name: unavailable,
+    symbol: unavailable,
+    decimals: 18,
+    metadataAvailable: false,
+  },
+  sources: [unavailable],
+}));
 
 export function RewardsPreview() {
   return (
@@ -476,8 +499,44 @@ export function RewardsPreview() {
         <section className="position-panel">
           <div className="position-section-heading">
             <div>
-              <p className="dapp-section-label">Atomic position creation</p>
-              <h2>Create and stake</h2>
+              <p className="dapp-section-label">From your deposited baskets</p>
+              <h2>Basket rewards</h2>
+              <p>
+                A deposited basket earns a share of the trading fees on its assets, paid in those
+                same assets. Each basket is claimed on its own.
+              </p>
+            </div>
+          </div>
+          <div className="reward-position-list">
+            {["01", "02"].map((row) => (
+              <article key={row}>
+                <div className="reward-position-heading">
+                  <div>
+                    <h3>{unavailable}</h3>
+                    <span>{unavailable} deposited</span>
+                  </div>
+                  <button type="button" disabled>
+                    Claim
+                  </button>
+                </div>
+                <dl>
+                  {["01", "02"].map((asset) => (
+                    <div key={asset}>
+                      <dt>{unavailable}</dt>
+                      <dd>{unavailable}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="position-panel">
+          <div className="position-section-heading">
+            <div>
+              <p className="dapp-section-label">From staking Statics</p>
+              <h2>Stake Statics to earn</h2>
             </div>
             <span>Total staked: {unavailable}</span>
           </div>
@@ -486,25 +545,23 @@ export function RewardsPreview() {
             <input value="" placeholder={unavailable} readOnly />
             <small>Wallet balance: {unavailable}</small>
           </label>
-          <fieldset className="reward-selector" disabled>
-            <legend>Initial reward selections · {unavailable}</legend>
-            {["01", "02", "03", "04"].map((row) => (
-              <label key={row}>
-                <input type="checkbox" />
-                <span>
-                  <strong>{unavailable}</strong>
-                  {unavailable}
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          <RewardAssetPicker
+            candidates={previewRewardCandidates}
+            selected={[]}
+            maximum={64n}
+            disabled
+            onToggle={() => undefined}
+          />
           <PreviewAction>Approve or create staking position</PreviewAction>
         </section>
-        <section className="position-panel">
+
+        {/* Carries is-wide so the preview reproduces the real page's layout: a
+            list panel spans the row rather than sitting in a column. */}
+        <section className="position-panel is-wide">
           <div className="position-section-heading">
             <div>
-              <p className="dapp-section-label">Wallet-owned positions</p>
-              <h2>Selected rewards</h2>
+              <p className="dapp-section-label">From staking Statics</p>
+              <h2>Your staked positions</h2>
             </div>
             <span>Multi-asset claims</span>
           </div>

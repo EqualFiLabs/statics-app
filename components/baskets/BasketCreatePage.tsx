@@ -96,6 +96,7 @@ function BasketCreateRuntime() {
     extension: "0.25",
     ltv: "75",
     durationDays: "30",
+    recoveryPenalty: "5",
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +130,7 @@ function BasketCreateRuntime() {
       next.push("Constituent addresses must be unique.");
     if (assets.some((asset) => !asset.amount || Number(asset.amount) <= 0))
       next.push("Bundle amounts must be positive.");
-    const bps = [fees.flash, fees.origination, fees.extension, fees.ltv].map(
+    const bps = [fees.flash, fees.origination, fees.extension, fees.ltv, fees.recoveryPenalty].map(
       parseBasketCreationBps
     );
     if (bps.some((value) => value === null))
@@ -170,6 +171,7 @@ function BasketCreateRuntime() {
       originationFeeBps: parseBasketCreationBps(fees.origination)!,
       extensionFeeBps: parseBasketCreationBps(fees.extension)!,
       ltvBps: parseBasketCreationBps(fees.ltv)!,
+      recoveryPenaltyBps: parseBasketCreationBps(fees.recoveryPenalty)!,
       loanDuration,
     };
   };
@@ -385,7 +387,7 @@ function BasketCreateRuntime() {
     <>
       <section className="remaining-hero">
         <div>
-          <p className="dapp-section-label">Permissionless configuration</p>
+          <p className="dapp-section-label">Basket setup</p>
           <h2>Create a static basket</h2>
           <p>Define the bundle and economics, then pay the exact current creation fee.</p>
         </div>
@@ -477,6 +479,7 @@ function BasketCreateRuntime() {
                     ["Extension fee %", "extension"],
                     ["Maximum LTV %", "ltv"],
                     ["Loan duration days", "durationDays"],
+                    ["Recovery penalty %", "recoveryPenalty"],
                   ] as const
                 ).map(([label, key]) => (
                   <label className="basket-field" key={key}>
@@ -524,9 +527,7 @@ function BasketCreateRuntime() {
                   ? "Loading…"
                   : `${formatEther(creationFee.data)} native`}
               </h3>
-              <p>
-                Read again before simulation. Basket creation does not initialize canonical pools.
-              </p>
+              <p>Read again before simulation. Basket creation does not initialize pools.</p>
             </section>
           </div>
         )}

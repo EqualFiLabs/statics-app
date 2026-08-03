@@ -13,7 +13,14 @@ import {
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useMemo, useState } from "react";
 
-import { basketTokenAbi, buildMintCall, buildRedeemCall, staticsAbi } from "@statics-protocol/sdk";
+import {
+  basketTokenAbi,
+  buildCreateAndMintBasketCollateralCall,
+  buildMintBasketCollateralCall,
+  buildMintCall,
+  buildRedeemCall,
+  staticsAbi,
+} from "@statics-protocol/sdk";
 
 import {
   DEFAULT_BASKET_SLIPPAGE_BPS,
@@ -24,6 +31,7 @@ import {
   maximumWithSlippage,
   minimumWithSlippage,
   parseSlippageBps,
+  validateBasketCollateralSimulation,
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
@@ -37,6 +45,7 @@ import {
   type ProtocolReplacementReason,
 } from "@/lib/dollar/activity";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { loadPositionCatalog } from "@/lib/positions/positions";
 import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -82,6 +91,7 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<"mint" | "redeem">("mint");
+  const [autoDeposit, setAutoDeposit] = useState(true);
   const [amountInput, setAmountInput] = useState("");
   const [slippageInput, setSlippageInput] = useState(
     (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
@@ -96,6 +106,23 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
     }
   }, [amountInput]);
   const slippageBps = parseSlippageBps(slippageInput);
+
+  const positions = useQuery({
+    queryKey: ["basket-detail-positions", wallet],
+    enabled:
+      deploymentState.status === "configured" &&
+      Boolean(publicClient) &&
+      Boolean(wallet) &&
+      walletState.status === "ready" &&
+      walletState.isTargetChain,
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      if (!publicClient || !wallet || deploymentState.status !== "configured") {
+        throw new Error("No verified Statics deployment is configured.");
+      }
+      return loadPositionCatalog(publicClient, deploymentState.deployment, wallet);
+    },
+  });
 
   const catalog = useQuery({
     queryKey: [
@@ -307,17 +334,46 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
             throw new Error("The fresh quote requires another bounded constituent approval.");
           }
         }
-        const data =
-          mode === "mint"
-            ? buildMintCall(basketId, amount, wallet, bounds)
-            : buildRedeemCall(basketId, amount, wallet, bounds);
+        // A minted basket held in the wallet earns nothing: rewards accrue
+        // against a PositionNFT. So the default mints straight into one --
+        // creating the position in the same call when there is not one yet --
+        // and only an explicit opt-out leaves the shares in the wallet.
+        const depositTarget = autoDeposit ? (positions.data?.positions[0] ?? null) : null;
+        const collateralFunction = !autoDeposit
+          ? null
+          : depositTarget
+            ? ("mintBasketCollateral" as const)
+            : ("createAndMintBasketCollateral" as const);
+
+        let data: Hex;
+        if (mode === "redeem") {
+          data = buildRedeemCall(basketId, amount, wallet, bounds);
+        } else if (collateralFunction === "mintBasketCollateral") {
+          data = buildMintBasketCollateralCall(depositTarget!.positionId, basketId, amount, bounds);
+        } else if (collateralFunction === "createAndMintBasketCollateral") {
+          data = buildCreateAndMintBasketCollateralCall(basketId, amount, wallet, bounds);
+        } else {
+          data = buildMintCall(basketId, amount, wallet, bounds);
+        }
+
         await recordAndSend({
           kind: mode === "mint" ? "mint-basket" : "redeem-basket",
-          label: mode === "mint" ? `Mint ${basket.symbol}` : `Redeem ${basket.symbol}`,
+          label:
+            mode === "redeem"
+              ? `Redeem ${basket.symbol}`
+              : collateralFunction
+                ? `Buy and deposit ${basket.symbol}`
+                : `Buy ${basket.symbol}`,
           to: deploymentState.deployment.contracts.diamond,
           data,
           validate: (result) =>
-            void validateBasketSimulation(mode, result, basket.constituents.length),
+            void (collateralFunction
+              ? validateBasketCollateralSimulation(
+                  collateralFunction,
+                  result,
+                  basket.constituents.length
+                )
+              : validateBasketSimulation(mode, result, basket.constituents.length)),
         });
         setAmountInput("");
       }
@@ -481,6 +537,28 @@ function BasketDetailRuntime({ basketId }: { basketId: bigint }) {
             </div>
             <small id="basket-slippage-help">Allowed range 0–5%. Default 0.50%.</small>
           </label>
+          {mode === "mint" && (
+            <label className="basket-toggle">
+              <input
+                type="checkbox"
+                checked={autoDeposit}
+                onChange={(event) => {
+                  setAutoDeposit(event.target.checked);
+                  setActionError(null);
+                }}
+                disabled={pending}
+                aria-describedby="basket-auto-deposit-help"
+              />
+              <span>
+                <strong>Start earning right away</strong>
+                <small id="basket-auto-deposit-help">
+                  {autoDeposit
+                    ? `Deposits your ${basket.symbol} so it earns fees in the assets it holds. Same transaction, and you can withdraw from the next block onward.`
+                    : `Your ${basket.symbol} stays in your wallet, where it earns nothing. You can deposit it later.`}
+                </small>
+              </span>
+            </label>
+          )}
           <div className="basket-quote">
             <span>{quoteLabel}</span>
             {quoteAmounts ? (

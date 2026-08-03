@@ -25,7 +25,9 @@ import {
 } from "@statics-protocol/sdk";
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { LoansPreview } from "@/components/preview/RemainingSurfacesPreview";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { dappPreviewEnabled } from "@/lib/dapp-preview";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -259,7 +261,7 @@ function LoansRuntime() {
           label: mode === "recover" ? "No recoverable loans" : "No owned loans",
           reason:
             mode === "recover"
-              ? "No tranche is currently beyond its recovery grace period."
+              ? "No loan is currently beyond its recovery grace period."
               : "This wallet does not own an open loan.",
           executable: false,
         };
@@ -347,7 +349,7 @@ function LoansRuntime() {
           (item) => item.basket.basketId === basket.basketId
         );
         if (!freshCollateral || borrowableCollateral(freshPosition, basket.basketId) < shares) {
-          throw new Error("The selected PositionNFT no longer has enough unlocked collateral.");
+          throw new Error("The selected position no longer has enough unlocked collateral.");
         }
         const quote = await loadBorrowQuote(
           publicClient,
@@ -576,7 +578,7 @@ function LoansRuntime() {
                 collateralAfter.lockedShares !==
                   collateralBefore.lockedShares - freshLoan.collateralShares
               ) {
-                throw new Error("Recovered collateral did not leave the PositionNFT as expected.");
+                throw new Error("Recovered collateral did not leave the position as expected.");
               }
             },
           });
@@ -643,15 +645,22 @@ function LoansRuntime() {
     }
   };
 
-  if (
-    deploymentState.status === "unavailable" ||
-    !wallet ||
-    !walletState.isTargetChain ||
-    (catalog.isPending && !catalog.data) ||
-    (catalog.isError && !catalog.data)
-  ) {
+  if (deploymentState.status === "unavailable") {
     return <LoansPreview />;
   }
+
+  const surfaceState = deriveSurfaceState({
+    walletStatus: walletState.status,
+    isTargetChain: walletState.isTargetChain,
+    isLoading: catalog.isPending,
+    isError: catalog.isError,
+    // Owned loans plus any that are publicly recoverable.
+    isEmpty:
+      (catalog.data?.ownedLoans.length ?? 0) +
+        (catalog.data?.publicRecoverableLoans.length ?? 0) ===
+      0,
+    hasData: Boolean(catalog.data),
+  });
 
   let primaryLabel = verificationBlocked ? "Refresh protocol state" : action.label;
   let primaryAction: (() => void) | null = action.executable ? () => void runAction() : null;
@@ -670,25 +679,20 @@ function LoansRuntime() {
     primaryAction = null;
   }
 
-  const displayLoans = [
-    ...(catalog.data?.ownedLoans ?? []),
-    ...(catalog.data?.publicRecoverableLoans ?? []),
-  ];
-
   return (
     <>
       <section className="remaining-hero" aria-labelledby="loans-title">
         <div>
-          <p className="dapp-section-label">Event-discovered · state-reconciled</p>
-          <h2 id="loans-title">Position-owned loans</h2>
+          <p className="dapp-section-label">Loans</p>
+          <h2 id="loans-title">Your loans</h2>
           <p>
-            Each borrow creates an independent principal vector, locked BasketToken collateral,
-            maturity, and permissionless recovery schedule.
+            Each loan stands on its own, with its own collateral locked against it and its own due
+            date. Repaying one does not affect the others.
           </p>
         </div>
         <dl>
           <div>
-            <dt>Owned open tranches</dt>
+            <dt>Open loans</dt>
             <dd>{catalog.data?.ownedLoans.length ?? "—"}</dd>
           </div>
           <div>
@@ -722,7 +726,7 @@ function LoansRuntime() {
       )}
 
       <div className="remaining-layout">
-        <section className="remaining-list" aria-label="Current loan tranches">
+        <section className="remaining-list" aria-label="Current loans">
           <div className="remaining-section-heading">
             <div>
               <p className="dapp-section-label">Onchain loan ledger</p>
@@ -730,10 +734,18 @@ function LoansRuntime() {
             </div>
             <span>Block {catalog.data?.currentBlock.toString() ?? "—"}</span>
           </div>
-          {catalog.isPending && wallet ? (
-            <p className="dollar-loading">Reconciling current loans…</p>
-          ) : displayLoans.length === 0 ? (
-            <p className="activity-empty">No open loan events reconcile to current state.</p>
+          {!isSurfaceReady(surfaceState) ? (
+            <SurfaceEmptyState
+              state={surfaceState}
+              subject="loans"
+              onRetry={() => void catalog.refetch()}
+              empty={{
+                title: "You do not have any loans",
+                description:
+                  "Borrow against collateral you have locked in a position. Each loan stands on its own, with its own due date.",
+                action: { label: "View your positions", href: "/app/positions" },
+              }}
+            />
           ) : (
             <>
               {catalog.data?.ownedLoans.map((loan) => (
@@ -750,7 +762,7 @@ function LoansRuntime() {
               {Boolean(catalog.data?.publicRecoverableLoans.length) && (
                 <div className="remaining-section-heading loan-queue-heading">
                   <div>
-                    <p className="dapp-section-label">Permissionless recovery queue</p>
+                    <p className="dapp-section-label">Recovery queue</p>
                     <h3>Non-owned recoverable loans</h3>
                   </div>
                 </div>
@@ -935,7 +947,7 @@ function BorrowFields({
     <>
       <div className="remaining-form-grid">
         <label className="basket-field">
-          <span>PositionNFT</span>
+          <span>Position</span>
           <select value={positionId} onChange={(event) => onPosition(event.target.value)}>
             {(catalog?.positions ?? [])
               .filter((item) => item.collateral.length > 0)
@@ -1073,7 +1085,7 @@ function LoanDetails({
         <AddressDisplay
           address={loan.positionOwner}
           chainId={chainId}
-          label={`PositionNFT #${loan.positionId.toString()} owner`}
+          label={`Position #${loan.positionId.toString()} owner`}
         />
         <p>
           Matures {displayDate(loan.maturity)} · Recovery strictly after{" "}

@@ -42,7 +42,6 @@ import {
   canClosePosition,
   claimablePositionRewards,
   describePositionError,
-  isUnstakeAvailable,
   loadPositionCatalog,
   unlockedCollateral,
   validateCustomRewardAsset,
@@ -199,15 +198,15 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
 
   const claimRewards = async () => {
     if (!wallet || !publicClient || !position || deploymentState.status !== "configured") {
-      throw new Error("The connected PositionNFT is unavailable.");
+      throw new Error("The connected position is unavailable.");
     }
     const refreshed = await catalog.refetch();
     const current = refreshed.data?.positions.find(
       (candidate) => candidate.positionId === position.positionId
     );
-    if (!current) throw new Error("This PositionNFT is no longer owned by the connected wallet.");
+    if (!current) throw new Error("This position is no longer owned by the connected wallet.");
     const rewards = claimablePositionRewards(current.rewards);
-    if (!rewards.length) throw new Error("This PositionNFT has no nonzero rewards to claim.");
+    if (!rewards.length) throw new Error("This position has no rewards to claim.");
     const assets = rewards.map((reward) => reward.token.address);
     const minimums = rewards.map((reward) => reward.pending);
     const balancesBefore = await Promise.all(
@@ -511,9 +510,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       if (position.stakedBalance < stakeAmount) {
         throw new Error("The position does not contain that much stake.");
       }
-      if (!isUnstakeAvailable(position, catalog.data.currentTimestamp)) {
-        throw new Error("The 24-hour unstaking cooldown is still active.");
-      }
       await sendTransaction({
         kind: "unstake-position",
         label: `Unstake ${token.symbol}`,
@@ -572,7 +568,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     return <PositionDetailPreview positionId={positionId} />;
   }
 
-  const cooldownRemaining = Number(position.unstakeAvailableAt - catalog.data.currentTimestamp);
   const closeReady = canClosePosition(position);
 
   return (
@@ -582,7 +577,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       </Link>
       <section className="position-hero">
         <div>
-          <p className="dapp-section-label">Wallet-owned PositionNFT</p>
+          <p className="dapp-section-label">Your position</p>
           <h2>Position #{position.positionId.toString()}</h2>
           <AddressDisplay
             address={position.owner}
@@ -609,7 +604,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       </section>
 
       <p className="dollar-warning">
-        Transferring this PositionNFT transfers every attached collateral, staking, reward, loan,
+        Transferring this position transfers every attached collateral, staking, reward, loan,
         Dollar, and liquidity obligation. This release intentionally does not provide a transfer
         button.
       </p>
@@ -750,9 +745,8 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             />
           </label>
           <p className="position-cooldown">
-            {cooldownRemaining > 0 && position.stakedBalance > 0n
-              ? `Unstaking available in ${Math.ceil(cooldownRemaining / 3_600)} hours.`
-              : "Unstaking is available. Adding stake or selecting a reward asset restarts the 24-hour cooldown."}
+            Your stake is always withdrawable. New stake and newly selected reward assets start
+            earning once they mature; withdrawals take from stake that is not yet earning first.
           </p>
           <button
             className="dollar-submit"
@@ -871,7 +865,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       <section className="position-close">
         <div>
           <p className="dapp-section-label">Terminal action</p>
-          <h3>Close PositionNFT</h3>
+          <h3>Close position</h3>
           <p>
             {closeReady
               ? "This position has no active protocol legs and can be burned."
@@ -885,7 +879,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             void runAction("close-position", async () => {
               await sendTransaction({
                 kind: "close-position",
-                label: `Close PositionNFT #${position.positionId.toString()}`,
+                label: `Close position #${position.positionId.toString()}`,
                 amount: `Position #${position.positionId.toString()}`,
                 to: deploymentState.deployment.contracts.diamond,
                 data: buildClosePositionCall(position.positionId),
@@ -893,7 +887,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             })
           }
         >
-          {pendingAction === "close-position" ? "Closing position…" : "Close PositionNFT"}
+          {pendingAction === "close-position" ? "Closing position…" : "Close position"}
         </button>
       </section>
     </div>

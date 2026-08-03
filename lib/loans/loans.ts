@@ -71,6 +71,10 @@ export type BorrowQuote = Readonly<{
   sharesIn: bigint;
   feeShares: bigint;
   collateralShares: bigint;
+  /** Shares burned on repayment. */
+  debtShares: bigint;
+  /** Creator-configured recovery penalty, charged only if the loan expires. */
+  penaltyShares: bigint;
   assets: readonly Address[];
   principals: readonly bigint[];
 }>;
@@ -122,6 +126,8 @@ function normalizeLoan(
     basketId: snapshot.basketId,
     collateralShares: snapshot.collateralShares,
     feeShares: snapshot.feeShares,
+    debtShares: snapshot.debtShares,
+    penaltyShares: snapshot.penaltyShares,
     maturity: BigInt(snapshot.maturity),
     assets: snapshot.assets.map(getAddress),
     principals: snapshot.principals,
@@ -302,16 +308,20 @@ export async function loadBorrowQuote(
     functionName: "quoteBorrow",
     args: [basketId, sharesIn],
   });
-  if (result[2].length !== result[3].length || result[3].some((amount) => amount <= 0n)) {
+  // quoteBorrow returns a named struct as of protocol 39156bc, which also
+  // added the debt and recovery-penalty shares.
+  if (result.assets.length !== result.principals.length || result.principals.some((a) => a <= 0n)) {
     throw new Error("The current borrow quote returned an invalid principal vector.");
   }
   return {
     basketId,
     sharesIn,
-    feeShares: result[0],
-    collateralShares: result[1],
-    assets: result[2].map(getAddress),
-    principals: result[3],
+    feeShares: result.feeShares,
+    collateralShares: result.collateralShares,
+    debtShares: result.debtShares,
+    penaltyShares: result.penaltyShares,
+    assets: result.assets.map(getAddress),
+    principals: result.principals,
   };
 }
 

@@ -9,90 +9,96 @@ export function isDappOverviewPath(pathname: string): boolean {
   return pathname === "/app" || pathname === "/app/";
 }
 
+/**
+ * Route copy, written for someone who has not read the protocol docs.
+ *
+ * Titles say what you can do here, in a verb. Descriptions say what you get,
+ * in one sentence, without naming a contract. See lib/vocabulary.ts for which
+ * words are translated and which are deliberately kept.
+ */
 const routePresentations = {
   overview: {
     label: "Overview",
-    status: "Portfolio view",
-    title: "Track your Statics portfolio.",
+    status: "Portfolio",
+    title: "Your portfolio",
     description:
-      "Review Dollar balances, PositionNFTs, basket collateral, pending rewards, and protocol readiness from one wallet-scoped view.",
+      "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
   },
   dollar: {
     label: "Dollar",
-    status: "Dollar flows",
-    title: "Issue and redeem Statics Dollar.",
+    status: "Dollar",
+    title: "Get Statics Dollar",
     description:
-      "Deposit ETH or WETH into the active profile, or recombine Dollar and Risk shares using fresh protocol quotes before signing.",
+      "Deposit ETH to receive Dollar, or convert your Dollar and risk shares back into ETH. You will see the exact amounts before you confirm.",
   },
   wallet: {
     label: "Wallet",
-    status: "Funding wallet",
-    title: "Fund and manage your wallet.",
+    status: "Wallet",
+    title: "Your wallet",
     description:
-      "Review balances, move assets, swap, bridge into Robinhood, and enter or exit Statics Dollar.",
+      "Check your balances, add funds, send assets, and move money in and out of Statics.",
   },
   portal: {
-    label: "Portal",
-    status: "Funding portal",
-    title: "Move assets into Statics.",
+    label: "Add funds",
+    status: "Add funds",
+    title: "Add funds to Statics",
     description:
-      "Swap on the active funding network, bridge into Robinhood, or convert between USDG and Statics Dollar.",
+      "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar.",
   },
   baskets: {
     label: "Baskets",
-    status: "Basket flows",
-    title: "Inspect, mint, and redeem static baskets.",
+    status: "Baskets",
+    title: "Baskets",
     description:
-      "Discover basket creation events, reconcile current protocol state, and enforce bounded constituent flows before signing.",
+      "Buy or sell a fixed bundle of assets as one unit. You will see exactly what a basket holds before you buy.",
   },
   positions: {
     label: "Positions",
-    status: "Position flows",
-    title: "Manage each wallet-owned PositionNFT.",
+    status: "Positions",
+    title: "Your positions",
     description:
-      "Reconcile ownership from current onchain state, then manage collateral, staking, and reward selections with bounded transactions.",
+      "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
   },
   loans: {
     label: "Loans",
-    status: "Loan portfolio",
-    title: "Review independent loan tranches.",
+    status: "Loans",
+    title: "Your loans",
     description:
-      "Inspect principal vectors, locked collateral, maturity, extension fees, and permissionless recovery timing per PositionNFT obligation.",
+      "Money you have borrowed against locked collateral. Review what you owe, what is locked, and when each loan is due.",
   },
   rewards: {
     label: "Rewards",
-    status: "Reward flows",
-    title: "Create stake positions with selected rewards.",
+    status: "Rewards",
+    title: "Your rewards",
     description:
-      "Choose fee assets per PositionNFT, inspect pending amounts, and respect the onchain unstaking cooldown.",
+      "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
   },
   liquidity: {
     label: "Liquidity",
-    status: "Canonical pools",
-    title: "Manage canonical v4 liquidity.",
+    status: "Liquidity",
+    title: "Provide liquidity",
     description:
-      "Separate hook-owned permanent liquidity from user LP NFTs, then review eligibility, activation, bilateral rewards, and exits.",
+      "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
   },
   create: {
     label: "Create basket",
-    status: "Permissionless creation",
-    title: "Configure a new static basket.",
+    status: "Create",
+    title: "Create a basket",
     description:
-      "Review constituents, bundle amounts, fee tiers, lending parameters, and the exact creation fee before signing.",
+      "Choose up to 16 assets and how much of each. You will see the full cost before anything is signed. Anyone can create one.",
   },
   activity: {
     label: "Activity",
-    status: "Activity view",
-    title: "Review protocol activity.",
+    status: "Activity",
+    title: "Your activity",
     description:
-      "Follow wallet-scoped actions from simulation through confirmation, replacement, rejection, or onchain failure.",
+      "Every action from this wallet, from the moment you confirm it to the moment it settles.",
   },
   settings: {
     label: "Settings",
-    status: "Wallet controls",
-    title: "Manage your Statics wallet.",
-    description:
-      "Review the active account, network, wallet type, explorer destination, export guidance, and Statics-only session controls.",
+    status: "Settings",
+    title: "Settings",
+    description: "Your account, network, and wallet details, plus how to export your keys.",
   },
 } as const satisfies Record<string, DappRoutePresentation>;
 

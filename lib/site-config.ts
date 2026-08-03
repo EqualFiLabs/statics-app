@@ -67,15 +67,111 @@ export const protocolStatus = {
   audit: "Not published",
 } as const;
 
-export const appNavigation = [
-  { label: "Overview", enabled: true, href: "/app" },
-  { label: "Wallet", enabled: true, href: "/app/wallet" },
-  { label: "Dollar", enabled: true, href: "/app/dollar" },
-  { label: "Baskets", enabled: true, href: "/app/baskets" },
-  { label: "Positions", enabled: true, href: "/app/positions" },
-  { label: "Loans", enabled: true, href: "/app/loans" },
-  { label: "Rewards", enabled: true, href: "/app/rewards" },
-  { label: "Liquidity", enabled: true, href: "/app/liquidity" },
-  { label: "Activity", enabled: true, href: "/app/activity" },
-  { label: "Settings", enabled: true, href: "/app/settings" },
-] as const;
+export type AppNavigationItem = Readonly<{
+  label: string;
+  enabled: boolean;
+  href: string;
+  /**
+   * Where this destination belongs on desktop.
+   *
+   *   primary -- a place you go to do something. Earns a sidebar slot, and a
+   *              tab if we get a tab bar, so this list has to stay countable.
+   *   header  -- account plumbing. Real destinations, but not things you set
+   *              out to visit, so they sit beside the wallet chip.
+   *   detail  -- reached from the thing it concerns rather than from a menu.
+   *              Positions is the container the rest sit inside; a loan is an
+   *              action on a holding. Neither is somewhere you navigate to.
+   *
+   * The mobile panel lists every item regardless: it is a full-height sheet
+   * with room to spare, and the mobile header has none.
+   */
+  placement?: "primary" | "header" | "detail";
+  /**
+   * Short label for the mobile tab bar, and the opt-in to appearing there.
+   *
+   * A tab bar is hard-limited by thumb width -- five is the practical maximum
+   * at 390px -- so it carries a curated subset rather than every primary
+   * destination. The sidebar has no such limit and still shows them all, and
+   * the panel still reaches everything, so nothing here removes a route.
+   */
+  tabLabel?: string;
+}>;
+
+export type AppNavigationGroup = Readonly<{
+  /** Null for the first group, which needs no heading above the home link. */
+  label: string | null;
+  items: readonly AppNavigationItem[];
+}>;
+
+/**
+ * Application navigation, grouped by what someone is trying to do.
+ *
+ * Ten flat peers described the protocol's facets rather than any intent, and
+ * gave no clue that Positions is the container the others sit inside. Grouping
+ * is deliberately the first step and changes no routes: it buys most of the
+ * apparent simplification, and it can be reverted or re-cut without touching a
+ * single page.
+ *
+ * Earn leads because staking is the one part of this protocol that reads as an
+ * ordinary savings product -- deposit, choose what you are paid in, get paid.
+ * Nobody arbitrages a basket by accident, but anyone can understand that.
+ */
+export const appNavigationGroups: readonly AppNavigationGroup[] = [
+  {
+    label: null,
+    items: [{ label: "Overview", enabled: true, href: "/app" }],
+  },
+  {
+    label: "Earn",
+    items: [
+      { label: "Earn", enabled: true, href: "/app/rewards", tabLabel: "Earn" },
+      { label: "Liquidity", enabled: true, href: "/app/liquidity" },
+    ],
+  },
+  {
+    label: "Assets",
+    items: [
+      { label: "Baskets", enabled: true, href: "/app/baskets", tabLabel: "Baskets" },
+      { label: "Dollar", enabled: true, href: "/app/dollar", tabLabel: "Dollar" },
+    ],
+  },
+  {
+    // These stay in the sidebar. Positions being the container the others sit
+    // inside is an argument about the data model, not about how people navigate:
+    // a position is something you go and look at. The overview's portfolio grid
+    // is an additional route to them, not a replacement for a menu entry.
+    label: "Manage",
+    items: [
+      { label: "Positions", enabled: true, href: "/app/positions" },
+      { label: "Loans", enabled: true, href: "/app/loans" },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { label: "Wallet", enabled: true, href: "/app/wallet", tabLabel: "Wallet" },
+      { label: "Activity", enabled: true, href: "/app/activity", placement: "header" },
+      { label: "Settings", enabled: true, href: "/app/settings", placement: "header" },
+    ],
+  },
+];
+
+/** Every navigable item, flattened, for callers that only need the routes. */
+export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.flatMap(
+  (group) => group.items
+);
+
+/** Items shown beside the wallet chip on desktop. */
+export const appHeaderNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => item.placement === "header"
+);
+
+/** Destinations that earn a desktop sidebar slot, and a tab bar slot later. */
+export const appPrimaryNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => (item.placement ?? "primary") === "primary"
+);
+
+/** The mobile tab bar, in order. Capped at five by thumb width. */
+export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filter(
+  (item) => typeof item.tabLabel === "string"
+);

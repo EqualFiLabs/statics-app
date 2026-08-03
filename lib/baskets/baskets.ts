@@ -58,6 +58,8 @@ export type BasketRecord = Readonly<{
   extensionFeeBps: number;
   ltvBps: number;
   loanDuration: number;
+  /** Creator-set penalty charged only when a loan is recovered after expiry. */
+  recoveryPenaltyBps: number;
 }>;
 
 export type BasketCatalog = Readonly<{
@@ -186,6 +188,7 @@ async function loadBasket(
     extensionFeeBps: Number(configured.extensionFeeBps),
     ltvBps: Number(configured.ltvBps),
     loanDuration: Number(configured.loanDuration),
+    recoveryPenaltyBps: Number(configured.recoveryPenaltyBps),
   };
 }
 
@@ -391,6 +394,38 @@ export function describeBasketError(error: unknown): string {
   if (known) return `${known[1]} (${known[0]})`;
   if (/rejected|denied|4001/i.test(message)) return "The wallet request was rejected.";
   return message;
+}
+
+/**
+ * Validates a mint-into-collateral simulation.
+ *
+ * The collateral variants return different shapes from a plain mint:
+ * `mintBasketCollateral` returns the constituent amounts pulled in, and
+ * `createAndMintBasketCollateral` returns the new position id alongside them.
+ * Both are checked so an auto-deposited mint is held to the same bar as a
+ * mint that lands in the wallet.
+ */
+export function validateBasketCollateralSimulation(
+  functionName: "mintBasketCollateral" | "createAndMintBasketCollateral",
+  result: Hex | undefined,
+  expectedLegs: number
+): readonly bigint[] {
+  if (!result) throw new Error(`The ${functionName} simulation returned no result.`);
+  const decoded = decodeFunctionResult({ abi: staticsAbi, functionName, data: result });
+  const amounts =
+    functionName === "createAndMintBasketCollateral"
+      ? (decoded as readonly [bigint, readonly bigint[]])[1]
+      : (decoded as readonly bigint[]);
+  if (functionName === "createAndMintBasketCollateral") {
+    const positionId = (decoded as readonly [bigint, readonly bigint[]])[0];
+    if (positionId === 0n) {
+      throw new Error("The createAndMintBasketCollateral simulation returned an invalid position.");
+    }
+  }
+  if (amounts.length !== expectedLegs || amounts.some((amount) => amount <= 0n)) {
+    throw new Error(`The ${functionName} simulation returned invalid constituent amounts.`);
+  }
+  return amounts;
 }
 
 export function validateBasketSimulation(

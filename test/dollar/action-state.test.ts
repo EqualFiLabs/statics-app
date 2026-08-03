@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveDollarActionAvailability,
+  dollarQuoteQueryKey,
   type DeriveDollarActionInput,
   type DollarActionSnapshot,
 } from "@/lib/dollar/action-state";
@@ -39,6 +40,17 @@ function derive(overrides: Partial<DeriveDollarActionInput> = {}) {
 }
 
 describe("Dollar action availability", () => {
+  it("keeps bigint quote identity serializable by the query cache", () => {
+    const key = dollarQuoteQueryKey({
+      chainId: 31_337,
+      mode: "deposit",
+      amount: 2n,
+      seriesId: 7n,
+    });
+
+    expect(JSON.stringify(key)).toBe('["dollar-quote",31337,"deposit","2","7"]');
+  });
+
   it("keeps input and preview freshness ahead of approvals or execution", () => {
     expect(derive({ amount: 0n })).toMatchObject({
       kind: "needs-input",
