@@ -102,17 +102,23 @@ describe("Dollar action availability", () => {
     ).toMatchObject({ kind: "blocked", reason: expect.stringContaining("debt ceiling") });
   });
 
-  it("presents exact WETH approval and then the deposit as separate next actions", () => {
+  it("accepts reusable WETH approval and then presents the deposit", () => {
     expect(
       derive({
         asset: "WETH",
         snapshot: { ...healthySnapshot, wethAllowance: 0n },
       })
-    ).toMatchObject({ kind: "approve-weth", label: "Approve exact WETH", executable: true });
+    ).toMatchObject({ kind: "approve-weth", label: "Enable WETH deposits", executable: true });
     expect(derive({ asset: "WETH" })).toMatchObject({
       kind: "execute",
       label: "Deposit WETH",
     });
+    expect(
+      derive({
+        asset: "WETH",
+        snapshot: { ...healthySnapshot, wethAllowance: amount + 1n },
+      })
+    ).toMatchObject({ kind: "execute", label: "Deposit WETH" });
   });
 
   it("uses recombination-specific recovery and balance rules", () => {

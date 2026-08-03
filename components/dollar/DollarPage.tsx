@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   buildDepositETHTransaction,
@@ -76,6 +77,8 @@ import { loadLoanCatalog } from "@/lib/loans/loans";
 import { loadBasketRewardSummary, totalRewardsByAsset } from "@/lib/baskets/rewards";
 import { readEvesMarketUrl } from "@/lib/site-config";
 import { overviewTiles } from "@/lib/overview";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -90,6 +93,54 @@ const modeLabels: Record<DollarActionMode, string> = {
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
   mode === "supply" || mode === "unsupply";
+type DollarProfileChoice = DollarCollateralChoice | "USDG";
+
+export function DollarProfileContent({
+  profile,
+  volatile,
+  pegged,
+}: {
+  profile: DollarProfileChoice;
+  volatile: ReactNode;
+  pegged: ReactNode;
+}) {
+  return profile === "USDG" ? pegged : volatile;
+}
+
+export function DollarProfilePills({
+  value,
+  peggedAvailable,
+  disabled,
+  onChange,
+}: {
+  value: DollarProfileChoice;
+  peggedAvailable: boolean;
+  disabled: boolean;
+  onChange: (choice: DollarProfileChoice) => void;
+}) {
+  const choices: readonly DollarProfileChoice[] = peggedAvailable
+    ? ["ETH", "WETH", "USDG"]
+    : ["ETH", "WETH"];
+  return (
+    <fieldset
+      className={`dollar-asset-choice dollar-profile-choice${peggedAvailable ? " has-pegged" : ""}`}
+    >
+      <legend>Collateral profile</legend>
+      {choices.map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          className={value === choice ? "active" : undefined}
+          aria-pressed={value === choice}
+          onClick={() => onChange(choice)}
+          disabled={disabled}
+        >
+          {choice}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
 const evesMarketUrl = readEvesMarketUrl(process.env.NEXT_PUBLIC_EVES_MARKET_URL);
 
 function shortAddress(address: Address): string {
@@ -478,6 +529,8 @@ function DollarActionPanel({
   const snapshot = useDollarSnapshot(deployment, wallet);
   const [mode, setMode] = useState<DollarActionMode>("deposit");
   const [asset, setAsset] = useState<DollarCollateralChoice>("ETH");
+  const [peggedSelected, setPeggedSelected] = useState(false);
+  const [peggedPending, setPeggedPending] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [pendingAction, setPendingAction] = useState<"primary" | "revoke" | "claim" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -730,23 +783,23 @@ function DollarActionPanel({
       } else if (actionAvailability.kind === "approve-weth") {
         await recordAndSend({
           kind: "approve-weth",
-          label: "Approve exact WETH",
+          label: "Enable WETH deposits",
           to: deployment.contracts.weth,
           data: encodeFunctionData({
             abi: wethAbi,
             functionName: "approve",
-            args: [deployment.contracts.gateway, amount],
+            args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
           }),
         });
       } else if (actionAvailability.kind === "approve-dollar") {
         await recordAndSend({
           kind: "approve-dollar",
-          label: "Approve exact Dollar",
+          label: "Enable Dollar recombination",
           to: deployment.contracts.dollar,
           data: encodeFunctionData({
             abi: staticsDollarTokenAbi,
             functionName: "approve",
-            args: [deployment.contracts.gateway, amount],
+            args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
           }),
         });
       } else if (actionAvailability.kind === "approve-dollar-periphery") {
@@ -755,12 +808,12 @@ function DollarActionPanel({
         }
         await recordAndSend({
           kind: "approve-dollar",
-          label: "Approve exact Dollar",
+          label: "Enable Dollar redemptions",
           to: deployment.contracts.dollar,
           data: encodeFunctionData({
             abi: staticsDollarTokenAbi,
             functionName: "approve",
-            args: [snapshot.data.periphery, amount],
+            args: [snapshot.data.periphery, MAX_ERC20_ALLOWANCE],
           }),
         });
       } else if (actionAvailability.kind === "execute" && currentQuote?.mode === "redeem") {
@@ -1024,7 +1077,7 @@ function DollarActionPanel({
             quote.data.mode === "deposit" ? asset : "Dollar"
           }`
         : "Onchain preview";
-  const anyPending = pendingAction !== null;
+  const anyPending = pendingAction !== null || peggedPending;
 
   return (
     <>
@@ -1049,91 +1102,99 @@ function DollarActionPanel({
 
       <section className="dollar-workspace">
         <div className="dollar-action-card">
-          <div className="dollar-tabs" aria-label="Dollar action">
-            {(["deposit", "recombine", "redeem", "supply", "unsupply"] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                className={mode === choice ? "active" : undefined}
-                onClick={() => {
-                  setMode(choice);
-                  setActionError(null);
-                }}
-                disabled={anyPending}
-              >
-                {modeLabels[choice]}
-              </button>
-            ))}
-          </div>
-          <div className="dollar-field">
-            <label htmlFor="dollar-amount">{amountUnit} amount</label>
-            <div>
-              <input
-                id="dollar-amount"
-                value={amountInput}
-                onChange={(event) => {
-                  setAmountInput(event.target.value);
-                  setActionError(null);
-                }}
-                inputMode="decimal"
-                placeholder="0.00"
-                disabled={anyPending}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setAmountInput(formatUnits(balance, 18));
-                  setActionError(null);
-                }}
-                disabled={anyPending || (mode === "deposit" && asset === "ETH")}
-              >
-                {mode === "deposit" && asset === "ETH" ? "Keep gas" : "Max"}
-              </button>
-            </div>
-            <small>
-              Available {displayAmount(balance)} {amountUnit}
-              {mode === "redeem" &&
-                ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
-              {isSupplyMode(mode) &&
-                ` · ${displayAmount(supply.effectiveShares)} currently supplied`}
-            </small>
-          </div>
-          <fieldset className="dollar-asset-choice" hidden={isSupplyMode(mode)}>
-            <legend>{mode === "deposit" ? "Deposit asset" : "Receive asset"}</legend>
-            {(["ETH", "WETH"] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                className={asset === choice ? "active" : undefined}
-                onClick={() => {
-                  setAsset(choice);
-                  setActionError(null);
-                }}
-                disabled={anyPending}
-              >
-                {choice}
-              </button>
-            ))}
-          </fieldset>
-          <div className="dollar-quote">
-            <span>{isSupplyMode(mode) ? "Your Risk shares" : previewLabel}</span>
-            <strong>{supplyOutput ?? output}</strong>
-            {preview && (
-              <small>
-                {quoteState === "ready"
-                  ? "Current input verified. Bounds include 0.50% execution tolerance."
-                  : "Refreshing for the current input; submission remains disabled."}
-              </small>
-            )}
-          </div>
-          {redeemShortfall !== null && (
+          <DollarProfilePills
+            value={peggedSelected ? "USDG" : asset}
+            peggedAvailable={Boolean(deployment.pegged)}
+            disabled={anyPending}
+            onChange={(choice) => {
+              setAmountInput("");
+              setActionError(null);
+              if (choice === "USDG") {
+                setPeggedSelected(true);
+                return;
+              }
+              setPeggedSelected(false);
+              setAsset(choice);
+            }}
+          />
+          <DollarProfileContent
+            profile={peggedSelected ? "USDG" : asset}
+            pegged={<PeggedDollarPanel embedded onPendingChange={setPeggedPending} />}
+            volatile={
+              <>
+                <div className="dollar-tabs" aria-label="Dollar action">
+                  {(["deposit", "recombine", "redeem", "supply", "unsupply"] as const).map(
+                    (choice) => (
+                      <button
+                        key={choice}
+                        type="button"
+                        className={mode === choice ? "active" : undefined}
+                        onClick={() => {
+                          setMode(choice);
+                          setActionError(null);
+                        }}
+                        disabled={anyPending}
+                      >
+                        {modeLabels[choice]}
+                      </button>
+                    )
+                  )}
+                </div>
+                <div className="dollar-field">
+                  <label htmlFor="dollar-amount">{amountUnit} amount</label>
+                  <div>
+                    <input
+                      id="dollar-amount"
+                      value={amountInput}
+                      onChange={(event) => {
+                        setAmountInput(event.target.value);
+                        setActionError(null);
+                      }}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      disabled={anyPending}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAmountInput(formatUnits(balance, 18));
+                        setActionError(null);
+                      }}
+                      disabled={anyPending || (mode === "deposit" && asset === "ETH")}
+                    >
+                      {mode === "deposit" && asset === "ETH" ? "Keep gas" : "Max"}
+                    </button>
+                  </div>
+                  <small>
+                    Available {displayAmount(balance)} {amountUnit}
+                    {mode === "redeem" &&
+                      ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
+                    {isSupplyMode(mode) &&
+                      ` · ${displayAmount(supply.effectiveShares)} currently supplied`}
+                  </small>
+                </div>
+                <div className="dollar-quote">
+                  <span>{isSupplyMode(mode) ? "Your Risk shares" : previewLabel}</span>
+                  <strong>{supplyOutput ?? output}</strong>
+                  {preview && (
+                    <small>
+                      {quoteState === "ready"
+                        ? "Current input verified. Bounds include 0.50% execution tolerance."
+                        : "Refreshing for the current input; submission remains disabled."}
+                    </small>
+                  )}
+                </div>
+              </>
+            }
+          />
+          {!peggedSelected && redeemShortfall !== null && (
             <p className="dollar-warning" role="status">
               Only {displayAmount(redeemShortfall)} of the {displayAmount(quote.data!.amount)}{" "}
               Dollar you entered can be redeemed right now -- that is all the Risk shares currently
               opted in. The rest stays in your wallet.
             </p>
           )}
-          {mode === "supply" && (
+          {!peggedSelected && mode === "supply" && (
             <p className="dollar-note">
               Supplying lets Dollar holders redeem without holding Risk shares of their own. Your
               shares become redeemable the moment this confirms, and you earn only where a
@@ -1141,136 +1202,176 @@ function DollarActionPanel({
               shares stay withdrawable.
             </p>
           )}
-          {mode === "unsupply" && (
+          {!peggedSelected && mode === "unsupply" && (
             <p className="dollar-note">
               Withdrawing returns unconsumed Risk shares to this wallet. Shares a redemption already
               consumed are gone as shares -- they became proceeds, which you collect by claiming.
             </p>
           )}
-          {isSupplyMode(mode) && hasClaimableProceeds(supply) && supply.positionId !== null && (
-            <div className="dollar-claim-row">
-              <div>
-                <span>Proceeds to claim</span>
-                <strong>
-                  {[
-                    [supply.claimableCollateral, asset] as const,
-                    [supply.claimableStaticsDollar, "Dollar"] as const,
-                    [supply.claimableStatics, "STATICS"] as const,
-                  ]
-                    .filter(([value]) => value > 0n)
-                    .map(([value, label]) => `${displayAmount(value)} ${label}`)
-                    .join(" · ")}
-                </strong>
+          {!peggedSelected &&
+            isSupplyMode(mode) &&
+            hasClaimableProceeds(supply) &&
+            supply.positionId !== null && (
+              <div className="dollar-claim-row">
+                <div>
+                  <span>Proceeds to claim</span>
+                  <strong>
+                    {[
+                      [supply.claimableCollateral, asset] as const,
+                      [supply.claimableStaticsDollar, "Dollar"] as const,
+                      [supply.claimableStatics, "STATICS"] as const,
+                    ]
+                      .filter(([value]) => value > 0n)
+                      .map(([value, label]) => `${displayAmount(value)} ${label}`)
+                      .join(" · ")}
+                  </strong>
+                </div>
+                <button type="button" disabled={anyPending} onClick={() => void claimProceeds()}>
+                  {pendingAction === "claim" ? "Waiting for confirmation…" : "Claim"}
+                </button>
               </div>
-              <button type="button" disabled={anyPending} onClick={() => void claimProceeds()}>
-                {pendingAction === "claim" ? "Waiting for confirmation…" : "Claim"}
-              </button>
-            </div>
-          )}
-          {mode === "redeem" && (
+            )}
+          {!peggedSelected && mode === "redeem" && (
             <p className="dollar-note">
               Redeeming spends Risk shares somebody else opted in, so you do not need to hold any.
               Recombine instead if you hold both and want the full collateral.
             </p>
           )}
-          {mode === "recombine" && !state.riskApproved && (
+          {!peggedSelected && mode === "recombine" && !state.riskApproved && (
             <p className="dollar-warning">
               ERC-1155 approval covers every Risk series, not only series{" "}
               {state.seriesId.toString()}. The gateway is fixed by the verified deployment and
               approval can be revoked below.
             </p>
           )}
-          {actionAvailability.reason && (
+          {!peggedSelected && actionAvailability.reason && (
             <p className="dollar-action-reason">{actionAvailability.reason}</p>
           )}
-          {actionError && (
+          {!peggedSelected && actionError && (
             <p className="dapp-inline-error" role="alert">
               {actionError}
             </p>
           )}
-          <button
-            className="dollar-submit"
-            type="button"
-            onClick={() => void executeNextAction()}
-            disabled={anyPending || !actionAvailability.executable}
-          >
-            {pendingAction === "primary" ? "Waiting for confirmation…" : actionAvailability.label}
-          </button>
-        </div>
-
-        <aside className="dollar-protocol-card">
-          <p className="dapp-section-label" aria-live="polite">
-            WETH profile{snapshot.isFetching ? " · refreshing" : ""}
-          </p>
-          <dl>
-            <div>
-              <dt>Health</dt>
-              <dd>
-                {!state.solvency.oracleAvailable
-                  ? "Oracle unavailable"
-                  : state.solvency.healthy
-                    ? "Healthy"
-                    : "Impaired"}
-              </dd>
-            </div>
-            <div>
-              <dt>Price feed</dt>
-              <dd>${displayAmount(state.priceWad)}</dd>
-            </div>
-            <div>
-              <dt>Collateral ratio</dt>
-              <dd>{Number(state.profile.collateralRatioBps) / 100}%</dd>
-            </div>
-            <div>
-              <dt>Debt</dt>
-              <dd>{displayAmount(state.profile.seniorOutstanding)} Dollar</dd>
-            </div>
-            <div>
-              <dt>Borrow limit</dt>
-              <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
-            </div>
-            <div>
-              <dt>Profile mode</dt>
-              <dd>{profileModeLabel(state.profile.mode)}</dd>
-            </div>
-            <div>
-              <dt>Series state</dt>
-              <dd>{seriesStatusLabel(state.series.status)}</dd>
-            </div>
-            <div>
-              <dt>Paused mask</dt>
-              <dd>{state.pausedOperations.toString()}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
-            </div>
-            <div>
-              <dt>Gateway</dt>
-              <dd title={deployment.contracts.gateway}>
-                {shortAddress(deployment.contracts.gateway)}
-              </dd>
-            </div>
-          </dl>
-          {state.riskApproved && (
-            <button type="button" onClick={() => void revokeRisk()} disabled={anyPending}>
-              {pendingAction === "revoke" ? "Revoking…" : "Revoke Risk operator"}
+          {!peggedSelected && (
+            <button
+              className="dollar-submit"
+              type="button"
+              onClick={() => void executeNextAction()}
+              disabled={anyPending || !actionAvailability.executable}
+            >
+              {pendingAction === "primary" ? "Waiting for confirmation…" : actionAvailability.label}
             </button>
           )}
-          <p>
-            Receiver is fixed to {shortAddress(wallet)}. Quotes are refreshed and simulated before
-            the wallet receives a signing request.
-          </p>
-          {evesMarketUrl ? (
-            <a href={evesMarketUrl} target="_blank" rel="noreferrer">
-              Continue to Eves Market ↗
-            </a>
-          ) : (
-            <span className="dollar-disabled-link" aria-disabled="true">
-              Eves Market link unavailable
-            </span>
-          )}
-        </aside>
+        </div>
+
+        {peggedSelected && (
+          <aside className="dollar-protocol-card">
+            <p className="dapp-section-label">USDG profile</p>
+            <dl>
+              <div>
+                <dt>Profile</dt>
+                <dd>#{deployment.pegged?.profileId.toString()}</dd>
+              </div>
+              <div>
+                <dt>Collateral</dt>
+                <dd>USDG</dd>
+              </div>
+              <div>
+                <dt>Dollar received</dt>
+                <dd>USDstx</dd>
+              </div>
+              <div>
+                <dt>Risk shares</dt>
+                <dd>None</dd>
+              </div>
+              <div>
+                <dt>Gateway</dt>
+                <dd title={deployment.contracts.gateway}>
+                  {shortAddress(deployment.contracts.gateway)}
+                </dd>
+              </div>
+            </dl>
+            <p>
+              USDG enters the pegged profile directly. It mints Statics Dollar without creating an
+              ethLEV position.
+            </p>
+          </aside>
+        )}
+        {!peggedSelected && (
+          <aside className="dollar-protocol-card">
+            <p className="dapp-section-label" aria-live="polite">
+              WETH profile{snapshot.isFetching ? " · refreshing" : ""}
+            </p>
+            <dl>
+              <div>
+                <dt>Health</dt>
+                <dd>
+                  {!state.solvency.oracleAvailable
+                    ? "Oracle unavailable"
+                    : state.solvency.healthy
+                      ? "Healthy"
+                      : "Impaired"}
+                </dd>
+              </div>
+              <div>
+                <dt>Price feed</dt>
+                <dd>${displayAmount(state.priceWad)}</dd>
+              </div>
+              <div>
+                <dt>Collateral ratio</dt>
+                <dd>{Number(state.profile.collateralRatioBps) / 100}%</dd>
+              </div>
+              <div>
+                <dt>Debt</dt>
+                <dd>{displayAmount(state.profile.seniorOutstanding)} Dollar</dd>
+              </div>
+              <div>
+                <dt>Borrow limit</dt>
+                <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
+              </div>
+              <div>
+                <dt>Profile mode</dt>
+                <dd>{profileModeLabel(state.profile.mode)}</dd>
+              </div>
+              <div>
+                <dt>Series state</dt>
+                <dd>{seriesStatusLabel(state.series.status)}</dd>
+              </div>
+              <div>
+                <dt>Paused mask</dt>
+                <dd>{state.pausedOperations.toString()}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
+              </div>
+              <div>
+                <dt>Gateway</dt>
+                <dd title={deployment.contracts.gateway}>
+                  {shortAddress(deployment.contracts.gateway)}
+                </dd>
+              </div>
+            </dl>
+            {state.riskApproved && (
+              <button type="button" onClick={() => void revokeRisk()} disabled={anyPending}>
+                {pendingAction === "revoke" ? "Revoking…" : "Revoke Risk operator"}
+              </button>
+            )}
+            <p>
+              Receiver is fixed to {shortAddress(wallet)}. Quotes are refreshed and simulated before
+              the wallet receives a signing request.
+            </p>
+            {evesMarketUrl ? (
+              <a href={evesMarketUrl} target="_blank" rel="noreferrer">
+                Continue to Eves Market ↗
+              </a>
+            ) : (
+              <span className="dollar-disabled-link" aria-disabled="true">
+                Eves Market link unavailable
+              </span>
+            )}
+          </aside>
+        )}
       </section>
     </>
   );

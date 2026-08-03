@@ -4,7 +4,6 @@ import type { Address } from "viem";
 import {
   canonicalSwapPoolKey,
   isCurrentCanonicalSwapQuote,
-  permit2SwapApproval,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
 
@@ -24,14 +23,6 @@ describe("canonical basket swaps", () => {
   it("derives exact-input direction from the canonical currencies", () => {
     expect(zeroForExactInput(poolKey, token0)).toBe(true);
     expect(zeroForExactInput(poolKey, token1)).toBe(false);
-  });
-
-  it("builds an exact bounded Permit2 authorization", () => {
-    expect(permit2SwapApproval(token0, 25n, 7, token1, 1_000n)).toEqual({
-      details: { token: token0, amount: 25n, expiration: 1_000, nonce: 7 },
-      spender: token1,
-      sigDeadline: 1_000n,
-    });
   });
 
   it("rejects a cached quote after the pool or direction changes", () => {

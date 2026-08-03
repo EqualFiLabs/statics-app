@@ -14,7 +14,6 @@ import { usePublicClient, useWalletClient } from "wagmi";
 import {
   CanonicalPoolStatus,
   basketTokenAbi,
-  buildPermit2PermitTypedData,
   buildQuoteV4ExactInputSingleCall,
   buildV4ExactInputSingleSwap,
   permit2AllowanceAbi,
@@ -25,7 +24,6 @@ import {
 import {
   canonicalSwapPoolKey,
   isCurrentCanonicalSwapQuote,
-  permit2SwapApproval,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
@@ -42,6 +40,12 @@ import {
   verifyLiquidityDeployment,
 } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import {
+  MAX_ERC20_ALLOWANCE,
+  MAX_PERMIT2_ALLOWANCE,
+  MAX_PERMIT2_EXPIRATION,
+  hasUsablePermit2Allowance,
+} from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -242,7 +246,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           data: encodeFunctionData({
             abi: basketTokenAbi,
             functionName: "approve",
-            args: [liquidity.contracts.permit2, freshBalance],
+            args: [liquidity.contracts.permit2, MAX_ERC20_ALLOWANCE],
           }),
           sendTransaction: ({ to, data, value }) =>
             walletClient.data!.sendTransaction({
@@ -287,21 +291,50 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         functionName: "allowance",
         args: [wallet, inputToken.address, router],
       });
-      const permitSingle = permit2SwapApproval(
-        inputToken.address,
-        amount,
-        allowance[2],
-        router,
-        deadline
-      );
-      const signature = await walletClient.data.signTypedData({
-        account: wallet,
-        ...buildPermit2PermitTypedData(
-          deploymentState.deployment.chainId,
-          liquidity.contracts.permit2,
-          permitSingle
-        ),
-      });
+      if (!hasUsablePermit2Allowance(allowance[0], allowance[1], amount, Number(block.timestamp))) {
+        await executeProtocolTransaction({
+          publicClient,
+          wallet,
+          chainId: deploymentState.deployment.chainId,
+          kind: "approve-permit2",
+          label: `Authorize ${inputToken.symbol} swaps`,
+          amount: `Maximum ${inputToken.symbol}`,
+          to: liquidity.contracts.permit2,
+          data: encodeFunctionData({
+            abi: permit2AllowanceAbi,
+            functionName: "approve",
+            args: [inputToken.address, router, MAX_PERMIT2_ALLOWANCE, MAX_PERMIT2_EXPIRATION],
+          }),
+          sendTransaction: ({ to, data, value }) =>
+            walletClient.data!.sendTransaction({
+              account: wallet,
+              chain: walletClient.data!.chain,
+              to,
+              data,
+              value,
+            }),
+          describeError: describeBasketError,
+          verifyConfirmation: async () => {
+            const confirmed = await publicClient.readContract({
+              address: liquidity.contracts.permit2,
+              abi: permit2AllowanceAbi,
+              functionName: "allowance",
+              args: [wallet, inputToken.address, router],
+            });
+            if (
+              !hasUsablePermit2Allowance(
+                confirmed[0],
+                confirmed[1],
+                amount,
+                Number(block.timestamp)
+              )
+            ) {
+              throw new Error("The confirmed Permit2 swap authorization is not usable.");
+            }
+          },
+        });
+        return;
+      }
       const execution = buildV4ExactInputSingleSwap({
         router,
         poolKey: currentQuote.poolKey,
@@ -309,7 +342,6 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         amountIn: amount,
         amountOutMinimum: minimumOut,
         deadline,
-        permit: { permitSingle, signature },
       });
       const outputBefore = await publicClient.readContract({
         address: outputToken.address,

@@ -90,8 +90,8 @@ export function DollarOverviewPreview() {
 }
 
 export function DollarPagePreview() {
-  const [mode, setMode] = useState<"deposit" | "recombine">("deposit");
-  const [asset, setAsset] = useState<"ETH" | "WETH">("ETH");
+  const [mode, setMode] = useState<"deposit" | "recombine" | "redeem">("deposit");
+  const [asset, setAsset] = useState<"ETH" | "WETH" | "USDG">("ETH");
   return (
     <>
       <PreviewBanner surface="Dollar" />
@@ -111,22 +111,36 @@ export function DollarPagePreview() {
             >
               Deposit
             </button>
-            <button
-              type="button"
-              className={mode === "recombine" ? "active" : undefined}
-              onClick={() => setMode("recombine")}
-            >
-              Recombine
-            </button>
+            {asset === "USDG" ? (
+              <button
+                type="button"
+                className={mode === "redeem" ? "active" : undefined}
+                onClick={() => setMode("redeem")}
+              >
+                Redeem
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={mode === "recombine" ? "active" : undefined}
+                onClick={() => setMode("recombine")}
+              >
+                Recombine
+              </button>
+            )}
           </div>
-          <fieldset className="dollar-asset-choice">
-            <legend>Collateral output</legend>
-            {(["ETH", "WETH"] as const).map((choice) => (
+          <fieldset className="dollar-asset-choice dollar-profile-choice has-pegged">
+            <legend>Collateral profile</legend>
+            {(["ETH", "WETH", "USDG"] as const).map((choice) => (
               <button
                 type="button"
                 key={choice}
                 className={asset === choice ? "active" : undefined}
-                onClick={() => setAsset(choice)}
+                aria-pressed={asset === choice}
+                onClick={() => {
+                  setAsset(choice);
+                  setMode("deposit");
+                }}
               >
                 {choice}
               </button>
@@ -134,7 +148,11 @@ export function DollarPagePreview() {
           </fieldset>
           <div className="dollar-field">
             <label htmlFor="preview-dollar-amount">
-              {mode === "deposit" ? `${asset} collateral` : "Dollar amount"}
+              {mode === "deposit"
+                ? asset === "USDG"
+                  ? "Statics Dollar to receive"
+                  : `${asset} collateral`
+                : "Dollar amount"}
             </label>
             <div>
               <input id="preview-dollar-amount" value="" placeholder={unavailable} readOnly />
@@ -151,7 +169,9 @@ export function DollarPagePreview() {
             <strong>{unavailable}</strong>
             <small>{unavailable}</small>
           </div>
-          <PreviewAction>{mode === "deposit" ? "Deposit" : "Recombine"}</PreviewAction>
+          <PreviewAction>
+            {mode === "deposit" ? "Deposit" : mode === "redeem" ? "Redeem" : "Recombine"}
+          </PreviewAction>
         </div>
         <aside className="dollar-protocol-card">
           <p className="dapp-section-label">Protocol state</p>

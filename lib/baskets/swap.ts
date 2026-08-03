@@ -1,6 +1,6 @@
 import { getAddress, type Address } from "viem";
 
-import type { Permit2PermitSingle, V4PoolKey } from "@statics-protocol/sdk";
+import type { V4PoolKey } from "@statics-protocol/sdk";
 
 export const SWAP_PERMIT_TTL_SECONDS = 20n * 60n;
 
@@ -47,24 +47,4 @@ export function zeroForExactInput(poolKey: V4PoolKey, inputToken: Address): bool
   if (poolKey.currency0.toLowerCase() === input) return true;
   if (poolKey.currency1.toLowerCase() === input) return false;
   throw new Error("The selected token is not in this canonical pool.");
-}
-
-export function permit2SwapApproval(
-  token: Address,
-  amount: bigint,
-  nonce: number,
-  router: Address,
-  deadline: bigint
-): Permit2PermitSingle {
-  if (deadline > BigInt(0xffff_ffff_ffff)) throw new Error("Permit2 deadline exceeds uint48.");
-  return {
-    details: {
-      token,
-      amount,
-      expiration: Number(deadline),
-      nonce,
-    },
-    spender: router,
-    sigDeadline: deadline,
-  };
 }

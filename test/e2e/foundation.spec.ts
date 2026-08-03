@@ -149,6 +149,9 @@ test.describe("Dollar DApp foundation", () => {
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
 
+    await navigateDapp(page, "/app/tools");
+    await expect(page).toHaveURL(/\/app\/tools$/);
+
     await navigateDapp(page, "/app/settings");
     await expect(page).toHaveURL(/\/app\/settings$/);
   });
@@ -225,6 +228,7 @@ test.describe("Dollar DApp foundation", () => {
       "/app/loans",
       "/app/rewards",
       "/app/liquidity",
+      "/app/tools",
     ]) {
       await page.goto(route);
       const overflow = await page
