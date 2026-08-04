@@ -10,17 +10,18 @@ export function WalletConnectionDialog() {
   const wallet = useWalletState();
   const t = useTranslations("walletConnection");
   const tCommon = useTranslations("common");
+  const { closeWalletPicker, walletPickerOpen } = wallet;
 
   useEffect(() => {
-    if (!wallet.walletPickerOpen) return;
+    if (!walletPickerOpen) return;
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") wallet.closeWalletPicker();
+      if (event.key === "Escape") closeWalletPicker();
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [wallet]);
+  }, [closeWalletPicker, walletPickerOpen]);
 
-  if (!wallet.walletPickerOpen || typeof document === "undefined") return null;
+  if (!walletPickerOpen || typeof document === "undefined") return null;
 
   const hasEmbeddedWallet = wallet.walletOptions.some((option) => option.kind === "embedded");
 

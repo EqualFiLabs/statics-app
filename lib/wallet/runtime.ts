@@ -48,3 +48,9 @@ export function walletClientMatchesAddress(
     clientAddress && activeAddress && clientAddress.toLowerCase() === activeAddress.toLowerCase()
   );
 }
+
+export function walletClientAccountAddress(
+  account: string | { readonly address: string } | null | undefined
+): string | undefined {
+  return typeof account === "string" ? account : account?.address;
+}

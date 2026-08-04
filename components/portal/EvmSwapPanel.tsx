@@ -358,9 +358,9 @@ export function EvmSwapPanel() {
 
   const actionLabel =
     wallet.status === "disconnected" || wallet.status === "error"
-      ? "Connect wallet"
+      ? t("connectWallet")
       : wallet.address && !wallet.fundingWalletOnSelectedChain
-        ? `Switch to ${wallet.fundingNetworkName}`
+        ? t("switchTo", { network: wallet.fundingNetworkName })
         : quoteLoading
           ? t("findingRoute")
           : insufficient

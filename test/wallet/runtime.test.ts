@@ -4,6 +4,7 @@ import {
   derivePrivyIdentityStatus,
   deriveWalletRuntimeStatus,
   parseWalletPreference,
+  walletClientAccountAddress,
   walletClientMatchesAddress,
 } from "@/lib/wallet/runtime";
 
@@ -69,5 +70,13 @@ describe("wallet and identity failure boundaries", () => {
         "0x1111111111111111111111111111111111111111"
       )
     ).toBe(true);
+  });
+
+  it("normalizes both Viem account objects and plain connector addresses", () => {
+    const address = "0x1111111111111111111111111111111111111111";
+
+    expect(walletClientAccountAddress(address)).toBe(address);
+    expect(walletClientAccountAddress({ address })).toBe(address);
+    expect(walletClientAccountAddress(undefined)).toBeUndefined();
   });
 });

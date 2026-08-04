@@ -50,6 +50,7 @@ import {
   derivePrivyIdentityStatus,
   deriveWalletRuntimeStatus,
   parseWalletPreference,
+  walletClientAccountAddress,
   walletClientMatchesAddress,
 } from "@/lib/wallet/runtime";
 import {
@@ -218,6 +219,7 @@ function WalletRuntimeBridge({
   const [preferenceLoaded, setPreferenceLoaded] = useState(false);
   const [walletPickerOpen, setWalletPickerOpen] = useState(false);
   const [embeddedWalletClient, setEmbeddedWalletClient] = useState<ActiveWalletClient | null>(null);
+  const closeWalletPicker = useCallback(() => setWalletPickerOpen(false), []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -302,7 +304,7 @@ function WalletRuntimeBridge({
 
   const externalWalletClient =
     selectedKind === "external" &&
-    walletClientMatchesAddress(connectorClient.data?.account?.address, address)
+    walletClientMatchesAddress(walletClientAccountAddress(connectorClient.data?.account), address)
       ? (connectorClient.data as ActiveWalletClient)
       : null;
   const walletClient = selectedKind === "external" ? externalWalletClient : embeddedWalletClient;
@@ -416,7 +418,7 @@ function WalletRuntimeBridge({
         setWalletError(null);
         setWalletPickerOpen(true);
       },
-      closeWalletPicker: () => setWalletPickerOpen(false),
+      closeWalletPicker,
       connectWalletOption: (id) =>
         runWalletAction("connect", async () => {
           if (id === "embedded") {
@@ -489,6 +491,7 @@ function WalletRuntimeBridge({
       account.isConnected,
       address,
       chainId,
+      closeWalletPicker,
       connectAsync,
       connectors,
       disconnectAsync,

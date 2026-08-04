@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react";
 import type { Account, Chain, EIP1193Provider, Transport, WalletClient } from "viem";
 
-import { walletClientMatchesAddress } from "@/lib/wallet/runtime";
+import { walletClientAccountAddress, walletClientMatchesAddress } from "@/lib/wallet/runtime";
 
 export type WalletRuntimeStatus = "unconfigured" | "loading" | "disconnected" | "ready" | "error";
 
@@ -126,7 +126,7 @@ export function useWalletState(): WalletState {
  */
 export function useActiveWalletClient(): { data: ActiveWalletClient | undefined } {
   const wallet = useWalletState();
-  const clientAddress = wallet.walletClient?.account?.address;
+  const clientAddress = walletClientAccountAddress(wallet.walletClient?.account);
   const matchesActiveAddress = walletClientMatchesAddress(clientAddress, wallet.address);
   return { data: matchesActiveAddress ? wallet.walletClient! : undefined };
 }
