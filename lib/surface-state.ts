@@ -1,7 +1,7 @@
 /**
  * Which state a data surface is actually in.
  *
- * Every list page currently collapses "disconnected", "still loading" and
+ * Every list page currently collapses "signed out", "still loading" and
  * "the query failed" into one branch that renders the sample preview, so a
  * first-time visitor sees a dashboard of em dashes and cannot tell which of
  * those three things happened. None of them mean "you have nothing" -- and
@@ -10,13 +10,16 @@
  * Deriving the state in one place keeps every surface telling the same story.
  */
 
-export type WalletStatus = "unconfigured" | "loading" | "disconnected" | "error" | "ready";
+export type WalletStatus =
+  "unconfigured" | "loading" | "signed-out" | "wallet-missing" | "error" | "ready";
 
 export type SurfaceStateKind =
   /** No verified deployment is configured. A developer problem, not a user one. */
   | "unconfigured"
-  /** No EVM wallet is connected, independent of account authentication. */
-  | "disconnected"
+  /** Nobody is signed in, so there is no wallet to have anything. */
+  | "signed-out"
+  /** Signed in, but no wallet exists yet. */
+  | "wallet-missing"
   /** Connected to the wrong chain: nothing will load until that is fixed. */
   | "wrong-network"
   /** Data is on its way. */
@@ -44,7 +47,8 @@ export function deriveSurfaceState(input: SurfaceStateInput): SurfaceStateKind {
   const { walletStatus, isTargetChain, isLoading, isError, isEmpty, hasData } = input;
 
   if (walletStatus === "unconfigured") return "unconfigured";
-  if (walletStatus === "disconnected" || walletStatus === "error") return "disconnected";
+  if (walletStatus === "signed-out" || walletStatus === "error") return "signed-out";
+  if (walletStatus === "wallet-missing") return "wallet-missing";
   if (walletStatus === "loading") return "loading";
   if (!isTargetChain) return "wrong-network";
 

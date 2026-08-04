@@ -16,15 +16,15 @@ const state = (overrides: Partial<SurfaceStateInput> = {}) =>
 
 describe("surface state", () => {
   it("separates the three things that used to render an identical placeholder", () => {
-    // The bug this exists to prevent: disconnected, loading and failed all
+    // The bug this exists to prevent: signed out, loading and failed all
     // collapsing into one branch, leaving a visitor unable to tell which.
-    expect(state({ walletStatus: "disconnected", hasData: false })).toBe("disconnected");
+    expect(state({ walletStatus: "signed-out", hasData: false })).toBe("signed-out");
     expect(state({ isLoading: true, hasData: false })).toBe("loading");
     expect(state({ isError: true, hasData: false })).toBe("error");
     expect(state({ isEmpty: true })).toBe("empty");
 
     const kinds = new Set([
-      state({ walletStatus: "disconnected", hasData: false }),
+      state({ walletStatus: "signed-out", hasData: false }),
       state({ isLoading: true, hasData: false }),
       state({ isError: true, hasData: false }),
       state({ isEmpty: true }),
@@ -33,15 +33,15 @@ describe("surface state", () => {
   });
 
   it("never reports empty when the reason is really the wallet", () => {
-    // "You have no positions" is a false statement when no wallet is connected.
-    for (const walletStatus of ["disconnected", "loading", "error"] as const) {
+    // "You have no positions" is a false statement when nobody is signed in.
+    for (const walletStatus of ["signed-out", "wallet-missing", "loading", "error"] as const) {
       expect(state({ walletStatus, isEmpty: true, hasData: false })).not.toBe("empty");
     }
     expect(state({ isTargetChain: false, isEmpty: true, hasData: false })).not.toBe("empty");
   });
 
-  it("treats an unusable wallet connection as disconnected", () => {
-    expect(state({ walletStatus: "error" })).toBe("disconnected");
+  it("treats an unusable wallet session as signed out", () => {
+    expect(state({ walletStatus: "error" })).toBe("signed-out");
   });
 
   it("reports a chain mismatch ahead of the read's own state", () => {
@@ -64,7 +64,8 @@ describe("surface state", () => {
     expect(isSurfaceReady("ready")).toBe(true);
     for (const kind of [
       "unconfigured",
-      "disconnected",
+      "signed-out",
+      "wallet-missing",
       "wrong-network",
       "loading",
       "error",

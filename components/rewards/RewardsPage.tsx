@@ -10,7 +10,7 @@ import {
   getAddress,
   parseEventLogs,
 } from "viem";
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -38,7 +38,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { focusRewardPositions } from "@/lib/rewards/navigation";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
-import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
+import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
@@ -70,7 +70,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
   const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useActiveWalletClient();
+  const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
@@ -218,9 +218,9 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           data: `0x${string}`;
           value?: bigint;
         }) =>
-          walletClient.data!.sendTransaction({
+          walletClient.data.sendTransaction({
             account: wallet,
-            chain: walletClient.data!.chain,
+            chain: walletClient.data.chain,
             to,
             data,
             value,
@@ -496,9 +496,12 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
 
   let primaryLabel = t("approveOrCreate");
   let primaryAction: (() => void) | null = () => void createAndStake();
-  if (walletState.status === "disconnected" || walletState.status === "error") {
+  if (walletState.status === "signed-out" || walletState.status === "error") {
     primaryLabel = t("signIn");
-    primaryAction = walletState.connectWallet;
+    primaryAction = walletState.login;
+  } else if (walletState.status === "wallet-missing") {
+    primaryLabel = t("createWallet");
+    primaryAction = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     primaryLabel = t("switchTo", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();

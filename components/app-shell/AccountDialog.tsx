@@ -94,12 +94,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   const disconnect = async () => {
-    await wallet.disconnectWallet();
+    await wallet.logout();
     onClose();
-  };
-  const changeWallet = () => {
-    onClose();
-    wallet.connectWallet();
   };
   const networkLabel =
     wallet.status === "ready" && !wallet.isTargetChain
@@ -169,19 +165,6 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             </a>
           )}
 
-          {wallet.identityStatus === "degraded" && (
-            <div className="wallet-service-warning" role="status">
-              <strong>{t("privyUnavailableTitle")}</strong>
-              <p>{t("privyUnavailableDescription")}</p>
-            </div>
-          )}
-
-          {wallet.identityError && (
-            <p className="dapp-inline-error" role="alert">
-              {wallet.identityError}
-            </p>
-          )}
-
           {wallet.walletKind === "embedded" && (
             <div className="account-export-warning">
               <strong>{t("exportTitle")}</strong>
@@ -189,42 +172,21 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={() => void wallet.exportWallet()}
-                disabled={wallet.identityBusyAction !== null}
+                disabled={wallet.busyAction !== null}
               >
-                {wallet.identityBusyAction === "export" ? t("openingExport") : t("reviewExport")}
+                {wallet.busyAction === "export" ? t("openingExport") : t("reviewExport")}
               </button>
             </div>
           )}
 
-          <div className="account-wallet-actions">
-            <button
-              type="button"
-              onClick={changeWallet}
-              disabled={wallet.walletBusyAction !== null}
-            >
-              {t("changeWallet")}
-            </button>
-            <button
-              type="button"
-              onClick={() => void disconnect()}
-              disabled={wallet.walletBusyAction !== null}
-            >
-              {wallet.walletBusyAction === "disconnect"
-                ? t("disconnecting")
-                : t("disconnectWallet")}
-            </button>
-          </div>
-
-          {wallet.authenticated && (
-            <button
-              className="account-signout"
-              type="button"
-              onClick={() => void wallet.signOut()}
-              disabled={wallet.identityBusyAction !== null}
-            >
-              {wallet.identityBusyAction === "sign-out" ? t("signingOut") : t("signOutPrivy")}
-            </button>
-          )}
+          <button
+            className="account-signout"
+            type="button"
+            onClick={() => void disconnect()}
+            disabled={wallet.busyAction !== null}
+          >
+            {wallet.busyAction === "logout" ? t("signingOut") : t("signOut")}
+          </button>
         </div>
       </section>
     </div>,

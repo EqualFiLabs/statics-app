@@ -347,9 +347,7 @@ export function EvmSwapPanel() {
   };
 
   const nextAction = () => {
-    if (wallet.status === "disconnected" || wallet.status === "error") {
-      return wallet.connectWallet();
-    }
+    if (wallet.status === "signed-out") return wallet.login();
     if (wallet.address && !wallet.fundingWalletOnSelectedChain) {
       return void wallet.selectFundingNetwork(wallet.fundingChainId);
     }
@@ -357,10 +355,10 @@ export function EvmSwapPanel() {
   };
 
   const actionLabel =
-    wallet.status === "disconnected" || wallet.status === "error"
-      ? t("connectWallet")
+    wallet.status === "signed-out"
+      ? "Connect wallet"
       : wallet.address && !wallet.fundingWalletOnSelectedChain
-        ? t("switchTo", { network: wallet.fundingNetworkName })
+        ? `Switch to ${wallet.fundingNetworkName}`
         : quoteLoading
           ? t("findingRoute")
           : insufficient

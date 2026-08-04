@@ -438,32 +438,34 @@ export function PeggedDollarPanel({
         : false;
 
   const primary = () => {
-    if (wallet.status === "disconnected" || wallet.status === "error")
-      return wallet.connectWallet();
+    if (wallet.status === "signed-out" || wallet.status === "error") return wallet.login();
+    if (wallet.status === "wallet-missing") return void wallet.createWallet();
     if (wallet.status !== "ready") return;
     if (deployment && wallet.chainId !== deployment.chainId) return void wallet.switchNetwork();
     return void nextAction();
   };
   const label =
-    wallet.status === "disconnected" || wallet.status === "error"
+    wallet.status === "signed-out" || wallet.status === "error"
       ? t("connectWallet")
-      : wallet.status !== "ready"
-        ? t("walletLoading")
-        : deployment && wallet.chainId !== deployment.chainId
-          ? t("switchTo", { network: wallet.networkName })
-          : pending
-            ? t("preparing")
-            : quoteLoading
-              ? t("readingQuote")
-              : balanceInsufficient
-                ? t("insufficientAsset", {
-                    symbol: direction === "mint" ? "USDG" : "USDstx",
-                  })
-                : direction === "mint"
-                  ? embedded
-                    ? t("reviewDeposit")
-                    : t("reviewMint")
-                  : t("reviewRedemption");
+      : wallet.status === "wallet-missing"
+        ? t("createEmbeddedWallet")
+        : wallet.status !== "ready"
+          ? t("walletLoading")
+          : deployment && wallet.chainId !== deployment.chainId
+            ? t("switchTo", { network: wallet.networkName })
+            : pending
+              ? t("preparing")
+              : quoteLoading
+                ? t("readingQuote")
+                : balanceInsufficient
+                  ? t("insufficientAsset", {
+                      symbol: direction === "mint" ? "USDG" : "USDstx",
+                    })
+                  : direction === "mint"
+                    ? embedded
+                      ? t("reviewDeposit")
+                      : t("reviewMint")
+                    : t("reviewRedemption");
 
   return (
     <div className={`portal-panel${embedded ? " dollar-pegged-panel" : ""}`} role="tabpanel">
@@ -581,8 +583,9 @@ export function PeggedDollarPanel({
           type="button"
           disabled={
             pending ||
-            (wallet.status !== "disconnected" &&
+            (wallet.status !== "signed-out" &&
               wallet.status !== "error" &&
+              wallet.status !== "wallet-missing" &&
               wallet.status !== "ready") ||
             (wallet.status === "ready" &&
               (balanceInsufficient ||
