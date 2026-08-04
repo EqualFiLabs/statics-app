@@ -47,6 +47,8 @@ export type WalletState = Readonly<{
   explorerUrl: string | null;
   error: string | null;
   identityError: string | null;
+  walletBusyAction: "connect" | "disconnect" | "switch" | "funding-switch" | null;
+  identityBusyAction: "create" | "sign-out" | "export" | null;
   busyAction:
     | "connect"
     | "disconnect"
@@ -92,6 +94,8 @@ export const defaultWalletState: WalletState = {
   explorerUrl: null,
   error: null,
   identityError: null,
+  walletBusyAction: null,
+  identityBusyAction: null,
   busyAction: null,
   walletPickerOpen: false,
   walletOptions: [],

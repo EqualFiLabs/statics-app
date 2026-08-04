@@ -189,23 +189,29 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={() => void wallet.exportWallet()}
-                disabled={wallet.busyAction !== null}
+                disabled={wallet.identityBusyAction !== null}
               >
-                {wallet.busyAction === "export" ? t("openingExport") : t("reviewExport")}
+                {wallet.identityBusyAction === "export" ? t("openingExport") : t("reviewExport")}
               </button>
             </div>
           )}
 
           <div className="account-wallet-actions">
-            <button type="button" onClick={changeWallet} disabled={wallet.busyAction !== null}>
+            <button
+              type="button"
+              onClick={changeWallet}
+              disabled={wallet.walletBusyAction !== null}
+            >
               {t("changeWallet")}
             </button>
             <button
               type="button"
               onClick={() => void disconnect()}
-              disabled={wallet.busyAction !== null}
+              disabled={wallet.walletBusyAction !== null}
             >
-              {wallet.busyAction === "disconnect" ? t("disconnecting") : t("disconnectWallet")}
+              {wallet.walletBusyAction === "disconnect"
+                ? t("disconnecting")
+                : t("disconnectWallet")}
             </button>
           </div>
 
@@ -214,9 +220,9 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               className="account-signout"
               type="button"
               onClick={() => void wallet.signOut()}
-              disabled={wallet.busyAction !== null}
+              disabled={wallet.identityBusyAction !== null}
             >
-              {wallet.busyAction === "sign-out" ? t("signingOut") : t("signOutPrivy")}
+              {wallet.identityBusyAction === "sign-out" ? t("signingOut") : t("signOutPrivy")}
             </button>
           )}
         </div>

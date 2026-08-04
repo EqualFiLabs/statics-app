@@ -62,7 +62,7 @@ export function WalletConnectionDialog() {
                 key={option.id}
                 type="button"
                 onClick={() => void wallet.connectWalletOption(option.id)}
-                disabled={wallet.busyAction !== null}
+                disabled={wallet.walletBusyAction !== null}
               >
                 <span>{option.name}</span>
                 <small>{option.connected ? t("active") : t(option.kind)}</small>
@@ -75,9 +75,9 @@ export function WalletConnectionDialog() {
               className="wallet-secondary-action"
               type="button"
               onClick={() => void wallet.createWallet()}
-              disabled={wallet.busyAction !== null}
+              disabled={wallet.identityBusyAction !== null}
             >
-              {wallet.busyAction === "create" ? t("creating") : t("createEmbedded")}
+              {wallet.identityBusyAction === "create" ? t("creating") : t("createEmbedded")}
             </button>
           )}
 
@@ -86,7 +86,7 @@ export function WalletConnectionDialog() {
               className="wallet-secondary-action"
               type="button"
               onClick={wallet.login}
-              disabled={wallet.busyAction !== null}
+              disabled={wallet.identityBusyAction !== null}
             >
               {t("signInForEmbedded")}
             </button>

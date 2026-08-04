@@ -265,4 +265,26 @@ describe("DApp wallet shell", () => {
     expect(signOut).toHaveBeenCalledOnce();
     expect(disconnectWallet).not.toHaveBeenCalled();
   });
+
+  it("allows wallet disconnect while a Privy sign-out request is still pending", () => {
+    const disconnectWallet = vi.fn().mockResolvedValue(undefined);
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      identityStatus: "authenticated",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      walletKind: "external",
+      busyAction: "sign-out",
+      identityBusyAction: "sign-out",
+      walletBusyAction: null,
+      disconnectWallet,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+    const disconnect = screen.getByRole("button", { name: "Disconnect wallet" });
+    expect(disconnect).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Signing out of Privy…" })).toBeDisabled();
+    fireEvent.click(disconnect);
+    expect(disconnectWallet).toHaveBeenCalledOnce();
+  });
 });

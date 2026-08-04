@@ -208,7 +208,9 @@ function WalletRuntimeBridge({
   const { connectors, connectAsync } = useConnect();
   const { disconnectAsync } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
-  const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
+  const [walletBusyAction, setWalletBusyAction] = useState<WalletState["walletBusyAction"]>(null);
+  const [identityBusyAction, setIdentityBusyAction] =
+    useState<WalletState["identityBusyAction"]>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [identityActionError, setIdentityActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
@@ -311,24 +313,30 @@ function WalletRuntimeBridge({
   }, [address, preferenceLoaded, queryClient]);
 
   const runWalletAction = useCallback(
-    async (action: NonNullable<WalletState["busyAction"]>, operation: () => Promise<void>) => {
+    async (
+      action: NonNullable<WalletState["walletBusyAction"]>,
+      operation: () => Promise<void>
+    ) => {
       setWalletError(null);
-      setBusyAction(action);
+      setWalletBusyAction(action);
       try {
         await operation();
       } catch (error) {
         setWalletError(error instanceof Error ? error.message : "The wallet request failed.");
       } finally {
-        setBusyAction(null);
+        setWalletBusyAction(null);
       }
     },
     []
   );
 
   const runIdentityAction = useCallback(
-    async (action: NonNullable<WalletState["busyAction"]>, operation: () => Promise<void>) => {
+    async (
+      action: NonNullable<WalletState["identityBusyAction"]>,
+      operation: () => Promise<void>
+    ) => {
       setIdentityActionError(null);
-      setBusyAction(action);
+      setIdentityBusyAction(action);
       try {
         await operation();
       } catch (error) {
@@ -336,7 +344,7 @@ function WalletRuntimeBridge({
           error instanceof Error ? error.message : "The Privy account request failed."
         );
       } finally {
-        setBusyAction(null);
+        setIdentityBusyAction(null);
       }
     },
     []
@@ -395,7 +403,9 @@ function WalletRuntimeBridge({
       explorerUrl: address ? getAddressExplorerUrl(targetChain, address) : null,
       error: walletError,
       identityError: identityActionError ?? privy.error?.message ?? null,
-      busyAction,
+      walletBusyAction,
+      identityBusyAction,
+      busyAction: walletBusyAction ?? identityBusyAction,
       walletPickerOpen,
       walletOptions,
       login: () => {
@@ -478,7 +488,6 @@ function WalletRuntimeBridge({
       account.connector,
       account.isConnected,
       address,
-      busyAction,
       chainId,
       connectAsync,
       connectors,
@@ -488,6 +497,7 @@ function WalletRuntimeBridge({
       fundingNetwork.label,
       getEthereumProvider,
       identityActionError,
+      identityBusyAction,
       identityStatus,
       persistPreference,
       privy,
@@ -498,6 +508,7 @@ function WalletRuntimeBridge({
       switchChainAsync,
       targetChain,
       walletClient,
+      walletBusyAction,
       walletError,
       walletOptions,
       walletPickerOpen,

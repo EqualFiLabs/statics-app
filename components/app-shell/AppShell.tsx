@@ -133,9 +133,9 @@ function WrongNetworkBar() {
         className="dapp-network-bar-action"
         type="button"
         onClick={() => void wallet.switchNetwork()}
-        disabled={wallet.busyAction !== null}
+        disabled={wallet.walletBusyAction !== null}
       >
-        {wallet.busyAction === "switch" ? t("switching") : t("switchNetwork")}
+        {wallet.walletBusyAction === "switch" ? t("switching") : t("switchNetwork")}
       </button>
     </div>
   );
