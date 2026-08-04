@@ -149,13 +149,13 @@ describe("DApp wallet shell", () => {
       connectWallet,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Connect external wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
     expect(connectExternalWallet).toHaveBeenCalledOnce();
     expect(reconnectWallet).not.toHaveBeenCalled();
     expect(login).not.toHaveBeenCalled();
     expect(connectWallet).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Use Privy wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(reconnectWallet).toHaveBeenCalledOnce();
     expect(login).not.toHaveBeenCalled();
     expect(connectWallet).not.toHaveBeenCalled();
