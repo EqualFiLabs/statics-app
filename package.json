@@ -37,7 +37,6 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "3.35.1",
-    "@privy-io/wagmi": "4.0.14",
     "@solana-program/memo": "^0.10.0",
     "@solana/web3.js": "^1.98.4",
     "@statics-protocol/sdk": "file:vendor/statics-sdk",

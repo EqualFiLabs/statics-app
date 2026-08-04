@@ -10,7 +10,7 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -36,7 +36,7 @@ import {
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
@@ -74,7 +74,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useWalletClient();
+  const walletClient = useActiveWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -156,9 +156,9 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       data,
       value,
       sendTransaction: ({ to: target, data: transactionData, value: transactionValue }) =>
-        walletClient.data.sendTransaction({
+        walletClient.data!.sendTransaction({
           account: wallet,
-          chain: walletClient.data.chain,
+          chain: walletClient.data!.chain,
           to: target,
           data: transactionData,
           value: transactionValue,

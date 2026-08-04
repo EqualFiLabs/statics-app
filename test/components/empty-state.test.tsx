@@ -54,34 +54,20 @@ describe("surface empty state", () => {
     expect(screen.queryByText("Live positions")).not.toBeInTheDocument();
   });
 
-  it("asks a signed-out visitor to sign in rather than claiming they have nothing", () => {
-    const login = vi.fn();
-    renderWithWallet(<SurfaceEmptyState state="signed-out" subject="positions" empty={empty} />, {
-      status: "signed-out",
-      login,
+  it("asks a disconnected visitor to connect rather than claiming they have nothing", () => {
+    const connectWallet = vi.fn();
+    renderWithWallet(<SurfaceEmptyState state="disconnected" subject="positions" empty={empty} />, {
+      status: "disconnected",
+      connectWallet,
     });
 
-    expect(screen.getByText("Sign in to see your positions")).toBeInTheDocument();
-    // The regression this guards: a signed-out visitor being told their
+    expect(screen.getByText("Connect a wallet to see your positions")).toBeInTheDocument();
+    // The regression this guards: a disconnected visitor being told their
     // (possibly full) account is empty.
     expect(screen.queryByText(empty.title)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(login).toHaveBeenCalledOnce();
-  });
-
-  it("offers a wallet when the account has none", () => {
-    const createWallet = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(
-      <SurfaceEmptyState state="wallet-missing" subject="positions" empty={empty} />,
-      {
-        status: "wallet-missing",
-        createWallet,
-      }
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Create wallet" }));
-    expect(createWallet).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    expect(connectWallet).toHaveBeenCalledOnce();
   });
 
   it("offers the switch when the chain is wrong", () => {

@@ -518,7 +518,9 @@ export function AcrossBridgePanel() {
   };
 
   const primary = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (wallet.status === "disconnected" || wallet.status === "error") {
+      return wallet.connectWallet();
+    }
     if (originIsSolana && !solana.wallet) return void solana.runtime.createWallet();
     if (!originIsSolana && wallet.fundingChainId !== originChainId) {
       return void wallet.selectFundingNetwork(originChainId);
@@ -529,7 +531,7 @@ export function AcrossBridgePanel() {
     if (quote?.quote) setReviewing(true);
   };
   const primaryLabel =
-    wallet.status === "signed-out"
+    wallet.status === "disconnected" || wallet.status === "error"
       ? t("connectWallet")
       : originIsSolana && !solana.wallet
         ? t("createSolanaWallet")
@@ -723,7 +725,8 @@ export function AcrossBridgePanel() {
           disabled={
             submitting ||
             loadingQuote ||
-            (wallet.status !== "signed-out" &&
+            (wallet.status !== "disconnected" &&
+              wallet.status !== "error" &&
               !(
                 (originIsSolana && !solana.wallet) ||
                 (!originIsSolana &&

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { decodeFunctionResult, encodeFunctionData, formatUnits, getAddress } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 
 import {
   basketTokenAbi,
@@ -42,7 +42,7 @@ import {
   MAX_PERMIT2_EXPIRATION,
   hasUsablePermit2Allowance,
 } from "@/lib/protocol/approvals";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -59,7 +59,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const t = useTranslations("baskets");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useWalletClient();
+  const walletClient = useActiveWalletClient();
   const queryClient = useQueryClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
@@ -414,12 +414,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const readError = pool.error ?? quote.error;
   let label = t("reviewSwap");
   let action: (() => void) | null = () => void submit();
-  if (walletState.status === "signed-out" || walletState.status === "error") {
+  if (walletState.status === "disconnected" || walletState.status === "error") {
     label = t("signIn");
-    action = walletState.login;
-  } else if (walletState.status === "wallet-missing") {
-    label = t("createWallet");
-    action = () => void walletState.createWallet();
+    action = walletState.connectWallet;
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     label = t("switchNetwork", { network: walletState.networkName });
     action = () => void walletState.switchNetwork();

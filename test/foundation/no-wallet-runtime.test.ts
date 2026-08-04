@@ -25,19 +25,26 @@ describe("wallet runtime boundary", () => {
     expect(source).not.toMatch(/DAppProviders|wallet-context|wallet-config/);
   });
 
-  it("keeps the configured provider order explicit", () => {
+  it("keeps native Wagmi outside the optional Privy capability branch", () => {
     const source = fs.readFileSync("providers/DAppProviders.tsx", "utf8");
     const queryProvider = source.indexOf("<QueryClientProvider");
-    const configuredProviders = source.indexOf("<ConfiguredWalletProviders>");
-    const privyProvider = source.indexOf("<PrivyProvider");
-    const wagmiProvider = source.indexOf("<WagmiProvider");
-    const bridge = source.indexOf("<WalletBridge>");
+    const wagmiProvider = source.indexOf('<WagmiProvider config={wagmiConfig}>');
+    const configuredProviders = source.indexOf(
+      "<ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>",
+      wagmiProvider
+    );
+    const externalOnlyRuntime = source.indexOf(
+      '<WalletRuntimeBridge privy={unavailablePrivyRuntime}>{children}</WalletRuntimeBridge>',
+      wagmiProvider
+    );
 
     expect(queryProvider).toBeGreaterThan(-1);
-    expect(configuredProviders).toBeGreaterThan(queryProvider);
-    expect(privyProvider).toBeGreaterThan(-1);
-    expect(wagmiProvider).toBeGreaterThan(privyProvider);
-    expect(bridge).toBeGreaterThan(wagmiProvider);
+    expect(wagmiProvider).toBeGreaterThan(queryProvider);
+    expect(configuredProviders).toBeGreaterThan(wagmiProvider);
+    expect(externalOnlyRuntime).toBeGreaterThan(wagmiProvider);
+    expect(source).toContain('from "wagmi";');
+    expect(source).not.toContain('from "@privy-io/wagmi"');
+    expect(source).toContain("connectors: [injected({ shimDisconnect: true })]");
     expect(source).toContain('walletChainType: "ethereum-and-solana"');
     expect(source).toContain("defaultSolanaRpcsPlugin()");
     expect(source).toContain("<ProtocolQueryReconciler />");

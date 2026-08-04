@@ -101,27 +101,14 @@ export function SurfaceEmptyState({ state, subject, empty, onRetry }: SurfaceEmp
         />
       );
 
-    case "signed-out":
+    case "disconnected":
       return (
         <EmptyState
-          title={t("signInTitle", { subject })}
+          title={t("connectTitle", { subject })}
           // Phrased to avoid subject-verb agreement: `subject` is sometimes a
           // mass noun ("activity"), which made "your activity are" ungrammatical.
-          description={t("signInDescription")}
-          action={{ label: t("signIn"), onClick: wallet.login }}
-        />
-      );
-
-    case "wallet-missing":
-      return (
-        <EmptyState
-          title={t("createWallet")}
-          description={t("createWalletDescription")}
-          action={{
-            label: wallet.busyAction === "create" ? t("creating") : t("create"),
-            onClick: () => void wallet.createWallet(),
-            disabled: wallet.busyAction !== null,
-          }}
+          description={t("connectDescription")}
+          action={{ label: t("connect"), onClick: wallet.connectWallet }}
         />
       );
 
