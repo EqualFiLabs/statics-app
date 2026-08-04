@@ -76,7 +76,7 @@ function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | n
 }
 
 function WalletBridge({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated, error: privyError, login, logout } = usePrivy();
+  const { ready, authenticated, error: privyError, login } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
@@ -87,9 +87,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
+  const [locallyDisconnected, setLocallyDisconnected] = useState(false);
 
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
-  const selectedWallet = selectStaticsWallet(wallets);
+  const selectedWallet = locallyDisconnected ? undefined : selectStaticsWallet(wallets);
   const address = selectedWallet?.address ?? null;
   const walletKind = selectedWallet
     ? selectedWallet.walletClientType === "privy" || selectedWallet.walletClientType === "privy-v2"
@@ -130,7 +131,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   };
 
   let status: WalletState["status"] = "loading";
-  if (privyError) status = "error";
+  if (locallyDisconnected) status = "signed-out";
+  else if (privyError) status = "error";
   else if (ready && !authenticated) status = "signed-out";
   else if (ready && authenticated && walletsReady && !selectedWallet) status = "wallet-missing";
   else if (ready && authenticated && walletsReady && selectedWallet) status = "ready";
@@ -152,13 +154,24 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       explorerUrl: address ? getAddressExplorerUrl(targetChain, address) : null,
       error: actionError ?? privyError?.message ?? null,
       busyAction,
-      login: () => login({ loginMethods: ["email", "wallet"] }),
-      connectWallet: () => login({ loginMethods: ["wallet"] }),
+      locallyDisconnected,
+      login: () => {
+        if (locallyDisconnected && authenticated) return setLocallyDisconnected(false);
+        login({ loginMethods: ["email", "wallet"] });
+      },
+      connectWallet: () => {
+        if (locallyDisconnected && authenticated) return setLocallyDisconnected(false);
+        login({ loginMethods: ["wallet"] });
+      },
+      disconnectWallet: () => setLocallyDisconnected(true),
+      reconnectWallet: () => {
+        if (authenticated) return setLocallyDisconnected(false);
+        login({ loginMethods: ["email", "wallet"] });
+      },
       createWallet: () =>
         runAction("create", async () => {
           await createWallet();
         }),
-      logout: () => runAction("logout", logout),
       switchNetwork: () =>
         runAction("switch", async () => {
           if (!selectedWallet) throw new Error("Connect a wallet before switching networks.");
@@ -199,7 +212,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingChainId,
       fundingNetwork,
       login,
-      logout,
+      locallyDisconnected,
       privyError,
       selectedWallet,
       status,

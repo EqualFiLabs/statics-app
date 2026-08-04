@@ -93,8 +93,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", close);
   }, [onClose]);
 
-  const disconnect = async () => {
-    await wallet.logout();
+  const disconnect = () => {
+    wallet.disconnectWallet();
     onClose();
   };
   const networkLabel =
@@ -179,13 +179,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          <button
-            className="account-signout"
-            type="button"
-            onClick={() => void disconnect()}
-            disabled={wallet.busyAction !== null}
-          >
-            {wallet.busyAction === "logout" ? t("signingOut") : t("signOut")}
+          <button className="account-signout" type="button" onClick={disconnect}>
+            {t("disconnectWallet")}
           </button>
         </div>
       </section>

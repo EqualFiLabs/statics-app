@@ -32,11 +32,13 @@ export type WalletState = Readonly<{
   fundingNetworks: readonly FundingNetworkSummary[];
   explorerUrl: string | null;
   error: string | null;
-  busyAction: "create" | "logout" | "switch" | "funding-switch" | "export" | null;
+  busyAction: "create" | "switch" | "funding-switch" | "export" | null;
+  locallyDisconnected: boolean;
   login: () => void;
   connectWallet: () => void;
+  disconnectWallet: () => void;
+  reconnectWallet: () => void;
   createWallet: () => Promise<void>;
-  logout: () => Promise<void>;
   switchNetwork: () => Promise<void>;
   selectFundingNetwork: (chainId: number) => Promise<void>;
   getEthereumProvider: () => Promise<WalletEthereumProvider | null>;
@@ -62,10 +64,12 @@ export const defaultWalletState: WalletState = {
   explorerUrl: null,
   error: null,
   busyAction: null,
+  locallyDisconnected: false,
   login: () => undefined,
   connectWallet: () => undefined,
+  disconnectWallet: () => undefined,
+  reconnectWallet: () => undefined,
   createWallet: unavailable,
-  logout: unavailable,
   switchNetwork: unavailable,
   selectFundingNetwork: unavailable,
   getEthereumProvider: async () => null,

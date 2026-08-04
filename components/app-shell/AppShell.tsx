@@ -38,6 +38,13 @@ function WalletHeaderControls() {
   }
 
   if (wallet.status === "signed-out") {
+    if (wallet.locallyDisconnected) {
+      return (
+        <button className="dapp-wallet-button" type="button" onClick={wallet.reconnectWallet}>
+          {t("reconnectWallet")}
+        </button>
+      );
+    }
     return (
       <div className="dapp-wallet-actions">
         <button className="dapp-wallet-link" type="button" onClick={wallet.connectWallet}>

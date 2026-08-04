@@ -143,6 +143,7 @@
     "walletUnavailable": "Wallet unavailable",
     "loadingWallet": "Loading wallet…",
     "connectWallet": "Connect wallet",
+    "reconnectWallet": "Reconnect wallet",
     "signIn": "Sign in",
     "creating": "Creating…",
     "createWallet": "Create wallet",
@@ -675,8 +676,7 @@
     "exportWarning": "Exporting reveals recovery material that controls this wallet and every asset it holds. Never share it or paste it into a website, chat, or cloud note.",
     "openingExport": "Opening secure export…",
     "reviewExport": "Review secure export",
-    "signingOut": "Signing out…",
-    "signOut": "Sign out of Statics"
+    "disconnectWallet": "Disconnect wallet"
   },
   "landing": {
     "eyebrow": "The anchor is fixed. The market is not.",

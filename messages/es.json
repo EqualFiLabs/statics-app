@@ -143,6 +143,7 @@
     "walletUnavailable": "Billetera no disponible",
     "loadingWallet": "Cargando billetera…",
     "connectWallet": "Conectar billetera",
+    "reconnectWallet": "Reconectar billetera",
     "signIn": "Iniciar sesión",
     "creating": "Creando…",
     "createWallet": "Crear billetera",
@@ -675,8 +676,7 @@
     "exportWarning": "La exportación revela el material de recuperación que controla esta billetera y todos sus activos. Nunca lo compartas ni lo pegues en un sitio web, chat o nota en la nube.",
     "openingExport": "Abriendo exportación segura…",
     "reviewExport": "Revisar exportación segura",
-    "signingOut": "Cerrando sesión…",
-    "signOut": "Cerrar sesión en Statics"
+    "disconnectWallet": "Desconectar billetera"
   },
   "landing": {
     "eyebrow": "El ancla es fija. El mercado no.",

@@ -76,9 +76,9 @@ describe("DApp wallet shell", () => {
   });
 
   // The pill used to copy silently on click, which gave no way to reach the
-  // Solana address or to sign out.
+  // Solana address or to disconnect.
   it("opens an account dialog from the address pill", () => {
-    const logout = vi.fn().mockResolvedValue(undefined);
+    const disconnectWallet = vi.fn();
     const address = "0x1234567890abcdef1234567890abcdef12345678";
     renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
@@ -90,7 +90,7 @@ describe("DApp wallet shell", () => {
       isTargetChain: true,
       explorerUrl:
         "https://explorer.testnet.chain.robinhood.com/address/0x1234567890abcdef1234567890abcdef12345678",
-      logout,
+      disconnectWallet,
     });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -112,8 +112,45 @@ describe("DApp wallet shell", () => {
     );
     expect(screen.getByText(/exporting reveals recovery material/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out of Statics" }));
-    expect(logout).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect wallet" }));
+    expect(disconnectWallet).toHaveBeenCalledOnce();
+  });
+
+  it("keeps local disconnect available while another wallet action is pending", () => {
+    const disconnectWallet = vi.fn();
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      walletKind: "embedded",
+      busyAction: "export",
+      disconnectWallet,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+    const disconnect = screen.getByRole("button", { name: "Disconnect wallet" });
+    expect(disconnect).toBeEnabled();
+    fireEvent.click(disconnect);
+    expect(disconnectWallet).toHaveBeenCalledOnce();
+  });
+
+  it("reconnects a locally disconnected Privy wallet without starting login", () => {
+    const reconnectWallet = vi.fn();
+    const login = vi.fn();
+    const connectWallet = vi.fn();
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "signed-out",
+      authenticated: true,
+      locallyDisconnected: true,
+      reconnectWallet,
+      login,
+      connectWallet,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconnect wallet" }));
+    expect(reconnectWallet).toHaveBeenCalledOnce();
+    expect(login).not.toHaveBeenCalled();
+    expect(connectWallet).not.toHaveBeenCalled();
   });
 
   // No Solana wallet exists until a Solana route is used, so the row has to say

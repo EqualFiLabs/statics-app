@@ -143,6 +143,7 @@
     "walletUnavailable": "钱包不可用",
     "loadingWallet": "正在加载钱包…",
     "connectWallet": "连接钱包",
+    "reconnectWallet": "重新连接钱包",
     "signIn": "登录",
     "creating": "正在创建…",
     "createWallet": "创建钱包",
@@ -675,8 +676,7 @@
     "exportWarning": "导出会显示控制此钱包及其中全部资产的恢复材料。切勿分享，也不要粘贴到网站、聊天或云笔记中。",
     "openingExport": "正在打开安全导出…",
     "reviewExport": "查看安全导出",
-    "signingOut": "正在退出…",
-    "signOut": "退出 Statics"
+    "disconnectWallet": "断开钱包连接"
   },
   "landing": {
     "eyebrow": "锚点固定，市场不固定。",
