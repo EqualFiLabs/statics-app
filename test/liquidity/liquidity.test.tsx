@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  formatLiquidityAmount,
   LiquidityContributionForm,
   lpStakeEligibility,
   resolveLiquidityPool,
@@ -270,6 +271,13 @@ describe("canonical liquidity identifiers", () => {
 });
 
 describe("single-input liquidity contribution", () => {
+  it("formats very large amounts without Number precision loss", () => {
+    const whole = 123_456_789_012_345_678_901_234_567_890n;
+    const value = whole * unit + 123_456_789_000_000_000n;
+
+    expect(formatLiquidityAmount(value, 18)).toBe("123,456,789,012,345,678,901,234,567,890.123457");
+  });
+
   it("surfaces the paired requirement, balances, switch, and Max actions", () => {
     const onSwitch = vi.fn();
     const onMax = vi.fn();
