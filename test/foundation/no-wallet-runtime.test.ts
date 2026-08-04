@@ -28,13 +28,13 @@ describe("wallet runtime boundary", () => {
   it("keeps native Wagmi outside the optional Privy capability branch", () => {
     const source = fs.readFileSync("providers/DAppProviders.tsx", "utf8");
     const queryProvider = source.indexOf("<QueryClientProvider");
-    const wagmiProvider = source.indexOf('<WagmiProvider config={wagmiConfig}>');
+    const wagmiProvider = source.indexOf("<WagmiProvider config={wagmiConfig}>");
     const configuredProviders = source.indexOf(
       "<ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>",
       wagmiProvider
     );
     const externalOnlyRuntime = source.indexOf(
-      '<WalletRuntimeBridge privy={unavailablePrivyRuntime}>{children}</WalletRuntimeBridge>',
+      "<WalletRuntimeBridge privy={unavailablePrivyRuntime}>{children}</WalletRuntimeBridge>",
       wagmiProvider
     );
 
