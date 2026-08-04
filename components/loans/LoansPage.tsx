@@ -12,7 +12,7 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 
 import {
   BasketStatus,
@@ -62,7 +62,7 @@ import {
   executeProtocolTransaction,
 } from "@/lib/protocol/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
@@ -125,7 +125,7 @@ function LoansRuntime({
   const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useWalletClient();
+  const walletClient = useActiveWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<LoanMode>("borrow");
@@ -975,12 +975,9 @@ function LoansRuntime({
   let primaryLabel = verificationBlocked ? "Refresh protocol state" : action.label;
   let primaryAction: (() => void) | null = action.executable ? () => void runAction() : null;
   if (verificationBlocked) primaryAction = () => void refetchVerifiedState();
-  if (walletState.status === "signed-out" || walletState.status === "error") {
-    primaryLabel = "Sign in to continue";
-    primaryAction = walletState.login;
-  } else if (walletState.status === "wallet-missing") {
-    primaryLabel = "Create embedded wallet";
-    primaryAction = () => void walletState.createWallet();
+  if (walletState.status === "disconnected" || walletState.status === "error") {
+    primaryLabel = "Connect wallet";
+    primaryAction = walletState.connectWallet;
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     primaryLabel = `Switch to ${walletState.networkName}`;
     primaryAction = () => void walletState.switchNetwork();

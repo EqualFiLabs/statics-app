@@ -16,7 +16,7 @@ import {
   type Hex,
 } from "viem";
 
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 import { ArrowDownUp, ArrowUpRight, Download, Send } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -42,7 +42,7 @@ import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation
 import { searchTokenList } from "@/lib/token-list";
 import { getNativeTokenLogoURI } from "@/lib/token-icons";
 import type { WalletToken } from "@/lib/wallet-tokens";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -857,7 +857,9 @@ function SendDialog({
   };
 
   const primary = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (wallet.status === "disconnected" || wallet.status === "error") {
+      return wallet.connectWallet();
+    }
     if (wallet.address && !wallet.fundingWalletOnSelectedChain) {
       return void wallet.selectFundingNetwork(wallet.fundingChainId);
     }
@@ -947,7 +949,7 @@ function SendDialog({
             }
             onClick={primary}
           >
-            {wallet.status === "signed-out"
+            {wallet.status === "disconnected" || wallet.status === "error"
               ? t("connectWallet")
               : wallet.address && !wallet.fundingWalletOnSelectedChain
                 ? t("switchNetwork", { network: wallet.fundingNetworkName })
@@ -977,7 +979,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
   const chainId =
     deploymentState.status === "configured" ? deploymentState.deployment.chainId : undefined;
   const publicClient = usePublicClient(chainId ? { chainId } : undefined);
-  const walletClient = useWalletClient(chainId ? { chainId } : undefined);
+  const walletClient = useActiveWalletClient();
   const [recipient, setRecipient] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

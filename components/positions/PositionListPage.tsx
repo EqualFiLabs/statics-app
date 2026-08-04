@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeFunctionResult, formatEther, formatUnits, getAddress } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -17,7 +17,7 @@ import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -38,7 +38,7 @@ function PositionListRuntime() {
   const t = useTranslations("positions");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useWalletClient();
+  const walletClient = useActiveWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pending, setPending] = useState(false);
@@ -94,9 +94,9 @@ function PositionListRuntime() {
         data,
         value: creationFee,
         sendTransaction: ({ to, data: transactionData, value }) =>
-          walletClient.data.sendTransaction({
+          walletClient.data!.sendTransaction({
             account: wallet,
-            chain: walletClient.data.chain,
+            chain: walletClient.data!.chain,
             to,
             data: transactionData,
             value,
@@ -141,12 +141,9 @@ function PositionListRuntime() {
 
   let primaryLabel = t("create");
   let primaryAction: (() => void) | null = () => void createPosition();
-  if (walletState.status === "signed-out" || walletState.status === "error") {
+  if (walletState.status === "disconnected" || walletState.status === "error") {
     primaryLabel = t("signIn");
-    primaryAction = walletState.login;
-  } else if (walletState.status === "wallet-missing") {
-    primaryLabel = t("createWallet");
-    primaryAction = () => void walletState.createWallet();
+    primaryAction = walletState.connectWallet;
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     primaryLabel = t("switchNetwork", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();

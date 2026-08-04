@@ -25,7 +25,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 
 import type { DollarActivityKind } from "@/lib/dollar/activity";
 import {
@@ -60,7 +60,7 @@ import {
   minimumWithTolerance,
   validateRecombinationSimulation,
 } from "@/lib/dollar/transactions";
-import { useWalletState } from "@/providers/wallet-context";
+import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
@@ -534,7 +534,7 @@ function DollarActionPanel({
   const t = useTranslations("dollar");
   const locale = useAppLocale();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
-  const walletClient = useWalletClient({ chainId: deployment.chainId });
+  const walletClient = useActiveWalletClient();
   const snapshot = useDollarSnapshot(deployment, wallet);
   const [mode, setMode] = useState<DollarActionMode>("deposit");
   const [asset, setAsset] = useState<DollarCollateralChoice>(

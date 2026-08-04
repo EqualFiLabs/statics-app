@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
+import { WalletConnectionDialog } from "@/components/app-shell/WalletConnectionDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
 import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
@@ -37,37 +38,18 @@ function WalletHeaderControls() {
     );
   }
 
-  if (wallet.status === "signed-out") {
+  if (wallet.status === "disconnected" || wallet.status === "error") {
     return (
       <div className="dapp-wallet-actions">
-        <button className="dapp-wallet-link" type="button" onClick={wallet.connectWallet}>
+        <button className="dapp-wallet-button" type="button" onClick={wallet.connectWallet}>
           {t("connectWallet")}
         </button>
-        <button className="dapp-wallet-button" type="button" onClick={wallet.login}>
-          {t("signIn")}
-        </button>
+        {wallet.identityStatus === "signed-out" && (
+          <button className="dapp-wallet-link" type="button" onClick={wallet.login}>
+            {t("signIn")}
+          </button>
+        )}
       </div>
-    );
-  }
-
-  if (wallet.status === "wallet-missing") {
-    return (
-      <button
-        className="dapp-wallet-button"
-        type="button"
-        onClick={() => void wallet.createWallet()}
-        disabled={wallet.busyAction !== null}
-      >
-        {wallet.busyAction === "create" ? t("creating") : t("createWallet")}
-      </button>
-    );
-  }
-
-  if (wallet.status === "error") {
-    return (
-      <button className="dapp-wallet-button" type="button" onClick={wallet.login}>
-        {t("retrySignIn")}
-      </button>
     );
   }
 
@@ -151,9 +133,9 @@ function WrongNetworkBar() {
         className="dapp-network-bar-action"
         type="button"
         onClick={() => void wallet.switchNetwork()}
-        disabled={wallet.busyAction !== null}
+        disabled={wallet.walletBusyAction !== null}
       >
-        {wallet.busyAction === "switch" ? t("switching") : t("switchNetwork")}
+        {wallet.walletBusyAction === "switch" ? t("switching") : t("switchNetwork")}
       </button>
     </div>
   );
@@ -343,6 +325,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span aria-hidden="true">{navigationOpen ? "✕" : "☰"}</span>
         </button>
       </nav>
+      <WalletConnectionDialog />
     </div>
   );
 }

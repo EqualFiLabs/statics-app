@@ -186,7 +186,7 @@ export function TestnetFaucetCard() {
   const claim = async () => {
     if (!deployment || !faucet || pending) return;
     if (!wallet.address) {
-      wallet.login();
+      wallet.connectWallet();
       return;
     }
     if (!onFundingChain) {
