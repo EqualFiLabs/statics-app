@@ -268,7 +268,9 @@ export async function loadPositionCatalog(
         )
       )
     )
-  ).sort((left, right) => Number(right.positionId - left.positionId));
+  ).sort((left, right) =>
+    left.positionId === right.positionId ? 0 : left.positionId > right.positionId ? -1 : 1
+  );
 
   const candidateSources = new Map<Address, Set<string>>();
   addCandidate(candidateSources, deployment.contracts.dollar, "Statics deployment");
