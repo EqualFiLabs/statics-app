@@ -15,9 +15,11 @@ describe("protocol transaction execution", () => {
 
   it("simulates before signing and reports success only after a confirmed receipt", async () => {
     const call = vi.fn().mockResolvedValue({ data: "0x01" });
+    const getBlockNumber = vi.fn().mockResolvedValue(17n);
     const waitForTransactionReceipt = vi.fn().mockResolvedValue({
       status: "success",
       transactionHash: hash,
+      blockNumber: 17n,
     });
     const sendTransaction = vi.fn().mockResolvedValue(hash);
 
@@ -25,6 +27,7 @@ describe("protocol transaction execution", () => {
       executeProtocolTransaction({
         publicClient: {
           call,
+          getBlockNumber,
           waitForTransactionReceipt,
         } as unknown as PublicClient,
         wallet,
@@ -43,6 +46,7 @@ describe("protocol transaction execution", () => {
     expect(waitForTransactionReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ hash, confirmations: 1 })
     );
+    expect(getBlockNumber).toHaveBeenCalledWith({ cacheTime: 0 });
     expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
       kind: "create-position",
       status: "confirmed",
@@ -84,8 +88,9 @@ describe("protocol transaction execution", () => {
   it("preserves a confirmed receipt when refreshed state cannot be verified", async () => {
     const verificationFailure = new Error("Loan state remained stale");
 
-    await expect(
-      executeProtocolTransaction({
+    vi.useFakeTimers();
+    try {
+      const execution = executeProtocolTransaction({
         publicClient: {
           call: vi.fn().mockResolvedValue({ data: "0x" }),
           waitForTransactionReceipt: vi.fn().mockResolvedValue({
@@ -105,8 +110,15 @@ describe("protocol transaction execution", () => {
         verifyConfirmation: async () => {
           throw verificationFailure;
         },
-      })
-    ).rejects.toThrow("confirmed, but refreshed protocol state could not be verified");
+      });
+      const rejection = expect(execution).rejects.toThrow(
+        "confirmed, but refreshed protocol state could not be verified"
+      );
+      await vi.runAllTimersAsync();
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
       kind: "repay-loan",

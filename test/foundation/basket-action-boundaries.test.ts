@@ -41,4 +41,11 @@ describe("basket action ownership", () => {
     expect(basketDetail).not.toContain("`Buy ${basket.symbol}`");
     expect(basketDetail).not.toContain("`Buy and deposit ${basket.symbol}`");
   });
+
+  it("refreshes the balance-bearing basket catalog after a swap", () => {
+    const basketSwap = read("components/baskets/BasketSwapPanel.tsx");
+
+    expect(basketSwap).toContain("protocolQueryKeys.basketCatalog(");
+    expect(basketSwap).toContain("queryClient.refetchQueries({");
+  });
 });

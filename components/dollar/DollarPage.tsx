@@ -915,7 +915,14 @@ function DollarActionPanel({
         });
         setAmountInput("");
       }
-      await snapshot.refetch();
+      await Promise.all([
+        snapshot.refetch(),
+        ...(supplySeriesId !== undefined &&
+        Boolean(supplyPeriphery) &&
+        supplyPeriphery !== zeroAddress
+          ? [supplyState.refetch()]
+          : []),
+      ]);
     } catch (error) {
       setActionError(describeDollarError(error));
     } finally {

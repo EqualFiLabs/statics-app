@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { decodeFunctionResult, encodeFunctionData, formatUnits, getAddress } from "viem";
@@ -36,6 +36,7 @@ import {
   verifyLiquidityDeployment,
 } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import {
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
@@ -59,6 +60,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const queryClient = useQueryClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [assetIndex, setAssetIndex] = useState(0);
@@ -390,7 +392,17 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         },
       });
       setAmountInput("");
-      await quote.refetch();
+      await Promise.all([
+        quote.refetch(),
+        queryClient.refetchQueries({
+          queryKey: protocolQueryKeys.basketCatalog(
+            deploymentState.deployment.protocolCommit,
+            wallet
+          ),
+          exact: true,
+          type: "active",
+        }),
+      ]);
     } catch (cause) {
       setError(describeBasketError(cause));
     } finally {
