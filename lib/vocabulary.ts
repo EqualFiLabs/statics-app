@@ -41,7 +41,7 @@ export const glossary = {
   },
   basket: {
     label: "Basket",
-    plain: "A fixed bundle of assets you can buy or sell as a single unit.",
+    plain: "A fixed bundle of assets you can mint or redeem as a single unit.",
     protocol: "Static basket",
   },
   underlying: {

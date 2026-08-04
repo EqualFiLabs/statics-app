@@ -94,7 +94,7 @@
       "label": "Baskets",
       "status": "Baskets",
       "title": "Baskets",
-      "description": "Buy or sell a fixed bundle of assets as one unit. You will see exactly what a basket holds before you buy."
+      "description": "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint."
     },
     "positions": {
       "label": "Positions",
@@ -200,7 +200,7 @@
     "discovered": "{count} discovered",
     "stale": "Basket data is temporarily unavailable. Showing the last received state.",
     "emptyTitle": "No baskets yet",
-    "emptyDescription": "A basket is a fixed bundle of assets you can buy or sell as one unit. New launches are currently steward-controlled.",
+    "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. New launches are currently steward-controlled.",
     "viewPolicy": "View launch policy",
     "underlyings": "Underlyings",
     "totalSupply": "Total supply",
@@ -449,7 +449,7 @@
     "itsAssets": "its assets",
     "basketSubject": "basket rewards",
     "noBaskets": "No baskets deposited yet",
-    "noBasketsDescription": "Buy a basket with depositing switched on, and it starts earning a share of the trading fees on the assets it holds.",
+    "noBasketsDescription": "Mint a basket with depositing switched on, and it starts earning a share of the trading fees on the assets it holds.",
     "browseBaskets": "Browse baskets",
     "startEarning": "Start earning",
     "createAndStakeTitle": "Stake Statics",
@@ -596,7 +596,7 @@
     "wethOracle": "WETH oracle",
     "openDollar": "Open Dollar",
     "nothingHere": "Nothing here yet",
-    "nothingHereDescription": "Buy a basket and it starts earning more of the assets it holds. Or get Statics Dollar and stake it to earn in whichever assets you choose.",
+    "nothingHereDescription": "Mint a basket and it starts earning more of the assets it holds. Or get Statics Dollar and stake it to earn in whichever assets you choose.",
     "browseBaskets": "Browse baskets",
     "getDollar": "Get Statics Dollar",
     "earnedByBaskets": "Earned by your baskets",
@@ -777,7 +777,7 @@
     "basket": {
       "label": "Basket",
       "plural": "Baskets",
-      "plain": "A fixed bundle of assets you can buy or sell as a single unit."
+      "plain": "A fixed bundle of assets you can mint or redeem as a single unit."
     },
     "underlying": {
       "label": "Underlying",

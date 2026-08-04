@@ -38,6 +38,7 @@ import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
 import { searchTokenList } from "@/lib/token-list";
 import { getNativeTokenLogoURI } from "@/lib/token-icons";
 import type { WalletToken } from "@/lib/wallet-tokens";
@@ -198,6 +199,22 @@ export function WalletPage() {
       if (currentRefresh === refreshId.current) setRefreshing(false);
     }
   };
+
+  const refreshBalancesRef = useRef(refreshBalances);
+  useEffect(() => {
+    refreshBalancesRef.current = refreshBalances;
+  });
+
+  useEffect(() => {
+    const walletAddress = wallet.address?.toLowerCase();
+    return subscribeToProtocolReconciliation(
+      () => refreshBalancesRef.current(),
+      (confirmed) =>
+        walletAddress !== undefined &&
+        confirmed.chainId === wallet.fundingChainId &&
+        confirmed.wallet.toLowerCase() === walletAddress
+    );
+  }, [wallet.address, wallet.fundingChainId]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

@@ -57,7 +57,7 @@ const routePresentations = {
     status: "Baskets",
     title: "Baskets",
     description:
-      "Buy or sell a fixed bundle of assets as one unit. You will see exactly what a basket holds before you buy.",
+      "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
     label: "Positions",

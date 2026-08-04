@@ -10,6 +10,11 @@ import {
   type ProtocolReplacementReason,
 } from "@/lib/dollar/activity";
 import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
+import {
+  announceProtocolTransactionConfirmed,
+  retryConfirmationVerification,
+  waitForRpcBlock,
+} from "@/lib/protocol/reconciliation";
 
 export type ProtocolTransactionRequest = Readonly<{
   publicClient: PublicClient;
@@ -101,9 +106,18 @@ export async function executeProtocolTransaction(
       throw new Error(message);
     }
 
+    if (typeof receipt.blockNumber === "bigint") {
+      await waitForRpcBlock(request.publicClient, receipt.blockNumber);
+      announceProtocolTransactionConfirmed({
+        wallet: request.wallet,
+        chainId: request.chainId,
+        blockNumber: receipt.blockNumber,
+      });
+    }
+
     if (request.verifyConfirmation) {
       try {
-        await request.verifyConfirmation(receipt);
+        await retryConfirmationVerification(() => request.verifyConfirmation!(receipt));
       } catch (error) {
         const verificationError = new ConfirmationVerificationError(
           "The transaction confirmed, but refreshed protocol state could not be verified. Refresh before another action.",

@@ -148,7 +148,7 @@ export function WalletNftPanel({
           empty={{
             title: "No NFTs yet",
             description:
-              "Positions and liquidity positions appear here. Buy a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
+              "Positions and liquidity positions appear here. Mint a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
             action: { label: "Browse baskets", href: "/app/baskets" },
           }}
         />

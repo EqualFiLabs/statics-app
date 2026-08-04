@@ -442,8 +442,8 @@ function BasketDetailRuntime({
                 ? `Redeem ${basket.symbol} from position`
                 : `Redeem ${basket.symbol}`
               : collateralFunction
-                ? `Buy and deposit ${basket.symbol}`
-                : `Buy ${basket.symbol}`,
+                ? `Mint and deposit ${basket.symbol}`
+                : `Mint ${basket.symbol}`,
           to: deploymentState.deployment.contracts.diamond,
           data,
           value:

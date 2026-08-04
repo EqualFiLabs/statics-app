@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -79,6 +81,13 @@ describe("Risk supply Position selection", () => {
 });
 
 describe("supplying Risk Shares as redemption liquidity", () => {
+  it("refreshes supply state after another Dollar action changes the wallet balance", () => {
+    const dollarPage = fs.readFileSync("components/dollar/DollarPage.tsx", "utf8");
+
+    expect(dollarPage).toContain("snapshot.refetch(),");
+    expect(dollarPage).toContain("? [supplyState.refetch()]");
+  });
+
   it("asks for approval before it can pull shares in", () => {
     const next = deriveSupplyStep(
       100n,

@@ -32,7 +32,7 @@ export function WalletNftList({
       <div className="ui-empty">
         <h3 className="ui-empty-title">No NFTs yet</h3>
         <p className="ui-empty-description">
-          Positions and liquidity positions appear here. Buy a basket or supply liquidity and the
+          Positions and liquidity positions appear here. Mint a basket or supply liquidity and the
           NFT that represents it shows up in your wallet.
         </p>
       </div>
