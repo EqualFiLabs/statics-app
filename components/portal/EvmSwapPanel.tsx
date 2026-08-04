@@ -26,7 +26,7 @@ import {
 } from "@/components/portal/SlippageSettingsDialog";
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { writePortalSlippage } from "@/lib/portal/slippage";
-import { useWalletState } from "@/providers/wallet-context";
+import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -346,8 +346,11 @@ export function EvmSwapPanel() {
     }
   };
 
+  const walletRecovery = walletRecoveryAction(wallet.status);
   const nextAction = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (walletRecovery === "login") return wallet.login();
+    if (walletRecovery === "create-wallet") return void wallet.createWallet();
+    if (wallet.status !== "ready") return;
     if (wallet.address && !wallet.fundingWalletOnSelectedChain) {
       return void wallet.selectFundingNetwork(wallet.fundingChainId);
     }
@@ -355,17 +358,20 @@ export function EvmSwapPanel() {
   };
 
   const actionLabel =
-    wallet.status === "signed-out"
-      ? "Connect wallet"
-      : wallet.address && !wallet.fundingWalletOnSelectedChain
-        ? `Switch to ${wallet.fundingNetworkName}`
-        : quoteLoading
-          ? t("findingRoute")
-          : insufficient
-            ? t("insufficientBalance")
-            : t("reviewSwap");
+    walletRecovery === "login"
+      ? t("connectWallet")
+      : walletRecovery === "create-wallet"
+        ? t("createEmbeddedWallet")
+        : wallet.address && !wallet.fundingWalletOnSelectedChain
+          ? t("switchTo", { network: wallet.fundingNetworkName })
+          : quoteLoading
+            ? t("findingRoute")
+            : insufficient
+              ? t("insufficientBalance")
+              : t("reviewSwap");
   const actionDisabled =
     wallet.status === "unconfigured" ||
+    wallet.status === "loading" ||
     submitting ||
     quoteLoading ||
     (wallet.status === "ready" &&

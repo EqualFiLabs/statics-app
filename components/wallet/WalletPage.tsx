@@ -42,7 +42,7 @@ import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation
 import { searchTokenList } from "@/lib/token-list";
 import { getNativeTokenLogoURI } from "@/lib/token-icons";
 import type { WalletToken } from "@/lib/wallet-tokens";
-import { useWalletState } from "@/providers/wallet-context";
+import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -856,8 +856,11 @@ function SendDialog({
     }
   };
 
+  const walletRecovery = walletRecoveryAction(wallet.status);
   const primary = () => {
-    if (wallet.status === "signed-out") return wallet.login();
+    if (walletRecovery === "login") return wallet.login();
+    if (walletRecovery === "create-wallet") return void wallet.createWallet();
+    if (wallet.status !== "ready") return;
     if (wallet.address && !wallet.fundingWalletOnSelectedChain) {
       return void wallet.selectFundingNetwork(wallet.fundingChainId);
     }
@@ -943,15 +946,18 @@ function SendDialog({
             type="button"
             disabled={
               wallet.status === "unconfigured" ||
+              wallet.status === "loading" ||
               (wallet.status === "ready" && wallet.fundingWalletOnSelectedChain && !valid)
             }
             onClick={primary}
           >
-            {wallet.status === "signed-out"
+            {walletRecovery === "login"
               ? t("connectWallet")
-              : wallet.address && !wallet.fundingWalletOnSelectedChain
-                ? t("switchNetwork", { network: wallet.fundingNetworkName })
-                : t("reviewSend")}
+              : walletRecovery === "create-wallet"
+                ? t("createWallet")
+                : wallet.address && !wallet.fundingWalletOnSelectedChain
+                  ? t("switchNetwork", { network: wallet.fundingNetworkName })
+                  : t("reviewSend")}
           </button>
         )}
       </div>

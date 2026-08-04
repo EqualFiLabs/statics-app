@@ -571,6 +571,7 @@
     "sending": "正在发送…",
     "confirmSend": "确认发送",
     "connectWallet": "连接钱包",
+    "createWallet": "创建嵌入式钱包",
     "switchNetwork": "切换到 {network}",
     "reviewSend": "查看发送",
     "sendTo": "发送至",

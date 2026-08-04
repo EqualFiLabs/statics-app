@@ -571,6 +571,7 @@
     "sending": "Sending…",
     "confirmSend": "Confirm send",
     "connectWallet": "Connect wallet",
+    "createWallet": "Create embedded wallet",
     "switchNetwork": "Switch to {network}",
     "reviewSend": "Review send",
     "sendTo": "Send to",

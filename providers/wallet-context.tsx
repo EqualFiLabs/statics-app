@@ -6,6 +6,14 @@ import type { ConnectedWallet } from "@privy-io/react-auth";
 export type WalletRuntimeStatus =
   "unconfigured" | "loading" | "signed-out" | "wallet-missing" | "ready" | "error";
 
+export type WalletRecoveryAction = "login" | "create-wallet" | null;
+
+export function walletRecoveryAction(status: WalletRuntimeStatus): WalletRecoveryAction {
+  if (status === "signed-out" || status === "error") return "login";
+  if (status === "wallet-missing") return "create-wallet";
+  return null;
+}
+
 export type WalletKind = "embedded" | "external" | null;
 
 export type FundingNetworkSummary = Readonly<{

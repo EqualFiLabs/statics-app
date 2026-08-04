@@ -571,6 +571,7 @@
     "sending": "Enviando…",
     "confirmSend": "Confirmar envío",
     "connectWallet": "Conectar billetera",
+    "createWallet": "Crear billetera integrada",
     "switchNetwork": "Cambiar a {network}",
     "reviewSend": "Revisar envío",
     "sendTo": "Enviar a",
