@@ -91,10 +91,35 @@ export function resolveLiquidityPool(
   return pools?.find((item) => item.poolId === position.poolId) ?? selected;
 }
 
-function amount(value: bigint, decimals: number): string {
-  return Number(formatUnits(value, decimals)).toLocaleString(undefined, {
-    maximumFractionDigits: 6,
-  });
+export function formatLiquidityAmount(value: bigint, decimals: number): string {
+  const [whole = "0", fraction = ""] = formatUnits(value, decimals).split(".");
+  const maximumFractionDigits = 6;
+  const paddedFraction = fraction.padEnd(maximumFractionDigits + 1, "0");
+  let roundedWhole = BigInt(whole);
+  let roundedFraction = BigInt(paddedFraction.slice(0, maximumFractionDigits) || "0");
+  const fractionScale = 10n ** BigInt(maximumFractionDigits);
+
+  if (paddedFraction[maximumFractionDigits] >= "5") {
+    roundedFraction += 1n;
+    if (roundedFraction === fractionScale) {
+      roundedWhole += 1n;
+      roundedFraction = 0n;
+    }
+  }
+
+  const wholeFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  const formattedWhole = wholeFormatter.format(roundedWhole);
+  const formattedFraction = roundedFraction
+    .toString()
+    .padStart(maximumFractionDigits, "0")
+    .replace(/0+$/, "");
+  if (!formattedFraction) return formattedWhole;
+
+  const decimalSeparator =
+    new Intl.NumberFormat(undefined, { minimumFractionDigits: 1 })
+      .formatToParts(0.1)
+      .find((part) => part.type === "decimal")?.value ?? ".";
+  return `${formattedWhole}${decimalSeparator}${formattedFraction}`;
 }
 
 function inputAmount(value: bigint, decimals: number, locale: string): string {
@@ -167,7 +192,7 @@ export function LiquidityContributionForm({
           <div className="liquidity-pair-requirement">
             <span>Paired asset required</span>
             <strong>
-              Up to {amount(quote.maximumAmounts[otherIndex], otherToken.decimals)}{" "}
+              Up to {formatLiquidityAmount(quote.maximumAmounts[otherIndex], otherToken.decimals)}{" "}
               {otherToken.symbol}
             </strong>
           </div>
@@ -178,7 +203,7 @@ export function LiquidityContributionForm({
                 {tokens.map((token, index) => (
                   <div key={token.address}>
                     <dt>{token.symbol}</dt>
-                    <dd>{amount(quote.estimatedAmounts[index]!, token.decimals)}</dd>
+                    <dd>{formatLiquidityAmount(quote.estimatedAmounts[index]!, token.decimals)}</dd>
                   </div>
                 ))}
               </dl>
@@ -189,7 +214,7 @@ export function LiquidityContributionForm({
                 {tokens.map((token, index) => (
                   <div key={token.address}>
                     <dt>{token.symbol}</dt>
-                    <dd>{amount(quote.maximumAmounts[index]!, token.decimals)}</dd>
+                    <dd>{formatLiquidityAmount(quote.maximumAmounts[index]!, token.decimals)}</dd>
                   </div>
                 ))}
               </dl>
@@ -215,9 +240,13 @@ export function LiquidityContributionForm({
               }
             >
               <span>{token.symbol} balance</span>
-              <strong>{balances ? amount(balance, token.decimals) : "Loading…"}</strong>
+              <strong>
+                {balances ? formatLiquidityAmount(balance, token.decimals) : "Loading…"}
+              </strong>
               {insufficient ? (
-                <small>Needs {amount(required - balance, token.decimals)} more</small>
+                <small>
+                  Needs {formatLiquidityAmount(required - balance, token.decimals)} more
+                </small>
               ) : quote && balances ? (
                 <small>Sufficient</small>
               ) : null}
@@ -444,7 +473,7 @@ function LiquidityRuntime() {
         await send(
           "approve-lp-token",
           `Approve ${token.symbol} for Permit2`,
-          `${amount(required, token.decimals)} ${token.symbol}`,
+          `${formatLiquidityAmount(required, token.decimals)} ${token.symbol}`,
           token.address,
           encodeFunctionData({
             abi: basketTokenAbi,
@@ -476,7 +505,7 @@ function LiquidityRuntime() {
         await send(
           "approve-permit2",
           `Authorize ${token.symbol} for PositionManager`,
-          `${amount(required, token.decimals)} ${token.symbol}`,
+          `${formatLiquidityAmount(required, token.decimals)} ${token.symbol}`,
           contracts.permit2,
           buildPermit2ApproveCall(
             token.address,
@@ -508,7 +537,7 @@ function LiquidityRuntime() {
     await send(
       "create-lp-nft",
       `Create ${selectedPool.basketSymbol}/${selectedPool.asset.symbol} liquidity position`,
-      `${amount(quote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${amount(
+      `${formatLiquidityAmount(quote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${formatLiquidityAmount(
         quote.estimatedAmounts[1],
         tokens[1].decimals
       )} ${tokens[1].symbol}`,
@@ -853,7 +882,7 @@ function LiquidityRuntime() {
           await send(
             "approve-lp-token",
             `Approve ${token.symbol} for liquidity increase`,
-            `${amount(required, token.decimals)} ${token.symbol}`,
+            `${formatLiquidityAmount(required, token.decimals)} ${token.symbol}`,
             token.address,
             encodeFunctionData({
               abi: basketTokenAbi,
@@ -884,7 +913,7 @@ function LiquidityRuntime() {
       await send(
         "increase-lp-nft",
         `Increase Liquidity position #${position.tokenId}`,
-        `${amount(contributionQuote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${amount(
+        `${formatLiquidityAmount(contributionQuote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${formatLiquidityAmount(
           contributionQuote.estimatedAmounts[1],
           tokens[1].decimals
         )} ${tokens[1].symbol}`,
@@ -1041,7 +1070,7 @@ function LiquidityRuntime() {
       const token = tokens[balanceShortfall];
       const missing =
         contributionQuote.maximumAmounts[balanceShortfall] - balances[balanceShortfall];
-      return `Your wallet needs ${amount(missing, token.decimals)} more ${token.symbol}.`;
+      return `Your wallet needs ${formatLiquidityAmount(missing, token.decimals)} more ${token.symbol}.`;
     }
     return null;
   })();
