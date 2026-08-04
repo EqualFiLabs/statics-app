@@ -27,7 +27,9 @@ import {
   type TokenMetadata,
 } from "@/lib/baskets/baskets";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
+import { loadOwnedPositionIds } from "@/lib/positions/owner-index";
 import { describeTransportFailure } from "@/lib/protocol/errors";
+import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 
 export type PositionCollateral = Readonly<{
   basket: BasketRecord;
@@ -102,17 +104,7 @@ async function readOwnedPosition(
   positionId: bigint,
   baskets: readonly BasketRecord[],
   knownRewardAssets: readonly Address[]
-): Promise<PositionRecord | null> {
-  const owner = await publicClient
-    .readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "ownerOf",
-      args: [positionId],
-    })
-    .catch(() => null);
-  if (!owner || getAddress(owner) !== wallet) return null;
-
+): Promise<PositionRecord> {
   const [state, closable, stake, selectedRewardAssets] = await Promise.all([
     publicClient.readContract({
       address: deployment.contracts.diamond,
@@ -141,7 +133,9 @@ async function readOwnedPosition(
       args: [positionId],
     }),
   ]);
-  if (!state.exists) return null;
+  if (!state.exists) {
+    throw new Error(`Position #${positionId.toString()} disappeared from the owner index.`);
+  }
 
   const rewardAssets = [
     ...new Set([...selectedRewardAssets, ...knownRewardAssets].map((asset) => getAddress(asset))),
@@ -199,42 +193,44 @@ export async function loadPositionCatalog(
   deployment: DollarDeployment,
   wallet: Address
 ): Promise<PositionCatalog> {
+  const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
   const basketCatalog = await loadBasketCatalog(publicClient, deployment, wallet);
   const [
-    transferLogs,
+    positionIds,
     rewardSelectionLogs,
     rewardLogs,
     stakingToken,
     totalStaked,
     maximumRewardAssets,
     positionCreationFee,
-    latestBlock,
   ] = await Promise.all([
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "Transfer",
-      args: { to: wallet },
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "RewardAssetOptedIn",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "GlobalFeeAccrued",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
+    loadOwnedPositionIds(publicClient, deployment.contracts.diamond, wallet, latestBlock.number),
+    loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock.number,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          eventName: "RewardAssetOptedIn",
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    ),
+    loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock.number,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          eventName: "GlobalFeeAccrued",
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    ),
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
@@ -255,12 +251,8 @@ export async function loadPositionCatalog(
       abi: staticsAbi,
       functionName: "positionCreationFee",
     }),
-    publicClient.getBlock({ blockTag: "latest" }),
   ]);
 
-  const positionIds = [...new Set(transferLogs.map((log) => log.args.tokenId.toString()))].map(
-    BigInt
-  );
   const positions = (
     await Promise.all(
       positionIds.map((positionId) =>
@@ -276,9 +268,9 @@ export async function loadPositionCatalog(
         )
       )
     )
-  )
-    .filter((position): position is PositionRecord => position !== null)
-    .sort((left, right) => Number(right.positionId - left.positionId));
+  ).sort((left, right) =>
+    left.positionId === right.positionId ? 0 : left.positionId > right.positionId ? -1 : 1
+  );
 
   const candidateSources = new Map<Address, Set<string>>();
   addCandidate(candidateSources, deployment.contracts.dollar, "Statics deployment");

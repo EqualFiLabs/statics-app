@@ -36,11 +36,22 @@ describe("Risk supply Position selection", () => {
     const periphery = "0x3333333333333333333333333333333333333333" as const;
     const risk = "0x4444444444444444444444444444444444444444" as const;
     const readContract = vi.fn(
-      async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
-        if (functionName === "balanceOf") return 10n;
+      async ({
+        address,
+        functionName,
+        args,
+      }: {
+        address: string;
+        functionName: string;
+        args?: readonly unknown[];
+      }) => {
+        if (functionName === "balanceOf") return address === diamond ? 30n : 10n;
         if (functionName === "isApprovedForAll") return true;
         if (functionName === "positionCreationFee") return 1n;
-        if (functionName === "ownerOf") return wallet;
+        if (functionName === "positionCount") return 30n;
+        if (functionName === "positionsOfOwner") {
+          return [Array.from({ length: 30 }, (_, index) => BigInt(index + 1)), 30n] as const;
+        }
         if (functionName === "riskLiquidity") {
           return {
             exists: args?.[0] === 5n,
@@ -55,22 +66,10 @@ describe("Risk supply Position selection", () => {
     );
     const publicClient = {
       readContract,
-      getContractEvents: vi
-        .fn()
-        .mockResolvedValue(
-          Array.from({ length: 30 }, (_, index) => ({ args: { tokenId: BigInt(index + 1) } }))
-        ),
+      getBlockNumber: vi.fn().mockResolvedValue(50n),
     } as never;
 
-    const loaded = await loadDollarSupplyState(
-      publicClient,
-      diamond,
-      periphery,
-      risk,
-      wallet,
-      2n,
-      1n
-    );
+    const loaded = await loadDollarSupplyState(publicClient, diamond, periphery, risk, wallet, 2n);
 
     expect(loaded.positionId).toBe(5n);
     expect(loaded.ownedPositionIds).toHaveLength(30);
@@ -86,6 +85,17 @@ describe("supplying Risk Shares as redemption liquidity", () => {
 
     expect(dollarPage).toContain("snapshot.refetch(),");
     expect(dollarPage).toContain("? [supplyState.refetch()]");
+  });
+
+  it("surfaces owner-index and RPC failures instead of rendering a zero balance", () => {
+    const supplyReader = fs.readFileSync("lib/dollar/supply.ts", "utf8");
+    const dollarPage = fs.readFileSync("components/dollar/DollarPage.tsx", "utf8");
+
+    expect(supplyReader).not.toContain("getContractEvents");
+    expect(supplyReader).not.toContain(".catch(() => 0n)");
+    expect(dollarPage).toContain("supplyState.isError");
+    expect(dollarPage).toContain("describeDollarError(supplyState.error)");
+    expect(dollarPage).toContain("supplyUnavailable");
   });
 
   it("asks for approval before it can pull shares in", () => {

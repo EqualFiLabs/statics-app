@@ -152,6 +152,7 @@ describe("basket action safety", () => {
       },
     } satisfies DollarDeployment;
     const publicClient = {
+      getBlockNumber: async () => 100n,
       getContractEvents: async () => [],
       readContract: async ({
         address,

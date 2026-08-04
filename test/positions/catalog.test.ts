@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { Address, PublicClient } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,31 +24,34 @@ vi.mock("@/lib/baskets/baskets", async (importOriginal) => {
 import { loadPositionCatalog } from "@/lib/positions/positions";
 
 const wallet = "0x0000000000000000000000000000000000000001" as Address;
-const otherWallet = "0x0000000000000000000000000000000000000002" as Address;
 const diamond = "0x0000000000000000000000000000000000000010" as Address;
 const dollar = "0x0000000000000000000000000000000000000011" as Address;
 const weth = "0x0000000000000000000000000000000000000012" as Address;
+const maximumPositionId = (1n << 256n) - 1n;
 
 describe("PositionNFT catalog discovery", () => {
-  it("reconciles inbound transfer events against current owner state", async () => {
+  it("does not reconstruct current ownership from Transfer history", () => {
+    const catalogReader = fs.readFileSync("lib/positions/positions.ts", "utf8");
+    expect(catalogReader).not.toContain('eventName: "Transfer"');
+  });
+
+  it("loads Positions from the current owner index", async () => {
     const publicClient = {
       getContractEvents: vi
         .fn()
         .mockImplementation(({ eventName }: { eventName: string }) =>
           Promise.resolve(
-            eventName === "Transfer"
-              ? [1n, 2n, 3n].map((tokenId) => ({ args: { tokenId } }))
-              : eventName === "RewardAssetOptedIn"
-                ? [{ args: { positionId: 1n, asset: dollar } }]
-                : []
+            eventName === "RewardAssetOptedIn" ? [{ args: { positionId: 1n, asset: dollar } }] : []
           )
         ),
+      getBlockNumber: vi.fn().mockResolvedValue(50n),
       getBlock: vi.fn().mockResolvedValue({ number: 50n, timestamp: 1_000n }),
-      readContract: vi.fn().mockImplementation(({ functionName, args }) => {
-        if (functionName === "ownerOf") {
-          if (args[0] === 1n) return Promise.resolve(wallet);
-          if (args[0] === 2n) return Promise.resolve(otherWallet);
-          return Promise.reject(new Error("burned"));
+      readContract: vi.fn().mockImplementation(({ functionName }) => {
+        if (functionName === "balanceOf" || functionName === "positionCount") {
+          return Promise.resolve(2n);
+        }
+        if (functionName === "positionsOfOwner") {
+          return Promise.resolve([[1n, maximumPositionId], 2n]);
         }
         if (functionName === "positionState") {
           return Promise.resolve({
@@ -86,15 +90,19 @@ describe("PositionNFT catalog discovery", () => {
 
     const catalog = await loadPositionCatalog(publicClient, deployment, wallet);
 
-    expect(catalog.positions.map((position) => position.positionId)).toEqual([1n]);
+    expect(catalog.positions.map((position) => position.positionId)).toEqual([
+      maximumPositionId,
+      1n,
+    ]);
     expect(catalog.currentBlock).toBe(50n);
     expect(catalog.currentTimestamp).toBe(1_000n);
     expect(catalog.maximumRewardAssets).toBe(64n);
     expect(catalog.positionCreationFee).toBe(123n);
-    expect(catalog.positions[0]?.selectedRewardAssets).toEqual([]);
-    expect(catalog.positions[0]?.stateNonce).toBe(3n);
-    expect(catalog.positions[0]?.closable).toBe(true);
-    expect(catalog.positions[0]?.rewards).toEqual([
+    const firstPosition = catalog.positions.find((position) => position.positionId === 1n);
+    expect(firstPosition?.selectedRewardAssets).toEqual([]);
+    expect(firstPosition?.stateNonce).toBe(3n);
+    expect(firstPosition?.closable).toBe(true);
+    expect(firstPosition?.rewards).toEqual([
       expect.objectContaining({
         pending: 5n,
         token: expect.objectContaining({ address: dollar }),

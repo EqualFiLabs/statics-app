@@ -1458,6 +1458,47 @@ export declare const staticsAbi: readonly [{
         readonly type: "bool";
     }];
 }, {
+    readonly name: "positionCount";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "positionsOfOwner";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "positionIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "syncPositionOwnerIndex";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+    readonly outputs: readonly [];
+}, {
     readonly name: "positionState";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -3054,6 +3095,35 @@ export declare const staticsAbi: readonly [{
         readonly type: "address";
         readonly name: "newRenderer";
         readonly indexed: true;
+    }];
+}, {
+    readonly name: "PositionOwnerIndexSynced";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "MetadataUpdate";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+}, {
+    readonly name: "BatchMetadataUpdate";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "fromTokenId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "toTokenId";
     }];
 }, {
     readonly name: "PositionLegAttached";
