@@ -38,10 +38,7 @@ import { TokenLogo } from "@/components/wallet/TokenLogo";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
-import {
-  scheduleProtocolReconciliation,
-  subscribeToProtocolTransactions,
-} from "@/lib/protocol/reconciliation";
+import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
 import { searchTokenList } from "@/lib/token-list";
 import { getNativeTokenLogoURI } from "@/lib/token-icons";
 import type { WalletToken } from "@/lib/wallet-tokens";
@@ -209,22 +206,14 @@ export function WalletPage() {
   });
 
   useEffect(() => {
-    const cancellations = new Set<() => void>();
-    const unsubscribe = subscribeToProtocolTransactions((confirmed) => {
-      if (
-        !wallet.address ||
-        confirmed.chainId !== wallet.fundingChainId ||
-        confirmed.wallet.toLowerCase() !== wallet.address.toLowerCase()
-      ) {
-        return;
-      }
-      const cancel = scheduleProtocolReconciliation(() => refreshBalancesRef.current());
-      cancellations.add(cancel);
-    });
-    return () => {
-      unsubscribe();
-      cancellations.forEach((cancel) => cancel());
-    };
+    const walletAddress = wallet.address?.toLowerCase();
+    return subscribeToProtocolReconciliation(
+      () => refreshBalancesRef.current(),
+      (confirmed) =>
+        walletAddress !== undefined &&
+        confirmed.chainId === wallet.fundingChainId &&
+        confirmed.wallet.toLowerCase() === walletAddress
+    );
   }, [wallet.address, wallet.fundingChainId]);
 
   useEffect(() => {

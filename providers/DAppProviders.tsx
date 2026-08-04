@@ -29,10 +29,7 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectStaticsWallet } from "@/lib/wallet/selection";
-import {
-  scheduleProtocolReconciliation,
-  subscribeToProtocolTransactions,
-} from "@/lib/protocol/reconciliation";
+import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
   defaultSolanaWalletState,
@@ -291,19 +288,10 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
 function ProtocolQueryReconciler() {
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const cancellations = new Set<() => void>();
-    const unsubscribe = subscribeToProtocolTransactions(() => {
-      const cancel = scheduleProtocolReconciliation(() =>
-        queryClient.refetchQueries({ type: "active" })
-      );
-      cancellations.add(cancel);
-    });
-    return () => {
-      unsubscribe();
-      cancellations.forEach((cancel) => cancel());
-    };
-  }, [queryClient]);
+  useEffect(
+    () => subscribeToProtocolReconciliation(() => queryClient.refetchQueries({ type: "active" })),
+    [queryClient]
+  );
 
   return null;
 }

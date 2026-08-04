@@ -103,3 +103,25 @@ export function scheduleProtocolReconciliation(
   );
   return () => timers.forEach((timer) => globalThis.clearTimeout(timer));
 }
+
+/**
+ * Keep only the newest reconciliation schedule. Its reads include every state
+ * transition through the newest confirmed block, so retaining older schedules
+ * adds RPC work without preserving information.
+ */
+export function subscribeToProtocolReconciliation(
+  refresh: () => void | Promise<unknown>,
+  matches: (detail: ProtocolTransactionConfirmedDetail) => boolean = () => true,
+  delays: readonly number[] = QUERY_RECONCILIATION_DELAYS_MS
+): () => void {
+  let cancelReconciliation: (() => void) | null = null;
+  const unsubscribe = subscribeToProtocolTransactions((detail) => {
+    if (!matches(detail)) return;
+    cancelReconciliation?.();
+    cancelReconciliation = scheduleProtocolReconciliation(refresh, delays);
+  });
+  return () => {
+    unsubscribe();
+    cancelReconciliation?.();
+  };
+}

@@ -5,6 +5,7 @@ import {
   announceProtocolTransactionConfirmed,
   retryConfirmationVerification,
   scheduleProtocolReconciliation,
+  subscribeToProtocolReconciliation,
   subscribeToProtocolTransactions,
   waitForRpcBlock,
 } from "@/lib/protocol/reconciliation";
@@ -55,6 +56,29 @@ describe("confirmed transaction reconciliation", () => {
       expect(refresh).toHaveBeenCalledTimes(2);
 
       cancel();
+      await vi.runAllTimersAsync();
+      expect(refresh).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("replaces an older transaction schedule and cancels the latest on unsubscribe", async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn();
+      const wallet = "0x0000000000000000000000000000000000000001" as Address;
+      const unsubscribe = subscribeToProtocolReconciliation(refresh, () => true, [10, 20]);
+
+      announceProtocolTransactionConfirmed({ wallet, chainId: 46_630, blockNumber: 100n });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(refresh).toHaveBeenCalledTimes(1);
+
+      announceProtocolTransactionConfirmed({ wallet, chainId: 46_630, blockNumber: 101n });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(refresh).toHaveBeenCalledTimes(2);
+
+      unsubscribe();
       await vi.runAllTimersAsync();
       expect(refresh).toHaveBeenCalledTimes(2);
     } finally {
