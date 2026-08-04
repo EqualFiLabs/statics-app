@@ -30,13 +30,13 @@ export async function executeProtocolActionPlan(
         status,
       });
 
-    if (step.isSatisfied && (await step.isSatisfied())) {
-      progress("skipped");
-      continue;
-    }
-
-    progress("active");
     try {
+      if (step.isSatisfied && (await step.isSatisfied())) {
+        progress("skipped");
+        continue;
+      }
+
+      progress("active");
       await step.run();
       progress("confirmed");
     } catch (error) {

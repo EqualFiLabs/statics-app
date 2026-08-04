@@ -64,4 +64,30 @@ describe("protocol action plans", () => {
       "Stopped at 1 of 2: Approve token"
     );
   });
+
+  it("reports a failed step when its satisfaction check throws", async () => {
+    const failure = new Error("Allowance RPC unavailable");
+    const approval = vi.fn();
+    const finalAction = vi.fn();
+    const progress: ProtocolActionProgress[] = [];
+
+    await expect(
+      executeProtocolActionPlan(
+        [
+          {
+            id: "approval",
+            label: "Check token approval",
+            isSatisfied: async () => Promise.reject(failure),
+            run: approval,
+          },
+          { id: "action", label: "Deposit token", run: finalAction },
+        ],
+        (value) => progress.push(value)
+      )
+    ).rejects.toBe(failure);
+
+    expect(approval).not.toHaveBeenCalled();
+    expect(finalAction).not.toHaveBeenCalled();
+    expect(progress.at(-1)).toMatchObject({ stepId: "approval", status: "failed" });
+  });
 });

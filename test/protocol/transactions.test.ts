@@ -111,7 +111,7 @@ describe("protocol transaction execution", () => {
     expect(
       defaultProtocolPresentation({
         kind: "approve-swap",
-        label: "Reset swap approval",
+        label: "Ajustar permiso de intercambio",
         amount: "10 TPA1",
         data: resetData,
       })
@@ -119,6 +119,16 @@ describe("protocol transaction execution", () => {
       buttonText: "Reset token approval",
       description: expect.stringContaining("removes the existing token spending allowance"),
     });
+
+    const boundedData = `0x095ea7b3${"0".repeat(24)}${spender}${"0".repeat(63)}1` as Hex;
+    expect(
+      defaultProtocolPresentation({
+        kind: "approve-swap",
+        label: "Reset swap approval",
+        amount: "10 TPA1",
+        data: boundedData,
+      }).buttonText
+    ).toBe("Approve reviewed amount");
   });
 
   it("does not request a signature when simulation validation fails", async () => {

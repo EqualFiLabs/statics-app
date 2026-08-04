@@ -98,6 +98,17 @@ function calldataAddress(data: Hex, wordIndex: number): Address | null {
   }
 }
 
+function calldataUint(data: Hex, wordIndex: number): bigint | null {
+  const wordStart = 10 + wordIndex * 64;
+  const encoded = data.slice(wordStart, wordStart + 64);
+  if (encoded.length !== 64) return null;
+  try {
+    return BigInt(`0x${encoded}`);
+  } catch {
+    return null;
+  }
+}
+
 export function defaultProtocolPresentation(
   request: Pick<ProtocolTransactionRequest, "kind" | "label" | "amount" | "data">
 ): ProtocolTransactionPresentation {
@@ -105,6 +116,8 @@ export function defaultProtocolPresentation(
   const isOperatorApproval = operatorApprovalKinds.has(request.kind);
   const isPermit2Approval = request.kind === "approve-permit2";
   const isBoundedApproval = request.kind === "approve-swap" || request.kind === "approve-bridge";
+  const isErc20Approval = request.data.startsWith(erc20ApproveSelector);
+  const erc20Allowance = isErc20Approval ? calldataUint(request.data, 1) : null;
   const spender = isPermit2Approval
     ? request.data.startsWith(permit2ApproveSelector)
       ? calldataAddress(request.data, 1)
@@ -113,7 +126,7 @@ export function defaultProtocolPresentation(
       ? request.data.startsWith(operatorApproveSelector)
         ? calldataAddress(request.data, 0)
         : null
-      : request.data.startsWith(erc20ApproveSelector)
+      : isErc20Approval
         ? calldataAddress(request.data, 0)
         : null;
   const spenderCopy = spender ? ` Spender: ${spender}.` : "";
@@ -143,7 +156,7 @@ export function defaultProtocolPresentation(
       contractName: request.kind === "approve-lp-nft" ? "Position Manager" : "Risk shares",
     };
   }
-  if (isBoundedApproval && /^(reset|revoke)\b/i.test(request.label)) {
+  if (isBoundedApproval && erc20Allowance === 0n) {
     return {
       action: request.label,
       description: `${request.label}. This removes the existing token spending allowance.${spenderCopy}`,
