@@ -13,7 +13,7 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 
 import {
   basketTokenAbi,
@@ -52,7 +52,7 @@ import {
   MAX_PERMIT2_EXPIRATION,
   operatorApprovalAbi,
 } from "@/lib/protocol/approvals";
-import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
+import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -102,7 +102,7 @@ function LiquidityRuntime() {
   const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useActiveWalletClient();
+  const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<Mode>("create");
@@ -890,9 +890,12 @@ function LiquidityRuntime() {
   };
   let actionLabel = actionLabels[resolvedMode];
   let action: (() => void) | null = managementReason ? null : () => void run();
-  if (walletState.status === "disconnected" || walletState.status === "error") {
-    actionLabel = "Connect wallet";
-    action = walletState.connectWallet;
+  if (walletState.status === "signed-out" || walletState.status === "error") {
+    actionLabel = "Sign in to continue";
+    action = walletState.login;
+  } else if (walletState.status === "wallet-missing") {
+    actionLabel = "Create embedded wallet";
+    action = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     actionLabel = `Switch to ${walletState.networkName}`;
     action = () => void walletState.switchNetwork();

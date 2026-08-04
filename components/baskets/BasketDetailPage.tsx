@@ -10,7 +10,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -53,7 +53,7 @@ import { loadPositionCatalog, unlockedCollateral } from "@/lib/positions/positio
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
-import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
+import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -118,7 +118,7 @@ function BasketDetailRuntime({
   const t = useTranslations("baskets");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useActiveWalletClient();
+  const walletClient = useWalletClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<"mint" | "redeem" | "swap">(initialAction);
@@ -523,9 +523,12 @@ function BasketDetailRuntime({
   const quoteAmounts = currentQuote?.amounts ?? quote.data?.amounts;
   let primaryLabel = availability?.label || t("review");
   let primaryAction: (() => void) | null = () => void executeNextAction();
-  if (walletState.status === "disconnected" || walletState.status === "error") {
+  if (walletState.status === "signed-out" || walletState.status === "error") {
     primaryLabel = t("signIn");
-    primaryAction = walletState.connectWallet;
+    primaryAction = walletState.login;
+  } else if (walletState.status === "wallet-missing") {
+    primaryLabel = t("createWallet");
+    primaryAction = () => void walletState.createWallet();
   } else if (walletState.status === "ready" && !walletState.isTargetChain) {
     primaryLabel = t("switchNetwork", { network: walletState.networkName });
     primaryAction = () => void walletState.switchNetwork();

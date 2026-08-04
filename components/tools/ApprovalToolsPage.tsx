@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
 import { useNow, useTranslations } from "next-intl";
 
@@ -21,7 +21,7 @@ import {
 } from "@/lib/protocol/approval-inventory";
 import { approvalClockTimestamp, approvalStatusLabel } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
-import { useActiveWalletClient, useWalletState } from "@/providers/wallet-context";
+import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
 const APPROVAL_REFRESH_INTERVAL_MS = 60_000;
@@ -56,7 +56,7 @@ function ApprovalToolsRuntime() {
   const t = useTranslations("tools");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
-  const walletClient = useActiveWalletClient();
+  const walletClient = useWalletClient();
   const now = useNow({ updateInterval: APPROVAL_REFRESH_INTERVAL_MS });
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
@@ -96,14 +96,21 @@ function ApprovalToolsRuntime() {
     },
   });
 
-  if (walletState.status === "disconnected" || walletState.status === "error") {
+  if (
+    walletState.status === "signed-out" ||
+    walletState.status === "error" ||
+    walletState.status === "wallet-missing"
+  ) {
     return (
       <EmptyState
         title={t("connectTitle")}
         description={t("connectDescription")}
         action={{
-          label: t("connectWallet"),
-          onClick: walletState.connectWallet,
+          label: walletState.status === "wallet-missing" ? t("createWallet") : t("connectWallet"),
+          onClick:
+            walletState.status === "wallet-missing"
+              ? () => void walletState.createWallet()
+              : walletState.login,
         }}
       />
     );

@@ -93,7 +93,7 @@ export type WalletEnvironment = Readonly<{
   anvilRpcUrl: string;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
-  privyConfigured: boolean;
+  configured: boolean;
 }>;
 
 export function readWalletEnvironment(
@@ -116,6 +116,9 @@ export function readWalletEnvironment(
     "NEXT_PUBLIC_ANVIL_RPC_URL"
   );
 
+  if (appEnvironment !== "development" && !appId) {
+    throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
+  }
   if (appEnvironment !== "development" && network === "robinhood" && !configuredRobinhoodRpc) {
     throw new Error("NEXT_PUBLIC_ROBINHOOD_RPC_URL is required for Robinhood mainnet.");
   }
@@ -147,7 +150,7 @@ export function readWalletEnvironment(
             ),
           ] as [Chain, ...Chain[]])
         : ([defaultChain] as const),
-    privyConfigured: Boolean(appId),
+    configured: Boolean(appId),
   };
 }
 

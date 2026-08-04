@@ -47,8 +47,7 @@ describe("DApp wallet shell", () => {
     const login = vi.fn();
     const connectWallet = vi.fn();
     renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "disconnected",
-      identityStatus: "signed-out",
+      status: "signed-out",
       login,
       connectWallet,
     });
@@ -57,39 +56,6 @@ describe("DApp wallet shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
     expect(login).toHaveBeenCalledOnce();
     expect(connectWallet).toHaveBeenCalledOnce();
-  });
-
-  it("keeps direct wallet connection available while Privy is degraded", () => {
-    const connectWallet = vi.fn();
-    renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "disconnected",
-      identityStatus: "degraded",
-      identityError: "Privy sessions are unavailable.",
-      connectWallet,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
-    expect(connectWallet).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
-  });
-
-  it("connects a listed external wallet without invoking Privy login", () => {
-    const connectWalletOption = vi.fn().mockResolvedValue(undefined);
-    const login = vi.fn();
-    renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "disconnected",
-      identityStatus: "degraded",
-      walletPickerOpen: true,
-      walletOptions: [{ id: "metamask", name: "MetaMask", kind: "external", connected: false }],
-      connectWalletOption,
-      login,
-    });
-
-    expect(screen.getByText(/external EVM wallets connect directly/i)).toBeInTheDocument();
-    expect(screen.getByText(/Privy is temporarily unavailable/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /MetaMask.*External wallet/i }));
-    expect(connectWalletOption).toHaveBeenCalledWith("metamask");
-    expect(login).not.toHaveBeenCalled();
   });
 
   it("shows the active address and requires a network switch when mismatched", () => {
@@ -110,10 +76,9 @@ describe("DApp wallet shell", () => {
   });
 
   // The pill used to copy silently on click, which gave no way to reach the
-  // Solana address or to sign out.
+  // Solana address or to disconnect.
   it("opens an account dialog from the address pill", () => {
-    const disconnectWallet = vi.fn().mockResolvedValue(undefined);
-    const signOut = vi.fn().mockResolvedValue(undefined);
+    const disconnectWallet = vi.fn();
     const address = "0x1234567890abcdef1234567890abcdef12345678";
     renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
@@ -126,7 +91,6 @@ describe("DApp wallet shell", () => {
       explorerUrl:
         "https://explorer.testnet.chain.robinhood.com/address/0x1234567890abcdef1234567890abcdef12345678",
       disconnectWallet,
-      signOut,
     });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -150,7 +114,51 @@ describe("DApp wallet shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Disconnect wallet" }));
     expect(disconnectWallet).toHaveBeenCalledOnce();
-    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("keeps local disconnect available while another wallet action is pending", () => {
+    const disconnectWallet = vi.fn();
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "ready",
+      authenticated: true,
+      address: "0x1234567890abcdef1234567890abcdef12345678",
+      walletKind: "embedded",
+      busyAction: "export",
+      disconnectWallet,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
+    const disconnect = screen.getByRole("button", { name: "Disconnect wallet" });
+    expect(disconnect).toBeEnabled();
+    fireEvent.click(disconnect);
+    expect(disconnectWallet).toHaveBeenCalledOnce();
+  });
+
+  it("offers Privy and external wallet choices after a local disconnect", () => {
+    const reconnectWallet = vi.fn();
+    const connectExternalWallet = vi.fn();
+    const login = vi.fn();
+    const connectWallet = vi.fn();
+    renderWithWallet(<AppShell>Overview</AppShell>, {
+      status: "signed-out",
+      authenticated: true,
+      locallyDisconnected: true,
+      reconnectWallet,
+      connectExternalWallet,
+      login,
+      connectWallet,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    expect(connectExternalWallet).toHaveBeenCalledOnce();
+    expect(reconnectWallet).not.toHaveBeenCalled();
+    expect(login).not.toHaveBeenCalled();
+    expect(connectWallet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(reconnectWallet).toHaveBeenCalledOnce();
+    expect(login).not.toHaveBeenCalled();
+    expect(connectWallet).not.toHaveBeenCalled();
   });
 
   // No Solana wallet exists until a Solana route is used, so the row has to say
@@ -208,7 +216,7 @@ describe("DApp wallet shell", () => {
 
   it("shows the target network before a wallet is connected", () => {
     renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "disconnected",
+      status: "signed-out",
       networkName: "Anvil",
       targetChainId: 31_337,
     });
@@ -245,46 +253,5 @@ describe("DApp wallet shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
     expect(screen.queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
-  });
-
-  it("keeps Privy sign-out separate from wallet disconnect", () => {
-    const disconnectWallet = vi.fn().mockResolvedValue(undefined);
-    const signOut = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "ready",
-      identityStatus: "authenticated",
-      authenticated: true,
-      address: "0x1234567890abcdef1234567890abcdef12345678",
-      walletKind: "external",
-      disconnectWallet,
-      signOut,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out of Privy" }));
-    expect(signOut).toHaveBeenCalledOnce();
-    expect(disconnectWallet).not.toHaveBeenCalled();
-  });
-
-  it("allows wallet disconnect while a Privy sign-out request is still pending", () => {
-    const disconnectWallet = vi.fn().mockResolvedValue(undefined);
-    renderWithWallet(<AppShell>Overview</AppShell>, {
-      status: "ready",
-      identityStatus: "authenticated",
-      authenticated: true,
-      address: "0x1234567890abcdef1234567890abcdef12345678",
-      walletKind: "external",
-      busyAction: "sign-out",
-      identityBusyAction: "sign-out",
-      walletBusyAction: null,
-      disconnectWallet,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "0x1234…5678" }));
-    const disconnect = screen.getByRole("button", { name: "Disconnect wallet" });
-    expect(disconnect).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Signing out of Privy…" })).toBeDisabled();
-    fireEvent.click(disconnect);
-    expect(disconnectWallet).toHaveBeenCalledOnce();
   });
 });

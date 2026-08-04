@@ -31,7 +31,7 @@ import {
 import { decodeJupiterTransaction } from "@/lib/portal/solana";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { SOLANA_MAINNET_CHAIN } from "@/lib/solana-wallet";
-import { useWalletState } from "@/providers/wallet-context";
+import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
@@ -517,10 +517,11 @@ export function AcrossBridgePanel() {
     }
   };
 
+  const walletRecovery = walletRecoveryAction(wallet.status);
   const primary = () => {
-    if (wallet.status === "disconnected" || wallet.status === "error") {
-      return wallet.connectWallet();
-    }
+    if (walletRecovery === "login") return wallet.login();
+    if (walletRecovery === "create-wallet") return void wallet.createWallet();
+    if (wallet.status !== "ready") return;
     if (originIsSolana && !solana.wallet) return void solana.runtime.createWallet();
     if (!originIsSolana && wallet.fundingChainId !== originChainId) {
       return void wallet.selectFundingNetwork(originChainId);
@@ -531,18 +532,21 @@ export function AcrossBridgePanel() {
     if (quote?.quote) setReviewing(true);
   };
   const primaryLabel =
-    wallet.status === "disconnected" || wallet.status === "error"
+    walletRecovery === "login"
       ? t("connectWallet")
-      : originIsSolana && !solana.wallet
-        ? t("createSolanaWallet")
-        : !originIsSolana &&
-            (wallet.fundingChainId !== originChainId || !wallet.fundingWalletOnSelectedChain)
-          ? t("switchTo", {
-              network: chains.find((chain) => chain.chainId === originChainId)?.name ?? t("origin"),
-            })
-          : loadingQuote
-            ? t("findingRoute")
-            : t("reviewBridge");
+      : walletRecovery === "create-wallet"
+        ? t("createEmbeddedWallet")
+        : originIsSolana && !solana.wallet
+          ? t("createSolanaWallet")
+          : !originIsSolana &&
+              (wallet.fundingChainId !== originChainId || !wallet.fundingWalletOnSelectedChain)
+            ? t("switchTo", {
+                network:
+                  chains.find((chain) => chain.chainId === originChainId)?.name ?? t("origin"),
+              })
+            : loadingQuote
+              ? t("findingRoute")
+              : t("reviewBridge");
   const actionReady = Boolean(
     selectedToken &&
     selectedDestinationToken &&
@@ -723,10 +727,11 @@ export function AcrossBridgePanel() {
           className="portal-primary-action"
           type="button"
           disabled={
+            wallet.status === "unconfigured" ||
+            wallet.status === "loading" ||
             submitting ||
             loadingQuote ||
-            (wallet.status !== "disconnected" &&
-              wallet.status !== "error" &&
+            (wallet.status === "ready" &&
               !(
                 (originIsSolana && !solana.wallet) ||
                 (!originIsSolana &&

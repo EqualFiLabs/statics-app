@@ -14,7 +14,7 @@ describe("wallet environment", () => {
     expect(environment.appEnvironment).toBe("development");
     expect(environment.network).toBe("robinhood-testnet");
     expect(environment.defaultChain.id).toBe(46_630);
-    expect(environment.privyConfigured).toBe(false);
+    expect(environment.configured).toBe(false);
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([46_630, 4_663, 31_337]);
   });
 
@@ -42,18 +42,16 @@ describe("wallet environment", () => {
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663]);
   });
 
-  it("keeps external wallets available without Privy but requires the public RPC", () => {
+  it("fails closed outside development when Privy or the RPC is absent", () => {
+    expect(() => readWalletEnvironment({ NEXT_PUBLIC_APP_ENV: "production" })).toThrow(
+      "NEXT_PUBLIC_PRIVY_APP_ID is required"
+    );
     expect(() =>
       readWalletEnvironment({
         NEXT_PUBLIC_APP_ENV: "production",
+        NEXT_PUBLIC_PRIVY_APP_ID: "app-id",
       })
     ).toThrow("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required");
-
-    const environment = readWalletEnvironment({
-      NEXT_PUBLIC_APP_ENV: "production",
-      NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: "https://rpc.example",
-    });
-    expect(environment.privyConfigured).toBe(false);
   });
 
   it("rejects credential-bearing public RPC URLs", () => {

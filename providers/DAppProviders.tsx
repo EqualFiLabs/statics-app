@@ -3,6 +3,7 @@
 import {
   getEmbeddedConnectedWallet,
   PrivyProvider,
+  useConnectWallet,
   useCreateWallet,
   useExportWallet,
   usePrivy,
@@ -16,50 +17,20 @@ import {
   useSignTransaction as useSignSolanaTransaction,
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
+import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  createWalletClient,
-  custom,
-  getAddress,
-  http,
-  type Chain,
-  type EIP1193Provider,
-  type Transport,
-} from "viem";
-import {
-  createConfig,
-  useAccount,
-  useConnect,
-  useConnectorClient,
-  useDisconnect,
-  useSwitchChain,
-  WagmiProvider,
-} from "wagmi";
-import { injected } from "wagmi/connectors";
+import { useEffect, useMemo, useState } from "react";
+import { useAccount } from "wagmi";
 
-import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
-import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
 import {
   createWalletTransports,
   getAddressExplorerUrl,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
-import { selectWalletKind, type WalletPreference } from "@/lib/wallet/selection";
-import {
-  derivePrivyIdentityStatus,
-  deriveWalletRuntimeStatus,
-  parseWalletPreference,
-  walletClientAccountAddress,
-  walletClientMatchesAddress,
-} from "@/lib/wallet/runtime";
-import {
-  WalletContext,
-  type ActiveWalletClient,
-  type PrivyIdentityStatus,
-  type WalletEthereumProvider,
-  type WalletState,
-} from "./wallet-context";
+import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
+import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
+import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
+import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
   defaultSolanaWalletState,
   SolanaWalletContext,
@@ -75,28 +46,17 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
 });
-
-const walletChains = [
-  walletEnvironment.defaultChain,
-  ...walletEnvironment.supportedChains,
+const transports = createWalletTransports(walletEnvironment);
+const wagmiConfig = createConfig({
+  chains: walletEnvironment.supportedChains,
+  transports,
+});
+const privySupportedChains = [
   ...fundingNetworks.map((network) => network.chain),
+  ...walletEnvironment.supportedChains,
 ].filter(
   (chain, index, chains) => chains.findIndex((candidate) => candidate.id === chain.id) === index
-) as [Chain, ...Chain[]];
-const configuredTransports = createWalletTransports(walletEnvironment);
-const walletTransports = Object.fromEntries(
-  walletChains.map((chain) => [
-    chain.id,
-    configuredTransports[chain.id] ?? http(chain.rpcUrls.default.http[0]),
-  ])
-) as Record<number, Transport>;
-const wagmiConfig = createConfig({
-  ssr: true,
-  chains: walletChains,
-  connectors: [injected({ shimDisconnect: true })],
-  transports: walletTransports,
-});
-const privySupportedChains = walletChains;
+);
 const fundingNetworkSummaries = fundingNetworks.map((network) => ({
   chainId: network.chain.id,
   label: network.label,
@@ -104,296 +64,115 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
   supportsUniswap: network.supportsUniswap,
 }));
 const FUNDING_CHAIN_STORAGE_KEY = "statics:funding-chain";
-const ACTIVE_WALLET_STORAGE_KEY = "statics:active-wallet-source";
 
-type PrivyRuntime = Readonly<{
-  configured: boolean;
-  ready: boolean;
-  authenticated: boolean;
-  error: Error | null;
-  embeddedWallet: ConnectedWallet | null;
-  login: () => void;
-  logout: () => Promise<void>;
-  createWallet: () => Promise<unknown>;
-  exportWallet: (address: string) => Promise<void>;
-  solana: SolanaWalletState;
-}>;
-
-const unavailablePrivyRuntime: PrivyRuntime = {
-  configured: false,
-  ready: true,
-  authenticated: false,
-  error: null,
-  embeddedWallet: null,
-  login: () => undefined,
-  logout: async () => undefined,
-  createWallet: async () => undefined,
-  exportWallet: async () => undefined,
-  solana: defaultSolanaWalletState,
-};
-
-function connectedWalletChainId(wallet: ConnectedWallet | null): number | null {
+function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
   if (!wallet?.chainId) return null;
   const parsed = Number(wallet.chainId.replace(/^eip155:/, ""));
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-function isEthereumProvider(provider: unknown): provider is WalletEthereumProvider {
-  return Boolean(
-    provider &&
-    typeof provider === "object" &&
-    "request" in provider &&
-    typeof (provider as { request?: unknown }).request === "function"
-  );
-}
-
-function PrivyRuntimeBridge({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated, error, login, logout } = usePrivy();
-  const { wallets } = useWallets();
+function WalletBridge({ children }: { children: React.ReactNode }) {
+  const { ready, authenticated, error: privyError, login } = usePrivy();
+  const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
+  const wagmiAccount = useAccount();
+  const { setActiveWallet } = useSetActiveWallet();
   const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
   const { signTransaction: signSolanaTransaction } = useSignSolanaTransaction();
   const { wallets: solanaWallets, ready: solanaWalletsReady } = useSolanaWallets();
-
-  const runtime = useMemo<PrivyRuntime>(
-    () => ({
-      configured: true,
-      ready,
-      authenticated,
-      error: error ?? null,
-      embeddedWallet: getEmbeddedConnectedWallet(wallets) ?? null,
-      login: () => login({ loginMethods: ["email", "wallet"] }),
-      logout,
-      createWallet,
-      exportWallet: async (address) => {
-        await exportWallet({ address });
-      },
-      solana: {
-        configured: true,
-        ready: solanaWalletsReady,
-        wallets: solanaWallets,
-        createWallet: createSolanaWallet,
-        signTransaction: signSolanaTransaction,
-      },
-    }),
-    [
-      authenticated,
-      createSolanaWallet,
-      createWallet,
-      error,
-      exportWallet,
-      login,
-      logout,
-      ready,
-      signSolanaTransaction,
-      solanaWallets,
-      solanaWalletsReady,
-      wallets,
-    ]
-  );
-
-  return <WalletRuntimeBridge privy={runtime}>{children}</WalletRuntimeBridge>;
-}
-
-function WalletRuntimeBridge({
-  children,
-  privy,
-}: {
-  children: React.ReactNode;
-  privy: PrivyRuntime;
-}) {
-  const queryClient = useQueryClient();
-  const account = useAccount();
-  const connectorClient = useConnectorClient();
-  const { connectors, connectAsync } = useConnect();
-  const { disconnectAsync } = useDisconnect();
-  const { switchChainAsync } = useSwitchChain();
-  const [walletBusyAction, setWalletBusyAction] = useState<WalletState["walletBusyAction"]>(null);
-  const [identityBusyAction, setIdentityBusyAction] =
-    useState<WalletState["identityBusyAction"]>(null);
-  const [walletError, setWalletError] = useState<string | null>(null);
-  const [identityActionError, setIdentityActionError] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
-  const [preference, setPreference] = useState<WalletPreference>("auto");
-  const [preferenceLoaded, setPreferenceLoaded] = useState(false);
-  const [walletPickerOpen, setWalletPickerOpen] = useState(false);
-  const [embeddedWalletClient, setEmbeddedWalletClient] = useState<ActiveWalletClient | null>(null);
-  const closeWalletPicker = useCallback(() => setWalletPickerOpen(false), []);
+  const [locallyDisconnected, setLocallyDisconnected] = useState(false);
+  const [requestedExternalAddress, setRequestedExternalAddress] = useState<string | null>(null);
+  const { connectWallet: promptExternalWallet } = useConnectWallet({
+    onSuccess: ({ wallet }) => {
+      if (wallet.type === "ethereum") setRequestedExternalAddress(wallet.address);
+    },
+    onError: () => setActionError("The external wallet connection was not completed."),
+  });
+
+  const embeddedWallet = getEmbeddedConnectedWallet(wallets);
+  const selectedWallet = locallyDisconnected
+    ? undefined
+    : selectActiveStaticsWallet(wallets, wagmiAccount.address);
+  const address = selectedWallet?.address ?? null;
+  const walletKind = selectedWallet
+    ? selectedWallet.walletClientType === "privy" || selectedWallet.walletClientType === "privy-v2"
+      ? "embedded"
+      : "external"
+    : null;
+  const chainId =
+    connectedWalletChainId(selectedWallet) ??
+    (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
+      ? (wagmiAccount.chainId ?? null)
+      : null);
+  const targetChain = walletEnvironment.defaultChain;
+  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const storedFundingChain = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
-      if (Number.isSafeInteger(storedFundingChain) && isFundingChainId(storedFundingChain)) {
-        setFundingChainId(storedFundingChain);
+      const stored = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
+      if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
+        setFundingChainId(stored);
       }
-      setPreference(parseWalletPreference(window.localStorage.getItem(ACTIVE_WALLET_STORAGE_KEY)));
-      setPreferenceLoaded(true);
     }, 0);
     return () => window.clearTimeout(timeout);
   }, []);
 
-  const persistPreference = useCallback((next: WalletPreference) => {
-    setPreference(next);
-    if (next === "auto") window.localStorage.removeItem(ACTIVE_WALLET_STORAGE_KEY);
-    else window.localStorage.setItem(ACTIVE_WALLET_STORAGE_KEY, next);
-  }, []);
-
-  const embeddedWallet = privy.embeddedWallet;
-  const selectedKind = selectWalletKind({
-    preference,
-    externalAvailable: account.isConnected && Boolean(account.address),
-    embeddedAvailable: Boolean(embeddedWallet),
-  });
-  const address =
-    selectedKind === "external"
-      ? (account.address ?? null)
-      : selectedKind === "embedded"
-        ? (embeddedWallet?.address ?? null)
-        : null;
-  const chainId =
-    selectedKind === "external"
-      ? (account.chainId ?? null)
-      : selectedKind === "embedded"
-        ? connectedWalletChainId(embeddedWallet)
-        : null;
-  const targetChain = walletEnvironment.defaultChain;
-  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
-
-  const getEthereumProvider = useCallback(async (): Promise<WalletEthereumProvider | null> => {
-    if (selectedKind === "embedded") {
-      const provider = await embeddedWallet?.getEthereumProvider();
-      return isEthereumProvider(provider) ? provider : null;
-    }
-    if (selectedKind === "external") {
-      const provider = await account.connector?.getProvider();
-      return isEthereumProvider(provider) ? provider : null;
-    }
-    return null;
-  }, [account.connector, embeddedWallet, selectedKind]);
-
   useEffect(() => {
-    let active = true;
-    if (selectedKind !== "embedded" || !address || chainId === null) {
-      const timeout = window.setTimeout(() => setEmbeddedWalletClient(null), 0);
-      return () => window.clearTimeout(timeout);
-    }
-    const chain = walletChains.find((candidate) => candidate.id === chainId);
-    if (!chain) {
-      const timeout = window.setTimeout(() => setEmbeddedWalletClient(null), 0);
-      return () => window.clearTimeout(timeout);
-    }
-    void getEthereumProvider()
-      .then((provider) => {
-        if (!active || !provider) return;
-        setEmbeddedWalletClient(
-          createWalletClient({
-            account: getAddress(address),
-            chain,
-            transport: custom(provider as EIP1193Provider),
-          }) as ActiveWalletClient
-        );
+    if (!requestedExternalAddress) return;
+    const requestedWallet = wallets.find(
+      (wallet) => wallet.address.toLowerCase() === requestedExternalAddress.toLowerCase()
+    );
+    if (!requestedWallet) return;
+
+    let cancelled = false;
+    void setActiveWallet(requestedWallet)
+      .then(() => {
+        if (cancelled) return;
+        setLocallyDisconnected(false);
+        setRequestedExternalAddress(null);
       })
       .catch(() => {
-        if (active) setEmbeddedWalletClient(null);
+        if (cancelled) return;
+        setActionError("The external wallet could not be activated.");
+        setRequestedExternalAddress(null);
       });
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [address, chainId, getEthereumProvider, selectedKind]);
+  }, [requestedExternalAddress, setActiveWallet, wallets]);
 
-  const externalWalletClient =
-    selectedKind === "external" &&
-    walletClientMatchesAddress(walletClientAccountAddress(connectorClient.data?.account), address)
-      ? (connectorClient.data as ActiveWalletClient)
-      : null;
-  const walletClient = selectedKind === "external" ? externalWalletClient : embeddedWalletClient;
+  const runAction = async (
+    action: NonNullable<WalletState["busyAction"]>,
+    operation: () => Promise<void>
+  ) => {
+    setActionError(null);
+    setBusyAction(action);
+    try {
+      await operation();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "The wallet request failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
-  useEffect(() => {
-    if (!preferenceLoaded) return;
-    void queryClient.invalidateQueries();
-  }, [address, preferenceLoaded, queryClient]);
-
-  const runWalletAction = useCallback(
-    async (
-      action: NonNullable<WalletState["walletBusyAction"]>,
-      operation: () => Promise<void>
-    ) => {
-      setWalletError(null);
-      setWalletBusyAction(action);
-      try {
-        await operation();
-      } catch (error) {
-        setWalletError(error instanceof Error ? error.message : "The wallet request failed.");
-      } finally {
-        setWalletBusyAction(null);
-      }
-    },
-    []
-  );
-
-  const runIdentityAction = useCallback(
-    async (
-      action: NonNullable<WalletState["identityBusyAction"]>,
-      operation: () => Promise<void>
-    ) => {
-      setIdentityActionError(null);
-      setIdentityBusyAction(action);
-      try {
-        await operation();
-      } catch (error) {
-        setIdentityActionError(
-          error instanceof Error ? error.message : "The Privy account request failed."
-        );
-      } finally {
-        setIdentityBusyAction(null);
-      }
-    },
-    []
-  );
-
-  const walletOptions = useMemo<WalletState["walletOptions"]>(() => {
-    const externalOptions = connectors.map((connector) => ({
-      id: connector.uid,
-      name: connector.name === "Injected" ? "Browser wallet" : connector.name,
-      kind: "external" as const,
-      connected: account.isConnected && account.connector?.uid === connector.uid,
-    }));
-    return embeddedWallet
-      ? [
-          ...externalOptions,
-          {
-            id: "embedded",
-            name: "Privy embedded wallet",
-            kind: "embedded" as const,
-            connected: selectedKind === "embedded",
-          },
-        ]
-      : externalOptions;
-  }, [account.connector?.uid, account.isConnected, connectors, embeddedWallet, selectedKind]);
-
-  const identityStatus: PrivyIdentityStatus = derivePrivyIdentityStatus({
-    configured: privy.configured,
-    ready: privy.ready,
-    authenticated: privy.authenticated,
-    hasError: Boolean(privy.error),
-  });
-  const status = deriveWalletRuntimeStatus({
-    preferenceLoaded,
-    connecting: account.isConnecting || account.isReconnecting,
-    address,
-    selectedKind,
-    hasError: Boolean(walletError),
-  });
+  let status: WalletState["status"] = "loading";
+  if (locallyDisconnected) status = "signed-out";
+  else if (privyError) status = "error";
+  else if (ready && !authenticated) status = "signed-out";
+  else if (ready && authenticated && walletsReady && !selectedWallet) status = "wallet-missing";
+  else if (ready && authenticated && walletsReady && selectedWallet) status = "ready";
 
   const value = useMemo<WalletState>(
     () => ({
       status,
-      identityStatus,
-      authenticated: privy.authenticated,
+      authenticated,
       address,
-      walletKind: selectedKind,
-      walletClient,
+      walletKind,
       networkName: targetChain.name,
       chainId,
       targetChainId: targetChain.id,
@@ -403,83 +182,58 @@ function WalletRuntimeBridge({
       fundingWalletOnSelectedChain: chainId === fundingChainId,
       fundingNetworks: fundingNetworkSummaries,
       explorerUrl: address ? getAddressExplorerUrl(targetChain, address) : null,
-      error: walletError,
-      identityError: identityActionError ?? privy.error?.message ?? null,
-      walletBusyAction,
-      identityBusyAction,
-      busyAction: walletBusyAction ?? identityBusyAction,
-      walletPickerOpen,
-      walletOptions,
+      error: actionError ?? privyError?.message ?? null,
+      busyAction,
+      locallyDisconnected,
       login: () => {
-        setIdentityActionError(null);
-        privy.login();
+        if (locallyDisconnected) {
+          return promptExternalWallet({ walletChainType: "ethereum-only" });
+        }
+        login({ loginMethods: ["email", "wallet"] });
       },
       connectWallet: () => {
-        setWalletError(null);
-        setWalletPickerOpen(true);
+        if (locallyDisconnected) {
+          return promptExternalWallet({ walletChainType: "ethereum-only" });
+        }
+        login({ loginMethods: ["wallet"] });
       },
-      closeWalletPicker,
-      connectWalletOption: (id) =>
-        runWalletAction("connect", async () => {
-          if (id === "embedded") {
-            if (!embeddedWallet) throw new Error("The embedded wallet is unavailable.");
-            persistPreference("embedded");
-            setWalletPickerOpen(false);
-            return;
-          }
-          const connector = connectors.find((candidate) => candidate.uid === id);
-          if (!connector) throw new Error("That wallet connector is unavailable.");
-          if (!account.isConnected || account.connector?.uid !== connector.uid) {
-            await connectAsync({ connector });
-          }
-          persistPreference("external");
-          setWalletPickerOpen(false);
+      connectExternalWallet: () => {
+        setActionError(null);
+        promptExternalWallet({ walletChainType: "ethereum-only" });
+      },
+      disconnectWallet: () => setLocallyDisconnected(true),
+      reconnectWallet: () =>
+        runAction("connect", async () => {
+          if (!embeddedWallet) throw new Error("The Privy embedded wallet is unavailable.");
+          await setActiveWallet(embeddedWallet);
+          setLocallyDisconnected(false);
         }),
       createWallet: () =>
-        runIdentityAction("create", async () => {
-          if (!privy.configured) throw new Error("Privy embedded wallets are not configured.");
-          if (!privy.authenticated) throw new Error("Sign in before creating an embedded wallet.");
-          await privy.createWallet();
-          persistPreference("embedded");
+        runAction("create", async () => {
+          await createWallet();
         }),
-      disconnectWallet: () =>
-        runWalletAction("disconnect", async () => {
-          persistPreference("none");
-          setWalletPickerOpen(false);
-          if (selectedKind === "external" && account.connector) {
-            await disconnectAsync({ connector: account.connector });
-          }
-        }),
-      signOut: () => runIdentityAction("sign-out", privy.logout),
       switchNetwork: () =>
-        runWalletAction("switch", async () => {
-          if (selectedKind === "external") {
-            await switchChainAsync({ chainId: targetChain.id });
-            return;
-          }
-          if (selectedKind === "embedded" && embeddedWallet) {
-            await embeddedWallet.switchChain(targetChain.id);
-            return;
-          }
-          throw new Error("Connect a wallet before switching networks.");
+        runAction("switch", async () => {
+          if (!selectedWallet) throw new Error("Connect a wallet before switching networks.");
+          await selectedWallet.switchChain(targetChain.id);
         }),
       selectFundingNetwork: (nextChainId) =>
-        runWalletAction("funding-switch", async () => {
+        runAction("funding-switch", async () => {
           const nextNetwork = getFundingNetwork(nextChainId);
           if (!nextNetwork) throw new Error("Choose a supported funding network.");
           setFundingChainId(nextChainId);
           window.localStorage.setItem(FUNDING_CHAIN_STORAGE_KEY, String(nextChainId));
-          if (selectedKind === "external") {
-            await switchChainAsync({ chainId: nextChainId });
-          } else if (selectedKind === "embedded" && embeddedWallet) {
-            await embeddedWallet.switchChain(nextChainId);
-          }
+          if (!selectedWallet) return;
+          await selectedWallet.switchChain(nextChainId);
         }),
-      getEthereumProvider,
+      getEthereumProvider: async () => {
+        if (!selectedWallet) return null;
+        return selectedWallet.getEthereumProvider();
+      },
       exportWallet: () =>
-        runIdentityAction("export", async () => {
+        runAction("export", async () => {
           if (!embeddedWallet) throw new Error("Only an embedded wallet can be exported here.");
-          await privy.exportWallet(embeddedWallet.address);
+          await exportWallet({ address: embeddedWallet.address });
         }),
       copyAddress: async () => {
         if (!address) return;
@@ -487,40 +241,42 @@ function WalletRuntimeBridge({
       },
     }),
     [
-      account.connector,
-      account.isConnected,
+      actionError,
       address,
+      authenticated,
+      busyAction,
       chainId,
-      closeWalletPicker,
-      connectAsync,
-      connectors,
-      disconnectAsync,
+      createWallet,
       embeddedWallet,
+      exportWallet,
       fundingChainId,
-      fundingNetwork.label,
-      getEthereumProvider,
-      identityActionError,
-      identityBusyAction,
-      identityStatus,
-      persistPreference,
-      privy,
-      runIdentityAction,
-      runWalletAction,
-      selectedKind,
+      fundingNetwork,
+      login,
+      locallyDisconnected,
+      promptExternalWallet,
+      privyError,
+      selectedWallet,
+      setActiveWallet,
       status,
-      switchChainAsync,
       targetChain,
-      walletClient,
-      walletBusyAction,
-      walletError,
-      walletOptions,
-      walletPickerOpen,
+      walletKind,
     ]
+  );
+
+  const solanaValue = useMemo<SolanaWalletState>(
+    () => ({
+      configured: true,
+      ready: solanaWalletsReady,
+      wallets: solanaWallets,
+      createWallet: createSolanaWallet,
+      signTransaction: signSolanaTransaction,
+    }),
+    [createSolanaWallet, signSolanaTransaction, solanaWallets, solanaWalletsReady]
   );
 
   return (
     <WalletContext.Provider value={value}>
-      <SolanaWalletContext.Provider value={privy.solana}>{children}</SolanaWalletContext.Provider>
+      <SolanaWalletContext.Provider value={solanaValue}>{children}</SolanaWalletContext.Provider>
     </WalletContext.Provider>
   );
 }
@@ -551,8 +307,36 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
         plugins: [defaultSolanaRpcsPlugin()],
       }}
     >
-      <PrivyRuntimeBridge>{children}</PrivyRuntimeBridge>
+      <WagmiProvider config={wagmiConfig}>
+        <WalletBridge>{children}</WalletBridge>
+      </WagmiProvider>
     </PrivyProvider>
+  );
+}
+
+function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
+  const [fundingChainId, setFundingChainId] = useState(8_453);
+  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
+  const value = useMemo<WalletState>(
+    () => ({
+      ...defaultWalletState,
+      fundingChainId,
+      fundingNetworkName: fundingNetwork.label,
+      fundingNetworks: fundingNetworkSummaries,
+      selectFundingNetwork: async (nextChainId) => {
+        const nextNetwork = getFundingNetwork(nextChainId);
+        if (!nextNetwork) return;
+        setFundingChainId(nextChainId);
+      },
+    }),
+    [fundingChainId, fundingNetwork.label]
+  );
+  return (
+    <WalletContext.Provider value={value}>
+      <SolanaWalletContext.Provider value={defaultSolanaWalletState}>
+        {children}
+      </SolanaWalletContext.Provider>
+    </WalletContext.Provider>
   );
 }
 
@@ -573,13 +357,11 @@ export function DAppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ProtocolQueryReconciler />
-      <WagmiProvider config={wagmiConfig}>
-        {walletEnvironment.privyConfigured ? (
-          <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
-        ) : (
-          <WalletRuntimeBridge privy={unavailablePrivyRuntime}>{children}</WalletRuntimeBridge>
-        )}
-      </WagmiProvider>
+      {walletEnvironment.configured ? (
+        <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
+      ) : (
+        <UnconfiguredWalletBridge>{children}</UnconfiguredWalletBridge>
+      )}
     </QueryClientProvider>
   );
 }
