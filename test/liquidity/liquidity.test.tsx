@@ -1,20 +1,67 @@
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@/test/render";
+import { describe, expect, it, vi } from "vitest";
 
-import { lpStakeEligibility, resolveLiquidityPool } from "@/components/liquidity/LiquidityPage";
+import {
+  LiquidityContributionForm,
+  lpStakeEligibility,
+  resolveLiquidityPool,
+} from "@/components/liquidity/LiquidityPage";
 import {
   basketLiquiditySnapshot,
   borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
   canonicalFullRange,
   canonicalPoolLabel,
+  liquidityWalletBalances,
   liquidityActivationWait,
   liquidityPositionActions,
+  maximumWalletLiquidityInput,
+  quoteWalletLiquidity,
   recommendedLiquidityAction,
   v4PoolId,
   type CanonicalPoolRecord,
   type LpPositionRecord,
 } from "@/lib/liquidity/liquidity";
 import type { BasketRecord } from "@/lib/baskets/baskets";
+
+const Q96 = 1n << 96n;
+const unit = 10n ** 18n;
+const basketAddress = "0x0000000000000000000000000000000000000002" as const;
+const assetAddress = "0x0000000000000000000000000000000000000001" as const;
+
+const basketToken = {
+  address: basketAddress,
+  name: "Test Pool Asset",
+  symbol: "TPA1",
+  decimals: 18,
+  metadataAvailable: true,
+};
+const assetToken = {
+  address: assetAddress,
+  name: "Test Asset",
+  symbol: "TST",
+  decimals: 18,
+  metadataAvailable: true,
+};
+
+function contributionPool(): CanonicalPoolRecord {
+  return {
+    basketId: 1n,
+    basketName: "Test Pool",
+    basketSymbol: "TPA1",
+    basketToken,
+    asset: assetToken,
+    poolId: `0x${"11".repeat(32)}`,
+    key: {
+      currency0: assetAddress,
+      currency1: basketAddress,
+      fee: 0,
+      tickSpacing: 10,
+      hooks: "0x0000000000000000000000000000000000000003",
+    },
+    sqrtPriceX96: Q96,
+  } as unknown as CanonicalPoolRecord;
+}
 
 describe("canonical liquidity identifiers", () => {
   it("anchors borrowed-liquidity deadlines to chain time", () => {
@@ -170,5 +217,115 @@ describe("canonical liquidity identifiers", () => {
     ]);
     expect(liquidityActivationWait(ready, 100n)).toBeNull();
     expect(recommendedLiquidityAction(ready, 100n)).toBe("activate");
+  });
+
+  it("maps basket and constituent balances into pool currency order", () => {
+    const basket = {
+      basketId: 1n,
+      token: basketToken,
+      walletBalance: 80n * unit,
+      constituents: [{ token: assetToken, walletBalance: 25n * unit }],
+    } as unknown as BasketRecord;
+
+    expect(liquidityWalletBalances(contributionPool(), [basket])).toEqual([25n * unit, 80n * unit]);
+  });
+
+  it("quotes the paired maximum and a buffered executable deposit from one asset", () => {
+    const quote = quoteWalletLiquidity(contributionPool(), 1, 100n * unit);
+
+    expect(quote).not.toBeNull();
+    expect(quote?.selectedIndex).toBe(1);
+    expect(quote?.maximumAmounts[1]).toBe(100n * unit);
+    expect(quote?.maximumAmounts[0]).toBeGreaterThan(0n);
+    expect(quote?.estimatedAmounts[0]).toBeLessThanOrEqual(quote!.maximumAmounts[0]);
+    expect(quote?.estimatedAmounts[1]).toBeLessThan(quote!.maximumAmounts[1]);
+  });
+
+  it("makes Max executable by both balances and reports the limiting side", () => {
+    const pool = contributionPool();
+    const balances = [20n * unit, 100n * unit] as const;
+    const maximum = maximumWalletLiquidityInput(pool, balances, 1);
+
+    expect(maximum).not.toBeNull();
+    expect(maximum?.limitingIndex).toBe(0);
+    const quote = quoteWalletLiquidity(pool, 1, maximum!.inputAmount);
+    expect(quote?.maximumAmounts[0]).toBeLessThanOrEqual(balances[0]);
+    expect(quote?.maximumAmounts[1]).toBeLessThanOrEqual(balances[1]);
+  });
+
+  it("preserves the quoted position size when the input asset switches", () => {
+    const pool = contributionPool();
+    const basketQuote = quoteWalletLiquidity(pool, 1, 100n * unit);
+    const assetQuote = quoteWalletLiquidity(pool, 0, basketQuote!.maximumAmounts[0]);
+
+    expect(assetQuote?.liquidity).toBe(basketQuote?.liquidity);
+    expect(assetQuote?.maximumAmounts).toEqual(basketQuote?.maximumAmounts);
+  });
+
+  it("rejects zero and uint128-overflowing single-asset requests", () => {
+    const pool = contributionPool();
+    expect(quoteWalletLiquidity(pool, 0, 0n)).toBeNull();
+    expect(quoteWalletLiquidity(pool, 0, 1n << 128n)).toBeNull();
+  });
+});
+
+describe("single-input liquidity contribution", () => {
+  it("surfaces the paired requirement, balances, switch, and Max actions", () => {
+    const onSwitch = vi.fn();
+    const onMax = vi.fn();
+    const quote = {
+      selectedIndex: 1 as const,
+      liquidity: 1n,
+      estimatedAmounts: [995n * unit, 1_990n * unit] as const,
+      maximumAmounts: [1_000n * unit, 2_000n * unit] as const,
+    };
+    render(
+      <LiquidityContributionForm
+        tokens={[assetToken, basketToken]}
+        balances={[1_000n * unit, 2_000n * unit]}
+        selectedIndex={1}
+        amountInput="2000"
+        quote={quote}
+        maxLimitedBy={0}
+        pending={false}
+        onAmountChange={vi.fn()}
+        onSwitch={onSwitch}
+        onMax={onMax}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "Maximum TPA1" })).toHaveValue("2000");
+    expect(screen.getByText("Up to 1,000 TST")).toBeInTheDocument();
+    expect(screen.getAllByText("Sufficient")).toHaveLength(2);
+    expect(screen.getByText(/limited by your TST balance/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use TST as the input asset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Max" }));
+    expect(onSwitch).toHaveBeenCalledOnce();
+    expect(onMax).toHaveBeenCalledOnce();
+  });
+
+  it("shows the exact counterpart shortfall", () => {
+    render(
+      <LiquidityContributionForm
+        tokens={[assetToken, basketToken]}
+        balances={[900n * unit, 2_000n * unit]}
+        selectedIndex={1}
+        amountInput="2000"
+        quote={{
+          selectedIndex: 1,
+          liquidity: 1n,
+          estimatedAmounts: [995n * unit, 1_990n * unit],
+          maximumAmounts: [1_000n * unit, 2_000n * unit],
+        }}
+        maxLimitedBy={null}
+        pending={false}
+        onAmountChange={vi.fn()}
+        onSwitch={vi.fn()}
+        onMax={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Needs 100 more")).toBeInTheDocument();
+    expect(screen.getAllByText("Sufficient")).toHaveLength(1);
   });
 });

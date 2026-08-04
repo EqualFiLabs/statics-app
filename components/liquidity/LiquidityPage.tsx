@@ -24,7 +24,6 @@ import {
   buildPermit2ApproveCall,
   buildStakeLiquidityPositionCall,
   buildUnstakeLiquidityPositionCall,
-  maximumLiquidityForAmounts,
   permit2AllowanceAbi,
   staticsAbi,
   v4PositionManagerReadAbi,
@@ -36,14 +35,20 @@ import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canonicalFullRange,
   canonicalPoolLabel,
+  liquidityWalletBalances,
   liquidityActivationWait,
   liquidityPositionActions,
   loadLiquidityCatalog,
+  maximumWalletLiquidityInput,
+  quoteWalletLiquidity,
   recommendedLiquidityAction,
   v4PoolId,
   type CanonicalPoolRecord,
+  type LiquidityTokenIndex,
   type LpPositionRecord,
+  type WalletLiquidityQuote,
 } from "@/lib/liquidity/liquidity";
+import type { TokenMetadata } from "@/lib/baskets/baskets";
 import { describePositionError } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
@@ -92,6 +97,143 @@ function amount(value: bigint, decimals: number): string {
   });
 }
 
+function inputAmount(value: bigint, decimals: number, locale: string): string {
+  const formatted = formatUnits(value, decimals);
+  return locale === "es" ? formatted.replace(".", ",") : formatted;
+}
+
+export function LiquidityContributionForm({
+  tokens,
+  balances,
+  selectedIndex,
+  amountInput,
+  quote,
+  maxLimitedBy,
+  pending,
+  onAmountChange,
+  onSwitch,
+  onMax,
+}: Readonly<{
+  tokens: readonly [TokenMetadata, TokenMetadata];
+  balances: readonly [bigint, bigint] | null;
+  selectedIndex: LiquidityTokenIndex;
+  amountInput: string;
+  quote: WalletLiquidityQuote | null;
+  maxLimitedBy: LiquidityTokenIndex | null;
+  pending: boolean;
+  onAmountChange: (value: string) => void;
+  onSwitch: () => void;
+  onMax: () => void;
+}>) {
+  const selectedToken = tokens[selectedIndex];
+  const otherIndex: LiquidityTokenIndex = selectedIndex === 0 ? 1 : 0;
+  const otherToken = tokens[otherIndex];
+  return (
+    <div className="liquidity-contribution">
+      <div className="basket-field">
+        <label htmlFor="liquidity-contribution-amount">Supply up to</label>
+        <div className="liquidity-amount-control">
+          <input
+            id="liquidity-contribution-amount"
+            aria-label={`Maximum ${selectedToken.symbol}`}
+            inputMode="decimal"
+            placeholder="0.00"
+            value={amountInput}
+            disabled={pending}
+            onChange={(event) => onAmountChange(event.target.value)}
+          />
+          <button
+            type="button"
+            className="liquidity-asset-switch"
+            aria-label={`Use ${otherToken.symbol} as the input asset`}
+            disabled={pending}
+            onClick={onSwitch}
+          >
+            {selectedToken.symbol} ⇄
+          </button>
+          <button
+            type="button"
+            className="liquidity-max-button"
+            disabled={pending || !balances}
+            onClick={onMax}
+          >
+            Max
+          </button>
+        </div>
+      </div>
+
+      {quote && (
+        <section className="liquidity-contribution-quote" aria-live="polite">
+          <div className="liquidity-pair-requirement">
+            <span>Paired asset required</span>
+            <strong>
+              Up to {amount(quote.maximumAmounts[otherIndex], otherToken.decimals)}{" "}
+              {otherToken.symbol}
+            </strong>
+          </div>
+          <div className="liquidity-quote-columns">
+            <div>
+              <span>Estimated deposit</span>
+              <dl>
+                {tokens.map((token, index) => (
+                  <div key={token.address}>
+                    <dt>{token.symbol}</dt>
+                    <dd>{amount(quote.estimatedAmounts[index]!, token.decimals)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div>
+              <span>Maximum spend</span>
+              <dl>
+                {tokens.map((token, index) => (
+                  <div key={token.address}>
+                    <dt>{token.symbol}</dt>
+                    <dd>{amount(quote.maximumAmounts[index]!, token.decimals)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+          <small>
+            Maximums include a 0.50% price-movement buffer. Unused tokens stay in or return to your
+            wallet.
+          </small>
+        </section>
+      )}
+
+      <div className="liquidity-balance-list" aria-live="polite">
+        {tokens.map((token, index) => {
+          const balance = balances?.[index] ?? 0n;
+          const required = quote?.maximumAmounts[index] ?? 0n;
+          const insufficient = Boolean(quote && balances && balance < required);
+          return (
+            <div
+              key={token.address}
+              className={
+                insufficient ? "is-insufficient" : quote && balances ? "is-sufficient" : undefined
+              }
+            >
+              <span>{token.symbol} balance</span>
+              <strong>{balances ? amount(balance, token.decimals) : "Loading…"}</strong>
+              {insufficient ? (
+                <small>Needs {amount(required - balance, token.decimals)} more</small>
+              ) : quote && balances ? (
+                <small>Sufficient</small>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {maxLimitedBy !== null && (
+        <p className="liquidity-limiting-balance" role="status">
+          Maximum position is limited by your {tokens[maxLimitedBy].symbol} balance.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function LiquidityPage() {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
@@ -109,8 +251,9 @@ function LiquidityRuntime() {
   const [poolId, setPoolId] = useState("");
   const [tokenId, setTokenId] = useState("");
   const [positionId, setPositionId] = useState("");
-  const [amount0, setAmount0] = useState("");
-  const [amount1, setAmount1] = useState("");
+  const [inputSide, setInputSide] = useState<"basket" | "asset">("basket");
+  const [amountInput, setAmountInput] = useState("");
+  const [maxLimitedBy, setMaxLimitedBy] = useState<LiquidityTokenIndex | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const catalog = useQuery({
@@ -154,17 +297,76 @@ function LiquidityRuntime() {
       pool.key.currency1 === pool.basketToken.address ? pool.basketToken : pool.asset,
     ] as const;
   }, [pool]);
-  const amountInputsReady = (() => {
-    if (!tokens) return false;
+  const selectedIndex: LiquidityTokenIndex =
+    tokens && pool
+      ? inputSide === "basket"
+        ? tokens[0].address === pool.basketToken.address
+          ? 0
+          : 1
+        : tokens[0].address === pool.asset.address
+          ? 0
+          : 1
+      : 0;
+  const balances = useMemo(
+    () => (pool && catalog.data ? liquidityWalletBalances(pool, catalog.data.baskets) : null),
+    [catalog.data, pool]
+  );
+  const parsedInput = useMemo(() => {
+    if (!tokens) return null;
     try {
-      return (
-        parseLocalizedUnits(amount0, tokens[0].decimals, locale) > 0n &&
-        parseLocalizedUnits(amount1, tokens[1].decimals, locale) > 0n
-      );
+      return parseLocalizedUnits(amountInput, tokens[selectedIndex].decimals, locale);
     } catch {
-      return false;
+      return null;
     }
-  })();
+  }, [amountInput, locale, selectedIndex, tokens]);
+  const contributionQuote = useMemo(
+    () =>
+      pool && parsedInput !== null ? quoteWalletLiquidity(pool, selectedIndex, parsedInput) : null,
+    [parsedInput, pool, selectedIndex]
+  );
+  const balanceShortfall: LiquidityTokenIndex | null =
+    contributionQuote && balances
+      ? contributionQuote.maximumAmounts[0] > balances[0]
+        ? 0
+        : contributionQuote.maximumAmounts[1] > balances[1]
+          ? 1
+          : null
+      : null;
+
+  const resetContribution = () => {
+    setInputSide("basket");
+    setAmountInput("");
+    setMaxLimitedBy(null);
+  };
+
+  const switchContributionAsset = () => {
+    if (!tokens) return;
+    const otherIndex: LiquidityTokenIndex = selectedIndex === 0 ? 1 : 0;
+    setAmountInput(
+      contributionQuote
+        ? inputAmount(
+            contributionQuote.maximumAmounts[otherIndex],
+            tokens[otherIndex].decimals,
+            locale
+          )
+        : ""
+    );
+    setInputSide(inputSide === "basket" ? "asset" : "basket");
+    setMaxLimitedBy(null);
+    setError(null);
+  };
+
+  const useMaximumContribution = () => {
+    if (!pool || !tokens || !balances) return;
+    const maximum = maximumWalletLiquidityInput(pool, balances, selectedIndex);
+    if (!maximum) {
+      setError("Both pool assets need a positive wallet balance before adding liquidity.");
+      return;
+    }
+    setAmountInput(inputAmount(maximum.inputAmount, tokens[selectedIndex].decimals, locale));
+    setMaxLimitedBy(maximum.limitingIndex);
+    setError(null);
+  };
 
   const send = async (
     kind:
@@ -211,7 +413,7 @@ function LiquidityRuntime() {
     });
   };
 
-  const create = async (selectedPool: CanonicalPoolRecord) => {
+  const create = async (selectedPool: CanonicalPoolRecord, quote: WalletLiquidityQuote) => {
     if (
       !tokens ||
       !wallet ||
@@ -222,21 +424,9 @@ function LiquidityRuntime() {
       return;
     if (selectedPool.decommissioned || !selectedPool.managerSynced)
       throw new Error("The pool must be live and manager-synced.");
-    const maximums = [
-      parseLocalizedUnits(amount0, tokens[0].decimals, locale),
-      parseLocalizedUnits(amount1, tokens[1].decimals, locale),
-    ] as const;
+    const maximums = quote.maximumAmounts;
     const [lower, upper] = canonicalFullRange(selectedPool.key.tickSpacing);
-    const liquidity =
-      (maximumLiquidityForAmounts(
-        selectedPool.sqrtPriceX96,
-        lower,
-        upper,
-        maximums[0],
-        maximums[1]
-      ) *
-        9_950n) /
-      10_000n;
+    const liquidity = quote.liquidity;
     if (liquidity === 0n) throw new Error("The entered amounts produce zero liquidity.");
     const contracts = deploymentState.deployment.liquidity.contracts;
     for (let index = 0; index < 2; index += 1) {
@@ -327,7 +517,10 @@ function LiquidityRuntime() {
     await send(
       "create-lp-nft",
       `Create ${selectedPool.basketSymbol}/${selectedPool.asset.symbol} liquidity position`,
-      `${liquidity} liquidity`,
+      `${amount(quote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${amount(
+        quote.estimatedAmounts[1],
+        tokens[1].decimals
+      )} ${tokens[1].symbol}`,
       contracts.positionManager,
       buildMintV4PositionCall({
         poolKey: selectedPool.key,
@@ -646,15 +839,9 @@ function LiquidityRuntime() {
         throw new Error("The selected liquidity position does not belong to the selected pool.");
       if (pool.decommissioned || !pool.managerSynced)
         throw new Error("The pool is not available for an increase.");
-      const maximums = [
-        parseLocalizedUnits(amount0, tokens[0].decimals, locale),
-        parseLocalizedUnits(amount1, tokens[1].decimals, locale),
-      ] as const;
-      const [lower, upper] = canonicalFullRange(pool.key.tickSpacing);
-      const delta =
-        (maximumLiquidityForAmounts(pool.sqrtPriceX96, lower, upper, maximums[0], maximums[1]) *
-          9_950n) /
-        10_000n;
+      if (!contributionQuote) throw new Error("Enter a valid liquidity contribution.");
+      const maximums = contributionQuote.maximumAmounts;
+      const delta = contributionQuote.liquidity;
       if (delta === 0n) throw new Error("The entered amounts produce zero liquidity.");
       for (let index = 0; index < 2; index += 1) {
         const token = tokens[index]!;
@@ -708,7 +895,10 @@ function LiquidityRuntime() {
       await send(
         "increase-lp-nft",
         `Increase Liquidity position #${position.tokenId}`,
-        `${delta} liquidity`,
+        `${amount(contributionQuote.estimatedAmounts[0], tokens[0].decimals)} ${tokens[0].symbol} + ${amount(
+          contributionQuote.estimatedAmounts[1],
+          tokens[1].decimals
+        )} ${tokens[1].symbol}`,
         diamond,
         buildIncreaseStakedLiquidityCall(
           position.positionId,
@@ -823,7 +1013,8 @@ function LiquidityRuntime() {
     try {
       if (resolvedMode === "create") {
         if (!pool) throw new Error("No pool is selected.");
-        await create(pool);
+        if (!contributionQuote) throw new Error("Enter a valid liquidity contribution.");
+        await create(pool, contributionQuote);
       } else await manage();
       await catalog.refetch();
     } catch (cause) {
@@ -850,15 +1041,28 @@ function LiquidityRuntime() {
   const selectedPool = position
     ? catalog.data?.pools.find((candidate) => candidate.poolId === position.poolId)
     : undefined;
+  const contributionReason = (() => {
+    if (!tokens) return "Select a canonical pool.";
+    if (!amountInput.trim()) return `Enter a maximum ${tokens[selectedIndex].symbol} amount.`;
+    if (parsedInput === null) return "Enter a valid token amount.";
+    if (parsedInput <= 0n) return "Enter a positive token amount.";
+    if (!contributionQuote) return "The entered amount is too small or exceeds the position limit.";
+    if (!balances) return "Wallet balances are still loading.";
+    if (balanceShortfall !== null) {
+      const token = tokens[balanceShortfall];
+      const missing =
+        contributionQuote.maximumAmounts[balanceShortfall] - balances[balanceShortfall];
+      return `Your wallet needs ${amount(missing, token.decimals)} more ${token.symbol}.`;
+    }
+    return null;
+  })();
   const managementReason =
     resolvedMode === "create"
       ? !pool
         ? "Select a canonical pool."
         : pool.decommissioned || !pool.managerSynced
           ? "The selected pool is not live and synced."
-          : !amountInputsReady
-            ? "Enter a positive maximum amount for both tokens."
-            : null
+          : contributionReason
       : !position
         ? "Select a liquidity position."
         : resolvedMode === "stake"
@@ -870,9 +1074,7 @@ function LiquidityRuntime() {
               ? `Activation becomes available at block ${position.eligibleAtBlock.toString()}.`
               : null
             : resolvedMode === "increase"
-              ? !amountInputsReady
-                ? "Enter a positive maximum amount for both tokens."
-                : null
+              ? contributionReason
               : resolvedMode === "claim"
                 ? position.claimable0 === 0n && position.claimable1 === 0n
                   ? "No LP rewards are currently claimable."
@@ -940,6 +1142,7 @@ function LiquidityRuntime() {
                 onClick={() => {
                   setPoolId(item.poolId);
                   setMode("create");
+                  resetContribution();
                   setError(null);
                 }}
               >
@@ -1012,6 +1215,7 @@ function LiquidityRuntime() {
               onClick={() => {
                 setTokenId(item.tokenId.toString());
                 setMode(recommendedLiquidityAction(item, currentBlock));
+                resetContribution();
                 setError(null);
               }}
             >
@@ -1034,6 +1238,7 @@ function LiquidityRuntime() {
               className={resolvedMode === "create" ? "active" : undefined}
               onClick={() => {
                 setMode("create");
+                resetContribution();
                 setError(null);
               }}
             >
@@ -1063,6 +1268,7 @@ function LiquidityRuntime() {
                     }
                     onClick={() => {
                       setMode(item);
+                      resetContribution();
                       setError(null);
                     }}
                   >
@@ -1090,6 +1296,7 @@ function LiquidityRuntime() {
                   value={pool?.poolId ?? ""}
                   onChange={(event) => {
                     setPoolId(event.target.value);
+                    resetContribution();
                     setError(null);
                   }}
                 >
@@ -1100,20 +1307,24 @@ function LiquidityRuntime() {
                   ))}
                 </select>
               </label>
-              {tokens?.map((token, index) => (
-                <label className="basket-field" key={token.address}>
-                  <span>Maximum {token.symbol}</span>
-                  <input
-                    inputMode="decimal"
-                    value={index === 0 ? amount0 : amount1}
-                    onChange={(event) => {
-                      if (index === 0) setAmount0(event.target.value);
-                      else setAmount1(event.target.value);
-                      setError(null);
-                    }}
-                  />
-                </label>
-              ))}
+              {tokens && (
+                <LiquidityContributionForm
+                  tokens={tokens}
+                  balances={balances}
+                  selectedIndex={selectedIndex}
+                  amountInput={amountInput}
+                  quote={contributionQuote}
+                  maxLimitedBy={maxLimitedBy}
+                  pending={pending}
+                  onAmountChange={(value) => {
+                    setAmountInput(value);
+                    setMaxLimitedBy(null);
+                    setError(null);
+                  }}
+                  onSwitch={switchContributionAsset}
+                  onMax={useMaximumContribution}
+                />
+              )}
             </>
           ) : (
             <>
@@ -1127,6 +1338,7 @@ function LiquidityRuntime() {
                     );
                     setTokenId(event.target.value);
                     if (next) setMode(recommendedLiquidityAction(next, currentBlock));
+                    resetContribution();
                     setError(null);
                   }}
                 >
@@ -1156,21 +1368,24 @@ function LiquidityRuntime() {
                   <small>LP rewards accrue to this PositionNFT after activation.</small>
                 </label>
               )}
-              {resolvedMode === "increase" &&
-                tokens?.map((token, index) => (
-                  <label className="basket-field" key={token.address}>
-                    <span>Maximum {token.symbol}</span>
-                    <input
-                      inputMode="decimal"
-                      value={index === 0 ? amount0 : amount1}
-                      onChange={(event) => {
-                        if (index === 0) setAmount0(event.target.value);
-                        else setAmount1(event.target.value);
-                        setError(null);
-                      }}
-                    />
-                  </label>
-                ))}
+              {resolvedMode === "increase" && tokens && (
+                <LiquidityContributionForm
+                  tokens={tokens}
+                  balances={balances}
+                  selectedIndex={selectedIndex}
+                  amountInput={amountInput}
+                  quote={contributionQuote}
+                  maxLimitedBy={maxLimitedBy}
+                  pending={pending}
+                  onAmountChange={(value) => {
+                    setAmountInput(value);
+                    setMaxLimitedBy(null);
+                    setError(null);
+                  }}
+                  onSwitch={switchContributionAsset}
+                  onMax={useMaximumContribution}
+                />
+              )}
               {activationWait !== null && (
                 <p className="dollar-warning">
                   New liquidity becomes eligible for activation in {activationWait.toString()} block
