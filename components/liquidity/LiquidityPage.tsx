@@ -399,14 +399,7 @@ function LiquidityRuntime() {
       amount: summary,
       to,
       data,
-      sendTransaction: ({ to, data: nextData, value }) =>
-        walletClient.data!.sendTransaction({
-          account: wallet,
-          chain: walletClient.data!.chain,
-          to,
-          data: nextData,
-          value,
-        }),
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describePositionError,
       validateSimulation: options?.validateSimulation,
       verifyConfirmation: options?.verifyConfirmation,
@@ -471,7 +464,6 @@ function LiquidityRuntime() {
             },
           }
         );
-        return;
       }
       const permit = await publicClient.readContract({
         address: contracts.permit2,
@@ -506,7 +498,6 @@ function LiquidityRuntime() {
             },
           }
         );
-        return;
       }
     }
     const nextTokenId = await publicClient.readContract({
@@ -638,7 +629,6 @@ function LiquidityRuntime() {
             },
           }
         );
-        return;
       }
       await send(
         "stake-lp-nft",
@@ -883,7 +873,6 @@ function LiquidityRuntime() {
               },
             }
           );
-          return;
         }
       }
       const liquidityBefore = await publicClient.readContract({
@@ -1083,10 +1072,10 @@ function LiquidityRuntime() {
                   ? "The selected liquidity position is not staked."
                   : null;
   const actionLabels: Record<Mode, string> = {
-    create: "Approve or add liquidity",
-    stake: "Approve or stake LP position",
+    create: "Add liquidity",
+    stake: "Stake LP position",
     activate: "Activate LP rewards",
-    increase: "Approve or add liquidity",
+    increase: "Add liquidity",
     claim: "Claim LP rewards",
     unstake: "Unstake LP position",
   };

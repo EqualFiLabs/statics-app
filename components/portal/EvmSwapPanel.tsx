@@ -2,14 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  createPublicClient,
-  createWalletClient,
-  custom,
-  formatUnits,
-  getAddress,
-  type Address,
-} from "viem";
+import { createPublicClient, custom, formatUnits, getAddress, type Address } from "viem";
 
 import {
   getDefaultEvmSwapTokens,
@@ -263,11 +256,6 @@ export function EvmSwapPanel() {
       chain: network.chain,
       transport: custom(provider),
     });
-    const walletClient = createWalletClient({
-      account,
-      chain: network.chain,
-      transport: custom(provider),
-    });
     return executeProtocolTransaction({
       publicClient,
       wallet: account,
@@ -278,8 +266,7 @@ export function EvmSwapPanel() {
       to: transaction.to,
       data: transaction.data,
       value: transaction.value,
-      sendTransaction: ({ to, data, value }) =>
-        walletClient.sendTransaction({ account, chain: network.chain, to, data, value }),
+      sendTransaction: wallet.sendEvmTransaction,
       describeError: (cause) =>
         cause instanceof Error ? cause.message : "The wallet transaction failed.",
     });

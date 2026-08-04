@@ -51,7 +51,12 @@ export function privyPermitRequest<
     options: {
       address,
       uiOptions: {
-        showWalletUIs: false as const,
+        showWalletUIs: true as const,
+        title: "Approve unlimited token spending",
+        description:
+          "Sign a maximum token allowance for the Statics Dollar Gateway. The signature expires in 20 minutes, but an executed allowance remains active until consumed or revoked in Approval Tools.",
+        buttonText: "Sign approval",
+        isCancellable: true as const,
       },
     },
   };

@@ -533,6 +533,7 @@ function DollarActionPanel({
 }) {
   const t = useTranslations("dollar");
   const locale = useAppLocale();
+  const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
   const snapshot = useDollarSnapshot(deployment, wallet);
@@ -659,18 +660,7 @@ function DollarActionPanel({
       to,
       data,
       value,
-      sendTransaction: ({
-        to: transactionTarget,
-        data: transactionData,
-        value: transactionValue,
-      }) =>
-        walletClient.data!.sendTransaction({
-          account: wallet,
-          chain: walletClient.data!.chain,
-          to: transactionTarget,
-          data: transactionData,
-          value: transactionValue,
-        }),
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describeDollarError,
       validateSimulation,
     });
@@ -725,7 +715,8 @@ function DollarActionPanel({
             to: deployment.contracts.risk,
             data: buildApproveRiskForPeripheryCall(periphery),
           });
-        } else if (actionAvailability.kind === "stake") {
+        }
+        if (mode === "supply") {
           const refreshedSupply = await supplyState.refetch();
           if (!refreshedSupply.data) throw new Error("The current Position state is unavailable.");
           if (
@@ -754,7 +745,7 @@ function DollarActionPanel({
             value: freshTargetPositionId === null ? refreshedSupply.data.positionCreationFee : 0n,
           });
           setAmountInput("");
-        } else if (actionAvailability.kind === "unstake") {
+        } else if (mode === "unsupply") {
           if (supply.positionId === null)
             throw new Error("No position holds this Risk series yet.");
           await recordAndSend({
@@ -766,154 +757,160 @@ function DollarActionPanel({
           setAmountInput("");
         }
         await supplyState.refetch();
-      } else if (actionAvailability.kind === "approve-weth") {
-        await recordAndSend({
-          kind: "approve-weth",
-          label: "Enable WETH deposits",
-          to: deployment.contracts.weth,
-          data: encodeFunctionData({
-            abi: wethAbi,
-            functionName: "approve",
-            args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-      } else if (actionAvailability.kind === "approve-dollar") {
-        await recordAndSend({
-          kind: "approve-dollar",
-          label: "Enable Dollar recombination",
-          to: deployment.contracts.dollar,
-          data: encodeFunctionData({
-            abi: staticsDollarTokenAbi,
-            functionName: "approve",
-            args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-      } else if (actionAvailability.kind === "approve-dollar-periphery") {
-        if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
-          throw new Error("This deployment has no periphery to approve.");
-        }
-        await recordAndSend({
-          kind: "approve-dollar",
-          label: "Enable Dollar redemptions",
-          to: deployment.contracts.dollar,
-          data: encodeFunctionData({
-            abi: staticsDollarTokenAbi,
-            functionName: "approve",
-            args: [snapshot.data.periphery, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-      } else if (actionAvailability.kind === "execute" && currentQuote?.mode === "redeem") {
-        const preview = await quote.refetch();
-        if (
-          !preview.data ||
-          preview.data.mode !== "redeem" ||
-          preview.data.amount !== amount ||
-          preview.data.seriesId !== snapshot.data.seriesId
-        ) {
-          throw new Error("Preview refresh failed.");
-        }
-        if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
-          throw new Error("This deployment has no periphery, so Dollar cannot be redeemed alone.");
-        }
-        const fill = preview.data.preview.staticsDollarRedeemed;
-        if (fill === 0n) throw new Error("There is no redemption liquidity to fill this amount.");
-        // The rate guard is collateral per Dollar, WAD-normalized -- the same
-        // number the contract recomputes after the split, so a fee or price
-        // move between preview and execution is caught rather than absorbed.
-        const rateWad = (preview.data.preview.collateralToRedeemer * WAD) / fill;
-        const data = encodeFunctionData({
-          abi: staticsDollarPeripheryAbi,
-          functionName: asset === "ETH" ? "redeemToETH" : "redeem",
-          args: [
-            snapshot.data.seriesId,
-            amount,
-            minimumWithTolerance(fill),
-            minimumWithTolerance(rateWad),
-            redeemDeadline(),
-            wallet,
-          ],
-        });
-        await recordAndSend({
-          kind: asset === "ETH" ? "redeem-eth" : "redeem-weth",
-          label: `Redeem Dollar for ${asset}`,
-          to: snapshot.data.periphery,
-          data,
-        });
-        setAmountInput("");
-      } else if (actionAvailability.kind === "approve-risk") {
-        await recordAndSend({
-          kind: "approve-risk",
-          label: "Approve Risk share operator",
-          to: deployment.contracts.risk,
-          data: encodeFunctionData({
-            abi: staticsDollarRiskTokenAbi,
-            functionName: "setApprovalForAll",
-            args: [deployment.contracts.gateway, true],
-          }),
-        });
-      } else if (actionAvailability.kind === "execute" && currentQuote?.mode === "deposit") {
-        const preview = await quote.refetch();
-        if (
-          !preview.data ||
-          preview.data.mode !== "deposit" ||
-          preview.data.amount !== amount ||
-          preview.data.seriesId !== snapshot.data.seriesId
-        ) {
-          throw new Error("Preview refresh failed.");
-        }
-        const minimumDollar = minimumWithTolerance(preview.data.preview.staticsDollarMinted);
-        const minimumShares = minimumWithTolerance(preview.data.preview.sharesMinted);
-        const transaction =
-          asset === "ETH"
-            ? buildDepositETHTransaction(amount, wallet, wallet, minimumDollar, minimumShares)
-            : {
-                data: buildDepositWETHCall(amount, wallet, wallet, minimumDollar, minimumShares),
-                value: 0n,
-              };
-        await recordAndSend({
-          kind: asset === "ETH" ? "deposit-eth" : "deposit-weth",
-          label: `Deposit ${asset}`,
-          to: deployment.contracts.gateway,
-          data: transaction.data,
-          value: transaction.value,
-        });
-        setAmountInput("");
       } else {
-        const preview = await quote.refetch();
-        if (
-          !preview.data ||
-          preview.data.mode !== "recombine" ||
-          preview.data.amount !== amount ||
-          preview.data.seriesId !== snapshot.data.seriesId
-        ) {
-          throw new Error("Preview refresh failed.");
+        if (actionAvailability.kind === "approve-weth") {
+          await recordAndSend({
+            kind: "approve-weth",
+            label: "Enable WETH deposits",
+            to: deployment.contracts.weth,
+            data: encodeFunctionData({
+              abi: wethAbi,
+              functionName: "approve",
+              args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
+            }),
+          });
+        } else if (actionAvailability.kind === "approve-dollar") {
+          await recordAndSend({
+            kind: "approve-dollar",
+            label: "Enable Dollar recombination",
+            to: deployment.contracts.dollar,
+            data: encodeFunctionData({
+              abi: staticsDollarTokenAbi,
+              functionName: "approve",
+              args: [deployment.contracts.gateway, MAX_ERC20_ALLOWANCE],
+            }),
+          });
+        } else if (actionAvailability.kind === "approve-dollar-periphery") {
+          if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
+            throw new Error("This deployment has no periphery to approve.");
+          }
+          await recordAndSend({
+            kind: "approve-dollar",
+            label: "Enable Dollar redemptions",
+            to: deployment.contracts.dollar,
+            data: encodeFunctionData({
+              abi: staticsDollarTokenAbi,
+              functionName: "approve",
+              args: [snapshot.data.periphery, MAX_ERC20_ALLOWANCE],
+            }),
+          });
+        } else if (actionAvailability.kind === "approve-risk") {
+          await recordAndSend({
+            kind: "approve-risk",
+            label: "Approve Risk share operator",
+            to: deployment.contracts.risk,
+            data: encodeFunctionData({
+              abi: staticsDollarRiskTokenAbi,
+              functionName: "setApprovalForAll",
+              args: [deployment.contracts.gateway, true],
+            }),
+          });
         }
-        const functionName = asset === "ETH" ? "recombineToETH" : "recombineToWETH";
-        const data =
-          functionName === "recombineToETH"
-            ? buildRecombineToETHCall(
-                snapshot.data.seriesId,
-                amount,
-                maximumWithTolerance(preview.data.preview.sharesBurned),
-                wallet,
-                minimumWithTolerance(preview.data.preview.collateralOut)
-              )
-            : buildRecombineToWETHCall(
-                snapshot.data.seriesId,
-                amount,
-                maximumWithTolerance(preview.data.preview.sharesBurned),
-                wallet,
-                minimumWithTolerance(preview.data.preview.collateralOut)
-              );
-        await recordAndSend({
-          kind: asset === "ETH" ? "recombine-eth" : "recombine-weth",
-          label: `Recombine to ${asset}`,
-          to: deployment.contracts.gateway,
-          data,
-          validateSimulation: (result) =>
-            void validateRecombinationSimulation(functionName, result),
-        });
-        setAmountInput("");
+
+        if (currentQuote?.mode === "redeem") {
+          const preview = await quote.refetch();
+          if (
+            !preview.data ||
+            preview.data.mode !== "redeem" ||
+            preview.data.amount !== amount ||
+            preview.data.seriesId !== snapshot.data.seriesId
+          ) {
+            throw new Error("Preview refresh failed.");
+          }
+          if (!snapshot.data.periphery || snapshot.data.periphery === zeroAddress) {
+            throw new Error(
+              "This deployment has no periphery, so Dollar cannot be redeemed alone."
+            );
+          }
+          const fill = preview.data.preview.staticsDollarRedeemed;
+          if (fill === 0n) throw new Error("There is no redemption liquidity to fill this amount.");
+          // The rate guard is collateral per Dollar, WAD-normalized -- the same
+          // number the contract recomputes after the split, so a fee or price
+          // move between preview and execution is caught rather than absorbed.
+          const rateWad = (preview.data.preview.collateralToRedeemer * WAD) / fill;
+          const data = encodeFunctionData({
+            abi: staticsDollarPeripheryAbi,
+            functionName: asset === "ETH" ? "redeemToETH" : "redeem",
+            args: [
+              snapshot.data.seriesId,
+              amount,
+              minimumWithTolerance(fill),
+              minimumWithTolerance(rateWad),
+              redeemDeadline(),
+              wallet,
+            ],
+          });
+          await recordAndSend({
+            kind: asset === "ETH" ? "redeem-eth" : "redeem-weth",
+            label: `Redeem Dollar for ${asset}`,
+            to: snapshot.data.periphery,
+            data,
+          });
+          setAmountInput("");
+        } else if (currentQuote?.mode === "deposit") {
+          const preview = await quote.refetch();
+          if (
+            !preview.data ||
+            preview.data.mode !== "deposit" ||
+            preview.data.amount !== amount ||
+            preview.data.seriesId !== snapshot.data.seriesId
+          ) {
+            throw new Error("Preview refresh failed.");
+          }
+          const minimumDollar = minimumWithTolerance(preview.data.preview.staticsDollarMinted);
+          const minimumShares = minimumWithTolerance(preview.data.preview.sharesMinted);
+          const transaction =
+            asset === "ETH"
+              ? buildDepositETHTransaction(amount, wallet, wallet, minimumDollar, minimumShares)
+              : {
+                  data: buildDepositWETHCall(amount, wallet, wallet, minimumDollar, minimumShares),
+                  value: 0n,
+                };
+          await recordAndSend({
+            kind: asset === "ETH" ? "deposit-eth" : "deposit-weth",
+            label: `Deposit ${asset}`,
+            to: deployment.contracts.gateway,
+            data: transaction.data,
+            value: transaction.value,
+          });
+          setAmountInput("");
+        } else {
+          const preview = await quote.refetch();
+          if (
+            !preview.data ||
+            preview.data.mode !== "recombine" ||
+            preview.data.amount !== amount ||
+            preview.data.seriesId !== snapshot.data.seriesId
+          ) {
+            throw new Error("Preview refresh failed.");
+          }
+          const functionName = asset === "ETH" ? "recombineToETH" : "recombineToWETH";
+          const data =
+            functionName === "recombineToETH"
+              ? buildRecombineToETHCall(
+                  snapshot.data.seriesId,
+                  amount,
+                  maximumWithTolerance(preview.data.preview.sharesBurned),
+                  wallet,
+                  minimumWithTolerance(preview.data.preview.collateralOut)
+                )
+              : buildRecombineToWETHCall(
+                  snapshot.data.seriesId,
+                  amount,
+                  maximumWithTolerance(preview.data.preview.sharesBurned),
+                  wallet,
+                  minimumWithTolerance(preview.data.preview.collateralOut)
+                );
+          await recordAndSend({
+            kind: asset === "ETH" ? "recombine-eth" : "recombine-weth",
+            label: `Recombine to ${asset}`,
+            to: deployment.contracts.gateway,
+            data,
+            validateSimulation: (result) =>
+              void validateRecombinationSimulation(functionName, result),
+          });
+          setAmountInput("");
+        }
       }
       await Promise.all([
         snapshot.refetch(),

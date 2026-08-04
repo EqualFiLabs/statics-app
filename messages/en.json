@@ -160,7 +160,10 @@
     "switching": "Switching…",
     "switchNetwork": "Switch network",
     "application": "Statics application",
-    "primary": "Primary"
+    "primary": "Primary",
+    "approvalsTitle": "How approvals work.",
+    "approvalsBody": "Statics uses maximum token and operator approvals so setup confirmations can run in sequence and routine actions do not ask again. Each wallet prompt identifies the permission and spender. Authority remains active until revoked.",
+    "manageApprovals": "Review or revoke approvals"
   },
   "surface": {
     "notConfigured": "Statics is not configured",
@@ -404,7 +407,7 @@
     "withdraw": "Withdraw",
     "basket": "Basket",
     "waiting": "Waiting for confirmation…",
-    "approveDeposit": "Approve or deposit BasketToken",
+    "approveDeposit": "Deposit BasketToken",
     "withdrawBasket": "Withdraw BasketToken",
     "mintInto": "Mint {symbol} into this position",
     "redeemFrom": "Redeem this position's {symbol}",
@@ -416,7 +419,7 @@
     "walletBalance": "Wallet balance",
     "positionStake": "Position stake",
     "maturityDescription": "Your stake is always withdrawable. New stake and newly selected reward assets start earning once they mature; withdrawals take from stake that is not yet earning first.",
-    "approveStake": "Approve or stake {symbol}",
+    "approveStake": "Stake {symbol}",
     "unstakeToken": "Unstake {symbol}",
     "selectedRewards": "Position-selected rewards",
     "chooseAssets": "Choose up to {count} fee assets",
@@ -438,7 +441,7 @@
   },
   "rewards": {
     "subject": "rewards",
-    "approveOrCreate": "Approve or create staking position",
+    "approveOrCreate": "Create staking position",
     "signIn": "Sign in to continue",
     "createWallet": "Create embedded wallet",
     "switchTo": "Switch to {network}",

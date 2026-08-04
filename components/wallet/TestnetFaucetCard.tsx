@@ -2,14 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import {
-  createPublicClient,
-  createWalletClient,
-  custom,
-  formatUnits,
-  getAddress,
-  type Address,
-} from "viem";
+import { createPublicClient, custom, formatUnits, getAddress, type Address } from "viem";
 
 import {
   basketTokenAbi,
@@ -204,11 +197,6 @@ export function TestnetFaucetCard() {
         chain: network.chain,
         transport: custom(provider),
       });
-      const walletClient = createWalletClient({
-        account,
-        chain: network.chain,
-        transport: custom(provider),
-      });
       const before = snapshot ?? (await readSnapshot());
       if (!before) throw new Error("Faucet inventory is unavailable.");
       if (before.assets.some((asset) => asset.inventory < asset.amount)) {
@@ -225,8 +213,7 @@ export function TestnetFaucetCard() {
           .join(" + "),
         to: faucet.address,
         data: buildTestnetFaucetClaimCall(),
-        sendTransaction: ({ to, data, value }) =>
-          walletClient.sendTransaction({ account, chain: network.chain, to, data, value }),
+        sendTransaction: wallet.sendEvmTransaction,
         describeError: describeDollarError,
         verifyConfirmation: async () => {
           const next = await readSnapshot();

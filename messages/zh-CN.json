@@ -160,7 +160,10 @@
     "switching": "正在切换…",
     "switchNetwork": "切换网络",
     "application": "Statics 应用",
-    "primary": "主要"
+    "primary": "主要",
+    "approvalsTitle": "授权的工作方式。",
+    "approvalsBody": "Statics 使用最大代币和操作员授权，让设置确认按顺序完成，并避免常规操作重复请求。每个钱包提示都会标明权限和支出方。授权会持续有效，直到你撤销。",
+    "manageApprovals": "查看或撤销授权"
   },
   "surface": {
     "notConfigured": "Statics 尚未配置",
@@ -404,7 +407,7 @@
     "withdraw": "取出",
     "basket": "篮子",
     "waiting": "等待确认…",
-    "approveDeposit": "授权或存入 BasketToken",
+    "approveDeposit": "存入 BasketToken",
     "withdrawBasket": "取出 BasketToken",
     "mintInto": "将 {symbol} 铸造到此仓位",
     "redeemFrom": "从此仓位赎回 {symbol}",
@@ -416,7 +419,7 @@
     "walletBalance": "钱包余额",
     "positionStake": "仓位质押",
     "maturityDescription": "质押始终可以取出。新增质押和新选奖励资产会在成熟后开始赚取；取出时会先使用尚未开始赚取的质押。",
-    "approveStake": "授权或质押 {symbol}",
+    "approveStake": "质押 {symbol}",
     "unstakeToken": "解除质押 {symbol}",
     "selectedRewards": "仓位选择的奖励",
     "chooseAssets": "最多选择 {count} 种手续费资产",
@@ -438,7 +441,7 @@
   },
   "rewards": {
     "subject": "奖励",
-    "approveOrCreate": "授权或创建质押仓位",
+    "approveOrCreate": "创建质押仓位",
     "signIn": "登录以继续",
     "createWallet": "创建内置钱包",
     "switchTo": "切换到 {network}",

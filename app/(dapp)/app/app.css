@@ -461,6 +461,37 @@
   cursor: not-allowed;
 }
 
+.dapp-approval-disclosure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.dapp-approval-disclosure p {
+  flex: 1 1 28rem;
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+.dapp-approval-disclosure strong {
+  color: var(--app-text);
+}
+
+.dapp-approval-disclosure a {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
 .dapp-header-actions,
 .dapp-wallet-actions {
   display: flex;

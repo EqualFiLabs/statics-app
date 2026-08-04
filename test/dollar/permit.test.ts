@@ -53,7 +53,7 @@ describe("Dollar permit helpers", () => {
     expect(external).not.toHaveBeenCalled();
   });
 
-  it("builds Privy's headless intermediate permit request", () => {
+  it("builds a visible Privy permit request with maximum-allowance disclosure", () => {
     const typedData = {
       domain: {
         name: "Mock USDG",
@@ -90,7 +90,12 @@ describe("Dollar permit helpers", () => {
     expect(request.options).toEqual({
       address: "0x0000000000000000000000000000000000000002",
       uiOptions: {
-        showWalletUIs: false,
+        showWalletUIs: true,
+        title: "Approve unlimited token spending",
+        description:
+          "Sign a maximum token allowance for the Statics Dollar Gateway. The signature expires in 20 minutes, but an executed allowance remains active until consumed or revoked in Approval Tools.",
+        buttonText: "Sign approval",
+        isCancellable: true,
       },
     });
     expect(() => JSON.stringify(request)).not.toThrow();

@@ -155,14 +155,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       to,
       data,
       value,
-      sendTransaction: ({ to: target, data: transactionData, value: transactionValue }) =>
-        walletClient.data.sendTransaction({
-          account: wallet,
-          chain: walletClient.data.chain,
-          to: target,
-          data: transactionData,
-          value: transactionValue,
-        }),
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describePositionError,
       validateSimulation,
       verifyConfirmation,
@@ -214,7 +207,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
-        return;
       }
       await sendTransaction({
         kind: "deposit-basket-collateral",
@@ -281,7 +273,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
-        return;
       }
       await sendTransaction({
         kind: "stake-position",

@@ -9,7 +9,6 @@ import {
   getAddress,
   parseEventLogs,
   type Address,
-  type Hex,
   type TransactionReceipt,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
@@ -361,17 +360,6 @@ function LoansRuntime({
     }
   };
 
-  const send = (to: Address, data: Hex, value?: bigint) => {
-    if (!walletClient.data || !wallet) throw new Error("The wallet client is unavailable.");
-    return walletClient.data.sendTransaction({
-      account: wallet,
-      chain: walletClient.data.chain,
-      to,
-      data,
-      value,
-    });
-  };
-
   const assertLoanClosed = async (loanId: bigint) => {
     if (!publicClient || deploymentState.status !== "configured") return;
     try {
@@ -491,7 +479,7 @@ function LoansRuntime({
         quote.pools,
         wallet
       ),
-      sendTransaction: ({ to, data, value }) => send(to, data, value),
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describeLoanError,
       validateSimulation: (result) => {
         if (!result) throw new Error("The borrowed-liquidity simulation returned no result.");
@@ -671,8 +659,7 @@ function LoansRuntime({
           amount: `${displayAmount(shares, basket.token.decimals)} ${basket.symbol}`,
           to: deploymentState.deployment.contracts.diamond,
           data,
-          sendTransaction: ({ to, data: transactionData, value }) =>
-            send(to, transactionData, value),
+          sendTransaction: walletState.sendEvmTransaction,
           describeError: describeLoanError,
           validateSimulation: (result) => {
             if (!result) throw new Error("The borrow simulation returned no loan ID.");
@@ -733,12 +720,14 @@ function LoansRuntime({
         if (insufficientBalance >= 0) {
           throw new Error(`The wallet lacks required asset ${insufficientBalance + 1}.`);
         }
-        const approvalIndex = currentRequirements.findIndex(
-          (amount, index) => (freshLoan.assets[index]?.allowance ?? 0n) < amount
-        );
-        if (approvalIndex >= 0) {
-          const loanAsset = freshLoan.assets[approvalIndex];
+        for (
+          let approvalIndex = 0;
+          approvalIndex < currentRequirements.length;
+          approvalIndex += 1
+        ) {
           const amount = currentRequirements[approvalIndex] ?? 0n;
+          const loanAsset = freshLoan.assets[approvalIndex];
+          if ((loanAsset?.allowance ?? 0n) >= amount) continue;
           if (!loanAsset || loanAsset.walletBalance < amount) {
             throw new Error(`The wallet lacks required asset ${approvalIndex + 1}.`);
           }
@@ -756,8 +745,7 @@ function LoansRuntime({
             amount: `${displayAmount(amount, loanAsset.token.decimals)} ${loanAsset.token.symbol}`,
             to: loanAsset.token.address,
             data,
-            sendTransaction: ({ to, data: transactionData, value }) =>
-              send(to, transactionData, value),
+            sendTransaction: walletState.sendEvmTransaction,
             describeError: describeLoanError,
             validateSimulation: (result) => {
               if (!result) return;
@@ -780,7 +768,8 @@ function LoansRuntime({
               }
             },
           });
-        } else if (mode === "repay") {
+        }
+        if (mode === "repay") {
           const collateralBefore = await publicClient.readContract({
             address: deploymentState.deployment.contracts.diamond,
             abi: staticsAbi,
@@ -796,8 +785,7 @@ function LoansRuntime({
             amount: `${freshLoan.assets.length} principal assets`,
             to: deploymentState.deployment.contracts.diamond,
             data: buildRepayCall(freshLoan.loanId),
-            sendTransaction: ({ to, data: transactionData, value }) =>
-              send(to, transactionData, value),
+            sendTransaction: walletState.sendEvmTransaction,
             describeError: describeLoanError,
             verifyConfirmation: async () => {
               await assertLoanClosed(freshLoan.loanId);
@@ -828,8 +816,7 @@ function LoansRuntime({
             amount: `${currentRequirements.length} extension fees`,
             to: deploymentState.deployment.contracts.diamond,
             data: buildExtendCall(freshLoan.loanId, currentRequirements),
-            sendTransaction: ({ to, data: transactionData, value }) =>
-              send(to, transactionData, value),
+            sendTransaction: walletState.sendEvmTransaction,
             describeError: describeLoanError,
             verifyConfirmation: async () => {
               const after = await publicClient.readContract({
@@ -865,8 +852,7 @@ function LoansRuntime({
             )} ${freshLoan.basket.symbol}`,
             to: deploymentState.deployment.contracts.diamond,
             data: buildRecoverCall(freshLoan.loanId),
-            sendTransaction: ({ to, data: transactionData, value }) =>
-              send(to, transactionData, value),
+            sendTransaction: walletState.sendEvmTransaction,
             describeError: describeLoanError,
             verifyConfirmation: async () => {
               await assertLoanClosed(freshLoan.loanId);

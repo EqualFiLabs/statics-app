@@ -1,6 +1,13 @@
 "use client";
 
-import type { Address, Hex, PublicClient, TransactionReceipt } from "viem";
+import {
+  getAddress,
+  toFunctionSelector,
+  type Address,
+  type Hex,
+  type PublicClient,
+  type TransactionReceipt,
+} from "viem";
 
 import {
   updateProtocolActivity,
@@ -16,6 +23,31 @@ import {
   waitForRpcBlock,
 } from "@/lib/protocol/reconciliation";
 
+export type ProtocolPermissionDisclosure = Readonly<{
+  scope: "unlimited-token" | "maximum-permit2" | "erc721-operator" | "erc1155-operator";
+  asset: string;
+  spender: Address;
+  spenderName: string;
+  detail: string;
+}>;
+
+export type ProtocolTransactionPresentation = Readonly<{
+  action: string;
+  description: string;
+  buttonText: string;
+  contractName: string;
+  permission?: ProtocolPermissionDisclosure;
+}>;
+
+export type ProtocolTransactionSendRequest = Readonly<{
+  wallet: Address;
+  chainId: number;
+  to: Address;
+  data: Hex;
+  value?: bigint;
+  presentation: ProtocolTransactionPresentation;
+}>;
+
 export type ProtocolTransactionRequest = Readonly<{
   publicClient: PublicClient;
   wallet: Address;
@@ -26,7 +58,8 @@ export type ProtocolTransactionRequest = Readonly<{
   to: Address;
   data: Hex;
   value?: bigint;
-  sendTransaction: (request: { to: Address; data: Hex; value?: bigint }) => Promise<Hex>;
+  presentation?: ProtocolTransactionPresentation;
+  sendTransaction: (request: ProtocolTransactionSendRequest) => Promise<Hex>;
   describeError: (error: unknown) => string;
   validateSimulation?: (result: Hex | undefined) => void;
   verifyConfirmation?: (receipt: TransactionReceipt) => Promise<void>;
@@ -37,6 +70,110 @@ export class ConfirmationVerificationError extends Error {
     super(message, options);
     this.name = "ConfirmationVerificationError";
   }
+}
+
+const maximumTokenApprovalKinds = new Set<ProtocolActivityKind>([
+  "approve-weth",
+  "approve-dollar",
+  "approve-basket-asset",
+  "approve-basket-token",
+  "approve-staking-token",
+  "approve-lp-token",
+  "approve-loan-asset",
+]);
+
+const operatorApprovalKinds = new Set<ProtocolActivityKind>(["approve-risk", "approve-lp-nft"]);
+const erc20ApproveSelector = toFunctionSelector("approve(address,uint256)");
+const permit2ApproveSelector = toFunctionSelector("approve(address,address,uint160,uint48)");
+const operatorApproveSelector = toFunctionSelector("setApprovalForAll(address,bool)");
+
+function calldataAddress(data: Hex, wordIndex: number): Address | null {
+  const wordStart = 10 + wordIndex * 64;
+  const encoded = data.slice(wordStart + 24, wordStart + 64);
+  if (encoded.length !== 40) return null;
+  try {
+    return getAddress(`0x${encoded}`);
+  } catch {
+    return null;
+  }
+}
+
+export function defaultProtocolPresentation(
+  request: Pick<ProtocolTransactionRequest, "kind" | "label" | "amount" | "data">
+): ProtocolTransactionPresentation {
+  const isMaximumTokenApproval = maximumTokenApprovalKinds.has(request.kind);
+  const isOperatorApproval = operatorApprovalKinds.has(request.kind);
+  const isPermit2Approval = request.kind === "approve-permit2";
+  const isBoundedApproval = request.kind === "approve-swap" || request.kind === "approve-bridge";
+  const spender = isPermit2Approval
+    ? request.data.startsWith(permit2ApproveSelector)
+      ? calldataAddress(request.data, 1)
+      : null
+    : isOperatorApproval
+      ? request.data.startsWith(operatorApproveSelector)
+        ? calldataAddress(request.data, 0)
+        : null
+      : request.data.startsWith(erc20ApproveSelector)
+        ? calldataAddress(request.data, 0)
+        : null;
+  const spenderCopy = spender ? ` Spender: ${spender}.` : "";
+
+  if (isMaximumTokenApproval) {
+    return {
+      action: request.label,
+      description: `${request.label}. This grants unlimited token spending until you revoke it.${spenderCopy} You can review or revoke it from Approval Tools.`,
+      buttonText: "Approve unlimited spending",
+      contractName: "Token approval",
+    };
+  }
+  if (isPermit2Approval) {
+    return {
+      action: request.label,
+      description: `${request.label}. This grants the maximum Permit2 allowance with no practical expiry; it remains active until revoked.${spenderCopy} You can review or revoke it from Approval Tools.`,
+      buttonText: "Approve maximum allowance",
+      contractName: "Permit2",
+    };
+  }
+  if (isOperatorApproval) {
+    const asset = request.kind === "approve-lp-nft" ? "liquidity-position NFTs" : "Risk share IDs";
+    return {
+      action: request.label,
+      description: `${request.label}. This grants operator access to all current and future ${asset} until revoked.${spenderCopy} You can review or revoke it from Approval Tools.`,
+      buttonText: "Approve operator access",
+      contractName: request.kind === "approve-lp-nft" ? "Position Manager" : "Risk shares",
+    };
+  }
+  if (isBoundedApproval && /^(reset|revoke)\b/i.test(request.label)) {
+    return {
+      action: request.label,
+      description: `${request.label}. This removes the existing token spending allowance.${spenderCopy}`,
+      buttonText: "Reset token approval",
+      contractName: "Token approval",
+    };
+  }
+  if (isBoundedApproval) {
+    return {
+      action: request.label,
+      description: `${request.label}. This approval is bounded to the reviewed route amount: ${request.amount}.${spenderCopy}`,
+      buttonText: "Approve reviewed amount",
+      contractName: "Token approval",
+    };
+  }
+
+  const contractName =
+    request.kind === "swap"
+      ? "Swap router"
+      : request.kind === "bridge"
+        ? "Across bridge"
+        : request.kind === "send"
+          ? "Wallet transfer"
+          : "Statics protocol";
+  return {
+    action: request.label,
+    description: `${request.label}. Reviewed amount: ${request.amount}.`,
+    buttonText: request.label,
+    contractName,
+  };
 }
 
 export async function executeProtocolTransaction(
@@ -69,9 +206,12 @@ export async function executeProtocolTransaction(
     updateProtocolActivity(request.wallet, request.chainId, id, { status: "signing" });
 
     const hash = await request.sendTransaction({
+      wallet: request.wallet,
+      chainId: request.chainId,
       to: request.to,
       data: request.data,
       value: request.value,
+      presentation: request.presentation ?? defaultProtocolPresentation(request),
     });
     stage = "submitted";
     updateProtocolActivity(request.wallet, request.chainId, id, {
