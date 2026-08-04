@@ -50,4 +50,13 @@ describe("wallet runtime boundary", () => {
     expect(source).toContain("<ProtocolQueryReconciler />");
     expect(source).not.toMatch(/addSigners|delegateWallet|policyIds/);
   });
+
+  it("routes transaction clients through the reconciled active signer", () => {
+    const source = sourceFiles("components")
+      .map((file) => fs.readFileSync(file, "utf8"))
+      .join("\n");
+
+    expect(source).not.toContain("useWalletClient");
+    expect(source).toContain("useActiveWalletClient");
+  });
 });
