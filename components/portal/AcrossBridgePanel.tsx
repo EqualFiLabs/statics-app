@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { createPublicClient, createWalletClient, custom, formatUnits, getAddress } from "viem";
+import { createPublicClient, custom, formatUnits, getAddress } from "viem";
 
 import {
   SlippageInlineControl,
@@ -427,11 +427,6 @@ export function AcrossBridgePanel() {
       chain: network.chain,
       transport: custom(provider),
     });
-    const walletClient = createWalletClient({
-      account,
-      chain: network.chain,
-      transport: custom(provider),
-    });
     return executeProtocolTransaction({
       publicClient,
       wallet: account,
@@ -442,8 +437,7 @@ export function AcrossBridgePanel() {
       to: transaction.to,
       data: transaction.data,
       value: transaction.value,
-      sendTransaction: ({ to, data, value }) =>
-        walletClient.sendTransaction({ account, chain: network.chain, to, data, value }),
+      sendTransaction: wallet.sendEvmTransaction,
       describeError: (cause) =>
         cause instanceof Error ? cause.message : "The bridge transaction failed.",
     });

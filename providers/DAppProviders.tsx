@@ -7,6 +7,7 @@ import {
   useCreateWallet,
   useExportWallet,
   usePrivy,
+  useSendTransaction,
   useWallets,
   type ConnectedWallet,
 } from "@privy-io/react-auth";
@@ -20,6 +21,7 @@ import {
 import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { createWalletClient, custom, getAddress } from "viem";
 import { useAccount } from "wagmi";
 
 import {
@@ -76,6 +78,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
+  const { sendTransaction: sendEmbeddedTransaction } = useSendTransaction();
   const wagmiAccount = useAccount();
   const { setActiveWallet } = useSetActiveWallet();
   const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
@@ -230,6 +233,58 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         if (!selectedWallet) return null;
         return selectedWallet.getEthereumProvider();
       },
+      sendEvmTransaction: async (request) => {
+        if (!selectedWallet || !address) throw new Error("Connect a wallet before continuing.");
+        if (getAddress(address) !== getAddress(request.wallet)) {
+          throw new Error("The transaction was prepared for a different wallet.");
+        }
+        if (chainId !== request.chainId) {
+          throw new Error("Switch the connected wallet to the transaction network.");
+        }
+
+        if (walletKind === "embedded") {
+          const result = await sendEmbeddedTransaction(
+            {
+              from: request.wallet,
+              to: request.to,
+              data: request.data,
+              value: request.value,
+              chainId: request.chainId,
+            },
+            {
+              address,
+              uiOptions: {
+                showWalletUIs: true,
+                description: request.presentation.description,
+                buttonText: request.presentation.buttonText,
+                transactionInfo: {
+                  title: "Transaction details",
+                  action: request.presentation.action,
+                  contractInfo: { name: request.presentation.contractName },
+                },
+                successHeader: `${request.presentation.action} submitted`,
+                successDescription: "The app will wait for onchain confirmation before continuing.",
+                isCancellable: true,
+              },
+            }
+          );
+          return result.hash;
+        }
+
+        const provider = await selectedWallet.getEthereumProvider();
+        const client = createWalletClient({
+          account: request.wallet,
+          chain: undefined,
+          transport: custom(provider),
+        });
+        return client.sendTransaction({
+          account: request.wallet,
+          chain: undefined,
+          to: request.to,
+          data: request.data,
+          value: request.value,
+        });
+      },
       exportWallet: () =>
         runAction("export", async () => {
           if (!embeddedWallet) throw new Error("Only an embedded wallet can be exported here.");
@@ -256,6 +311,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       promptExternalWallet,
       privyError,
       selectedWallet,
+      sendEmbeddedTransaction,
       setActiveWallet,
       status,
       targetChain,
@@ -294,6 +350,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
           ethereum: { createOnLogin: "users-without-wallets" },
           solana: { createOnLogin: "off" },
           showWalletUIs: true,
+          extendedCalldataDecoding: true,
         },
         externalWallets: {
           solana: { connectors: toSolanaWalletConnectors() },

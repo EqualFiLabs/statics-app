@@ -20,6 +20,15 @@ import {
   type ApprovalRecord,
 } from "@/lib/protocol/approval-inventory";
 import { approvalClockTimestamp, approvalStatusLabel } from "@/lib/protocol/approvals";
+import { executeProtocolActionPlan } from "@/lib/protocol/action-plan";
+import {
+  actionPresentation,
+  approvalPresentation,
+  erc1155OperatorPermission,
+  erc721OperatorPermission,
+  maximumPermit2Permission,
+  unlimitedTokenPermission,
+} from "@/lib/protocol/presentation";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -149,6 +158,45 @@ function ApprovalToolsRuntime() {
       throw new Error("The connected wallet is unavailable.");
     }
     const transaction = buildApprovalUpdate(approval, enabled);
+    const permissionPresentation =
+      approval.kind === "erc20"
+        ? approvalPresentation(
+            unlimitedTokenPermission({
+              asset: approval.tokenSymbol,
+              spender: approval.spender,
+              spenderName: approval.spenderLabel,
+            }),
+            approval.tokenName
+          )
+        : approval.kind === "permit2"
+          ? approvalPresentation(
+              maximumPermit2Permission({
+                asset: approval.tokenSymbol,
+                spender: approval.spender,
+                spenderName: approval.spenderLabel,
+              }),
+              "Permit2"
+            )
+          : approval.kind === "operator"
+            ? approvalPresentation(
+                approval.token === deploymentState.deployment.contracts.risk
+                  ? erc1155OperatorPermission({
+                      asset: approval.tokenName,
+                      spender: approval.spender,
+                      spenderName: approval.spenderLabel,
+                    })
+                  : erc721OperatorPermission({
+                      asset: approval.tokenName,
+                      spender: approval.spender,
+                      spenderName: approval.spenderLabel,
+                    }),
+                approval.tokenName
+              )
+            : actionPresentation({
+                action: `Approve ${approval.tokenSymbol}`,
+                description: `Approve only ${approval.tokenSymbol} for ${approval.spenderLabel} (${approval.spender}). This does not grant collection-wide operator access.`,
+                contractName: approval.tokenName,
+              });
     await executeProtocolTransaction({
       publicClient,
       wallet,
@@ -158,14 +206,8 @@ function ApprovalToolsRuntime() {
       amount: `${approvalKindLabel(approval.kind)} for ${approval.spenderLabel}`,
       to: transaction.target,
       data: transaction.data,
-      sendTransaction: ({ to, data, value }) =>
-        walletClient.data!.sendTransaction({
-          account: wallet,
-          chain: walletClient.data!.chain,
-          to,
-          data,
-          value,
-        }),
+      presentation: enabled ? permissionPresentation : undefined,
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describeApprovalError,
       verifyConfirmation: async () => {
         const confirmed = await readApprovalState(publicClient, wallet, approval);
@@ -200,10 +242,14 @@ function ApprovalToolsRuntime() {
     setPendingKey("all");
     setError(null);
     try {
-      for (let index = 0; index < active.length; index += 1) {
-        setBulkProgress({ current: index + 1, total: active.length });
-        await updateApproval(active[index]!, false);
-      }
+      await executeProtocolActionPlan(
+        active.map((approval) => ({
+          id: approval.key,
+          label: `Revoke ${approval.tokenSymbol} for ${approval.spenderLabel}`,
+          run: () => updateApproval(approval, false),
+        })),
+        ({ current, total }) => setBulkProgress({ current, total })
+      );
       await approvals.refetch();
     } catch (cause) {
       setError(

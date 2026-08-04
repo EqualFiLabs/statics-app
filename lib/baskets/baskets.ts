@@ -347,7 +347,7 @@ export function deriveBasketActionAvailability(input: {
       if (constituent.allowance < maximum) {
         return {
           kind: "approve",
-          label: `Approve underlying ${index + 1}`,
+          label: "Mint basket",
           reason: null,
           approvalIndex: index,
           executable: true,

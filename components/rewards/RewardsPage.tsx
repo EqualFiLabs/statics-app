@@ -209,22 +209,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         publicClient,
         wallet,
         chainId: deploymentState.deployment.chainId,
-        sendTransaction: ({
-          to,
-          data,
-          value,
-        }: {
-          to: `0x${string}`;
-          data: `0x${string}`;
-          value?: bigint;
-        }) =>
-          walletClient.data.sendTransaction({
-            account: wallet,
-            chain: walletClient.data.chain,
-            to,
-            data,
-            value,
-          }),
+        sendTransaction: walletState.sendEvmTransaction,
         describeError: describePositionError,
       };
       if (refreshed.data.stakingTokenBalance < amount) {
@@ -243,42 +228,41 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
             args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
-      } else {
-        await executeProtocolTransaction({
-          ...common,
-          kind: stakePositionId === null ? "create-and-stake" : "stake-position",
-          label:
-            stakePositionId === null
-              ? `Create position and stake ${token.symbol}`
-              : `Stake ${token.symbol} in Position #${stakePositionId.toString()}`,
-          amount:
-            stakePositionId === null
-              ? `${amountInput} ${token.symbol} + ${formatEther(refreshed.data.positionCreationFee)} ETH account fee`
-              : `${amountInput} ${token.symbol}`,
-          to: diamond,
-          data:
-            stakePositionId === null
-              ? buildCreateAndStakeCall(amount, wallet, [])
-              : buildStakeCall(stakePositionId, amount),
-          value: stakePositionId === null ? refreshed.data.positionCreationFee : 0n,
-          validateSimulation:
-            stakePositionId === null
-              ? (result) => {
-                  if (!result)
-                    throw new Error("The create-and-stake simulation returned no position.");
-                  const positionId = decodeFunctionResult({
-                    abi: staticsAbi,
-                    functionName: "createAndStake",
-                    data: result,
-                  });
-                  if (positionId === 0n) {
-                    throw new Error("The create-and-stake simulation returned an invalid ID.");
-                  }
-                }
-              : undefined,
-        });
-        setAmountInput("");
       }
+      await executeProtocolTransaction({
+        ...common,
+        kind: stakePositionId === null ? "create-and-stake" : "stake-position",
+        label:
+          stakePositionId === null
+            ? `Create position and stake ${token.symbol}`
+            : `Stake ${token.symbol} in Position #${stakePositionId.toString()}`,
+        amount:
+          stakePositionId === null
+            ? `${amountInput} ${token.symbol} + ${formatEther(refreshed.data.positionCreationFee)} ETH account fee`
+            : `${amountInput} ${token.symbol}`,
+        to: diamond,
+        data:
+          stakePositionId === null
+            ? buildCreateAndStakeCall(amount, wallet, [])
+            : buildStakeCall(stakePositionId, amount),
+        value: stakePositionId === null ? refreshed.data.positionCreationFee : 0n,
+        validateSimulation:
+          stakePositionId === null
+            ? (result) => {
+                if (!result)
+                  throw new Error("The create-and-stake simulation returned no position.");
+                const positionId = decodeFunctionResult({
+                  abi: staticsAbi,
+                  functionName: "createAndStake",
+                  data: result,
+                });
+                if (positionId === 0n) {
+                  throw new Error("The create-and-stake simulation returned an invalid ID.");
+                }
+              }
+            : undefined,
+      });
+      setAmountInput("");
       await catalog.refetch();
     } catch (error) {
       setActionError(describePositionError(error));
@@ -330,14 +314,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           .join(" + "),
         to: deploymentState.deployment.contracts.diamond,
         data: buildClaimRewardsCall(positionId, assets, wallet, minimums),
-        sendTransaction: ({ to, data, value }) =>
-          walletClient.data!.sendTransaction({
-            account: wallet,
-            chain: walletClient.data!.chain,
-            to,
-            data,
-            value,
-          }),
+        sendTransaction: walletState.sendEvmTransaction,
         describeError: describePositionError,
         validateSimulation: (result) => {
           if (!result) throw new Error("The reward claim simulation returned no amounts.");
@@ -429,14 +406,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           .join(" + "),
         to: deploymentState.deployment.contracts.diamond,
         data: buildClaimBasketRewardsCall(entry.positionId, entry.basketId, wallet),
-        sendTransaction: ({ to, data, value }) =>
-          walletClient.data!.sendTransaction({
-            account: wallet,
-            chain: walletClient.data!.chain,
-            to,
-            data,
-            value,
-          }),
+        sendTransaction: walletState.sendEvmTransaction,
         describeError: describePositionError,
         validateSimulation: (result) => {
           if (!result) throw new Error("The basket reward claim simulation returned no amounts.");

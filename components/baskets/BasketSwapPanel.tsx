@@ -259,14 +259,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           amount: `${display(amount, inputToken.decimals)} ${inputToken.symbol}`,
           to: inputToken.address,
           data: buildSwapTokenApproval(liquidity.contracts.permit2, amount),
-          sendTransaction: ({ to, data, value }) =>
-            walletClient.data!.sendTransaction({
-              account: wallet,
-              chain: walletClient.data!.chain,
-              to,
-              data,
-              value,
-            }),
+          sendTransaction: walletState.sendEvmTransaction,
           describeError: describeBasketError,
           verifyConfirmation: async () => {
             const allowance = await publicClient.readContract({
@@ -279,7 +272,6 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           },
         });
         await permit2Approval.refetch();
-        return;
       }
       if (!freshQuote.data) throw new Error("The refreshed canonical quote returned no result.");
       const [freshAmountOut] = decodeFunctionResult({
@@ -316,14 +308,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             functionName: "approve",
             args: [inputToken.address, router, MAX_PERMIT2_ALLOWANCE, MAX_PERMIT2_EXPIRATION],
           }),
-          sendTransaction: ({ to, data, value }) =>
-            walletClient.data!.sendTransaction({
-              account: wallet,
-              chain: walletClient.data!.chain,
-              to,
-              data,
-              value,
-            }),
+          sendTransaction: walletState.sendEvmTransaction,
           describeError: describeBasketError,
           verifyConfirmation: async () => {
             const confirmed = await publicClient.readContract({
@@ -344,7 +329,6 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             }
           },
         });
-        return;
       }
       const execution = buildV4ExactInputSingleSwap({
         router,
@@ -370,14 +354,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
         to: execution.target,
         data: execution.calldata,
         value: execution.value,
-        sendTransaction: ({ to, data, value }) =>
-          walletClient.data!.sendTransaction({
-            account: wallet,
-            chain: walletClient.data!.chain,
-            to,
-            data,
-            value,
-          }),
+        sendTransaction: walletState.sendEvmTransaction,
         describeError: describeBasketError,
         verifyConfirmation: async () => {
           const outputAfter = await publicClient.readContract({

@@ -93,14 +93,7 @@ function PositionListRuntime() {
         to: deploymentState.deployment.contracts.diamond,
         data,
         value: creationFee,
-        sendTransaction: ({ to, data: transactionData, value }) =>
-          walletClient.data.sendTransaction({
-            account: wallet,
-            chain: walletClient.data.chain,
-            to,
-            data: transactionData,
-            value,
-          }),
+        sendTransaction: walletState.sendEvmTransaction,
         describeError: describePositionError,
         validateSimulation: (result) => {
           if (!result) throw new Error("The position simulation returned no token ID.");

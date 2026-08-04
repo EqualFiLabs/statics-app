@@ -489,7 +489,7 @@ export function deriveLoanActionAvailability(input: {
       if ((input.allowances?.[index] ?? 0n) < required) {
         return {
           kind: "approve",
-          label: `Approve asset ${index + 1}`,
+          label: input.mode === "extend" ? "Extend loan" : "Repay loan",
           reason: null,
           approvalIndex: index,
           executable: true,

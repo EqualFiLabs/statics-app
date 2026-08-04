@@ -461,6 +461,37 @@
   cursor: not-allowed;
 }
 
+.dapp-approval-disclosure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.dapp-approval-disclosure p {
+  flex: 1 1 28rem;
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+.dapp-approval-disclosure strong {
+  color: var(--app-text);
+}
+
+.dapp-approval-disclosure a {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
 .dapp-header-actions,
 .dapp-wallet-actions {
   display: flex;
@@ -4270,6 +4301,143 @@
   color: var(--accent);
 }
 
+.liquidity-contribution {
+  display: grid;
+  gap: 1rem;
+}
+
+.basket-field > .liquidity-amount-control {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.liquidity-amount-control button {
+  min-height: 48px;
+  padding: 0 0.8rem;
+  border: 0;
+  border-left: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.liquidity-amount-control button:disabled {
+  color: var(--app-text-muted);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.liquidity-contribution-quote {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  border-radius: var(--radius-lg);
+}
+
+.liquidity-pair-requirement {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.liquidity-pair-requirement span,
+.liquidity-quote-columns > div > span,
+.liquidity-contribution-quote > small {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+.liquidity-pair-requirement strong {
+  color: var(--app-text);
+  text-align: right;
+}
+
+.liquidity-quote-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--app-border);
+  border-radius: var(--radius-md);
+}
+
+.liquidity-quote-columns > div {
+  padding: 0.85rem;
+  background: var(--app-surface);
+}
+
+.liquidity-quote-columns dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0;
+}
+
+.liquidity-quote-columns dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.liquidity-quote-columns dt {
+  color: var(--app-text-muted);
+}
+
+.liquidity-quote-columns dd {
+  margin: 0;
+  color: var(--app-text);
+}
+
+.liquidity-balance-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.liquidity-balance-list > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+}
+
+.liquidity-balance-list span,
+.liquidity-balance-list small {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+.liquidity-balance-list strong {
+  color: var(--app-text);
+}
+
+.liquidity-balance-list .is-sufficient {
+  border-color: color-mix(in srgb, var(--positive) 45%, var(--app-border));
+}
+
+.liquidity-balance-list .is-sufficient small {
+  color: var(--positive);
+}
+
+.liquidity-balance-list .is-insufficient {
+  border-color: color-mix(in srgb, var(--negative) 55%, var(--app-border));
+}
+
+.liquidity-balance-list .is-insufficient small {
+  color: var(--negative);
+}
+
+.liquidity-limiting-balance {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
 .liquidity-tabs {
   grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
   margin: 1rem 0;
@@ -5035,6 +5203,19 @@
   .remaining-tabs,
   .liquidity-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .liquidity-pair-requirement {
+    display: grid;
+  }
+
+  .liquidity-pair-requirement strong {
+    text-align: left;
+  }
+
+  .liquidity-quote-columns,
+  .liquidity-balance-list {
+    grid-template-columns: 1fr;
   }
 
   .creation-steps button {

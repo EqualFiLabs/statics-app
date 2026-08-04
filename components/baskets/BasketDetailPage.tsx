@@ -304,14 +304,7 @@ function BasketDetailRuntime({
       to,
       data,
       value,
-      sendTransaction: ({ to: transactionTarget, data: transactionData, value }) =>
-        walletClient.data!.sendTransaction({
-          account: wallet,
-          chain: walletClient.data!.chain,
-          to: transactionTarget,
-          data: transactionData,
-          value,
-        }),
+      sendTransaction: walletState.sendEvmTransaction,
       describeError: describeBasketError,
       validateSimulation: validate,
     });
@@ -327,146 +320,146 @@ function BasketDetailRuntime({
       if (!availability.executable || !currentQuote || slippageBps === null) {
         throw new Error(availability.reason || "Wait for a fresh basket quote.");
       }
-      if (availability.kind === "approve" && availability.approvalIndex !== undefined) {
-        const constituent = basket.constituents[availability.approvalIndex];
-        const quoted = currentQuote.amounts[availability.approvalIndex];
-        if (!constituent || quoted === undefined)
-          throw new Error("The approval quote is incomplete.");
-        await recordAndSend({
-          kind: "approve-basket-asset",
-          label: `Approve ${constituent.token.symbol}`,
-          to: constituent.token.address,
-          data: encodeFunctionData({
-            abi: basketTokenAbi,
-            functionName: "approve",
-            args: [deploymentState.deployment.contracts.diamond, MAX_ERC20_ALLOWANCE],
-          }),
-        });
-      } else if (availability.kind === "execute") {
-        const refreshed = await quote.refetch();
-        if (
-          !refreshed.data ||
-          refreshed.data.mode !== mode ||
-          refreshed.data.amount !== amount ||
-          refreshed.data.amounts.length !== basket.constituents.length
-        ) {
-          throw new Error("The basket quote could not be refreshed for the current input.");
-        }
-        const bounds =
-          mode === "mint"
-            ? refreshed.data.amounts.map((value) => maximumWithSlippage(value, slippageBps))
-            : refreshed.data.amounts.map((value) => minimumWithSlippage(value, slippageBps));
-        if (mode === "mint") {
-          const refreshedCatalog = await catalog.refetch();
-          const currentBasket = refreshedCatalog.data?.baskets.find(
-            (candidate) => candidate.basketId === basketId
-          );
-          if (
-            !currentBasket ||
-            currentBasket.constituents.some(
-              (constituent, index) =>
-                constituent.walletBalance < (bounds[index] ?? 0n) ||
-                constituent.allowance < (bounds[index] ?? 0n)
-            )
-          ) {
-            throw new Error("The fresh quote requires another underlying approval.");
+      if (mode === "mint") {
+        for (let index = 0; index < basket.constituents.length; index += 1) {
+          const constituent = basket.constituents[index];
+          const quoted = currentQuote.amounts[index];
+          if (!constituent || quoted === undefined) {
+            throw new Error("The approval quote is incomplete.");
           }
+          const required = maximumWithSlippage(quoted, slippageBps);
+          if (constituent.allowance >= required) continue;
+          await recordAndSend({
+            kind: "approve-basket-asset",
+            label: `Approve unlimited ${constituent.token.symbol}`,
+            to: constituent.token.address,
+            data: encodeFunctionData({
+              abi: basketTokenAbi,
+              functionName: "approve",
+              args: [deploymentState.deployment.contracts.diamond, MAX_ERC20_ALLOWANCE],
+            }),
+            activityAmount: `Unlimited ${constituent.token.symbol}`,
+          });
         }
-        // A minted basket held in the wallet earns nothing: rewards accrue
-        // against a PositionNFT. So the default mints straight into one --
-        // creating the position in the same call when there is not one yet --
-        // and only an explicit opt-out leaves the shares in the wallet.
-        const refreshedPositions = await positions.refetch();
-        const targetPositionId = selectedPositionId(conversionSelection);
-        const targetPosition =
-          targetPositionId === null
-            ? null
-            : (refreshedPositions.data?.positions.find(
-                (position) => position.positionId === targetPositionId
-              ) ?? null);
-        if (targetPositionId !== null && !targetPosition) {
-          throw new Error("The selected position is no longer owned by this wallet.");
-        }
-        const collateralFunction =
-          mode === "mint"
-            ? conversionSelection === "new-position"
-              ? ("createAndMintBasketCollateral" as const)
-              : targetPosition
-                ? ("mintBasketCollateral" as const)
-                : null
-            : targetPosition
-              ? ("redeemBasketCollateral" as const)
-              : null;
-
-        let data: Hex;
-        if (mode === "redeem" && targetPosition) {
-          const freshCollateral = targetPosition.collateral.find(
-            (collateral) => collateral.basket.basketId === basketId
-          );
-          if (!freshCollateral || unlockedCollateral(freshCollateral) < amount) {
-            throw new Error("The selected position does not have enough unlocked BasketToken.");
-          }
-          if (
-            refreshedPositions.data &&
-            refreshedPositions.data.currentBlock < freshCollateral.withdrawableAfterBlock
-          ) {
-            throw new Error("Basket collateral becomes redeemable in the next block.");
-          }
-          data = buildRedeemBasketCollateralCall(
-            targetPosition.positionId,
-            basketId,
-            amount,
-            wallet,
-            bounds
-          );
-        } else if (mode === "redeem") {
-          data = buildRedeemCall(basketId, amount, wallet, bounds);
-        } else if (collateralFunction === "mintBasketCollateral") {
-          data = buildMintBasketCollateralCall(
-            targetPosition!.positionId,
-            basketId,
-            amount,
-            bounds
-          );
-        } else if (collateralFunction === "createAndMintBasketCollateral") {
-          data = buildCreateAndMintBasketCollateralCall(basketId, amount, wallet, bounds);
-        } else {
-          data = buildMintCall(basketId, amount, wallet, bounds);
-        }
-
-        await recordAndSend({
-          kind: mode === "mint" ? "mint-basket" : "redeem-basket",
-          label:
-            mode === "redeem"
-              ? collateralFunction === "redeemBasketCollateral"
-                ? `Redeem ${basket.symbol} from position`
-                : `Redeem ${basket.symbol}`
-              : collateralFunction
-                ? `Mint and deposit ${basket.symbol}`
-                : `Mint ${basket.symbol}`,
-          to: deploymentState.deployment.contracts.diamond,
-          data,
-          value:
-            collateralFunction === "createAndMintBasketCollateral"
-              ? (refreshedPositions.data?.positionCreationFee ?? 0n)
-              : 0n,
-          activityAmount:
-            collateralFunction === "createAndMintBasketCollateral"
-              ? `${amountInput || "0"} ${basket.symbol} + ${formatEther(
-                  refreshedPositions.data?.positionCreationFee ?? 0n
-                )} ETH account fee`
-              : undefined,
-          validate: (result) =>
-            void (collateralFunction
-              ? validateBasketCollateralSimulation(
-                  collateralFunction,
-                  result,
-                  basket.constituents.length
-                )
-              : validateBasketSimulation(mode, result, basket.constituents.length)),
-        });
-        setAmountInput("");
       }
+      const refreshed = await quote.refetch();
+      if (
+        !refreshed.data ||
+        refreshed.data.mode !== mode ||
+        refreshed.data.amount !== amount ||
+        refreshed.data.amounts.length !== basket.constituents.length
+      ) {
+        throw new Error("The basket quote could not be refreshed for the current input.");
+      }
+      const bounds =
+        mode === "mint"
+          ? refreshed.data.amounts.map((value) => maximumWithSlippage(value, slippageBps))
+          : refreshed.data.amounts.map((value) => minimumWithSlippage(value, slippageBps));
+      if (mode === "mint") {
+        const refreshedCatalog = await catalog.refetch();
+        const currentBasket = refreshedCatalog.data?.baskets.find(
+          (candidate) => candidate.basketId === basketId
+        );
+        if (
+          !currentBasket ||
+          currentBasket.constituents.some(
+            (constituent, index) =>
+              constituent.walletBalance < (bounds[index] ?? 0n) ||
+              constituent.allowance < (bounds[index] ?? 0n)
+          )
+        ) {
+          throw new Error("The fresh quote requires another underlying approval.");
+        }
+      }
+      // A minted basket held in the wallet earns nothing: rewards accrue
+      // against a PositionNFT. So the default mints straight into one --
+      // creating the position in the same call when there is not one yet --
+      // and only an explicit opt-out leaves the shares in the wallet.
+      const refreshedPositions = await positions.refetch();
+      const targetPositionId = selectedPositionId(conversionSelection);
+      const targetPosition =
+        targetPositionId === null
+          ? null
+          : (refreshedPositions.data?.positions.find(
+              (position) => position.positionId === targetPositionId
+            ) ?? null);
+      if (targetPositionId !== null && !targetPosition) {
+        throw new Error("The selected position is no longer owned by this wallet.");
+      }
+      const collateralFunction =
+        mode === "mint"
+          ? conversionSelection === "new-position"
+            ? ("createAndMintBasketCollateral" as const)
+            : targetPosition
+              ? ("mintBasketCollateral" as const)
+              : null
+          : targetPosition
+            ? ("redeemBasketCollateral" as const)
+            : null;
+
+      let data: Hex;
+      if (mode === "redeem" && targetPosition) {
+        const freshCollateral = targetPosition.collateral.find(
+          (collateral) => collateral.basket.basketId === basketId
+        );
+        if (!freshCollateral || unlockedCollateral(freshCollateral) < amount) {
+          throw new Error("The selected position does not have enough unlocked BasketToken.");
+        }
+        if (
+          refreshedPositions.data &&
+          refreshedPositions.data.currentBlock < freshCollateral.withdrawableAfterBlock
+        ) {
+          throw new Error("Basket collateral becomes redeemable in the next block.");
+        }
+        data = buildRedeemBasketCollateralCall(
+          targetPosition.positionId,
+          basketId,
+          amount,
+          wallet,
+          bounds
+        );
+      } else if (mode === "redeem") {
+        data = buildRedeemCall(basketId, amount, wallet, bounds);
+      } else if (collateralFunction === "mintBasketCollateral") {
+        data = buildMintBasketCollateralCall(targetPosition!.positionId, basketId, amount, bounds);
+      } else if (collateralFunction === "createAndMintBasketCollateral") {
+        data = buildCreateAndMintBasketCollateralCall(basketId, amount, wallet, bounds);
+      } else {
+        data = buildMintCall(basketId, amount, wallet, bounds);
+      }
+
+      await recordAndSend({
+        kind: mode === "mint" ? "mint-basket" : "redeem-basket",
+        label:
+          mode === "redeem"
+            ? collateralFunction === "redeemBasketCollateral"
+              ? `Redeem ${basket.symbol} from position`
+              : `Redeem ${basket.symbol}`
+            : collateralFunction
+              ? `Mint and deposit ${basket.symbol}`
+              : `Mint ${basket.symbol}`,
+        to: deploymentState.deployment.contracts.diamond,
+        data,
+        value:
+          collateralFunction === "createAndMintBasketCollateral"
+            ? (refreshedPositions.data?.positionCreationFee ?? 0n)
+            : 0n,
+        activityAmount:
+          collateralFunction === "createAndMintBasketCollateral"
+            ? `${amountInput || "0"} ${basket.symbol} + ${formatEther(
+                refreshedPositions.data?.positionCreationFee ?? 0n
+              )} ETH account fee`
+            : undefined,
+        validate: (result) =>
+          void (collateralFunction
+            ? validateBasketCollateralSimulation(
+                collateralFunction,
+                result,
+                basket.constituents.length
+              )
+            : validateBasketSimulation(mode, result, basket.constituents.length)),
+      });
+      setAmountInput("");
       await Promise.all([catalog.refetch(), positions.refetch(), quote.refetch()]);
     } catch (error) {
       setActionError(describeBasketError(error));

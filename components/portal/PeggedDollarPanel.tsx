@@ -255,7 +255,7 @@ export function PeggedDollarPanel({
     }
   ) => {
     if (!deployment) throw new Error("No Dollar deployment is configured.");
-    const { account, publicClient, walletClient } = await walletClients(wallet);
+    const { account, publicClient } = await walletClients(wallet);
     return executeProtocolTransaction({
       publicClient,
       wallet: account,
@@ -265,8 +265,7 @@ export function PeggedDollarPanel({
       amount: activityAmount,
       to: target,
       data,
-      sendTransaction: ({ to, data, value }) =>
-        walletClient.sendTransaction({ account, chain: null, to, data, value }),
+      sendTransaction: wallet.sendEvmTransaction,
       describeError: describeDollarError,
       validateSimulation: options?.validateSimulation,
       verifyConfirmation: options?.verifyConfirmation

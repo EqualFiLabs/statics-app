@@ -13,6 +13,8 @@ import {
 import {
   BasketStatus,
   decodePositionInfo,
+  maximumLiquidityForAmounts,
+  quoteRangeAmounts,
   staticsAbi,
   staticsLiquidityManagerAbi,
   staticsSwapFeeHookAbi,
@@ -36,6 +38,10 @@ import {
 } from "@/lib/dollar/deployment";
 import { loadPositionCatalog, type PositionRecord } from "@/lib/positions/positions";
 import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
+
+const BPS = 10_000n;
+const MAX_POSITION_AMOUNT = (1n << 128n) - 1n;
+export const LIQUIDITY_TOLERANCE_BPS = 50n;
 
 export type CanonicalPoolRecord = Readonly<{
   basketId: bigint;
@@ -76,6 +82,20 @@ export type LpPositionRecord = Readonly<{
 
 export type LiquidityManageAction = "stake" | "activate" | "increase" | "claim" | "unstake";
 
+export type LiquidityTokenIndex = 0 | 1;
+
+export type WalletLiquidityQuote = Readonly<{
+  selectedIndex: LiquidityTokenIndex;
+  liquidity: bigint;
+  estimatedAmounts: readonly [bigint, bigint];
+  maximumAmounts: readonly [bigint, bigint];
+}>;
+
+export type MaximumWalletLiquidity = Readonly<{
+  inputAmount: bigint;
+  limitingIndex: LiquidityTokenIndex;
+}>;
+
 export type LiquidityCatalog = Readonly<{
   pools: readonly CanonicalPoolRecord[];
   positions: readonly LpPositionRecord[];
@@ -87,6 +107,100 @@ export type LiquidityCatalog = Readonly<{
 
 export function canonicalFullRange(spacing: number): readonly [number, number] {
   return [Math.ceil(-887_272 / spacing) * spacing, Math.floor(887_272 / spacing) * spacing];
+}
+
+function orderedPoolTokens(pool: CanonicalPoolRecord): readonly [TokenMetadata, TokenMetadata] {
+  return [
+    pool.key.currency0 === pool.basketToken.address ? pool.basketToken : pool.asset,
+    pool.key.currency1 === pool.basketToken.address ? pool.basketToken : pool.asset,
+  ];
+}
+
+export function liquidityWalletBalances(
+  pool: CanonicalPoolRecord,
+  baskets: readonly BasketRecord[]
+): readonly [bigint, bigint] | null {
+  const basket = baskets.find((candidate) => candidate.basketId === pool.basketId);
+  const constituent = basket?.constituents.find(
+    (candidate) => candidate.token.address === pool.asset.address
+  );
+  if (!basket || !constituent) return null;
+  const balancesByAddress = new Map<Address, bigint>([
+    [basket.token.address, basket.walletBalance],
+    [constituent.token.address, constituent.walletBalance],
+  ]);
+  const tokens = orderedPoolTokens(pool);
+  const balance0 = balancesByAddress.get(tokens[0].address);
+  const balance1 = balancesByAddress.get(tokens[1].address);
+  return balance0 === undefined || balance1 === undefined ? null : [balance0, balance1];
+}
+
+export function quoteWalletLiquidity(
+  pool: CanonicalPoolRecord,
+  selectedIndex: LiquidityTokenIndex,
+  selectedMaximum: bigint
+): WalletLiquidityQuote | null {
+  if (selectedMaximum <= 0n || selectedMaximum > MAX_POSITION_AMOUNT) return null;
+  const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
+  const capacity = [MAX_POSITION_AMOUNT, MAX_POSITION_AMOUNT] as [bigint, bigint];
+  capacity[selectedIndex] = selectedMaximum;
+  const maximumLiquidity = maximumLiquidityForAmounts(
+    pool.sqrtPriceX96,
+    tickLower,
+    tickUpper,
+    capacity[0],
+    capacity[1]
+  );
+  const liquidity = (maximumLiquidity * (BPS - LIQUIDITY_TOLERANCE_BPS)) / BPS;
+  if (maximumLiquidity === 0n || liquidity === 0n) return null;
+  const maximumQuote = quoteRangeAmounts(pool.sqrtPriceX96, tickLower, tickUpper, maximumLiquidity);
+  const estimatedQuote = quoteRangeAmounts(pool.sqrtPriceX96, tickLower, tickUpper, liquidity);
+  const maximumAmounts = [maximumQuote.amount0, maximumQuote.amount1] as [bigint, bigint];
+  maximumAmounts[selectedIndex] = selectedMaximum;
+  return {
+    selectedIndex,
+    liquidity,
+    estimatedAmounts: [estimatedQuote.amount0, estimatedQuote.amount1],
+    maximumAmounts,
+  };
+}
+
+export function maximumWalletLiquidityInput(
+  pool: CanonicalPoolRecord,
+  balances: readonly [bigint, bigint],
+  selectedIndex: LiquidityTokenIndex
+): MaximumWalletLiquidity | null {
+  const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
+  const limits = balances.map((balance) =>
+    balance > MAX_POSITION_AMOUNT ? MAX_POSITION_AMOUNT : balance
+  ) as [bigint, bigint];
+  if (limits[0] === 0n || limits[1] === 0n) return null;
+  const liquidity = maximumLiquidityForAmounts(
+    pool.sqrtPriceX96,
+    tickLower,
+    tickUpper,
+    limits[0],
+    limits[1]
+  );
+  if (liquidity === 0n) return null;
+  const amounts = quoteRangeAmounts(pool.sqrtPriceX96, tickLower, tickUpper, liquidity);
+  const nextAmounts =
+    liquidity < MAX_POSITION_AMOUNT
+      ? quoteRangeAmounts(pool.sqrtPriceX96, tickLower, tickUpper, liquidity + 1n)
+      : amounts;
+  const limitingIndex: LiquidityTokenIndex =
+    nextAmounts.amount0 > limits[0] ? 0 : nextAmounts.amount1 > limits[1] ? 1 : selectedIndex;
+  let inputAmount = selectedIndex === 0 ? amounts.amount0 : amounts.amount1;
+
+  // Integer rounding can let the selected amount represent a slightly larger
+  // liquidity plateau than the balance-constrained quote. Step down one token
+  // unit when needed so Max always remains executable by both wallet balances.
+  const selectedQuote = quoteWalletLiquidity(pool, selectedIndex, inputAmount);
+  const otherIndex: LiquidityTokenIndex = selectedIndex === 0 ? 1 : 0;
+  if (selectedQuote && selectedQuote.maximumAmounts[otherIndex] > limits[otherIndex]) {
+    inputAmount -= 1n;
+  }
+  return inputAmount > 0n ? { inputAmount, limitingIndex } : null;
 }
 
 export function borrowedLiquidityDeadline(blockTimestamp: bigint): bigint {

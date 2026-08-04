@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPublicClient,
-  createWalletClient,
   custom,
   encodeFunctionData,
   formatUnits,
@@ -805,11 +804,6 @@ function SendDialog({
         chain: network.chain,
         transport: custom(provider),
       });
-      const walletClient = createWalletClient({
-        account,
-        chain: network.chain,
-        transport: custom(provider),
-      });
       const to = asset.kind === "native" ? getAddress(recipient) : asset.address!;
       let data: Hex = "0x";
       if (asset.kind === "erc20") {
@@ -837,14 +831,7 @@ function SendDialog({
         to,
         data,
         value: asset.kind === "native" ? amountRaw : 0n,
-        sendTransaction: ({ to: target, data: transactionData, value }) =>
-          walletClient.sendTransaction({
-            account,
-            chain: network.chain,
-            to: target,
-            data: transactionData,
-            value,
-          }),
+        sendTransaction: wallet.sendEvmTransaction,
         describeError: (cause) => (cause instanceof Error ? cause.message : "The transfer failed."),
       });
       await onConfirmed();
@@ -1010,14 +997,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
           functionName: "safeTransferFrom",
           args: [sender, to, nft.tokenId],
         }),
-        sendTransaction: ({ to: target, data, value }) =>
-          walletClient.data!.sendTransaction({
-            account: sender,
-            chain: walletClient.data!.chain,
-            to: target,
-            data,
-            value,
-          }),
+        sendTransaction: wallet.sendEvmTransaction,
         describeError: (cause) =>
           cause instanceof Error ? cause.message : "The transfer did not complete.",
         // Confirms the chain actually reassigned the token, rather than

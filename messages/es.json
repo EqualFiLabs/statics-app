@@ -160,7 +160,10 @@
     "switching": "Cambiando…",
     "switchNetwork": "Cambiar de red",
     "application": "Aplicación Statics",
-    "primary": "Principal"
+    "primary": "Principal",
+    "approvalsTitle": "Cómo funcionan las aprobaciones.",
+    "approvalsBody": "Statics usa aprobaciones máximas de tokens y operadores para confirmar la configuración en secuencia y evitar solicitudes repetidas. Cada aviso de la billetera identifica el permiso y el gastador. La autoridad permanece activa hasta que la revoques.",
+    "manageApprovals": "Revisar o revocar aprobaciones"
   },
   "surface": {
     "notConfigured": "Statics no está configurado",
@@ -404,7 +407,7 @@
     "withdraw": "Retirar",
     "basket": "Canasta",
     "waiting": "Esperando confirmación…",
-    "approveDeposit": "Aprobar o depositar BasketToken",
+    "approveDeposit": "Depositar BasketToken",
     "withdrawBasket": "Retirar BasketToken",
     "mintInto": "Acuñar {symbol} en esta posición",
     "redeemFrom": "Reembolsar {symbol} de esta posición",
@@ -416,7 +419,7 @@
     "walletBalance": "Saldo de cartera",
     "positionStake": "Stake de la posición",
     "maturityDescription": "Tu stake siempre puede retirarse. El stake nuevo y los activos recién seleccionados empiezan a ganar al madurar; los retiros usan primero el stake que aún no gana.",
-    "approveStake": "Aprobar o depositar {symbol}",
+    "approveStake": "Depositar {symbol}",
     "unstakeToken": "Retirar {symbol}",
     "selectedRewards": "Recompensas elegidas por la posición",
     "chooseAssets": "Elige hasta {count} activos de comisión",
@@ -438,7 +441,7 @@
   },
   "rewards": {
     "subject": "recompensas",
-    "approveOrCreate": "Aprobar o crear posición de staking",
+    "approveOrCreate": "Crear posición de staking",
     "signIn": "Inicia sesión para continuar",
     "createWallet": "Crear cartera integrada",
     "switchTo": "Cambiar a {network}",

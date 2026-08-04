@@ -173,7 +173,7 @@ describe("loan lifecycle state", () => {
     ).toMatchObject({
       kind: "approve",
       approvalIndex: 1,
-      label: "Approve asset 2",
+      label: "Repay loan",
     });
     expect(
       deriveLoanActionAvailability({
