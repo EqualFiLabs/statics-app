@@ -1,7 +1,7 @@
 import type { ConnectedWallet } from "@privy-io/react-auth";
 import { describe, expect, it } from "vitest";
 
-import { selectStaticsWallet } from "@/lib/wallet/selection";
+import { selectActiveStaticsWallet, selectStaticsWallet } from "@/lib/wallet/selection";
 
 function wallet({
   address,
@@ -45,5 +45,32 @@ describe("Statics EVM wallet selection", () => {
 
     expect(selectStaticsWallet([external])).toBe(external);
     expect(selectStaticsWallet([])).toBeUndefined();
+  });
+
+  it("honors an external wallet explicitly activated through Privy", () => {
+    const external = wallet({
+      address: "0x1111111111111111111111111111111111111111",
+      walletClientType: "metamask",
+      connectorType: "injected",
+    });
+    const embedded = wallet({
+      address: "0x2222222222222222222222222222222222222222",
+      walletClientType: "privy",
+      connectorType: "embedded",
+    });
+
+    expect(selectActiveStaticsWallet([embedded, external], external.address)).toBe(external);
+  });
+
+  it("falls back to the embedded wallet when the active external wallet is stale", () => {
+    const embedded = wallet({
+      address: "0x2222222222222222222222222222222222222222",
+      walletClientType: "privy",
+      connectorType: "embedded",
+    });
+
+    expect(
+      selectActiveStaticsWallet([embedded], "0x1111111111111111111111111111111111111111")
+    ).toBe(embedded);
   });
 });

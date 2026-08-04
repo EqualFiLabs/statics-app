@@ -134,8 +134,9 @@ describe("DApp wallet shell", () => {
     expect(disconnectWallet).toHaveBeenCalledOnce();
   });
 
-  it("reconnects a locally disconnected Privy wallet without starting login", () => {
+  it("offers Privy and external wallet choices after a local disconnect", () => {
     const reconnectWallet = vi.fn();
+    const connectExternalWallet = vi.fn();
     const login = vi.fn();
     const connectWallet = vi.fn();
     renderWithWallet(<AppShell>Overview</AppShell>, {
@@ -143,11 +144,18 @@ describe("DApp wallet shell", () => {
       authenticated: true,
       locallyDisconnected: true,
       reconnectWallet,
+      connectExternalWallet,
       login,
       connectWallet,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Reconnect wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect external wallet" }));
+    expect(connectExternalWallet).toHaveBeenCalledOnce();
+    expect(reconnectWallet).not.toHaveBeenCalled();
+    expect(login).not.toHaveBeenCalled();
+    expect(connectWallet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Use Privy wallet" }));
     expect(reconnectWallet).toHaveBeenCalledOnce();
     expect(login).not.toHaveBeenCalled();
     expect(connectWallet).not.toHaveBeenCalled();

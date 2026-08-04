@@ -3,12 +3,12 @@
 import {
   getEmbeddedConnectedWallet,
   PrivyProvider,
+  useConnectWallet,
   useCreateWallet,
   useExportWallet,
   usePrivy,
   useWallets,
   type ConnectedWallet,
-  type User,
 } from "@privy-io/react-auth";
 import {
   defaultSolanaRpcsPlugin,
@@ -17,7 +17,7 @@ import {
   useSignTransaction as useSignSolanaTransaction,
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
-import { createConfig, WagmiProvider } from "@privy-io/wagmi";
+import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
@@ -28,7 +28,7 @@ import {
   readWalletEnvironment,
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
-import { selectStaticsWallet } from "@/lib/wallet/selection";
+import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
 import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
@@ -65,10 +65,6 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
 }));
 const FUNDING_CHAIN_STORAGE_KEY = "statics:funding-chain";
 
-function selectWallet({ wallets }: { wallets: ConnectedWallet[]; user: User | null }) {
-  return selectStaticsWallet(wallets);
-}
-
 function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
   if (!wallet?.chainId) return null;
   const parsed = Number(wallet.chainId.replace(/^eip155:/, ""));
@@ -81,6 +77,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
   const wagmiAccount = useAccount();
+  const { setActiveWallet } = useSetActiveWallet();
   const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
   const { signTransaction: signSolanaTransaction } = useSignSolanaTransaction();
   const { wallets: solanaWallets, ready: solanaWalletsReady } = useSolanaWallets();
@@ -88,9 +85,18 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
   const [locallyDisconnected, setLocallyDisconnected] = useState(false);
+  const [requestedExternalAddress, setRequestedExternalAddress] = useState<string | null>(null);
+  const { connectWallet: promptExternalWallet } = useConnectWallet({
+    onSuccess: ({ wallet }) => {
+      if (wallet.type === "ethereum") setRequestedExternalAddress(wallet.address);
+    },
+    onError: () => setActionError("The external wallet connection was not completed."),
+  });
 
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
-  const selectedWallet = locallyDisconnected ? undefined : selectStaticsWallet(wallets);
+  const selectedWallet = locallyDisconnected
+    ? undefined
+    : selectActiveStaticsWallet(wallets, wagmiAccount.address);
   const address = selectedWallet?.address ?? null;
   const walletKind = selectedWallet
     ? selectedWallet.walletClientType === "privy" || selectedWallet.walletClientType === "privy-v2"
@@ -114,6 +120,30 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    if (!requestedExternalAddress) return;
+    const requestedWallet = wallets.find(
+      (wallet) => wallet.address.toLowerCase() === requestedExternalAddress.toLowerCase()
+    );
+    if (!requestedWallet) return;
+
+    let cancelled = false;
+    void setActiveWallet(requestedWallet)
+      .then(() => {
+        if (cancelled) return;
+        setLocallyDisconnected(false);
+        setRequestedExternalAddress(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActionError("The external wallet could not be activated.");
+        setRequestedExternalAddress(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedExternalAddress, setActiveWallet, wallets]);
 
   const runAction = async (
     action: NonNullable<WalletState["busyAction"]>,
@@ -156,18 +186,28 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       busyAction,
       locallyDisconnected,
       login: () => {
-        if (locallyDisconnected && authenticated) return setLocallyDisconnected(false);
+        if (locallyDisconnected) {
+          return promptExternalWallet({ walletChainType: "ethereum-only" });
+        }
         login({ loginMethods: ["email", "wallet"] });
       },
       connectWallet: () => {
-        if (locallyDisconnected && authenticated) return setLocallyDisconnected(false);
+        if (locallyDisconnected) {
+          return promptExternalWallet({ walletChainType: "ethereum-only" });
+        }
         login({ loginMethods: ["wallet"] });
       },
-      disconnectWallet: () => setLocallyDisconnected(true),
-      reconnectWallet: () => {
-        if (authenticated) return setLocallyDisconnected(false);
-        login({ loginMethods: ["email", "wallet"] });
+      connectExternalWallet: () => {
+        setActionError(null);
+        promptExternalWallet({ walletChainType: "ethereum-only" });
       },
+      disconnectWallet: () => setLocallyDisconnected(true),
+      reconnectWallet: () =>
+        runAction("connect", async () => {
+          if (!embeddedWallet) throw new Error("The Privy embedded wallet is unavailable.");
+          await setActiveWallet(embeddedWallet);
+          setLocallyDisconnected(false);
+        }),
       createWallet: () =>
         runAction("create", async () => {
           await createWallet();
@@ -213,8 +253,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
+      promptExternalWallet,
       privyError,
       selectedWallet,
+      setActiveWallet,
       status,
       targetChain,
       walletKind,
@@ -265,7 +307,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
         plugins: [defaultSolanaRpcsPlugin()],
       }}
     >
-      <WagmiProvider config={wagmiConfig} setActiveWalletForWagmi={selectWallet}>
+      <WagmiProvider config={wagmiConfig}>
         <WalletBridge>{children}</WalletBridge>
       </WagmiProvider>
     </PrivyProvider>

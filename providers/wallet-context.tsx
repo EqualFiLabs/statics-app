@@ -32,12 +32,13 @@ export type WalletState = Readonly<{
   fundingNetworks: readonly FundingNetworkSummary[];
   explorerUrl: string | null;
   error: string | null;
-  busyAction: "create" | "switch" | "funding-switch" | "export" | null;
+  busyAction: "connect" | "create" | "switch" | "funding-switch" | "export" | null;
   locallyDisconnected: boolean;
   login: () => void;
   connectWallet: () => void;
+  connectExternalWallet: () => void;
   disconnectWallet: () => void;
-  reconnectWallet: () => void;
+  reconnectWallet: () => Promise<void>;
   createWallet: () => Promise<void>;
   switchNetwork: () => Promise<void>;
   selectFundingNetwork: (chainId: number) => Promise<void>;
@@ -67,8 +68,9 @@ export const defaultWalletState: WalletState = {
   locallyDisconnected: false,
   login: () => undefined,
   connectWallet: () => undefined,
+  connectExternalWallet: () => undefined,
   disconnectWallet: () => undefined,
-  reconnectWallet: () => undefined,
+  reconnectWallet: unavailable,
   createWallet: unavailable,
   switchNetwork: unavailable,
   selectFundingNetwork: unavailable,
