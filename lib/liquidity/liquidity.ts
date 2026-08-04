@@ -35,6 +35,7 @@ import {
   type DollarDeployment,
 } from "@/lib/dollar/deployment";
 import { loadPositionCatalog, type PositionRecord } from "@/lib/positions/positions";
+import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 
 export type CanonicalPoolRecord = Readonly<{
   basketId: bigint;
@@ -315,29 +316,32 @@ export async function loadLiquidityCatalog(
   if (getAddress(configuredPoolManager) !== liquidity.contracts.poolManager) {
     throw new Error("StateView is not bound to the verified PoolManager.");
   }
-  const [basketCatalog, positionCatalog, currentBlock, walletTransfers, stakeEvents] =
-    await Promise.all([
-      loadBasketCatalog(publicClient, deployment, wallet),
-      loadPositionCatalog(publicClient, deployment, wallet),
-      publicClient.getBlockNumber(),
+  const currentBlock = await publicClient.getBlockNumber();
+  const [basketCatalog, positionCatalog, walletTransfers, stakeEvents] = await Promise.all([
+    loadBasketCatalog(publicClient, deployment, wallet),
+    loadPositionCatalog(publicClient, deployment, wallet),
+    loadEventHistoryInChunks(deployment.deploymentStartBlock, currentBlock, (fromBlock, toBlock) =>
       publicClient.getContractEvents({
         address: liquidity.contracts.positionManager,
         abi: v4PositionManagerReadAbi,
         eventName: "Transfer",
         args: { to: wallet },
-        fromBlock: deployment.deploymentStartBlock,
-        toBlock: "latest",
+        fromBlock,
+        toBlock,
         strict: true,
-      }),
+      })
+    ),
+    loadEventHistoryInChunks(deployment.deploymentStartBlock, currentBlock, (fromBlock, toBlock) =>
       publicClient.getContractEvents({
         address: deployment.contracts.diamond,
         abi: staticsAbi,
         eventName: "LiquidityPositionStaked",
-        fromBlock: deployment.deploymentStartBlock,
-        toBlock: "latest",
+        fromBlock,
+        toBlock,
         strict: true,
-      }),
-    ]);
+      })
+    ),
+  ]);
   const pools = (
     await Promise.all(
       basketCatalog.baskets.flatMap((basket) =>

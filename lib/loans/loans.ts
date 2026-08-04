@@ -23,6 +23,7 @@ import {
 
 import { loadTokenMetadata, type BasketRecord, type TokenMetadata } from "@/lib/baskets/baskets";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
+import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 import { describeTransportFailure } from "@/lib/protocol/errors";
 import {
   loadPositionCatalog,
@@ -230,33 +231,48 @@ export async function loadLoanCatalog(
   deployment: DollarDeployment,
   wallet: Address
 ): Promise<LoanCatalog> {
-  const [positionCatalog, originated, repaid, recovered, latestBlock] = await Promise.all([
+  const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+  const [positionCatalog, originated, repaid, recovered] = await Promise.all([
     loadPositionCatalog(publicClient, deployment, wallet),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "LoanOriginated",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "LoanRepaid",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "LoanRecovered",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
-    publicClient.getBlock({ blockTag: "latest" }),
+    loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock.number,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          eventName: "LoanOriginated",
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    ),
+    loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock.number,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          eventName: "LoanRepaid",
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    ),
+    loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock.number,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.contracts.diamond,
+          abi: staticsAbi,
+          eventName: "LoanRecovered",
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    ),
   ]);
 
   const closed = new Set([...repaid, ...recovered].map((event) => event.args.loanId.toString()));

@@ -19,6 +19,7 @@ import {
 } from "@statics-protocol/sdk";
 
 import type { DollarDeployment } from "@/lib/dollar/deployment";
+import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 import { describeTransportFailure } from "@/lib/protocol/errors";
 
 const BPS = 10_000n;
@@ -197,21 +198,27 @@ export async function loadBasketCatalog(
   deployment: DollarDeployment,
   wallet: Address | null
 ): Promise<BasketCatalog> {
-  const [count, logs] = await Promise.all([
+  const [count, latestBlock] = await Promise.all([
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
       functionName: "basketCount",
     }),
-    publicClient.getContractEvents({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      eventName: "BasketCreated",
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    }),
+    publicClient.getBlockNumber(),
   ]);
+  const logs = await loadEventHistoryInChunks(
+    deployment.deploymentStartBlock,
+    latestBlock,
+    (fromBlock, toBlock) =>
+      publicClient.getContractEvents({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        eventName: "BasketCreated",
+        fromBlock,
+        toBlock,
+        strict: true,
+      })
+  );
   if (count > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error("The basket registry is too large for this client.");
   }

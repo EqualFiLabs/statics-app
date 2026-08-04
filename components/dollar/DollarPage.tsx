@@ -969,7 +969,6 @@ function DollarActionPanel({
       supplySeriesId !== undefined &&
       Boolean(supplyPeriphery) &&
       supplyPeriphery !== zeroAddress,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || supplySeriesId === undefined || !supplyPeriphery) {
         throw new Error("Dollar state is not ready.");
@@ -980,8 +979,7 @@ function DollarActionPanel({
         supplyPeriphery,
         deployment.contracts.risk,
         wallet,
-        supplySeriesId,
-        deployment.deploymentStartBlock
+        supplySeriesId
       );
     },
   });
@@ -1004,9 +1002,23 @@ function DollarActionPanel({
   }
 
   const state = snapshot.data!;
+  const supplyLoadError = supplyState.isError ? describeDollarError(supplyState.error) : null;
+  const supplyUnavailable = isSupplyMode(mode) && !supplyState.data;
+  const supplyUnavailableReason =
+    !supplyPeriphery || supplyPeriphery === zeroAddress
+      ? "Risk supply is not configured for this series."
+      : (supplyLoadError ?? "Loading current Risk supply state…");
 
   const actionAvailability = isSupplyMode(mode)
-    ? supplyActionAvailability(mode, amount, supply, state.series.status === 1)
+    ? supplyUnavailable
+      ? {
+          kind: "blocked" as const,
+          label: "Supply unavailable",
+          reason: supplyUnavailableReason,
+          executable: false,
+          moves: 0n,
+        }
+      : supplyActionAvailability(mode, amount, supply, state.series.status === 1)
     : deriveDollarActionAvailability({
         mode,
         asset,
@@ -1165,16 +1177,22 @@ function DollarActionPanel({
                         setAmountInput(formatUnits(balance, 18));
                         setActionError(null);
                       }}
-                      disabled={anyPending || (mode === "deposit" && asset === "ETH")}
+                      disabled={
+                        anyPending || supplyUnavailable || (mode === "deposit" && asset === "ETH")
+                      }
                     >
                       {mode === "deposit" && asset === "ETH" ? t("keepGas") : t("max")}
                     </button>
                   </div>
                   <small>
-                    Available {displayAmount(balance)} {amountUnit}
-                    {mode === "redeem" &&
+                    {supplyUnavailable
+                      ? supplyUnavailableReason
+                      : `Available ${displayAmount(balance)} ${amountUnit}`}
+                    {!supplyUnavailable &&
+                      mode === "redeem" &&
                       ` · ${displayAmount(state.redeemableLiquidity)} Dollar redeemable right now`}
-                    {isSupplyMode(mode) &&
+                    {!supplyUnavailable &&
+                      isSupplyMode(mode) &&
                       ` · ${displayAmount(supply.effectiveShares)} currently supplied`}
                   </small>
                 </div>

@@ -8,6 +8,8 @@ import {
   staticsDollarRiskTokenAbi,
 } from "@statics-protocol/sdk";
 
+import { loadOwnedPositionIds } from "@/lib/positions/owner-index";
+
 /**
  * Supplying Risk Shares as redemption liquidity.
  *
@@ -77,10 +79,9 @@ export function hasClaimableProceeds(state: DollarSupplyState): boolean {
 /**
  * Finds the position already carrying risk liquidity for this series.
  *
- * There is no reverse index from series to position, so candidates come from
- * Transfer logs the way the position catalog finds them, and each is asked
- * directly. Newest first, because a supplier's most recent position is the
- * likeliest holder, and the scan stops at the first match.
+ * Candidates come from the Position NFT's current owner index. Newest first,
+ * because a supplier's most recent position is the likeliest holder, and the
+ * scan stops at the first match.
  */
 export async function loadDollarSupplyState(
   publicClient: PublicClient,
@@ -88,38 +89,23 @@ export async function loadDollarSupplyState(
   periphery: Address,
   risk: Address,
   wallet: Address,
-  seriesId: bigint,
-  fromBlock: bigint
+  seriesId: bigint
 ): Promise<DollarSupplyState> {
-  const [walletShares, riskApprovedForPeriphery, transferLogs, positionCreationFee] =
+  const [walletShares, riskApprovedForPeriphery, currentPositionIds, positionCreationFee] =
     await Promise.all([
-      publicClient
-        .readContract({
-          address: risk,
-          abi: staticsDollarRiskTokenAbi,
-          functionName: "balanceOf",
-          args: [wallet, seriesId],
-        })
-        .catch(() => 0n),
-      publicClient
-        .readContract({
-          address: risk,
-          abi: staticsDollarRiskTokenAbi,
-          functionName: "isApprovedForAll",
-          args: [wallet, periphery],
-        })
-        .catch(() => false),
-      publicClient
-        .getContractEvents({
-          address: diamond,
-          abi: staticsAbi,
-          eventName: "Transfer",
-          args: { to: wallet },
-          fromBlock,
-          toBlock: "latest",
-          strict: true,
-        })
-        .catch(() => []),
+      publicClient.readContract({
+        address: risk,
+        abi: staticsDollarRiskTokenAbi,
+        functionName: "balanceOf",
+        args: [wallet, seriesId],
+      }),
+      publicClient.readContract({
+        address: risk,
+        abi: staticsDollarRiskTokenAbi,
+        functionName: "isApprovedForAll",
+        args: [wallet, periphery],
+      }),
+      loadOwnedPositionIds(publicClient, diamond, wallet),
       publicClient.readContract({
         address: diamond,
         abi: staticsAbi,
@@ -127,35 +113,22 @@ export async function loadDollarSupplyState(
       }),
     ]);
 
-  const candidates = [...new Set(transferLogs.map((log) => log.args.tokenId.toString()))]
-    .map(BigInt)
-    .sort((left, right) => (left === right ? 0 : left > right ? -1 : 1));
+  const candidates = [...currentPositionIds].sort((left, right) =>
+    left === right ? 0 : left > right ? -1 : 1
+  );
 
-  const ownedPositionIds: bigint[] = [];
+  const ownedPositionIds = candidates;
   let matched: DollarSupplyState | null = null;
   for (const positionId of candidates) {
-    // A Transfer to this wallet does not mean it still holds the position.
-    const owner = await publicClient
-      .readContract({
-        address: diamond,
-        abi: staticsAbi,
-        functionName: "ownerOf",
-        args: [positionId],
-      })
-      .catch(() => null);
-    if (!owner || owner.toLowerCase() !== wallet.toLowerCase()) continue;
-    ownedPositionIds.push(positionId);
     if (matched) continue;
 
-    const liquidity = await publicClient
-      .readContract({
-        address: periphery,
-        abi: staticsDollarPeripheryAbi,
-        functionName: "riskLiquidity",
-        args: [positionId, seriesId],
-      })
-      .catch(() => null);
-    if (!liquidity?.exists) continue;
+    const liquidity = await publicClient.readContract({
+      address: periphery,
+      abi: staticsDollarPeripheryAbi,
+      functionName: "riskLiquidity",
+      args: [positionId, seriesId],
+    });
+    if (!liquidity.exists) continue;
     matched = {
       positionId,
       ownedPositionIds,

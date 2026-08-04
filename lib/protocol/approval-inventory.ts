@@ -24,6 +24,7 @@ import {
   MAX_PERMIT2_EXPIRATION,
   operatorApprovalAbi,
 } from "@/lib/protocol/approvals";
+import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 
 export type ApprovalKind = "erc20" | "permit2" | "operator" | "erc721-token";
 
@@ -223,15 +224,21 @@ export async function loadApprovalInventory(
       spenderLabel: "StaticsDiamond",
       purpose: "Stake wallet-owned liquidity positions",
     });
-    const receivedPositions = await publicClient.getContractEvents({
-      address: deployment.liquidity.contracts.positionManager,
-      abi: v4PositionManagerReadAbi,
-      eventName: "Transfer",
-      args: { to: wallet },
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-      strict: true,
-    });
+    const latestBlock = await publicClient.getBlockNumber();
+    const receivedPositions = await loadEventHistoryInChunks(
+      deployment.deploymentStartBlock,
+      latestBlock,
+      (fromBlock, toBlock) =>
+        publicClient.getContractEvents({
+          address: deployment.liquidity!.contracts.positionManager,
+          abi: v4PositionManagerReadAbi,
+          eventName: "Transfer",
+          args: { to: wallet },
+          fromBlock,
+          toBlock,
+          strict: true,
+        })
+    );
     const tokenIds = [
       ...new Set(receivedPositions.map((event) => event.args.tokenId.toString())),
     ].map(BigInt);
