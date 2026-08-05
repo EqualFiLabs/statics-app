@@ -271,15 +271,18 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           return result.hash;
         }
 
+        const transactionNetwork = getFundingNetwork(request.chainId);
+        if (!transactionNetwork) throw new Error("The transaction network is not supported.");
+
         const provider = await selectedWallet.getEthereumProvider();
         const client = createWalletClient({
           account: request.wallet,
-          chain: undefined,
+          chain: transactionNetwork.chain,
           transport: custom(provider),
         });
         return client.sendTransaction({
           account: request.wallet,
-          chain: undefined,
+          chain: transactionNetwork.chain,
           to: request.to,
           data: request.data,
           value: request.value,
