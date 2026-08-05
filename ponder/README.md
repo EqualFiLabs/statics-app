@@ -15,4 +15,9 @@ npm run codegen
 npm run dev
 ```
 
-Point the frontend at the service with `NEXT_PUBLIC_STATICS_INDEXER_URL`. `/health` is a liveness probe, `/ready` verifies database access, and `/status` reports sample indexed blocks.
+For production, configure PostgreSQL with `DATABASE_URL`, assign the deployment a unique
+`DATABASE_SCHEMA`, and run `npm run start`.
+
+Point the frontend at the service with `NEXT_PUBLIC_STATICS_INDEXER_URL`. Ponder owns the reserved
+`/health`, `/ready`, and `/status` endpoints. `/health` reports process liveness, while `/ready`
+returns success only after the indexer has caught up to realtime.

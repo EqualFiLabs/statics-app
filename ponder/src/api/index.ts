@@ -10,33 +10,6 @@ import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
 
-app.get("/health", (context) => context.json({ status: "ok" }));
-
-app.get("/ready", async (context) => {
-  await db.select({ id: activeLoan.id }).from(activeLoan).limit(1);
-  return context.json({ status: "ready" });
-});
-
-app.get("/status", async (context) => {
-  const [loan, position] = await Promise.all([
-    db
-      .select({ block: activeLoan.updatedAtBlock })
-      .from(activeLoan)
-      .orderBy(asc(activeLoan.id))
-      .limit(1),
-    db
-      .select({ block: v4Position.updatedAtBlock })
-      .from(v4Position)
-      .orderBy(asc(v4Position.id))
-      .limit(1),
-  ]);
-  return context.json({
-    status: "ok",
-    sampleLoanBlock: loan[0]?.block.toString() ?? null,
-    samplePositionBlock: position[0]?.block.toString() ?? null,
-  });
-});
-
 app.get("/loans/recoverable", async (context) => {
   const asOfValue = context.req.query("asOf");
   const limit = readLimit(context.req.query("limit"));
