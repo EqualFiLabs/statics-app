@@ -155,12 +155,13 @@ export function readWalletEnvironment(
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
+  const batchedHttp = (url: string) => http(url, { batch: { batchSize: 50, wait: 8 } });
   const transports: Record<number, Transport> = {
-    [robinhoodMainnet.id]: http(environment.robinhoodRpcUrl),
-    [robinhoodTestnet.id]: http(environment.robinhoodTestnetRpcUrl),
+    [robinhoodMainnet.id]: batchedHttp(environment.robinhoodRpcUrl),
+    [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),
   };
   if (environment.appEnvironment === "development") {
-    transports[anvil.id] = http(environment.anvilRpcUrl);
+    transports[anvil.id] = batchedHttp(environment.anvilRpcUrl);
   }
   return transports;
 }

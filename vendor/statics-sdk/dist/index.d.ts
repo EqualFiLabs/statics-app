@@ -5,6 +5,7 @@ export declare const SHARE_SCALE: bigint;
 export declare const MAX_LTV_BPS = 9500n;
 export declare const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
 export declare const RECOVERY_CALLER_SHARE_BPS = 2000n;
+export declare const POSITION_PORTFOLIO_MAX_PAGE_SIZE = 100n;
 export declare const Q96: bigint;
 export declare const Q128: bigint;
 export declare const Q192: bigint;
@@ -193,6 +194,13 @@ export type LoanSnapshot = {
     maturity: bigint;
     assets: readonly Address[];
     principals: readonly bigint[];
+};
+export type PositionPortfolioCounts = {
+    basketCount: bigint;
+    loanCount: bigint;
+    liquidityPositionCount: bigint;
+    globalRewardAssetCount: bigint;
+    riskSeriesCount: bigint;
 };
 export type RecoveryQuote = {
     recoverableAt: bigint;
@@ -1279,6 +1287,14 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256";
     }];
 }, {
+    readonly name: "recoveryGracePeriod";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
     readonly name: "flashLoan";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
@@ -1547,6 +1563,139 @@ export declare const staticsAbi: readonly [{
     }];
     readonly outputs: readonly [{
         readonly type: "bool";
+    }];
+}, {
+    readonly name: "positionPortfolioCounts";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "basketCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "loanCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "liquidityPositionCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "globalRewardAssetCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "riskSeriesCount";
+        }];
+        readonly name: "counts";
+    }];
+}, {
+    readonly name: "basketIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "basketIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "loanIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "loanIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "liquidityPositionIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "tokenIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "globalRewardAssetsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address[]";
+        readonly name: "assets";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "riskSeriesIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "seriesIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
     }];
 }, {
     readonly name: "quarantineBasket";
@@ -4125,6 +4274,150 @@ export declare const staticsAbi: readonly [{
     }, {
         readonly type: "uint256";
         readonly name: "amount";
+    }];
+}];
+export declare const staticsPositionPortfolioAbi: readonly [{
+    readonly name: "positionPortfolioCounts";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "basketCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "loanCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "liquidityPositionCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "globalRewardAssetCount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "riskSeriesCount";
+        }];
+        readonly name: "counts";
+    }];
+}, {
+    readonly name: "basketIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "basketIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "loanIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "loanIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "liquidityPositionIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "tokenIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "globalRewardAssetsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address[]";
+        readonly name: "assets";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "riskSeriesIdsOfPosition";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "seriesIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
+    readonly name: "InvalidPortfolioPageSize";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "requested";
+    }, {
+        readonly type: "uint256";
+        readonly name: "maximum";
     }];
 }];
 export declare const staticsSwapFeeHookAbi: readonly [{

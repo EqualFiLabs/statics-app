@@ -20,12 +20,17 @@ import type { PositionCatalog } from "@/lib/positions/positions";
 
 const mocks = vi.hoisted(() => ({
   loadPositionCatalog: vi.fn(),
+  loadRecoverableLoanIds: vi.fn(),
 }));
 
 vi.mock("@/lib/positions/positions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/positions/positions")>();
   return { ...actual, loadPositionCatalog: mocks.loadPositionCatalog };
 });
+
+vi.mock("@/lib/indexer/statics", () => ({
+  loadRecoverableLoanIds: mocks.loadRecoverableLoanIds,
+}));
 
 const wallet = "0x0000000000000000000000000000000000000001" as Address;
 const diamond = "0x0000000000000000000000000000000000000002" as Address;
@@ -120,6 +125,7 @@ describe("loan lifecycle state", () => {
   });
   beforeEach(() => {
     mocks.loadPositionCatalog.mockReset();
+    mocks.loadRecoverableLoanIds.mockReset().mockResolvedValue([]);
   });
 
   it("uses the protocol's strict maturity and recovery boundaries", () => {
@@ -207,27 +213,24 @@ describe("loan lifecycle state", () => {
     ).toMatchObject({ kind: "blocked", label: "Extension unavailable" });
   });
 
-  it("reconciles originated loans against closure events and current ownership", async () => {
+  it("combines owned portfolio loans with indexed recoverable discovery", async () => {
     const positionCatalog = {
       positions: [
         {
           positionId: 17n,
           collateral: [],
+          loanIds: [1n],
         },
       ],
       baskets: [basket],
     } as unknown as PositionCatalog;
     mocks.loadPositionCatalog.mockResolvedValue(positionCatalog);
+    mocks.loadRecoverableLoanIds.mockResolvedValue([3n]);
 
-    const getContractEvents = vi.fn(async ({ eventName }: { eventName: string }) => {
-      if (eventName === "LoanOriginated") {
-        return [{ args: { loanId: 1n } }, { args: { loanId: 2n } }, { args: { loanId: 3n } }];
-      }
-      if (eventName === "LoanRepaid") return [{ args: { loanId: 2n } }];
-      return [] as { args: { loanId: bigint } }[];
-    });
+    const getContractEvents = vi.fn();
     const readContract = vi.fn(
       async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+        if (functionName === "recoveryGracePeriod") return 3_600n;
         if (functionName === "loan") {
           const loanId = args?.[0] as bigint;
           return {
@@ -269,6 +272,7 @@ describe("loan lifecycle state", () => {
     expect(readContract).not.toHaveBeenCalledWith(
       expect.objectContaining({ functionName: "loan", args: [2n] })
     );
+    expect(getContractEvents).not.toHaveBeenCalled();
   });
 
   it("preserves canonical addresses across multi-asset borrow and extension quotes", async () => {

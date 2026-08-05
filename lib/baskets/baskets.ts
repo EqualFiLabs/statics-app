@@ -19,7 +19,6 @@ import {
 } from "@statics-protocol/sdk";
 
 import type { DollarDeployment } from "@/lib/dollar/deployment";
-import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 import { describeTransportFailure } from "@/lib/protocol/errors";
 
 const BPS = 10_000n;
@@ -71,17 +70,18 @@ export type BasketCatalog = Readonly<{
 export async function loadTokenMetadata(
   publicClient: PublicClient,
   address: Address,
-  fallback?: Readonly<{ name?: string; symbol?: string }>
+  fallback?: Readonly<{ name?: string; symbol?: string }>,
+  blockNumber?: bigint
 ): Promise<TokenMetadata> {
   const [name, symbol, decimals] = await Promise.all([
     publicClient
-      .readContract({ address, abi: basketTokenAbi, functionName: "name" })
+      .readContract({ address, abi: basketTokenAbi, functionName: "name", blockNumber })
       .catch(() => null),
     publicClient
-      .readContract({ address, abi: basketTokenAbi, functionName: "symbol" })
+      .readContract({ address, abi: basketTokenAbi, functionName: "symbol", blockNumber })
       .catch(() => null),
     publicClient
-      .readContract({ address, abi: basketTokenAbi, functionName: "decimals" })
+      .readContract({ address, abi: basketTokenAbi, functionName: "decimals", blockNumber })
       .catch(() => null),
   ]);
   const metadataAvailable =
@@ -110,21 +110,23 @@ async function loadBasket(
   deployment: DollarDeployment,
   basketId: bigint,
   wallet: Address | null,
-  eventMetadata?: Readonly<{ name: string; symbol: string }>
+  blockNumber: bigint
 ): Promise<BasketRecord> {
   const configured = (await publicClient.readContract({
     address: deployment.contracts.diamond,
     abi: staticsAbi,
     functionName: "basket",
     args: [basketId],
+    blockNumber,
   })) as BasketConfiguration;
   const token = getAddress(configured.token);
   const [tokenMetadata, totalSupply, walletBalance] = await Promise.all([
-    loadTokenMetadata(publicClient, token, eventMetadata),
+    loadTokenMetadata(publicClient, token, undefined, blockNumber),
     publicClient.readContract({
       address: token,
       abi: basketTokenAbi,
       functionName: "totalSupply",
+      blockNumber,
     }),
     wallet
       ? publicClient.readContract({
@@ -132,6 +134,7 @@ async function loadBasket(
           abi: basketTokenAbi,
           functionName: "balanceOf",
           args: [wallet],
+          blockNumber,
         })
       : 0n,
   ]);
@@ -139,12 +142,13 @@ async function loadBasket(
     configured.assets.map(async (asset, index): Promise<BasketConstituent> => {
       const address = getAddress(asset);
       const [metadata, vaultBalance, constituentBalance, allowance] = await Promise.all([
-        loadTokenMetadata(publicClient, address),
+        loadTokenMetadata(publicClient, address, undefined, blockNumber),
         publicClient.readContract({
           address: deployment.contracts.diamond,
           abi: staticsAbi,
           functionName: "vaultBalance",
           args: [basketId, address],
+          blockNumber,
         }),
         wallet
           ? publicClient.readContract({
@@ -152,6 +156,7 @@ async function loadBasket(
               abi: basketTokenAbi,
               functionName: "balanceOf",
               args: [wallet],
+              blockNumber,
             })
           : 0n,
         wallet
@@ -160,6 +165,7 @@ async function loadBasket(
               abi: basketTokenAbi,
               functionName: "allowance",
               args: [wallet, deployment.contracts.diamond],
+              blockNumber,
             })
           : 0n,
       ]);
@@ -196,48 +202,26 @@ async function loadBasket(
 export async function loadBasketCatalog(
   publicClient: PublicClient,
   deployment: DollarDeployment,
-  wallet: Address | null
+  wallet: Address | null,
+  atBlock?: bigint
 ): Promise<BasketCatalog> {
-  const [count, latestBlock] = await Promise.all([
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "basketCount",
-    }),
-    publicClient.getBlockNumber(),
-  ]);
-  const logs = await loadEventHistoryInChunks(
-    deployment.deploymentStartBlock,
-    latestBlock,
-    (fromBlock, toBlock) =>
-      publicClient.getContractEvents({
-        address: deployment.contracts.diamond,
-        abi: staticsAbi,
-        eventName: "BasketCreated",
-        fromBlock,
-        toBlock,
-        strict: true,
-      })
-  );
+  const blockNumber = atBlock ?? (await publicClient.getBlockNumber());
+  const count = await publicClient.readContract({
+    address: deployment.contracts.diamond,
+    abi: staticsAbi,
+    functionName: "basketCount",
+    blockNumber,
+  });
   if (count > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error("The basket registry is too large for this client.");
   }
-  const eventMetadata = new Map(
-    logs.map((log) => [log.args.basketId, { name: log.args.name, symbol: log.args.symbol }])
-  );
   const baskets = await Promise.all(
     Array.from({ length: Number(count) }, (_, index) => {
       const basketId = BigInt(index);
-      return loadBasket(publicClient, deployment, basketId, wallet, eventMetadata.get(basketId));
+      return loadBasket(publicClient, deployment, basketId, wallet, blockNumber);
     })
   );
-  const eventIds = new Set(logs.map((log) => log.args.basketId.toString()));
-  const warning =
-    eventIds.size === Number(count) &&
-    baskets.every((basket) => eventIds.has(basket.basketId.toString()))
-      ? null
-      : "Creation-event history is incomplete; current onchain basket state is shown.";
-  return { baskets, warning };
+  return { baskets, warning: null };
 }
 
 export function basketStatusLabel(status: number): string {

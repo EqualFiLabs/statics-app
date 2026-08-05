@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import { useTranslations } from "next-intl";
@@ -42,7 +42,6 @@ function BasketListRuntime() {
       walletAddress
     ),
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");

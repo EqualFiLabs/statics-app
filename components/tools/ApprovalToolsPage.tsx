@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { useState } from "react";
@@ -89,7 +89,6 @@ function ApprovalToolsRuntime() {
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     staleTime: APPROVAL_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

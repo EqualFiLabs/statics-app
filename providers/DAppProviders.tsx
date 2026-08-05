@@ -31,7 +31,10 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
-import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
+import {
+  queryMatchesProtocolReconciliation,
+  subscribeToProtocolReconciliation,
+} from "@/lib/protocol/reconciliation";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
   defaultSolanaWalletState,
@@ -404,7 +407,13 @@ function ProtocolQueryReconciler() {
   const queryClient = useQueryClient();
 
   useEffect(
-    () => subscribeToProtocolReconciliation(() => queryClient.refetchQueries({ type: "active" })),
+    () =>
+      subscribeToProtocolReconciliation((detail) =>
+        queryClient.refetchQueries({
+          type: "active",
+          predicate: (query) => queryMatchesProtocolReconciliation(query.queryKey, detail),
+        })
+      ),
     [queryClient]
   );
 

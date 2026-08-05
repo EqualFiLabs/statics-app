@@ -5,6 +5,7 @@ export const SHARE_SCALE = 10n ** 18n;
 export const MAX_LTV_BPS = 9500n;
 export const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
 export const RECOVERY_CALLER_SHARE_BPS = 2000n;
+export const POSITION_PORTFOLIO_MAX_PAGE_SIZE = 100n;
 export const Q96 = 1n << 96n;
 export const Q128 = 1n << 128n;
 export const Q192 = 1n << 192n;
@@ -433,6 +434,7 @@ export const staticsAbi = parseAbi([
     "function quoteExtension(uint256 loanId) view returns (address[] assets,uint256[] requiredFees)",
     "function loan(uint256 loanId) view returns ((uint256 positionId,uint256 basketId,uint256 collateralShares,uint256 feeShares,uint256 debtShares,uint256 penaltyShares,uint40 maturity,address[] assets,uint256[] principals) result)",
     "function outstandingPrincipal(uint256 basketId,address asset) view returns (uint256)",
+    "function recoveryGracePeriod() view returns (uint256)",
     "function flashLoan(uint256 basketId,uint256 shares,address receiver,bytes data)",
     "function balanceOf(address owner) view returns (uint256)",
     "function ownerOf(uint256 tokenId) view returns (address)",
@@ -456,6 +458,12 @@ export const staticsAbi = parseAbi([
     "function positionState(uint256 tokenId) view returns ((bool exists,uint256 stateNonce,uint256 activeLegCount,uint256 unresolvedObligationCount) state)",
     "function isLegActive(uint256 tokenId,bytes32 legKey) view returns (bool)",
     "function isPositionClosable(uint256 tokenId) view returns (bool)",
+    "function positionPortfolioCounts(uint256 positionId) view returns ((uint256 basketCount,uint256 loanCount,uint256 liquidityPositionCount,uint256 globalRewardAssetCount,uint256 riskSeriesCount) counts)",
+    "function basketIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] basketIds,uint256 nextCursor)",
+    "function loanIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] loanIds,uint256 nextCursor)",
+    "function liquidityPositionIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] tokenIds,uint256 nextCursor)",
+    "function globalRewardAssetsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (address[] assets,uint256 nextCursor)",
+    "function riskSeriesIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] seriesIds,uint256 nextCursor)",
     "function quarantineBasket(uint256 basketId)",
     "function releaseBasketQuarantine(uint256 basketId)",
     "function decommissionBasket(uint256 basketId)",
@@ -573,6 +581,15 @@ export const staticsAbi = parseAbi([
     "event LiquidityRewardAccrued(bytes32 indexed poolId,address indexed asset,uint256 amount,uint256 indexRay)",
     "event LiquidityRewardSettled(uint256 indexed positionId,uint256 indexed tokenId,address indexed asset,uint256 amount)",
     "event LiquidityRewardClaimed(uint256 indexed positionId,uint256 indexed tokenId,address indexed asset,address receiver,uint256 amount)",
+]);
+export const staticsPositionPortfolioAbi = parseAbi([
+    "function positionPortfolioCounts(uint256 positionId) view returns ((uint256 basketCount,uint256 loanCount,uint256 liquidityPositionCount,uint256 globalRewardAssetCount,uint256 riskSeriesCount) counts)",
+    "function basketIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] basketIds,uint256 nextCursor)",
+    "function loanIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] loanIds,uint256 nextCursor)",
+    "function liquidityPositionIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] tokenIds,uint256 nextCursor)",
+    "function globalRewardAssetsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (address[] assets,uint256 nextCursor)",
+    "function riskSeriesIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] seriesIds,uint256 nextCursor)",
+    "error InvalidPortfolioPageSize(uint256 requested,uint256 maximum)",
 ]);
 export const staticsSwapFeeHookAbi = parseAbi([
     "function staticsDiamond() view returns (address)",

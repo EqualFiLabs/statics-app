@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   encodeFunctionData,
   formatUnits,
@@ -99,7 +99,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");

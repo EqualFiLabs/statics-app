@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
@@ -49,14 +49,21 @@ export function WalletNftPanel({
   const { collections, removeCollection } = useWalletNftCollections(collectionChainId);
 
   const catalog = useQuery({
-    queryKey: ["wallet-nfts", walletAddress, collections.map((c) => c.address).join(",")],
+    queryKey: [
+      "wallet-nfts",
+      collectionChainId,
+      deploymentState.status === "configured"
+        ? deploymentState.deployment.protocolCommit
+        : "unconfigured",
+      walletAddress,
+      collections.map((c) => c.address).join(","),
+    ],
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(walletAddress) &&
       wallet.status === "ready" &&
       wallet.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !walletAddress || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");

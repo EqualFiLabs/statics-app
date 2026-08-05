@@ -152,7 +152,6 @@ function BasketDetailRuntime({
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -169,7 +168,6 @@ function BasketDetailRuntime({
       wallet
     ),
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
