@@ -37,7 +37,7 @@ import {
   type DollarDeployment,
 } from "@/lib/dollar/deployment";
 import { loadPositionCatalog, type PositionRecord } from "@/lib/positions/positions";
-import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
+import { loadWalletV4PositionIds } from "@/lib/indexer/statics";
 
 const BPS = 10_000n;
 const MAX_POSITION_AMOUNT = (1n << 128n) - 1n;
@@ -103,6 +103,7 @@ export type LiquidityCatalog = Readonly<{
   positionRecords: readonly PositionRecord[];
   positionNftIds: readonly bigint[];
   currentBlock: bigint;
+  warnings: readonly string[];
 }>;
 
 export function canonicalFullRange(spacing: number): readonly [number, number] {
@@ -298,7 +299,8 @@ async function loadPool(
   publicClient: PublicClient,
   deployment: DollarDeployment,
   basket: Awaited<ReturnType<typeof loadBasketCatalog>>["baskets"][number],
-  asset: Address
+  asset: Address,
+  blockNumber: bigint
 ): Promise<CanonicalPoolRecord | null> {
   const liquidity = deployment.liquidity!;
   const configured = await publicClient.readContract({
@@ -306,6 +308,7 @@ async function loadPool(
     abi: staticsAbi,
     functionName: "canonicalPool",
     args: [basket.basketId, asset],
+    blockNumber,
   });
   if (configured.poolId === zeroHash || configured.hook === zeroAddress) return null;
   const key: V4PoolKey = {
@@ -334,53 +337,61 @@ async function loadPool(
     pending1,
     locked,
   ] = await Promise.all([
-    loadTokenMetadata(publicClient, asset),
+    loadTokenMetadata(publicClient, asset, undefined, blockNumber),
     publicClient.readContract({
       address: liquidity.contracts.stateView,
       abi: v4StateViewReadAbi,
       functionName: "getSlot0",
       args: [configured.poolId],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.liquidityManager,
       abi: staticsLiquidityManagerAbi,
       functionName: "canonicalPoolHash",
       args: [basket.basketId, asset],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "poolDecommissioned",
       args: [configured.poolId],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "feeConfiguration",
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "poolFeeConfiguration",
       args: [configured.poolId],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "pendingPermanentLiquidity",
       args: [configured.poolId, getAddress(configured.currency0)],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "pendingPermanentLiquidity",
       args: [configured.poolId, getAddress(configured.currency1)],
+      blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
       functionName: "lockedLiquidity",
       args: [configured.poolId],
+      blockNumber,
     }),
   ]);
   const effective = poolFees.overridden ? poolFees : { ...globalFees, overridden: false };
@@ -422,45 +433,34 @@ export async function loadLiquidityCatalog(
 ): Promise<LiquidityCatalog> {
   await verifyDollarDeployment(publicClient, deployment);
   const liquidity = await verifyLiquidityDeployment(publicClient, deployment);
+  const currentBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
   const configuredPoolManager = await publicClient.readContract({
     address: liquidity.contracts.stateView,
     abi: v4StateViewReadAbi,
     functionName: "poolManager",
+    blockNumber: currentBlock,
   });
   if (getAddress(configuredPoolManager) !== liquidity.contracts.poolManager) {
     throw new Error("StateView is not bound to the verified PoolManager.");
   }
-  const currentBlock = await publicClient.getBlockNumber();
-  const [basketCatalog, positionCatalog, walletTransfers, stakeEvents] = await Promise.all([
-    loadBasketCatalog(publicClient, deployment, wallet),
-    loadPositionCatalog(publicClient, deployment, wallet),
-    loadEventHistoryInChunks(deployment.deploymentStartBlock, currentBlock, (fromBlock, toBlock) =>
-      publicClient.getContractEvents({
-        address: liquidity.contracts.positionManager,
-        abi: v4PositionManagerReadAbi,
-        eventName: "Transfer",
-        args: { to: wallet },
-        fromBlock,
-        toBlock,
-        strict: true,
-      })
-    ),
-    loadEventHistoryInChunks(deployment.deploymentStartBlock, currentBlock, (fromBlock, toBlock) =>
-      publicClient.getContractEvents({
-        address: deployment.contracts.diamond,
-        abi: staticsAbi,
-        eventName: "LiquidityPositionStaked",
-        fromBlock,
-        toBlock,
-        strict: true,
-      })
-    ),
+  const [basketCatalog, positionCatalog] = await Promise.all([
+    loadBasketCatalog(publicClient, deployment, wallet, currentBlock),
+    loadPositionCatalog(publicClient, deployment, wallet, currentBlock),
   ]);
+  const warnings: string[] = [];
+  let walletTokenIds: bigint[] = [];
+  try {
+    walletTokenIds = await loadWalletV4PositionIds(wallet);
+  } catch {
+    warnings.push(
+      "External wallet liquidity-position discovery is temporarily unavailable; protocol-staked positions are still shown."
+    );
+  }
   const pools = (
     await Promise.all(
       basketCatalog.baskets.flatMap((basket) =>
         basket.constituents.map((constituent) =>
-          loadPool(publicClient, deployment, basket, constituent.token.address)
+          loadPool(publicClient, deployment, basket, constituent.token.address, currentBlock)
         )
       )
     )
@@ -468,14 +468,10 @@ export async function loadLiquidityCatalog(
   const ownedPositionIds = new Set(
     positionCatalog.positions.map((position) => position.positionId.toString())
   );
-  const tokenIds = [
-    ...new Set([
-      ...walletTransfers.map((event) => event.args.tokenId.toString()),
-      ...stakeEvents
-        .filter((event) => ownedPositionIds.has(event.args.positionId.toString()))
-        .map((event) => event.args.tokenId.toString()),
-    ]),
-  ].map(BigInt);
+  const stakedTokenIds = positionCatalog.positions.flatMap(
+    (position) => position.liquidityPositionIds
+  );
+  const tokenIds = [...new Set([...walletTokenIds, ...stakedTokenIds].map(String))].map(BigInt);
   const positions = (
     await Promise.all(
       tokenIds.map(async (tokenId): Promise<LpPositionRecord | null> => {
@@ -486,6 +482,7 @@ export async function loadLiquidityCatalog(
               abi: v4PositionManagerReadAbi,
               functionName: "ownerOf",
               args: [tokenId],
+              blockNumber: currentBlock,
             })
             .catch(() => null),
           publicClient
@@ -494,6 +491,7 @@ export async function loadLiquidityCatalog(
               abi: v4PositionManagerReadAbi,
               functionName: "getPoolAndPositionInfo",
               args: [tokenId],
+              blockNumber: currentBlock,
             })
             .catch(() => null),
           publicClient
@@ -502,6 +500,7 @@ export async function loadLiquidityCatalog(
               abi: v4PositionManagerReadAbi,
               functionName: "getPositionLiquidity",
               args: [tokenId],
+              blockNumber: currentBlock,
             })
             .catch(() => 0n),
           publicClient
@@ -510,6 +509,7 @@ export async function loadLiquidityCatalog(
               abi: staticsAbi,
               functionName: "stakedLiquidityPosition",
               args: [tokenId],
+              blockNumber: currentBlock,
             })
             .catch(() => null),
         ]);
@@ -531,6 +531,7 @@ export async function loadLiquidityCatalog(
               abi: staticsAbi,
               functionName: "pendingLiquidityRewards",
               args: [staked.positionId, tokenId],
+              blockNumber: currentBlock,
             })
           : null;
         return {
@@ -560,6 +561,7 @@ export async function loadLiquidityCatalog(
     positionRecords: positionCatalog.positions,
     positionNftIds: positionCatalog.positions.map((position) => position.positionId),
     currentBlock,
+    warnings,
   };
 }
 

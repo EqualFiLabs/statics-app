@@ -28,8 +28,8 @@ import {
 } from "@/lib/baskets/baskets";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
 import { loadOwnedPositionIds } from "@/lib/positions/owner-index";
+import { loadPositionPortfolio } from "@/lib/positions/portfolio";
 import { describeTransportFailure } from "@/lib/protocol/errors";
-import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
 
 export type PositionCollateral = Readonly<{
   basket: BasketRecord;
@@ -55,6 +55,9 @@ export type PositionRecord = Readonly<{
   claimAssetCount: bigint;
   selectedRewardAssets: readonly Address[];
   rewards: readonly PositionReward[];
+  loanIds: readonly bigint[];
+  liquidityPositionIds: readonly bigint[];
+  riskSeriesIds: readonly bigint[];
 }>;
 
 export function claimablePositionRewards(
@@ -103,20 +106,22 @@ async function readOwnedPosition(
   wallet: Address,
   positionId: bigint,
   baskets: readonly BasketRecord[],
-  knownRewardAssets: readonly Address[]
+  blockNumber: bigint
 ): Promise<PositionRecord> {
-  const [state, closable, stake, selectedRewardAssets] = await Promise.all([
+  const [state, closable, stake, selectedRewardAssets, portfolio] = await Promise.all([
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
       functionName: "positionState",
       args: [positionId],
+      blockNumber,
     }),
     publicClient.readContract({
       address: deployment.contracts.diamond,
       abi: staticsAbi,
       functionName: "isPositionClosable",
       args: [positionId],
+      blockNumber,
     }),
     publicClient.readContract({
       account: wallet,
@@ -124,6 +129,7 @@ async function readOwnedPosition(
       abi: staticsAbi,
       functionName: "stakePosition",
       args: [positionId],
+      blockNumber,
     }),
     publicClient.readContract({
       account: wallet,
@@ -131,23 +137,31 @@ async function readOwnedPosition(
       abi: staticsAbi,
       functionName: "positionRewardAssets",
       args: [positionId],
+      blockNumber,
     }),
+    loadPositionPortfolio(publicClient, deployment.contracts.diamond, positionId, blockNumber),
   ]);
   if (!state.exists) {
     throw new Error(`Position #${positionId.toString()} disappeared from the owner index.`);
   }
 
-  const rewardAssets = [
-    ...new Set([...selectedRewardAssets, ...knownRewardAssets].map((asset) => getAddress(asset))),
-  ];
+  const normalizedSelectedRewardAssets = selectedRewardAssets.map((asset) => getAddress(asset));
+  const rewardAssets = [...new Set(portfolio.globalRewardAssets.map((asset) => getAddress(asset)))];
   const [collateral, pending, rewardMetadata] = await Promise.all([
     Promise.all(
-      baskets.map(async (basket): Promise<PositionCollateral | null> => {
+      portfolio.basketIds.map(async (basketId): Promise<PositionCollateral | null> => {
+        const basket = baskets.find((candidate) => candidate.basketId === basketId);
+        if (!basket) {
+          throw new Error(
+            `Position #${positionId.toString()} references unavailable basket #${basketId.toString()}.`
+          );
+        }
         const state = await publicClient.readContract({
           address: deployment.contracts.diamond,
           abi: staticsAbi,
           functionName: "basketCollateralPosition",
           args: [positionId, basket.basketId],
+          blockNumber,
         });
         if (state.depositedShares === 0n && state.lockedShares === 0n) return null;
         return {
@@ -165,9 +179,12 @@ async function readOwnedPosition(
           abi: staticsAbi,
           functionName: "pendingRewards",
           args: [positionId, rewardAssets],
+          blockNumber,
         })
       : Promise.resolve([] as readonly bigint[]),
-    Promise.all(rewardAssets.map((asset) => loadTokenMetadata(publicClient, asset))),
+    Promise.all(
+      rewardAssets.map((asset) => loadTokenMetadata(publicClient, asset, undefined, blockNumber))
+    ),
   ]);
 
   return {
@@ -180,78 +197,60 @@ async function readOwnedPosition(
     collateral: collateral.filter((item): item is PositionCollateral => item !== null),
     stakedBalance: stake.stakedBalance,
     claimAssetCount: stake.claimAssetCount,
-    selectedRewardAssets,
+    selectedRewardAssets: normalizedSelectedRewardAssets,
     rewards: rewardMetadata.map((token, index) => ({
       token,
       pending: pending[index] ?? 0n,
     })),
+    loanIds: portfolio.loanIds,
+    liquidityPositionIds: portfolio.liquidityPositionIds,
+    riskSeriesIds: portfolio.riskSeriesIds,
   };
 }
 
 export async function loadPositionCatalog(
   publicClient: PublicClient,
   deployment: DollarDeployment,
-  wallet: Address
+  wallet: Address,
+  atBlock?: bigint
 ): Promise<PositionCatalog> {
-  const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
-  const basketCatalog = await loadBasketCatalog(publicClient, deployment, wallet);
-  const [
-    positionIds,
-    rewardSelectionLogs,
-    rewardLogs,
-    stakingToken,
-    totalStaked,
-    maximumRewardAssets,
-    positionCreationFee,
-  ] = await Promise.all([
-    loadOwnedPositionIds(publicClient, deployment.contracts.diamond, wallet, latestBlock.number),
-    loadEventHistoryInChunks(
-      deployment.deploymentStartBlock,
-      latestBlock.number,
-      (fromBlock, toBlock) =>
-        publicClient.getContractEvents({
-          address: deployment.contracts.diamond,
-          abi: staticsAbi,
-          eventName: "RewardAssetOptedIn",
-          fromBlock,
-          toBlock,
-          strict: true,
-        })
-    ),
-    loadEventHistoryInChunks(
-      deployment.deploymentStartBlock,
-      latestBlock.number,
-      (fromBlock, toBlock) =>
-        publicClient.getContractEvents({
-          address: deployment.contracts.diamond,
-          abi: staticsAbi,
-          eventName: "GlobalFeeAccrued",
-          fromBlock,
-          toBlock,
-          strict: true,
-        })
-    ),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "stakingToken",
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "totalStaked",
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "maxRewardAssetsPerPosition",
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "positionCreationFee",
-    }),
-  ]);
+  const latestBlock = atBlock
+    ? await publicClient.getBlock({ blockNumber: atBlock })
+    : await publicClient.getBlock({ blockTag: "latest" });
+  const basketCatalog = await loadBasketCatalog(
+    publicClient,
+    deployment,
+    wallet,
+    latestBlock.number
+  );
+  const [positionIds, stakingToken, totalStaked, maximumRewardAssets, positionCreationFee] =
+    await Promise.all([
+      loadOwnedPositionIds(publicClient, deployment.contracts.diamond, wallet, latestBlock.number),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "stakingToken",
+        blockNumber: latestBlock.number,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "totalStaked",
+        blockNumber: latestBlock.number,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "maxRewardAssetsPerPosition",
+        blockNumber: latestBlock.number,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "positionCreationFee",
+        blockNumber: latestBlock.number,
+      }),
+    ]);
 
   const positions = (
     await Promise.all(
@@ -262,9 +261,7 @@ export async function loadPositionCatalog(
           wallet,
           positionId,
           basketCatalog.baskets,
-          rewardSelectionLogs
-            .filter((log) => log.args.positionId === positionId)
-            .map((log) => log.args.asset)
+          latestBlock.number
         )
       )
     )
@@ -281,7 +278,6 @@ export async function loadPositionCatalog(
       addCandidate(candidateSources, constituent.token.address, `${basket.symbol} underlying`);
     }
   }
-  for (const log of rewardLogs) addCandidate(candidateSources, log.args.asset, "Fee history");
   for (const position of positions) {
     for (const reward of position.rewards) {
       addCandidate(
@@ -300,7 +296,9 @@ export async function loadPositionCatalog(
     stakingTokenAllowance,
   ] = await Promise.all([
     Promise.all(
-      [...candidateSources.keys()].map((address) => loadTokenMetadata(publicClient, address))
+      [...candidateSources.keys()].map((address) =>
+        loadTokenMetadata(publicClient, address, undefined, latestBlock.number)
+      )
     ),
     Promise.all(
       basketCatalog.baskets.map(
@@ -312,22 +310,25 @@ export async function loadPositionCatalog(
               abi: basketTokenAbi,
               functionName: "allowance",
               args: [wallet, deployment.contracts.diamond],
+              blockNumber: latestBlock.number,
             }),
           ] as const
       )
     ),
-    loadTokenMetadata(publicClient, stakingToken),
+    loadTokenMetadata(publicClient, stakingToken, undefined, latestBlock.number),
     publicClient.readContract({
       address: stakingToken,
       abi: basketTokenAbi,
       functionName: "balanceOf",
       args: [wallet],
+      blockNumber: latestBlock.number,
     }),
     publicClient.readContract({
       address: stakingToken,
       abi: basketTokenAbi,
       functionName: "allowance",
       args: [wallet, deployment.contracts.diamond],
+      blockNumber: latestBlock.number,
     }),
   ]);
 

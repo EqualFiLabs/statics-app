@@ -1,5 +1,5 @@
 import { keccak256 } from "viem";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   readDollarDeployment,
@@ -165,6 +165,30 @@ describe("Dollar deployment configuration", () => {
     await expect(verifyDollarDeployment(publicClient as never, state.deployment)).resolves.toBe(
       undefined
     );
+  });
+
+  it("caches a successful deployment verification per client and release", async () => {
+    const runtimeCodeHash = keccak256("0x6000");
+    const runtimeHashes = Object.fromEntries(
+      Object.keys(localDeploymentEnvironment())
+        .filter((key) => key.endsWith("_CODE_HASH"))
+        .map((key) => [key, runtimeCodeHash])
+    );
+    const state = readDollarDeployment({
+      ...localDeploymentEnvironment(),
+      ...runtimeHashes,
+    });
+    if (state.status !== "configured") throw new Error("expected configured deployment");
+    const publicClient = {
+      getChainId: vi.fn().mockResolvedValue(31_337),
+      getCode: vi.fn().mockResolvedValue("0x6000"),
+    };
+
+    await verifyDollarDeployment(publicClient as never, state.deployment);
+    await verifyDollarDeployment(publicClient as never, state.deployment);
+
+    expect(publicClient.getChainId).toHaveBeenCalledOnce();
+    expect(publicClient.getCode).toHaveBeenCalledTimes(7);
   });
 
   it("rejects a Position renderer bound to a different avatar contract", async () => {

@@ -37,16 +37,10 @@ describe("PositionNFT catalog discovery", () => {
 
   it("loads Positions from the current owner index", async () => {
     const publicClient = {
-      getContractEvents: vi
-        .fn()
-        .mockImplementation(({ eventName }: { eventName: string }) =>
-          Promise.resolve(
-            eventName === "RewardAssetOptedIn" ? [{ args: { positionId: 1n, asset: dollar } }] : []
-          )
-        ),
+      getContractEvents: vi.fn(),
       getBlockNumber: vi.fn().mockResolvedValue(50n),
       getBlock: vi.fn().mockResolvedValue({ number: 50n, timestamp: 1_000n }),
-      readContract: vi.fn().mockImplementation(({ functionName }) => {
+      readContract: vi.fn().mockImplementation(({ functionName, args }) => {
         if (functionName === "balanceOf" || functionName === "positionCount") {
           return Promise.resolve(2n);
         }
@@ -70,6 +64,18 @@ describe("PositionNFT catalog discovery", () => {
           });
         }
         if (functionName === "positionRewardAssets") return Promise.resolve([]);
+        if (functionName === "positionPortfolioCounts") {
+          return Promise.resolve({
+            basketCount: 0n,
+            loanCount: 0n,
+            liquidityPositionCount: 0n,
+            globalRewardAssetCount: args?.[0] === 1n ? 1n : 0n,
+            riskSeriesCount: 0n,
+          });
+        }
+        if (functionName === "globalRewardAssetsOfPosition") {
+          return Promise.resolve([[dollar], 1n]);
+        }
         if (functionName === "pendingRewards") return Promise.resolve([5n]);
         if (functionName === "stakingToken") return Promise.resolve(weth);
         if (functionName === "totalStaked") return Promise.resolve(0n);
@@ -108,5 +114,6 @@ describe("PositionNFT catalog discovery", () => {
         token: expect.objectContaining({ address: dollar }),
       }),
     ]);
+    expect(publicClient.getContractEvents).not.toHaveBeenCalled();
   });
 });

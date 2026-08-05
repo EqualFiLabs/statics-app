@@ -31,7 +31,10 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
-import { subscribeToProtocolReconciliation } from "@/lib/protocol/reconciliation";
+import {
+  queryMatchesProtocolReconciliation,
+  subscribeToProtocolReconciliation,
+} from "@/lib/protocol/reconciliation";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import {
   defaultSolanaWalletState,
@@ -271,15 +274,18 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           return result.hash;
         }
 
+        const transactionNetwork = getFundingNetwork(request.chainId);
+        if (!transactionNetwork) throw new Error("The transaction network is not supported.");
+
         const provider = await selectedWallet.getEthereumProvider();
         const client = createWalletClient({
           account: request.wallet,
-          chain: undefined,
+          chain: transactionNetwork.chain,
           transport: custom(provider),
         });
         return client.sendTransaction({
           account: request.wallet,
-          chain: undefined,
+          chain: transactionNetwork.chain,
           to: request.to,
           data: request.data,
           value: request.value,
@@ -401,7 +407,13 @@ function ProtocolQueryReconciler() {
   const queryClient = useQueryClient();
 
   useEffect(
-    () => subscribeToProtocolReconciliation(() => queryClient.refetchQueries({ type: "active" })),
+    () =>
+      subscribeToProtocolReconciliation((detail) =>
+        queryClient.refetchQueries({
+          type: "active",
+          predicate: (query) => queryMatchesProtocolReconciliation(query.queryKey, detail),
+        })
+      ),
     [queryClient]
   );
 

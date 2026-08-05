@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   decodeFunctionResult,
@@ -286,7 +286,14 @@ function LiquidityRuntime() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const catalog = useQuery({
-    queryKey: ["liquidity-catalog", wallet],
+    queryKey: [
+      "liquidity-catalog",
+      deploymentState.status === "configured" ? deploymentState.deployment.chainId : null,
+      deploymentState.status === "configured"
+        ? deploymentState.deployment.protocolCommit
+        : "unconfigured",
+      wallet,
+    ],
     enabled:
       deploymentState.status === "configured" &&
       Boolean(deploymentState.deployment.liquidity) &&
@@ -294,7 +301,6 @@ function LiquidityRuntime() {
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured")
         throw new Error("No verified liquidity deployment is configured.");
@@ -1439,6 +1445,11 @@ function LiquidityRuntime() {
             </>
           )}
           {managementReason && <p className="dollar-action-reason">{managementReason}</p>}
+          {catalog.data?.warnings.map((warning) => (
+            <p className="dollar-warning" key={warning}>
+              {warning}
+            </p>
+          ))}
           {error && (
             <p className="dapp-inline-error" role="alert">
               {error}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   deriveBasketActionAvailability,
@@ -125,7 +125,7 @@ describe("basket action safety", () => {
     );
   });
 
-  it("reconciles current state when event history or metadata is incomplete", async () => {
+  it("loads the complete current basket registry without event history", async () => {
     const deployment = {
       chainId: 31_337,
       deploymentStartBlock: 1n,
@@ -153,7 +153,7 @@ describe("basket action safety", () => {
     } satisfies DollarDeployment;
     const publicClient = {
       getBlockNumber: async () => 100n,
-      getContractEvents: async () => [],
+      getContractEvents: vi.fn(),
       readContract: async ({
         address,
         functionName,
@@ -197,7 +197,8 @@ describe("basket action safety", () => {
     } as unknown as PublicClient;
 
     const catalog = await loadBasketCatalog(publicClient, deployment, null);
-    expect(catalog.warning).toMatch(/event history is incomplete/i);
+    expect(catalog.warning).toBeNull();
+    expect(publicClient.getContractEvents).not.toHaveBeenCalled();
     expect(catalog.baskets[0].name).toBe("Local Basket");
     expect(catalog.baskets[0].constituents[0]).toMatchObject({
       vaultBalance: 5n,

@@ -366,7 +366,34 @@ export function readClientDollarDeployment(): DollarDeploymentState {
   });
 }
 
-export async function verifyDollarDeployment(
+const dollarVerificationCache = new WeakMap<PublicClient, Map<string, Promise<void>>>();
+const liquidityVerificationCache = new WeakMap<
+  PublicClient,
+  Map<string, Promise<LiquidityDeployment>>
+>();
+
+function cachedVerification<T>(
+  cache: WeakMap<PublicClient, Map<string, Promise<T>>>,
+  publicClient: PublicClient,
+  key: string,
+  verify: () => Promise<T>
+): Promise<T> {
+  let clientCache = cache.get(publicClient);
+  if (!clientCache) {
+    clientCache = new Map();
+    cache.set(publicClient, clientCache);
+  }
+  const current = clientCache.get(key);
+  if (current) return current;
+  const pending = verify().catch((error) => {
+    clientCache?.delete(key);
+    throw error;
+  });
+  clientCache.set(key, pending);
+  return pending;
+}
+
+async function verifyDollarDeploymentUncached(
   publicClient: PublicClient,
   deployment: DollarDeployment
 ): Promise<void> {
@@ -448,7 +475,19 @@ export async function verifyDollarDeployment(
   }
 }
 
-export async function verifyLiquidityDeployment(
+export function verifyDollarDeployment(
+  publicClient: PublicClient,
+  deployment: DollarDeployment
+): Promise<void> {
+  return cachedVerification(
+    dollarVerificationCache,
+    publicClient,
+    `${deployment.chainId}:${deployment.protocolCommit}`,
+    () => verifyDollarDeploymentUncached(publicClient, deployment)
+  );
+}
+
+async function verifyLiquidityDeploymentUncached(
   publicClient: PublicClient,
   deployment: DollarDeployment
 ): Promise<LiquidityDeployment> {
@@ -542,4 +581,16 @@ export async function verifyLiquidityDeployment(
     throw new Error("Liquidity deployment is bound to a different StaticsDiamond.");
   }
   return liquidity;
+}
+
+export function verifyLiquidityDeployment(
+  publicClient: PublicClient,
+  deployment: DollarDeployment
+): Promise<LiquidityDeployment> {
+  return cachedVerification(
+    liquidityVerificationCache,
+    publicClient,
+    `${deployment.chainId}:${deployment.protocolCommit}`,
+    () => verifyLiquidityDeploymentUncached(publicClient, deployment)
+  );
 }

@@ -23,7 +23,7 @@ import {
 
 import { loadTokenMetadata, type BasketRecord, type TokenMetadata } from "@/lib/baskets/baskets";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
-import { loadEventHistoryInChunks } from "@/lib/protocol/event-history";
+import { loadRecoverableLoanIds } from "@/lib/indexer/statics";
 import { describeTransportFailure } from "@/lib/protocol/errors";
 import {
   loadPositionCatalog,
@@ -115,9 +115,13 @@ export function isCurrentExtensionQuote(
   return Boolean(quote && quote.loanId === loanId);
 }
 
-export function loanTimeline(maturity: bigint, currentTimestamp: bigint): LoanTimeline {
+export function loanTimeline(
+  maturity: bigint,
+  currentTimestamp: bigint,
+  recoveryGracePeriod: bigint = LOAN_RECOVERY_GRACE_PERIOD
+): LoanTimeline {
   if (currentTimestamp <= maturity) return "active";
-  if (currentTimestamp <= maturity + LOAN_RECOVERY_GRACE_PERIOD) return "grace";
+  if (currentTimestamp <= maturity + recoveryGracePeriod) return "grace";
   return "recoverable";
 }
 
@@ -147,7 +151,9 @@ async function loadLoanRecord(
   wallet: Address,
   loanId: bigint,
   positionCatalog: PositionCatalog,
-  currentTimestamp: bigint
+  currentTimestamp: bigint,
+  recoveryGracePeriod: bigint,
+  blockNumber: bigint
 ): Promise<LoanRecord | null> {
   const raw = await publicClient
     .readContract({
@@ -155,6 +161,7 @@ async function loadLoanRecord(
       abi: staticsAbi,
       functionName: "loan",
       args: [loanId],
+      blockNumber,
     })
     .catch((error) => {
       if (isLoanNotFoundError(error)) return null;
@@ -179,23 +186,28 @@ async function loadLoanRecord(
       abi: staticsAbi,
       functionName: "ownerOf",
       args: [snapshot.positionId],
+      blockNumber,
     }),
     Promise.all(
       snapshot.assets.map(async (address, index): Promise<LoanAsset> => {
         const known = basket.constituents.find((item) => item.token.address === address);
         const [token, walletBalance, allowance] = await Promise.all([
-          known ? Promise.resolve(known.token) : loadTokenMetadata(publicClient, address),
+          known
+            ? Promise.resolve(known.token)
+            : loadTokenMetadata(publicClient, address, undefined, blockNumber),
           publicClient.readContract({
             address,
             abi: basketTokenAbi,
             functionName: "balanceOf",
             args: [wallet],
+            blockNumber,
           }),
           publicClient.readContract({
             address,
             abi: basketTokenAbi,
             functionName: "allowance",
             args: [wallet, deployment.contracts.diamond],
+            blockNumber,
           }),
         ]);
         return {
@@ -222,7 +234,7 @@ async function loadLoanRecord(
     maturity: snapshot.maturity,
     assets,
     walletOwned,
-    timeline: loanTimeline(snapshot.maturity, currentTimestamp),
+    timeline: loanTimeline(snapshot.maturity, currentTimestamp, recoveryGracePeriod),
   };
 }
 
@@ -232,57 +244,26 @@ export async function loadLoanCatalog(
   wallet: Address
 ): Promise<LoanCatalog> {
   const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
-  const [positionCatalog, originated, repaid, recovered] = await Promise.all([
-    loadPositionCatalog(publicClient, deployment, wallet),
-    loadEventHistoryInChunks(
-      deployment.deploymentStartBlock,
-      latestBlock.number,
-      (fromBlock, toBlock) =>
-        publicClient.getContractEvents({
-          address: deployment.contracts.diamond,
-          abi: staticsAbi,
-          eventName: "LoanOriginated",
-          fromBlock,
-          toBlock,
-          strict: true,
-        })
-    ),
-    loadEventHistoryInChunks(
-      deployment.deploymentStartBlock,
-      latestBlock.number,
-      (fromBlock, toBlock) =>
-        publicClient.getContractEvents({
-          address: deployment.contracts.diamond,
-          abi: staticsAbi,
-          eventName: "LoanRepaid",
-          fromBlock,
-          toBlock,
-          strict: true,
-        })
-    ),
-    loadEventHistoryInChunks(
-      deployment.deploymentStartBlock,
-      latestBlock.number,
-      (fromBlock, toBlock) =>
-        publicClient.getContractEvents({
-          address: deployment.contracts.diamond,
-          abi: staticsAbi,
-          eventName: "LoanRecovered",
-          fromBlock,
-          toBlock,
-          strict: true,
-        })
-    ),
+  const [positionCatalog, recoveryGracePeriod] = await Promise.all([
+    loadPositionCatalog(publicClient, deployment, wallet, latestBlock.number),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "recoveryGracePeriod",
+      blockNumber: latestBlock.number,
+    }),
   ]);
-
-  const closed = new Set([...repaid, ...recovered].map((event) => event.args.loanId.toString()));
-  const activeIds = [
-    ...new Set(
-      originated
-        .map((event) => event.args.loanId.toString())
-        .filter((loanId) => !closed.has(loanId))
-    ),
-  ].map(BigInt);
+  const warnings: string[] = [];
+  let recoverableIds: bigint[] = [];
+  try {
+    recoverableIds = await loadRecoverableLoanIds(latestBlock.timestamp);
+  } catch {
+    warnings.push(
+      "Public recoverable-loan discovery is temporarily unavailable; your current loans are still shown."
+    );
+  }
+  const ownedIds = positionCatalog.positions.flatMap((position) => position.loanIds);
+  const activeIds = [...new Set([...ownedIds, ...recoverableIds].map(String))].map(BigInt);
   const records = await Promise.all(
     activeIds.map((loanId) =>
       loadLoanRecord(
@@ -291,15 +272,16 @@ export async function loadLoanCatalog(
         wallet,
         loanId,
         positionCatalog,
-        latestBlock.timestamp
+        latestBlock.timestamp,
+        recoveryGracePeriod,
+        latestBlock.number
       )
     )
   );
-  const warnings: string[] = [];
   const loans = records.filter((loan): loan is LoanRecord => loan !== null);
   if (loans.length !== activeIds.length) {
     warnings.push(
-      "Loan event history included a closed or unavailable tranche; current onchain state is shown."
+      "Indexed discovery included a closed or unavailable loan; current onchain state is shown."
     );
   }
 

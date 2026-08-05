@@ -154,7 +154,6 @@ function LoansRuntime({
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -164,7 +163,14 @@ function LoansRuntime({
     },
   });
   const liquidityCatalog = useQuery({
-    queryKey: ["liquidity-catalog", wallet],
+    queryKey: [
+      "liquidity-catalog",
+      deploymentState.status === "configured" ? deploymentState.deployment.chainId : null,
+      deploymentState.status === "configured"
+        ? deploymentState.deployment.protocolCommit
+        : "unconfigured",
+      wallet,
+    ],
     enabled:
       mode === "borrow" &&
       borrowDestination === "liquidity" &&
@@ -174,7 +180,6 @@ function LoansRuntime({
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified liquidity deployment is configured.");

@@ -378,7 +378,6 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
   const catalog = useQuery({
     queryKey: ["overview-portfolio", wallet],
     enabled: deploymentState.status === "configured" && Boolean(publicClient),
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -397,7 +396,6 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
     ],
     enabled:
       deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");

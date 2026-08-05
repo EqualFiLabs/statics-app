@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   decodeFunctionResult,
   encodeFunctionData,
@@ -95,7 +95,6 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       Boolean(wallet) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -121,7 +120,6 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       Boolean(publicClient) &&
       Boolean(wallet) &&
       Boolean(catalog.data),
-    placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !wallet || deploymentState.status !== "configured" || !catalog.data) {
         throw new Error("No verified Statics deployment is configured.");
@@ -159,7 +157,6 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     ],
     enabled:
       deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
-    placeholderData: keepPreviousData,
     queryFn: () => {
       if (!publicClient || deploymentState.status !== "configured" || !catalog.data) {
         throw new Error("No verified Statics deployment is configured.");

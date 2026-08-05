@@ -20,6 +20,7 @@ import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
 import {
   announceProtocolTransactionConfirmed,
   retryConfirmationVerification,
+  protocolQueryScopes,
   waitForRpcBlock,
 } from "@/lib/protocol/reconciliation";
 
@@ -265,6 +266,8 @@ export async function executeProtocolTransaction(
         wallet: request.wallet,
         chainId: request.chainId,
         blockNumber: receipt.blockNumber,
+        kind: request.kind,
+        scopes: protocolQueryScopes(request.kind),
       });
     }
 

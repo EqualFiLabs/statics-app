@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   announceProtocolTransactionConfirmed,
   retryConfirmationVerification,
+  protocolQueryScopes,
+  queryMatchesProtocolReconciliation,
   scheduleProtocolReconciliation,
   subscribeToProtocolReconciliation,
   subscribeToProtocolTransactions,
@@ -38,6 +40,8 @@ describe("confirmed transaction reconciliation", () => {
       wallet: "0x0000000000000000000000000000000000000001" as Address,
       chainId: 46_630,
       blockNumber: 123n,
+      kind: "mint-basket" as const,
+      scopes: protocolQueryScopes("mint-basket"),
     };
 
     announceProtocolTransactionConfirmed(detail);
@@ -70,11 +74,23 @@ describe("confirmed transaction reconciliation", () => {
       const wallet = "0x0000000000000000000000000000000000000001" as Address;
       const unsubscribe = subscribeToProtocolReconciliation(refresh, () => true, [10, 20]);
 
-      announceProtocolTransactionConfirmed({ wallet, chainId: 46_630, blockNumber: 100n });
+      announceProtocolTransactionConfirmed({
+        wallet,
+        chainId: 46_630,
+        blockNumber: 100n,
+        kind: "repay-loan",
+        scopes: protocolQueryScopes("repay-loan"),
+      });
       await vi.advanceTimersByTimeAsync(10);
       expect(refresh).toHaveBeenCalledTimes(1);
 
-      announceProtocolTransactionConfirmed({ wallet, chainId: 46_630, blockNumber: 101n });
+      announceProtocolTransactionConfirmed({
+        wallet,
+        chainId: 46_630,
+        blockNumber: 101n,
+        kind: "repay-loan",
+        scopes: protocolQueryScopes("repay-loan"),
+      });
       await vi.advanceTimersByTimeAsync(10);
       expect(refresh).toHaveBeenCalledTimes(2);
 
@@ -84,5 +100,64 @@ describe("confirmed transaction reconciliation", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("targets only affected query families for the confirmed wallet", () => {
+    const wallet = "0x0000000000000000000000000000000000000001" as Address;
+    const detail = {
+      wallet,
+      chainId: 46_630,
+      blockNumber: 100n,
+      kind: "repay-loan" as const,
+      scopes: protocolQueryScopes("repay-loan"),
+    };
+
+    expect(queryMatchesProtocolReconciliation(["loan-catalog", "release", wallet], detail)).toBe(
+      true
+    );
+    expect(
+      queryMatchesProtocolReconciliation(["position-catalog", "release", wallet], detail)
+    ).toBe(true);
+    expect(queryMatchesProtocolReconciliation(["reward-preview", wallet], detail)).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["canonical-swap-pool", "1", "0x0000000000000000000000000000000000000002"],
+        { ...detail, kind: "swap", scopes: protocolQueryScopes("swap") }
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["loan-catalog", "release", "0x0000000000000000000000000000000000000002"],
+        detail
+      )
+    ).toBe(false);
+
+    const approvalDetail = {
+      ...detail,
+      kind: "approve-permit2" as const,
+      scopes: protocolQueryScopes("approve-permit2"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(
+        [
+          "canonical-swap-permit2-approval",
+          wallet,
+          "0x0000000000000000000000000000000000000003",
+          "100",
+        ],
+        approvalDetail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        [
+          "canonical-swap-permit2-approval",
+          "0x0000000000000000000000000000000000000002",
+          "0x0000000000000000000000000000000000000003",
+          "100",
+        ],
+        approvalDetail
+      )
+    ).toBe(false);
   });
 });
