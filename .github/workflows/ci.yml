@@ -23,10 +23,16 @@ jobs:
         with:
           node-version: 22.22.0
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ponder/package-lock.json
       - run: npm ci
+      - run: npm ci --prefix ponder
       - run: npm run lint
       - run: npm run lint:css
       - run: npm run format:check
       - run: npm run typecheck
+      - run: npm --prefix ponder run typecheck
       - run: npm test
+      - run: npm --prefix ponder test
       - run: npm run build
