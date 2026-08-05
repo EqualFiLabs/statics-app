@@ -45,6 +45,7 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
 
 const walletScopedRoots = new Set([
   "basket-catalog",
+  "canonical-swap-permit2-approval",
   "position-catalog",
   "loan-catalog",
   "liquidity-catalog",

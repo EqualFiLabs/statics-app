@@ -131,5 +131,33 @@ describe("confirmed transaction reconciliation", () => {
         detail
       )
     ).toBe(false);
+
+    const approvalDetail = {
+      ...detail,
+      kind: "approve-permit2" as const,
+      scopes: protocolQueryScopes("approve-permit2"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(
+        [
+          "canonical-swap-permit2-approval",
+          wallet,
+          "0x0000000000000000000000000000000000000003",
+          "100",
+        ],
+        approvalDetail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        [
+          "canonical-swap-permit2-approval",
+          "0x0000000000000000000000000000000000000002",
+          "0x0000000000000000000000000000000000000003",
+          "100",
+        ],
+        approvalDetail
+      )
+    ).toBe(false);
   });
 });
