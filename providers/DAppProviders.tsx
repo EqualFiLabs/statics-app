@@ -294,6 +294,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
               to: request.to,
               data: request.data,
               value: request.value,
+              gasLimit: request.gasLimit,
               chainId: request.chainId,
             },
             {
@@ -331,6 +332,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           to: request.to,
           data: request.data,
           value: request.value,
+          gas: request.gasLimit,
         });
       },
       exportWallet: () =>

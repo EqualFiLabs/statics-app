@@ -46,6 +46,7 @@ export type ProtocolTransactionSendRequest = Readonly<{
   to: Address;
   data: Hex;
   value?: bigint;
+  gasLimit: bigint;
   presentation: ProtocolTransactionPresentation;
 }>;
 
@@ -87,6 +88,15 @@ const operatorApprovalKinds = new Set<ProtocolActivityKind>(["approve-risk", "ap
 const erc20ApproveSelector = toFunctionSelector("approve(address,uint256)");
 const permit2ApproveSelector = toFunctionSelector("approve(address,address,uint160,uint48)");
 const operatorApproveSelector = toFunctionSelector("setApprovalForAll(address,bool)");
+
+/**
+ * Wallet RPCs do not all apply the same safety margin to `eth_estimateGas`.
+ * Supplying one reviewed estimate with a modest buffer avoids a second,
+ * wallet-specific estimate producing an invalid transaction request.
+ */
+export function bufferedGasLimit(estimate: bigint): bigint {
+  return estimate + (estimate + 4n) / 5n;
+}
 
 function calldataAddress(data: Hex, wordIndex: number): Address | null {
   const wordStart = 10 + wordIndex * 64;
@@ -216,6 +226,14 @@ export async function executeProtocolTransaction(
       value: request.value,
     });
     request.validateSimulation?.(simulation.data);
+    const gasLimit = bufferedGasLimit(
+      await request.publicClient.estimateGas({
+        account: request.wallet,
+        to: request.to,
+        data: request.data,
+        value: request.value,
+      })
+    );
     stage = "signing";
     updateProtocolActivity(request.wallet, request.chainId, id, { status: "signing" });
 
@@ -225,6 +243,7 @@ export async function executeProtocolTransaction(
       to: request.to,
       data: request.data,
       value: request.value,
+      gasLimit,
       presentation: request.presentation ?? defaultProtocolPresentation(request),
     });
     stage = "submitted";
