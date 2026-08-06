@@ -60,7 +60,7 @@ describe("PositionNFT catalog discovery", () => {
           return Promise.resolve({
             stakedBalance: 0n,
             claimAssetCount: 0n,
-            optedInAssetCount: 0n,
+            optedInAssetCount: args?.[0] === 1n ? 1n : 0n,
           });
         }
         if (functionName === "positionRewardAssets") {
