@@ -31,8 +31,12 @@ import {
   privyPermitRequest,
   signPermitForWallet,
 } from "@/lib/dollar/permit";
-import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import {
+  executeProtocolTransaction,
+  type ProtocolTransactionPresentation,
+} from "@/lib/protocol/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import { permittedActionPresentation } from "@/lib/protocol/presentation";
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
@@ -252,6 +256,7 @@ export function PeggedDollarPanel({
     options?: {
       validateSimulation?: (result: `0x${string}` | undefined) => void;
       verifyConfirmation?: () => Promise<void>;
+      presentation?: ProtocolTransactionPresentation;
     }
   ) => {
     if (!deployment) throw new Error("No Dollar deployment is configured.");
@@ -267,6 +272,7 @@ export function PeggedDollarPanel({
       data,
       sendTransaction: wallet.sendEvmTransaction,
       describeError: describeDollarError,
+      presentation: options?.presentation,
       validateSimulation: options?.validateSimulation,
       verifyConfirmation: options?.verifyConfirmation
         ? async () => options.verifyConfirmation?.()
@@ -349,16 +355,16 @@ export function PeggedDollarPanel({
           throw cause;
         }
         const receiver = getAddress(wallet.address!);
-        const data =
-          before.collateralAllowance >= fresh.totalCollateralIn
-            ? buildMintPeggedCall(deployment.pegged.profileId, quote.amount, maximum, receiver)
-            : buildMintPeggedWithPermitCall(
-                deployment.pegged.profileId,
-                quote.amount,
-                maximum,
-                receiver,
-                await signPermit(deployment.pegged.collateral, MAX_ERC20_ALLOWANCE)
-              );
+        const usesPermit = before.collateralAllowance < fresh.totalCollateralIn;
+        const data = usesPermit
+          ? buildMintPeggedWithPermitCall(
+              deployment.pegged.profileId,
+              quote.amount,
+              maximum,
+              receiver,
+              await signPermit(deployment.pegged.collateral, MAX_ERC20_ALLOWANCE)
+            )
+          : buildMintPeggedCall(deployment.pegged.profileId, quote.amount, maximum, receiver);
         await send(
           "mint-pegged",
           "Mint Statics Dollar with USDG",
@@ -366,6 +372,16 @@ export function PeggedDollarPanel({
           deployment.contracts.gateway,
           data,
           {
+            presentation: usesPermit
+              ? permittedActionPresentation({
+                  action: "Mint Statics Dollar with USDG",
+                  description: `Mint the reviewed ${display(quote.amount, 18, "USDstx")} using USDG.`,
+                  asset: "USDG",
+                  spender: deployment.contracts.gateway,
+                  spenderName: "Statics Dollar Gateway",
+                  contractName: "Statics Dollar Gateway",
+                })
+              : undefined,
             validateSimulation: (result) => void validatePeggedMintSimulation(result),
             verifyConfirmation: async () => {
               const next = await readSnapshot();
@@ -385,16 +401,16 @@ export function PeggedDollarPanel({
           throw new Error("The USDG output moved below the reviewed minimum.");
         }
         const receiver = getAddress(wallet.address!);
-        const data =
-          before.dollarAllowance >= quote.amount
-            ? buildRedeemPeggedCall(deployment.pegged.profileId, quote.amount, minimum, receiver)
-            : buildRedeemPeggedWithPermitCall(
-                deployment.pegged.profileId,
-                quote.amount,
-                minimum,
-                receiver,
-                await signPermit(deployment.contracts.dollar, MAX_ERC20_ALLOWANCE)
-              );
+        const usesPermit = before.dollarAllowance < quote.amount;
+        const data = usesPermit
+          ? buildRedeemPeggedWithPermitCall(
+              deployment.pegged.profileId,
+              quote.amount,
+              minimum,
+              receiver,
+              await signPermit(deployment.contracts.dollar, MAX_ERC20_ALLOWANCE)
+            )
+          : buildRedeemPeggedCall(deployment.pegged.profileId, quote.amount, minimum, receiver);
         await send(
           "redeem-pegged",
           "Redeem Statics Dollar for USDG",
@@ -402,6 +418,16 @@ export function PeggedDollarPanel({
           deployment.contracts.gateway,
           data,
           {
+            presentation: usesPermit
+              ? permittedActionPresentation({
+                  action: "Redeem Statics Dollar for USDG",
+                  description: `Redeem the reviewed ${display(quote.amount, 18, "USDstx")} for USDG.`,
+                  asset: "USDstx",
+                  spender: deployment.contracts.gateway,
+                  spenderName: "Statics Dollar Gateway",
+                  contractName: "Statics Dollar Gateway",
+                })
+              : undefined,
             validateSimulation: (result) => void validatePeggedRedemptionSimulation(result),
             verifyConfirmation: async () => {
               const next = await readSnapshot();

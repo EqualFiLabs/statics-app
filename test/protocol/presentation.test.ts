@@ -5,6 +5,7 @@ import {
   erc1155OperatorPermission,
   erc721OperatorPermission,
   maximumPermit2Permission,
+  permittedActionPresentation,
   unlimitedTokenPermission,
 } from "@/lib/protocol/presentation";
 
@@ -34,5 +35,25 @@ describe("transaction permission presentation", () => {
       erc1155OperatorPermission({ asset: "Risk shares", spender, spenderName: "Dollar Gateway" })
         .detail
     ).toContain("every current and future token ID");
+  });
+
+  it("discloses an atomic permit on the submitted action", () => {
+    const presentation = permittedActionPresentation({
+      action: "Mint Statics Dollar with USDG",
+      description: "Mint the reviewed 10 USDstx using USDG.",
+      asset: "USDG",
+      spender,
+      spenderName: "Statics Dollar Gateway",
+      contractName: "Statics Dollar Gateway",
+    });
+
+    expect(presentation.description).toContain("Unlimited USDG spending permission");
+    expect(presentation.description).toContain("This transaction applies it");
+    expect(presentation.description).toContain("Approval Tools");
+    expect(presentation.permission).toMatchObject({
+      scope: "unlimited-token",
+      asset: "USDG",
+      spender,
+    });
   });
 });

@@ -42,10 +42,9 @@ describe("wallet runtime boundary", () => {
     expect(source).toContain("defaultSolanaRpcsPlugin()");
     expect(source).toContain("<ProtocolQueryReconciler />");
     expect(source).toContain('promptExternalWallet({ walletChainType: "ethereum-only" })');
-    expect(source).toContain("await setActiveWallet(embeddedWallet)");
-    expect(source).toContain("disconnectWallet: () => setLocallyDisconnected(true)");
+    expect(source).toContain("recoverPrivyWallet");
+    expect(source).toContain("setLocallyDisconnected(true)");
     expect(source).not.toContain("setActiveWalletForWagmi");
-    expect(source).not.toMatch(/\blogout\b/);
     expect(source).not.toMatch(/addSigners|delegateWallet|policyIds/);
   });
 

@@ -56,6 +56,29 @@ export function approvalPresentation(
   };
 }
 
+export function permittedActionPresentation(input: {
+  action: string;
+  description: string;
+  asset: string;
+  spender: Address;
+  spenderName: string;
+  contractName: string;
+  buttonText?: string;
+}): ProtocolTransactionPresentation {
+  const permission = unlimitedTokenPermission({
+    asset: input.asset,
+    spender: input.spender,
+    spenderName: input.spenderName,
+  });
+  return {
+    action: input.action,
+    description: `${input.description} ${permission.detail} This transaction applies it to ${permission.spenderName} (${permission.spender}). You can revoke it from Approval Tools.`,
+    buttonText: input.buttonText ?? input.action,
+    contractName: input.contractName,
+    permission,
+  };
+}
+
 export function actionPresentation(input: {
   action: string;
   description: string;
