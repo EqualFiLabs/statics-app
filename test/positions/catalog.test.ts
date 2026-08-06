@@ -21,7 +21,7 @@ vi.mock("@/lib/baskets/baskets", async (importOriginal) => {
   };
 });
 
-import { loadPositionCatalog } from "@/lib/positions/positions";
+import { loadConfirmedRewardSelection, loadPositionCatalog } from "@/lib/positions/positions";
 
 const wallet = "0x0000000000000000000000000000000000000001" as Address;
 const diamond = "0x0000000000000000000000000000000000000010" as Address;
@@ -63,7 +63,9 @@ describe("PositionNFT catalog discovery", () => {
             optedInAssetCount: 0n,
           });
         }
-        if (functionName === "positionRewardAssets") return Promise.resolve([]);
+        if (functionName === "positionRewardAssets") {
+          return Promise.resolve(args?.[0] === 1n ? [dollar] : []);
+        }
         if (functionName === "positionPortfolioCounts") {
           return Promise.resolve({
             basketCount: 0n,
@@ -105,7 +107,7 @@ describe("PositionNFT catalog discovery", () => {
     expect(catalog.maximumRewardAssets).toBe(64n);
     expect(catalog.positionCreationFee).toBe(123n);
     const firstPosition = catalog.positions.find((position) => position.positionId === 1n);
-    expect(firstPosition?.selectedRewardAssets).toEqual([]);
+    expect(firstPosition?.selectedRewardAssets).toEqual([dollar]);
     expect(firstPosition?.stateNonce).toBe(3n);
     expect(firstPosition?.closable).toBe(true);
     expect(firstPosition?.rewards).toEqual([
@@ -115,5 +117,71 @@ describe("PositionNFT catalog discovery", () => {
       }),
     ]);
     expect(publicClient.getContractEvents).not.toHaveBeenCalled();
+  });
+
+  it("loads reward membership at the transaction's confirmed block", async () => {
+    const publicClient = {
+      getBlock: vi.fn().mockResolvedValue({ number: 50n, timestamp: 1_000n }),
+      readContract: vi.fn().mockImplementation(({ functionName }) => {
+        if (functionName === "balanceOf" || functionName === "positionCount") {
+          return Promise.resolve(1n);
+        }
+        if (functionName === "positionsOfOwner") return Promise.resolve([[1n], 1n]);
+        if (functionName === "positionState") {
+          return Promise.resolve({
+            exists: true,
+            stateNonce: 4n,
+            activeLegCount: 1n,
+            unresolvedObligationCount: 0n,
+          });
+        }
+        if (functionName === "isPositionClosable") return Promise.resolve(false);
+        if (functionName === "stakePosition") {
+          return Promise.resolve({
+            stakedBalance: 10n,
+            claimAssetCount: 0n,
+            optedInAssetCount: 1n,
+          });
+        }
+        if (functionName === "positionRewardAssets") return Promise.resolve([dollar]);
+        if (functionName === "positionPortfolioCounts") {
+          return Promise.resolve({
+            basketCount: 0n,
+            loanCount: 0n,
+            liquidityPositionCount: 0n,
+            globalRewardAssetCount: 1n,
+            riskSeriesCount: 0n,
+          });
+        }
+        if (functionName === "globalRewardAssetsOfPosition") {
+          return Promise.resolve([[dollar], 1n]);
+        }
+        if (functionName === "pendingRewards") return Promise.resolve([0n]);
+        if (functionName === "stakingToken") return Promise.resolve(weth);
+        if (functionName === "totalStaked") return Promise.resolve(10n);
+        if (functionName === "maxRewardAssetsPerPosition") return Promise.resolve(64n);
+        if (functionName === "positionCreationFee") return Promise.resolve(123n);
+        if (functionName === "allowance") return Promise.resolve(0n);
+        throw new Error(`Unexpected read: ${functionName}`);
+      }),
+    } as unknown as PublicClient;
+    const deployment = {
+      chainId: 31_337,
+      deploymentStartBlock: 1n,
+      protocolCommit: "f82f3a7e4ba4c9bfbf749c3208f68bb18fd4afa1",
+      contracts: { diamond, dollar, weth },
+    } as DollarDeployment;
+
+    await expect(
+      loadConfirmedRewardSelection(publicClient, deployment, wallet, 1n, dollar, true, 50n)
+    ).resolves.toMatchObject({
+      currentBlock: 50n,
+      positions: [expect.objectContaining({ selectedRewardAssets: [dollar] })],
+    });
+    expect(publicClient.getBlock).toHaveBeenCalledWith({ blockNumber: 50n });
+
+    await expect(
+      loadConfirmedRewardSelection(publicClient, deployment, wallet, 1n, dollar, false, 50n)
+    ).rejects.toThrow("confirmed reward selection is not yet available");
   });
 });

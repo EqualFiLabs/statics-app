@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readProtocolActivity } from "@/lib/dollar/activity";
 import {
+  bufferedGasLimit,
   defaultProtocolPresentation,
   executeProtocolTransaction,
 } from "@/lib/protocol/transactions";
@@ -19,6 +20,7 @@ describe("protocol transaction execution", () => {
   it("simulates before signing and reports success only after a confirmed receipt", async () => {
     const call = vi.fn().mockResolvedValue({ data: "0x01" });
     const getBlockNumber = vi.fn().mockResolvedValue(17n);
+    const estimateGas = vi.fn().mockResolvedValue(100_000n);
     const waitForTransactionReceipt = vi.fn().mockResolvedValue({
       status: "success",
       transactionHash: hash,
@@ -30,6 +32,7 @@ describe("protocol transaction execution", () => {
       executeProtocolTransaction({
         publicClient: {
           call,
+          estimateGas,
           getBlockNumber,
           waitForTransactionReceipt,
         } as unknown as PublicClient,
@@ -51,6 +54,7 @@ describe("protocol transaction execution", () => {
         wallet,
         chainId: 31_337,
         to: target,
+        gasLimit: 120_000n,
         presentation: expect.objectContaining({
           action: "Create PositionNFT",
           buttonText: "Create PositionNFT",
@@ -60,6 +64,12 @@ describe("protocol transaction execution", () => {
     expect(waitForTransactionReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ hash, confirmations: 1 })
     );
+    expect(estimateGas).toHaveBeenCalledWith({
+      account: wallet,
+      to: target,
+      data: "0x1234",
+      value: undefined,
+    });
     expect(getBlockNumber).toHaveBeenCalledWith({ cacheTime: 0 });
     expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
       kind: "create-position",
@@ -76,6 +86,7 @@ describe("protocol transaction execution", () => {
     await executeProtocolTransaction({
       publicClient: {
         call: vi.fn().mockResolvedValue({ data: "0x01" }),
+        estimateGas: vi.fn().mockResolvedValue(100_000n),
         waitForTransactionReceipt: vi.fn().mockResolvedValue({
           status: "success",
           transactionHash: hash,
@@ -139,6 +150,7 @@ describe("protocol transaction execution", () => {
       executeProtocolTransaction({
         publicClient: {
           call: vi.fn().mockResolvedValue({ data: "0x01" }),
+          estimateGas: vi.fn().mockResolvedValue(100_000n),
         } as unknown as PublicClient,
         wallet,
         chainId: 31_337,
@@ -170,6 +182,7 @@ describe("protocol transaction execution", () => {
       const execution = executeProtocolTransaction({
         publicClient: {
           call: vi.fn().mockResolvedValue({ data: "0x" }),
+          estimateGas: vi.fn().mockResolvedValue(100_000n),
           waitForTransactionReceipt: vi.fn().mockResolvedValue({
             status: "success",
             transactionHash: hash,
@@ -203,5 +216,10 @@ describe("protocol transaction execution", () => {
       confirmedHash: hash,
       error: expect.stringContaining("Refresh before another action"),
     });
+  });
+
+  it("adds a twenty percent safety margin to the public RPC gas estimate", () => {
+    expect(bufferedGasLimit(100_000n)).toBe(120_000n);
+    expect(bufferedGasLimit(1n)).toBe(2n);
   });
 });

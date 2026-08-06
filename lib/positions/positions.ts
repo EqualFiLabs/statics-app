@@ -355,6 +355,30 @@ export async function loadPositionCatalog(
   };
 }
 
+/**
+ * Reloads the complete position catalog at the transaction's confirmed block
+ * and rejects until the requested reward membership is authoritative there.
+ */
+export async function loadConfirmedRewardSelection(
+  publicClient: PublicClient,
+  deployment: DollarDeployment,
+  wallet: Address,
+  positionId: bigint,
+  asset: Address,
+  expectedSelected: boolean,
+  blockNumber: bigint
+): Promise<PositionCatalog> {
+  const catalog = await loadPositionCatalog(publicClient, deployment, wallet, blockNumber);
+  const position = catalog.positions.find((candidate) => candidate.positionId === positionId);
+  if (!position) {
+    throw new Error("This PositionNFT is no longer owned by the connected wallet.");
+  }
+  if (position.selectedRewardAssets.includes(asset) !== expectedSelected) {
+    throw new Error("The confirmed reward selection is not yet available from the read RPC.");
+  }
+  return catalog;
+}
+
 export async function validateCustomRewardAsset(
   publicClient: PublicClient,
   value: string,

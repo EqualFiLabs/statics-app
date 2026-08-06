@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   encodeFunctionData,
   formatUnits,
@@ -29,6 +29,7 @@ import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar
 import {
   canClosePosition,
   describePositionError,
+  loadConfirmedRewardSelection,
   loadPositionCatalog,
   unlockedCollateral,
   validateCustomRewardAsset,
@@ -75,6 +76,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const queryClient = useQueryClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -86,13 +88,12 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const [stakeAmountInput, setStakeAmountInput] = useState("");
   const [customRewardAddress, setCustomRewardAddress] = useState("");
 
+  const catalogQueryKey = protocolQueryKeys.positionCatalog(
+    deploymentState.status === "configured" ? deploymentState.deployment.protocolCommit : undefined,
+    wallet
+  );
   const catalog = useQuery({
-    queryKey: protocolQueryKeys.positionCatalog(
-      deploymentState.status === "configured"
-        ? deploymentState.deployment.protocolCommit
-        : undefined,
-      wallet
-    ),
+    queryKey: catalogQueryKey,
     enabled:
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -161,17 +162,37 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     });
   };
 
-  const runAction = async (key: string, action: () => Promise<void>) => {
+  const runAction = async (key: string, action: () => Promise<void>, refreshCatalog = true) => {
     setPendingAction(key);
     setActionError(null);
     try {
       await action();
-      await catalog.refetch();
+      if (refreshCatalog) await catalog.refetch();
     } catch (error) {
       setActionError(describePositionError(error));
     } finally {
       setPendingAction(null);
     }
+  };
+
+  const verifyRewardSelection = async (
+    receipt: TransactionReceipt,
+    asset: Address,
+    expectedSelected: boolean
+  ) => {
+    if (!publicClient || !wallet || deploymentState.status !== "configured") {
+      throw new Error("The connected PositionNFT is unavailable.");
+    }
+    const confirmedCatalog = await loadConfirmedRewardSelection(
+      publicClient,
+      deploymentState.deployment,
+      wallet,
+      positionId,
+      asset,
+      expectedSelected,
+      receipt.blockNumber
+    );
+    queryClient.setQueryData(catalogQueryKey, confirmedCatalog);
   };
 
   const executeCollateralAction = async () => {
@@ -306,6 +327,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       data: selected
         ? buildOptOutRewardAssetsCall(position.positionId, [asset])
         : buildOptInRewardAssetsCall(position.positionId, [asset]),
+      verifyConfirmation: (receipt) => verifyRewardSelection(receipt, asset, !selected),
     });
   };
 
@@ -325,6 +347,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       amount: metadata.symbol,
       to: deploymentState.deployment.contracts.diamond,
       data: buildOptInRewardAssetsCall(position.positionId, [metadata.address]),
+      verifyConfirmation: (receipt) => verifyRewardSelection(receipt, metadata.address, true),
     });
     setCustomRewardAddress("");
   };
@@ -600,8 +623,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
                   type="button"
                   disabled={pendingAction !== null}
                   onClick={() =>
-                    void runAction(`reward-${candidate.token.address}`, () =>
-                      changeRewardSelection(candidate.token.address, selected)
+                    void runAction(
+                      `reward-${candidate.token.address}`,
+                      () => changeRewardSelection(candidate.token.address, selected),
+                      false
                     )
                   }
                 >
@@ -634,7 +659,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             className="dollar-submit"
             type="button"
             disabled={pendingAction !== null || customRewardAddress.length === 0}
-            onClick={() => void runAction("custom-reward", addCustomReward)}
+            onClick={() => void runAction("custom-reward", addCustomReward, false)}
           >
             {pendingAction === "custom-reward" ? t("waiting") : t("selectAddress")}
           </button>
