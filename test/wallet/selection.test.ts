@@ -62,6 +62,21 @@ describe("Statics EVM wallet selection", () => {
     expect(selectActiveStaticsWallet([embedded, external], external.address)).toBe(external);
   });
 
+  it("lets an explicit embedded choice override a stale external Wagmi address", () => {
+    const external = wallet({
+      address: "0x1111111111111111111111111111111111111111",
+      walletClientType: "metamask",
+      connectorType: "injected",
+    });
+    const embedded = wallet({
+      address: "0x2222222222222222222222222222222222222222",
+      walletClientType: "privy",
+      connectorType: "embedded",
+    });
+
+    expect(selectActiveStaticsWallet([external, embedded], embedded.address)).toBe(embedded);
+  });
+
   it("falls back to the embedded wallet when the active external wallet is stale", () => {
     const embedded = wallet({
       address: "0x2222222222222222222222222222222222222222",

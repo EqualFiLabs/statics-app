@@ -20,7 +20,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createWalletClient, custom, getAddress } from "viem";
 import { useAccount } from "wagmi";
 
@@ -31,6 +31,7 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
+import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
 import {
   queryMatchesProtocolReconciliation,
   subscribeToProtocolReconciliation,
@@ -77,7 +78,7 @@ function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | n
 }
 
 function WalletBridge({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated, error: privyError, login } = usePrivy();
+  const { ready, authenticated, error: privyError, login, logout } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { exportWallet } = useExportWallet();
@@ -91,6 +92,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [fundingChainId, setFundingChainId] = useState(8_453);
   const [locallyDisconnected, setLocallyDisconnected] = useState(false);
+  const [preferredWalletAddress, setPreferredWalletAddress] = useState<string>();
+  const [waitingForPrivyWallet, setWaitingForPrivyWallet] = useState(false);
   const [requestedExternalAddress, setRequestedExternalAddress] = useState<string | null>(null);
   const { connectWallet: promptExternalWallet } = useConnectWallet({
     onSuccess: ({ wallet }) => {
@@ -102,7 +105,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
   const selectedWallet = locallyDisconnected
     ? undefined
-    : selectActiveStaticsWallet(wallets, wagmiAccount.address);
+    : selectActiveStaticsWallet(wallets, preferredWalletAddress ?? wagmiAccount.address);
   const address = selectedWallet?.address ?? null;
   const walletKind = selectedWallet
     ? selectedWallet.walletClientType === "privy" || selectedWallet.walletClientType === "privy-v2"
@@ -138,6 +141,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     void setActiveWallet(requestedWallet)
       .then(() => {
         if (cancelled) return;
+        setPreferredWalletAddress(requestedWallet.address);
+        setWaitingForPrivyWallet(false);
         setLocallyDisconnected(false);
         setRequestedExternalAddress(null);
       })
@@ -151,20 +156,58 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     };
   }, [requestedExternalAddress, setActiveWallet, wallets]);
 
-  const runAction = async (
-    action: NonNullable<WalletState["busyAction"]>,
-    operation: () => Promise<void>
-  ) => {
-    setActionError(null);
-    setBusyAction(action);
-    try {
-      await operation();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "The wallet request failed.");
-    } finally {
-      setBusyAction(null);
-    }
-  };
+  useEffect(() => {
+    if (!waitingForPrivyWallet || !authenticated || !embeddedWallet) return;
+
+    let cancelled = false;
+    void setActiveWallet(embeddedWallet)
+      .then(() => {
+        if (cancelled) return;
+        setPreferredWalletAddress(embeddedWallet.address);
+        setWaitingForPrivyWallet(false);
+        setLocallyDisconnected(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWaitingForPrivyWallet(false);
+        setActionError("The Privy embedded wallet could not be activated.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, embeddedWallet, setActiveWallet, waitingForPrivyWallet]);
+
+  const runAction = useCallback(
+    async (action: NonNullable<WalletState["busyAction"]>, operation: () => Promise<void>) => {
+      setActionError(null);
+      setBusyAction(action);
+      try {
+        await operation();
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : "The wallet request failed.");
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    []
+  );
+
+  const reconnectPrivyWallet = useCallback(
+    () =>
+      runAction("connect", async () => {
+        await recoverPrivyWallet({
+          embeddedWallet,
+          authenticated,
+          activateEmbedded: setActiveWallet,
+          logout,
+          selectEmbedded: (wallet) => setPreferredWalletAddress(wallet.address),
+          restoreLocalConnection: () => setLocallyDisconnected(false),
+          waitForEmbeddedWallet: () => setWaitingForPrivyWallet(true),
+          openEmailLogin: () => login({ loginMethods: ["email"] }),
+        });
+      }),
+    [authenticated, embeddedWallet, login, logout, runAction, setActiveWallet]
+  );
 
   let status: WalletState["status"] = "loading";
   if (locallyDisconnected) status = "signed-out";
@@ -193,7 +236,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       locallyDisconnected,
       login: () => {
         if (locallyDisconnected) {
-          return promptExternalWallet({ walletChainType: "ethereum-only" });
+          void reconnectPrivyWallet();
+          return;
         }
         login({ loginMethods: ["email", "wallet"] });
       },
@@ -207,13 +251,11 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         setActionError(null);
         promptExternalWallet({ walletChainType: "ethereum-only" });
       },
-      disconnectWallet: () => setLocallyDisconnected(true),
-      reconnectWallet: () =>
-        runAction("connect", async () => {
-          if (!embeddedWallet) throw new Error("The Privy embedded wallet is unavailable.");
-          await setActiveWallet(embeddedWallet);
-          setLocallyDisconnected(false);
-        }),
+      disconnectWallet: () => {
+        setWaitingForPrivyWallet(false);
+        setLocallyDisconnected(true);
+      },
+      reconnectWallet: reconnectPrivyWallet,
       createWallet: () =>
         runAction("create", async () => {
           await createWallet();
@@ -316,9 +358,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       locallyDisconnected,
       promptExternalWallet,
       privyError,
+      reconnectPrivyWallet,
+      runAction,
       selectedWallet,
       sendEmbeddedTransaction,
-      setActiveWallet,
       status,
       targetChain,
       walletKind,
