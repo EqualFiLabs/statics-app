@@ -32,7 +32,8 @@ against that manifest.
 
 - `/app` — Dollar and portfolio overview.
 - `/app/wallet` — EVM and Solana assets, transfers, Portal access, and testnet fixture controls.
-- `/app/wallet?modal=portal` — Uniswap EVM swaps, Jupiter Solana swaps, and Across funding.
+- `/app/wallet?modal=portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and the
+  LayerZero EVE bridge between Base and Robinhood Chain.
 - `/app/dollar` — ETH/WETH deposits, recombination, and Risk Share supply.
 - `/app/dollar?profile=USDG` — pegged Statics Dollar profile.
 - `/app/baskets` — basket discovery, creation, conversion, and canonical swaps.
@@ -83,9 +84,15 @@ Server-only configuration:
 - `JUPITER_API_KEY`
 - `ACROSS_API_KEY`
 - `ACROSS_INTEGRATOR_ID`
+- `EVE_BASE_RPC_URL`
+- `EVE_ROBINHOOD_RPC_URL`
 
 The server integrations read these values only from their process environment. They are never
 copied into browser configuration.
+
+The EVE RPCs verify the destination `OFTReceived` receipt before a LayerZero bridge is displayed as
+filled. They must point to authenticated, production-capable Base and Robinhood Chain RPC services;
+the app does not fall back to rate-limited public RPCs for this check.
 
 ## Connected local environment
 
