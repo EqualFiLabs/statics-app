@@ -27,6 +27,7 @@ describe("protocol transaction execution", () => {
       blockNumber: 17n,
     });
     const sendTransaction = vi.fn().mockResolvedValue(hash);
+    const onSubmitted = vi.fn();
 
     await expect(
       executeProtocolTransaction({
@@ -44,6 +45,7 @@ describe("protocol transaction execution", () => {
         to: target,
         data: "0x1234",
         sendTransaction,
+        onSubmitted,
         describeError: (error) => (error instanceof Error ? error.message : "Unknown error"),
       })
     ).resolves.toBe(hash);
@@ -64,6 +66,7 @@ describe("protocol transaction execution", () => {
     expect(waitForTransactionReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ hash, confirmations: 1 })
     );
+    expect(onSubmitted).toHaveBeenCalledWith(hash);
     expect(estimateGas).toHaveBeenCalledWith({
       account: wallet,
       to: target,
