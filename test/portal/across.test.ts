@@ -108,4 +108,41 @@ describe("Across bridge behavior", () => {
       fillTxnRef: `0x${"34".repeat(32)}`,
     });
   });
+
+  it("clears a prior delivery error after LayerZero verification recovers", async () => {
+    const activity = {
+      id: "bridge-lz-recovered",
+      provider: "layerzero" as const,
+      wallet,
+      recipient: wallet,
+      originChainId: 8_453,
+      destinationChainId: 4_663,
+      inputSymbol: "EVE",
+      outputSymbol: "EVE",
+      amount: "0.000001",
+      amountRaw: "1000000000000",
+      depositTxnRef: hash,
+      status: "attention" as const,
+      error: "Destination verification is temporarily unavailable.",
+      createdAt: 1,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status: "filled",
+            destinationTxnRef: `0x${"34".repeat(32)}`,
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    writeBridgeActivity(activity);
+
+    await refreshBridgeActivity(activity);
+
+    expect(readBridgeActivity(wallet)[0]).toMatchObject({ status: "filled" });
+    expect(readBridgeActivity(wallet)[0]?.error).toBeUndefined();
+  });
 });

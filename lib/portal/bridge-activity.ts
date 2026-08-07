@@ -122,9 +122,9 @@ export async function refreshBridgeActivity(activity: BridgeActivity) {
   const next = {
     ...activity,
     status,
+    error,
     ...(fillTxnRef ? { fillTxnRef } : {}),
     ...(guid ? { guid } : {}),
-    ...(error ? { error } : {}),
   };
   updateBridgeActivity(activity.id, next);
   return next;
