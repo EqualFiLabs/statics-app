@@ -64,6 +64,7 @@ export type ProtocolTransactionRequest = Readonly<{
   sendTransaction: (request: ProtocolTransactionSendRequest) => Promise<Hex>;
   describeError: (error: unknown) => string;
   validateSimulation?: (result: Hex | undefined) => void;
+  onSubmitted?: (hash: Hex) => void;
   verifyConfirmation?: (receipt: TransactionReceipt) => Promise<void>;
 }>;
 
@@ -251,6 +252,14 @@ export async function executeProtocolTransaction(
       hash,
       status: "submitted",
     });
+    // Cross-chain activity needs the source hash before confirmation so a
+    // reload cannot make a submitted transfer undiscoverable.
+    try {
+      request.onSubmitted?.(hash);
+    } catch {
+      // Protocol activity remains the recovery source if local bridge-specific
+      // persistence is unavailable.
+    }
 
     const receipt = await request.publicClient.waitForTransactionReceipt({
       hash,

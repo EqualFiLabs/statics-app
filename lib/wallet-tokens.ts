@@ -4,6 +4,12 @@ import { getAddress, isAddress, type Address } from "viem";
 
 import { readClientDollarDeployment, type DollarDeploymentState } from "@/lib/dollar/deployment";
 import { getDefaultEvmSwapTokens } from "@/lib/portal/uniswap";
+import {
+  EVE_LOCAL_DECIMALS,
+  EVE_NAME,
+  EVE_SYMBOL,
+  getEveBridgeDeployment,
+} from "@/lib/portal/eve-bridge";
 import { getTokenListEntry } from "@/lib/token-list";
 
 export type WalletToken = Readonly<{
@@ -38,6 +44,16 @@ export function defaultWalletTokens(
         isDefault: true,
       };
     });
+  const eve = getEveBridgeDeployment(chainId);
+  if (eve) {
+    defaults.push({
+      address: eve.tokenAddress,
+      symbol: EVE_SYMBOL,
+      name: EVE_NAME,
+      decimals: EVE_LOCAL_DECIMALS,
+      isDefault: true,
+    });
+  }
   if (deployment.status === "configured" && deployment.deployment.chainId === chainId) {
     if (deployment.deployment.pegged) {
       defaults.push({

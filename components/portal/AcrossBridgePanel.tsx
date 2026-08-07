@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { createPublicClient, custom, formatUnits, getAddress } from "viem";
+import {
+  createPublicClient,
+  custom,
+  encodeFunctionData,
+  formatEther,
+  formatUnits,
+  getAddress,
+  parseEventLogs,
+} from "viem";
 
 import {
   SlippageInlineControl,
@@ -26,8 +34,22 @@ import {
   readBridgeActivity,
   refreshBridgeActivity,
   subscribeBridgeActivity,
+  updateBridgeActivity,
   writeBridgeActivity,
 } from "@/lib/portal/bridge-activity";
+import {
+  EVE_LOCAL_DECIMALS,
+  EVE_NAME,
+  EVE_SYMBOL,
+  bufferedLayerZeroFee,
+  createEveSendParam,
+  eveOftAbi,
+  eveTokenApprovalAbi,
+  getEveBridgeDeployment,
+  getEveBridgeDestination,
+  isEveToken,
+  type EveSendParam,
+} from "@/lib/portal/eve-bridge";
 import { decodeJupiterTransaction } from "@/lib/portal/solana";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { SOLANA_MAINNET_CHAIN } from "@/lib/solana-wallet";
@@ -49,6 +71,13 @@ type QuotePayload = {
   error?: string;
   detail?: string;
 };
+
+type EveQuote = Readonly<{
+  sendParam: EveSendParam;
+  nativeFee: bigint;
+  maximumNativeFee: bigint;
+  needsApproval: boolean;
+}>;
 
 async function json(response: Response): Promise<unknown> {
   const text = await response.text();
@@ -92,6 +121,42 @@ function tokenArray(payload: unknown): AcrossToken[] {
       },
     ];
   });
+}
+
+function eveToken(chainId: number): AcrossToken | null {
+  const deployment = getEveBridgeDeployment(chainId);
+  return deployment
+    ? {
+        chainId,
+        address: deployment.tokenAddress,
+        name: EVE_NAME,
+        symbol: EVE_SYMBOL,
+        decimals: EVE_LOCAL_DECIMALS,
+      }
+    : null;
+}
+
+export function withEveToken(tokens: readonly AcrossToken[], chainId: number): AcrossToken[] {
+  const eve = eveToken(chainId);
+  if (!eve || tokens.some((token) => isEveToken(chainId, token.address))) return [...tokens];
+  return [...tokens, eve];
+}
+
+function selectedByAddress(tokens: readonly AcrossToken[], address: string) {
+  return tokens.find((token) => token.address.toLowerCase() === address.toLowerCase());
+}
+
+function eveBridgeError(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (/rejected|denied|declined/i.test(message)) return "The wallet request was rejected.";
+  if (/insufficient funds/i.test(message)) return "There is not enough ETH to pay the bridge fee.";
+  if (/SlippageExceeded|minimum bridge amount/i.test(message)) {
+    return "The minimum bridge amount is 0.000001 EVE.";
+  }
+  if (/NotEnoughNative|InsufficientFee/i.test(message)) {
+    return "The LayerZero fee changed before submission. Refresh the quote and try again.";
+  }
+  return cause instanceof Error ? cause.message : "The EVE bridge transaction failed.";
 }
 
 /**
@@ -151,8 +216,11 @@ export function AcrossBridgePanel() {
   const [destinationTokenTouched, setDestinationTokenTouched] = useState(false);
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<QuotePayload | null>(null);
+  const [eveQuote, setEveQuote] = useState<EveQuote | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [preparingEve, setPreparingEve] = useState(false);
+  const [approvingEve, setApprovingEve] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +230,18 @@ export function AcrossBridgePanel() {
   // Funds land on the destination chain, so the recipient has to be an address
   // that chain can actually hold -- an EVM address is unusable on Solana.
   const recipient = destinationIsSolana ? solana.wallet?.address : wallet.address;
-  const selectedToken = tokens.find((token) => token.address === tokenAddress) ?? tokens[0];
+  const selectedToken = selectedByAddress(tokens, tokenAddress) ?? tokens[0];
   const selectedDestinationToken =
-    destinationTokens.find((token) => token.address === destinationTokenAddress) ??
-    destinationTokens[0];
+    selectedByAddress(destinationTokens, destinationTokenAddress) ?? destinationTokens[0];
+  const selectedEve = isEveToken(originChainId, selectedToken?.address);
+  const eveDestination = selectedEve
+    ? getEveBridgeDestination(originChainId, destinationChainId)
+    : null;
+  const eveRoute = Boolean(
+    selectedEve &&
+    eveDestination &&
+    isEveToken(destinationChainId, selectedDestinationToken?.address)
+  );
   const destinationChainName =
     chains.find((chain) => chain.chainId === destinationChainId)?.name ??
     staticsDestination.chainName;
@@ -207,13 +283,22 @@ export function AcrossBridgePanel() {
             },
           ];
         });
+        for (const deployment of [getEveBridgeDeployment(8_453), getEveBridgeDeployment(4_663)]) {
+          if (!deployment || next.some((chain) => chain.chainId === deployment.chainId)) continue;
+          next.push({
+            chainId: deployment.chainId,
+            name:
+              wallet.fundingNetworks.find((network) => network.chainId === deployment.chainId)
+                ?.label ?? `Chain ${deployment.chainId}`,
+          });
+        }
         if (active && next.length) setChains(next);
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, []);
+  }, [wallet.fundingNetworks]);
 
   // Sending needs a signable wallet on the chain, so origins stay limited to
   // configured EVM networks plus Solana. Destinations do not.
@@ -230,16 +315,21 @@ export function AcrossBridgePanel() {
     void fetch(`/api/across/tokens?chainId=${destinationChainId}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await json(response);
-        const next = response.ok ? tokenArray(payload) : [];
+        const acrossTokens = response.ok ? tokenArray(payload) : [];
+        const next =
+          selectedEve && getEveBridgeDestination(originChainId, destinationChainId)
+            ? withEveToken(acrossTokens, destinationChainId)
+            : acrossTokens;
         if (!active) return;
         setQuote(null);
+        setEveQuote(null);
         setReviewing(false);
         setDestinationTokens(next);
         // An explicit choice is never overridden. Everything below only picks
         // the opening value.
         if (destinationTokenTouched) {
           setDestinationTokenAddress((current) =>
-            next.some((token) => token.address === current) ? current : (next[0]?.address ?? "")
+            selectedByAddress(next, current) ? current : (next[0]?.address ?? "")
           );
           return;
         }
@@ -254,22 +344,30 @@ export function AcrossBridgePanel() {
     return () => {
       active = false;
     };
-  }, [destinationChainId, selectedToken?.symbol, destinationTokenTouched]);
+  }, [
+    destinationChainId,
+    originChainId,
+    selectedEve,
+    selectedToken?.address,
+    selectedToken?.symbol,
+    destinationTokenTouched,
+  ]);
 
   useEffect(() => {
     let active = true;
     void fetch(`/api/across/tokens?chainId=${originChainId}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await json(response);
-        const next = response.ok ? tokenArray(payload) : [];
+        const next = withEveToken(response.ok ? tokenArray(payload) : [], originChainId);
         if (!active) return;
         setQuote(null);
+        setEveQuote(null);
         setReviewing(false);
         setError(null);
         if (next.length) {
           setTokens(next);
           setTokenAddress((current) =>
-            next.some((token) => token.address === current)
+            selectedByAddress(next, current)
               ? current
               : (next.find((token) => token.symbol.toUpperCase() === "USDC")?.address ??
                 next[0]!.address)
@@ -293,12 +391,14 @@ export function AcrossBridgePanel() {
               decimals: token.decimals,
               logoUrl: token.logoURI,
             }));
-        setTokens(fallback);
-        setTokenAddress(fallback[0]?.address ?? "");
+        const fallbackWithEve = originIsSolana ? fallback : withEveToken(fallback, originChainId);
+        setTokens(fallbackWithEve);
+        setTokenAddress(fallbackWithEve[0]?.address ?? "");
       })
       .catch(() => {
         if (active) {
           setQuote(null);
+          setEveQuote(null);
           setTokens([]);
           setTokenAddress("");
         }
@@ -311,7 +411,9 @@ export function AcrossBridgePanel() {
   useEffect(() => {
     if (!recentBridgeActivity) return;
     void refreshBridgeActivity(recentBridgeActivity);
-    if (!["submitted", "pending", "received"].includes(recentBridgeActivity.status)) return;
+    if (!["submitted", "pending", "received", "attention"].includes(recentBridgeActivity.status)) {
+      return;
+    }
     const interval = window.setInterval(
       () => void refreshBridgeActivity(recentBridgeActivity),
       10_000
@@ -350,6 +452,59 @@ export function AcrossBridgePanel() {
     return payload;
   };
 
+  const requestEveQuote = async (): Promise<EveQuote> => {
+    if (!wallet.address || !recipient || !eveRoute || rawAmount <= 0n) {
+      throw new Error("EVE bridge quote inputs are incomplete.");
+    }
+    const origin = getEveBridgeDeployment(originChainId);
+    const network = getFundingNetwork(originChainId);
+    const provider = await wallet.getEthereumProvider();
+    if (!origin || !network || !provider) {
+      throw new Error("The selected EVE origin wallet is unavailable.");
+    }
+    const account = getAddress(wallet.address);
+    const publicClient = createPublicClient({ chain: network.chain, transport: custom(provider) });
+    const initialParam = createEveSendParam(
+      originChainId,
+      destinationChainId,
+      getAddress(recipient),
+      rawAmount
+    );
+    const [, , oftReceipt] = await publicClient.readContract({
+      address: origin.bridgeAddress,
+      abi: eveOftAbi,
+      functionName: "quoteOFT",
+      args: [initialParam],
+    });
+    const sendParam = {
+      ...initialParam,
+      amountLD: oftReceipt.amountSentLD,
+      minAmountLD: oftReceipt.amountReceivedLD,
+    };
+    const [feeQuote, allowance] = await Promise.all([
+      publicClient.readContract({
+        address: origin.bridgeAddress,
+        abi: eveOftAbi,
+        functionName: "quoteSend",
+        args: [sendParam, false],
+      }),
+      origin.approvalRequired
+        ? publicClient.readContract({
+            address: origin.tokenAddress,
+            abi: eveTokenApprovalAbi,
+            functionName: "allowance",
+            args: [account, origin.bridgeAddress],
+          })
+        : Promise.resolve(sendParam.amountLD),
+    ]);
+    return {
+      sendParam,
+      nativeFee: feeQuote.nativeFee,
+      maximumNativeFee: bufferedLayerZeroFee(feeQuote.nativeFee),
+      needsApproval: allowance < sendParam.amountLD,
+    };
+  };
+
   useEffect(() => {
     if (
       !selectedToken ||
@@ -359,19 +514,30 @@ export function AcrossBridgePanel() {
       !recipient ||
       (!originIsSolana && !wallet.fundingWalletOnSelectedChain)
     ) {
-      const timeout = window.setTimeout(() => setQuote(null), 0);
+      const timeout = window.setTimeout(() => {
+        setQuote(null);
+        setEveQuote(null);
+      }, 0);
       return () => window.clearTimeout(timeout);
     }
     let active = true;
     const timeout = window.setTimeout(() => {
       setLoadingQuote(true);
       setError(null);
-      void requestQuote()
+      void (eveRoute ? requestEveQuote() : requestQuote())
         .then((result) => {
-          if (active) setQuote(result);
+          if (!active) return;
+          if (eveRoute) {
+            setEveQuote(result as EveQuote);
+            setQuote(null);
+          } else {
+            setQuote(result as QuotePayload);
+            setEveQuote(null);
+          }
         })
         .catch((cause) => {
-          if (active) setError(cause instanceof Error ? cause.message : "No Across route.");
+          if (active)
+            setError(eveRoute ? eveBridgeError(cause) : acrossError(cause, "No Across route."));
         })
         .finally(() => {
           if (active) setLoadingQuote(false);
@@ -392,6 +558,7 @@ export function AcrossBridgePanel() {
     rawAmount,
     depositor,
     recipient,
+    eveRoute,
     slippage,
     wallet.fundingWalletOnSelectedChain,
   ]);
@@ -399,13 +566,15 @@ export function AcrossBridgePanel() {
   const outputRaw =
     quote?.quote?.steps?.bridge?.outputAmount ?? quote?.quote?.outputAmount ?? undefined;
   const outputAmount = parseAcrossAmount(outputRaw);
-  const output =
-    outputAmount !== null && quote?.destination
+  const output = eveQuote
+    ? `${formatUnits(eveQuote.sendParam.minAmountLD, EVE_LOCAL_DECIMALS)} ${EVE_SYMBOL}`
+    : outputAmount !== null && quote?.destination
       ? `${formatUnits(outputAmount, quote.destination.decimals)} ${quote.destination.symbol}`
       : "--";
   const feeAmount = parseAcrossAmount(quote?.quote?.fees?.total ?? quote?.quote?.fees?.totalMax);
-  const fee =
-    feeAmount !== null && selectedToken
+  const fee = eveQuote
+    ? `${formatEther(eveQuote.nativeFee)} ETH`
+    : feeAmount !== null && selectedToken
       ? `${formatUnits(feeAmount, selectedToken.decimals)} ${selectedToken.symbol}`
       : "--";
 
@@ -443,7 +612,147 @@ export function AcrossBridgePanel() {
     });
   };
 
+  const executeEve = async () => {
+    if (
+      !wallet.address ||
+      !selectedToken ||
+      !eveRoute ||
+      preparingEve ||
+      approvingEve ||
+      submitting
+    ) {
+      return;
+    }
+    setPreparingEve(true);
+    const origin = getEveBridgeDeployment(originChainId);
+    const network = getFundingNetwork(originChainId);
+    const provider = await wallet.getEthereumProvider();
+    if (!origin || !network || !provider) {
+      setError("The selected EVE origin wallet is unavailable.");
+      setPreparingEve(false);
+      return;
+    }
+    const account = getAddress(wallet.address);
+    const publicClient = createPublicClient({ chain: network.chain, transport: custom(provider) });
+    setError(null);
+    try {
+      const fresh = await requestEveQuote();
+      const displayAmount = formatUnits(fresh.sendParam.amountLD, EVE_LOCAL_DECIMALS);
+      if (fresh.needsApproval) {
+        setPreparingEve(false);
+        setApprovingEve(true);
+        const approvalData = encodeFunctionData({
+          abi: eveTokenApprovalAbi,
+          functionName: "approve",
+          args: [origin.bridgeAddress, fresh.sendParam.amountLD],
+        });
+        await executeProtocolTransaction({
+          publicClient,
+          wallet: account,
+          chainId: originChainId,
+          kind: "approve-bridge",
+          label: `Approve ${EVE_SYMBOL} bridge`,
+          amount: `${displayAmount} ${EVE_SYMBOL}`,
+          to: origin.tokenAddress,
+          data: approvalData,
+          sendTransaction: wallet.sendEvmTransaction,
+          describeError: eveBridgeError,
+          verifyConfirmation: async () => {
+            const allowance = await publicClient.readContract({
+              address: origin.tokenAddress,
+              abi: eveTokenApprovalAbi,
+              functionName: "allowance",
+              args: [account, origin.bridgeAddress],
+            });
+            if (allowance < fresh.sendParam.amountLD) {
+              throw new Error("The confirmed EVE approval is not visible yet.");
+            }
+          },
+        });
+        setEveQuote(await requestEveQuote());
+        return;
+      }
+
+      setPreparingEve(false);
+      setSubmitting(true);
+      const activityId = crypto.randomUUID();
+      const sendData = encodeFunctionData({
+        abi: eveOftAbi,
+        functionName: "send",
+        args: [fresh.sendParam, { nativeFee: fresh.maximumNativeFee, lzTokenFee: 0n }, account],
+      });
+      await executeProtocolTransaction({
+        publicClient,
+        wallet: account,
+        chainId: originChainId,
+        kind: "bridge",
+        label: `Bridge ${EVE_SYMBOL} to ${destinationChainName}`,
+        amount: `${displayAmount} ${EVE_SYMBOL}`,
+        to: origin.bridgeAddress,
+        data: sendData,
+        value: fresh.maximumNativeFee,
+        presentation: {
+          action: `Bridge ${EVE_SYMBOL} to ${destinationChainName}`,
+          description: `Bridge ${displayAmount} ${EVE_SYMBOL} through the configured LayerZero OFT pathway. Maximum LayerZero fee: ${formatEther(fresh.maximumNativeFee)} ETH; unused fee is refunded to this wallet.`,
+          buttonText: `Bridge ${EVE_SYMBOL}`,
+          contractName: origin.approvalRequired ? "EVE OFT Adapter" : "EVE OFT",
+        },
+        sendTransaction: wallet.sendEvmTransaction,
+        describeError: eveBridgeError,
+        onSubmitted: (hash) =>
+          writeBridgeActivity({
+            id: activityId,
+            provider: "layerzero",
+            wallet: account,
+            recipient: account,
+            originChainId,
+            destinationChainId,
+            inputSymbol: EVE_SYMBOL,
+            outputSymbol: EVE_SYMBOL,
+            amount: displayAmount,
+            amountRaw: fresh.sendParam.minAmountLD.toString(),
+            depositTxnRef: hash,
+            status: "submitted",
+            createdAt: Date.now(),
+          }),
+        verifyConfirmation: async (receipt) => {
+          const sent = parseEventLogs({
+            abi: eveOftAbi,
+            eventName: "OFTSent",
+            logs: receipt.logs,
+            strict: true,
+          }).find(
+            (event) =>
+              event.address.toLowerCase() === origin.bridgeAddress.toLowerCase() &&
+              event.args.dstEid === fresh.sendParam.dstEid &&
+              getAddress(event.args.fromAddress) === account &&
+              event.args.amountSentLD === fresh.sendParam.amountLD &&
+              event.args.amountReceivedLD === fresh.sendParam.minAmountLD
+          );
+          if (!sent) throw new Error("The confirmed transaction emitted no matching EVE send.");
+          updateBridgeActivity(activityId, {
+            depositTxnRef: receipt.transactionHash,
+            guid: sent.args.guid,
+            status: "pending",
+          });
+        },
+      });
+      const activity = readBridgeActivity(account).find((item) => item.id === activityId);
+      if (activity) void refreshBridgeActivity(activity);
+      setAmount("");
+      setEveQuote(null);
+      setReviewing(false);
+    } catch (cause) {
+      setError(eveBridgeError(cause));
+    } finally {
+      setPreparingEve(false);
+      setApprovingEve(false);
+      setSubmitting(false);
+    }
+  };
+
   const execute = async () => {
+    if (eveRoute) return executeEve();
     if (!quote?.quote || !selectedToken || !depositor || submitting) return;
     setSubmitting(true);
     setError(null);
@@ -523,7 +832,7 @@ export function AcrossBridgePanel() {
     if (!originIsSolana && !wallet.fundingWalletOnSelectedChain) {
       return void wallet.selectFundingNetwork(originChainId);
     }
-    if (quote?.quote) setReviewing(true);
+    if (quote?.quote || eveQuote) setReviewing(true);
   };
   const primaryLabel =
     walletRecovery === "login"
@@ -545,7 +854,7 @@ export function AcrossBridgePanel() {
     selectedToken &&
     selectedDestinationToken &&
     rawAmount > 0n &&
-    quote?.quote &&
+    (eveRoute ? eveQuote : quote?.quote) &&
     depositor &&
     recipient
   );
@@ -561,6 +870,7 @@ export function AcrossBridgePanel() {
               const next = Number(event.target.value);
               setOriginChainId(next);
               setQuote(null);
+              setEveQuote(null);
               setReviewing(false);
               setError(null);
               if (next !== ACROSS_SOLANA_CHAIN_ID && supportedEvmChains.has(next)) {
@@ -581,15 +891,21 @@ export function AcrossBridgePanel() {
           <span>{t("to")}</span>
           <select
             value={destinationChainId}
+            disabled={selectedEve}
             onChange={(event) => {
               setDestinationChainId(Number(event.target.value));
               setQuote(null);
+              setEveQuote(null);
               setReviewing(false);
               setError(null);
             }}
           >
             {chains
-              .filter((chain) => chain.chainId !== originChainId)
+              .filter(
+                (chain) =>
+                  chain.chainId !== originChainId &&
+                  (!selectedEve || chain.chainId === eveDestination?.chainId)
+              )
               .map((chain) => (
                 <option key={chain.chainId} value={chain.chainId}>
                   {chain.name}
@@ -604,7 +920,11 @@ export function AcrossBridgePanel() {
       <div className="portal-field portal-asset-field">
         <div className="portal-asset-field-head">
           <span>{t("youSend")}</span>
-          <SlippageInlineControl value={slippage} onEdit={() => setSettingsOpen(true)} />
+          {selectedEve ? (
+            <span>{t("layerZeroOft")}</span>
+          ) : (
+            <SlippageInlineControl value={slippage} onEdit={() => setSettingsOpen(true)} />
+          )}
         </div>
         <div>
           <input
@@ -615,6 +935,7 @@ export function AcrossBridgePanel() {
             onChange={(event) => {
               setAmount(event.target.value);
               setQuote(null);
+              setEveQuote(null);
               setReviewing(false);
               setError(null);
             }}
@@ -623,10 +944,20 @@ export function AcrossBridgePanel() {
             aria-label={t("bridgeAsset")}
             value={selectedToken?.address ?? ""}
             onChange={(event) => {
-              setTokenAddress(event.target.value);
+              const nextAddress = event.target.value;
+              setTokenAddress(nextAddress);
               setQuote(null);
+              setEveQuote(null);
               setReviewing(false);
               setError(null);
+              if (isEveToken(originChainId, nextAddress)) {
+                const destination = getEveBridgeDestination(originChainId);
+                if (destination) {
+                  setDestinationChainId(destination.chainId);
+                  setDestinationTokenAddress(destination.tokenAddress);
+                  setDestinationTokenTouched(false);
+                }
+              }
             }}
           >
             {tokens.map((token) => (
@@ -636,7 +967,15 @@ export function AcrossBridgePanel() {
             ))}
           </select>
         </div>
-        <small>--</small>
+        <small>
+          {eveQuote && rawAmount > eveQuote.sendParam.amountLD
+            ? t("eveDustRetained", {
+                amount: formatUnits(rawAmount - eveQuote.sendParam.amountLD, EVE_LOCAL_DECIMALS),
+              })
+            : selectedEve
+              ? t("eveMinimum")
+              : "--"}
+        </small>
       </div>
 
       <label className="portal-field">
@@ -644,10 +983,12 @@ export function AcrossBridgePanel() {
         <select
           aria-label={t("destinationAsset")}
           value={selectedDestinationToken?.address ?? ""}
+          disabled={selectedEve}
           onChange={(event) => {
             setDestinationTokenAddress(event.target.value);
             setDestinationTokenTouched(true);
             setQuote(null);
+            setEveQuote(null);
             setReviewing(false);
             setError(null);
           }}
@@ -670,8 +1011,14 @@ export function AcrossBridgePanel() {
           <dd>{fee}</dd>
         </div>
         <div>
-          <dt>{t("estimatedTime")}</dt>
-          <dd>{quote?.quote?.expectedFillTime ? `${quote.quote.expectedFillTime}s` : "--"}</dd>
+          <dt>{selectedEve ? t("route") : t("estimatedTime")}</dt>
+          <dd>
+            {selectedEve
+              ? t("layerZeroOft")
+              : quote?.quote?.expectedFillTime
+                ? `${quote.quote.expectedFillTime}s`
+                : "--"}
+          </dd>
         </div>
       </dl>
 
@@ -682,7 +1029,7 @@ export function AcrossBridgePanel() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {reviewing && quote?.quote && (
+      {reviewing && (quote?.quote || eveQuote) && (
         <div className="portal-review">
           <div>
             <span>
@@ -691,6 +1038,13 @@ export function AcrossBridgePanel() {
             <strong>→</strong>
             <span>{output}</span>
           </div>
+          {eveQuote && (
+            <small>
+              {t("maximumLayerZeroFee", {
+                fee: formatEther(eveQuote.maximumNativeFee),
+              })}
+            </small>
+          )}
         </div>
       )}
       {recentBridgeActivity && (
@@ -700,6 +1054,7 @@ export function AcrossBridgePanel() {
           <button type="button" onClick={() => void refreshBridgeActivity(recentBridgeActivity)}>
             {t("refresh")}
           </button>
+          {recentBridgeActivity.error && <small>{recentBridgeActivity.error}</small>}
         </div>
       )}
       {error && (
@@ -711,10 +1066,18 @@ export function AcrossBridgePanel() {
         <button
           className="portal-primary-action"
           type="button"
-          disabled={submitting}
+          disabled={preparingEve || submitting || approvingEve}
           onClick={() => void execute()}
         >
-          {submitting ? t("bridging") : t("confirmBridge")}
+          {preparingEve
+            ? t("preparing")
+            : approvingEve
+              ? t("approvingEve")
+              : eveQuote?.needsApproval
+                ? t("approveEve")
+                : submitting
+                  ? t("bridging")
+                  : t("confirmBridge")}
         </button>
       ) : (
         <button
@@ -724,6 +1087,8 @@ export function AcrossBridgePanel() {
             wallet.status === "unconfigured" ||
             wallet.status === "loading" ||
             submitting ||
+            preparingEve ||
+            approvingEve ||
             loadingQuote ||
             (wallet.status === "ready" &&
               !(

@@ -1,7 +1,9 @@
 "use client";
 
 export type BridgeActivityStatus =
-  "submitted" | "pending" | "received" | "filled" | "expired" | "refunded" | "failed";
+  "submitted" | "pending" | "received" | "filled" | "attention" | "expired" | "refunded" | "failed";
+
+export type BridgeProvider = "across" | "layerzero";
 
 export type BridgeActivity = Readonly<{
   id: string;
@@ -14,6 +16,10 @@ export type BridgeActivity = Readonly<{
   depositTxnRef: string;
   status: BridgeActivityStatus;
   createdAt: number;
+  provider?: BridgeProvider;
+  recipient?: string;
+  amountRaw?: string;
+  guid?: string;
   fillTxnRef?: string;
   error?: string;
 }>;
@@ -26,6 +32,7 @@ const statuses = new Set<BridgeActivityStatus>([
   "pending",
   "received",
   "filled",
+  "attention",
   "expired",
   "refunded",
   "failed",
@@ -86,8 +93,18 @@ export function subscribeBridgeActivity(listener: () => void) {
 
 export async function refreshBridgeActivity(activity: BridgeActivity) {
   if (["filled", "expired", "refunded", "failed"].includes(activity.status)) return activity;
+  const layerZero = activity.provider === "layerzero";
+  if (layerZero && (!activity.recipient || !activity.amountRaw)) return activity;
   const response = await fetch(
-    `/api/across/status?depositTxnRef=${encodeURIComponent(activity.depositTxnRef)}`,
+    layerZero
+      ? `/api/layerzero/status?${new URLSearchParams({
+          txHash: activity.depositTxnRef,
+          originChainId: String(activity.originChainId),
+          destinationChainId: String(activity.destinationChainId),
+          recipient: activity.recipient!,
+          amountRaw: activity.amountRaw!,
+        })}`
+      : `/api/across/status?depositTxnRef=${encodeURIComponent(activity.depositTxnRef)}`,
     { cache: "no-store" }
   );
   const payload: unknown = await response.json().catch(() => ({}));
@@ -100,7 +117,15 @@ export async function refreshBridgeActivity(activity: BridgeActivity) {
   const fillTxnRef = [record.fillTxnRef, record.fillTxHash, record.destinationTxnRef].find(
     (value): value is string => typeof value === "string" && value.length > 0
   );
-  const next = { ...activity, status, ...(fillTxnRef ? { fillTxnRef } : {}) };
+  const guid = typeof record.guid === "string" ? record.guid : undefined;
+  const error = typeof record.error === "string" ? record.error : undefined;
+  const next = {
+    ...activity,
+    status,
+    error,
+    ...(fillTxnRef ? { fillTxnRef } : {}),
+    ...(guid ? { guid } : {}),
+  };
   updateBridgeActivity(activity.id, next);
   return next;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultDestinationToken } from "@/components/portal/AcrossBridgePanel";
+import { defaultDestinationToken, withEveToken } from "@/components/portal/AcrossBridgePanel";
 import { parseAcrossAmount } from "@/lib/portal/across";
 
 describe("parseAcrossAmount", () => {
@@ -63,5 +63,26 @@ describe("defaultDestinationToken", () => {
     const sparse = [{ chainId: 1, address: "0xabc", name: "Token", symbol: "TKN", decimals: 18 }];
     expect(defaultDestinationToken(sparse, "ETH")).toBe("0xabc");
     expect(defaultDestinationToken([], "ETH")).toBe("");
+  });
+
+  it("selects the canonical EVE representation injected for the paired destination", () => {
+    const tokens = withEveToken(robinhood, 4_663);
+    expect(defaultDestinationToken(tokens, "EVE")).toBe(
+      "0x12Fa0ec31BE30677Fa38274b3AFBc2A0fCE7648F"
+    );
+  });
+});
+
+describe("withEveToken", () => {
+  it("adds EVE only on deployed chains and deduplicates by deployed address", () => {
+    expect(withEveToken([], 8_453)).toEqual([
+      expect.objectContaining({
+        chainId: 8_453,
+        address: "0xe7D192e52Fa418236d6EEcf7D5Eb38dA9Dd11ba3",
+        symbol: "EVE",
+      }),
+    ]);
+    expect(withEveToken(withEveToken([], 8_453), 8_453)).toHaveLength(1);
+    expect(withEveToken([], 1)).toEqual([]);
   });
 });
