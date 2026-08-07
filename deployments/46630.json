@@ -4,14 +4,14 @@
   "chainId": 46630,
   "deploymentStartBlock": "97383161",
   "wethProfileId": "1",
-  "protocolCommit": "724df0fe80be8e376a5cb61811d02e1ef7413707",
+  "protocolCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics",
-    "publicCommit": "724df0fe80be8e376a5cb61811d02e1ef7413707",
+    "publicCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b",
     "deploymentArtifact": "deployments/robinhood-testnet-46630-statics.json",
-    "recordedDeploymentCommit": "724df0fe80be8e376a5cb61811d02e1ef7413707"
+    "recordedDeploymentCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b"
   },
-  "generatedAt": "2026-08-05T19:59:16.002Z",
+  "generatedAt": "2026-08-07T19:34:26.242Z",
   "contracts": {
     "diamond": {
       "address": "0x2340741Ec94dF12678312f564eBc2c776d8FaA6a",
@@ -70,8 +70,8 @@
       "runtimeCodeHash": "0xf3f05eb498f5051637cc1313bddbd948dcba5fc15fa762555c8b7bf8c8408005"
     },
     "liquidityManager": {
-      "address": "0xbE5A795ae0754D8D36F6EdFD546e55f5E60d6455",
-      "runtimeCodeHash": "0x1e107bdcef45fe1bcf06f2d5ca5cdaf462182928f73a50107b2ad984f5a737b7"
+      "address": "0x9E8B33ff86e36fe64ba2f1504fF53bE586F4183A",
+      "runtimeCodeHash": "0xc24a2bdc27399ebf3c2522253151f410b5e99f2b05630dbb58e17c95a7ad34eb"
     },
     "stateView": {
       "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
