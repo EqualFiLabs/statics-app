@@ -13,6 +13,13 @@ export type EveLayerZeroStatus = Readonly<{
   error?: string;
 }>;
 
+const layerZeroStatusPrecedence: Readonly<Record<EveLayerZeroStatus["status"], number>> = {
+  pending: 0,
+  received: 1,
+  attention: 2,
+  filled: 3,
+};
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
@@ -32,6 +39,7 @@ export function resolveEveLayerZeroStatus(
   if (!origin || !destination) return null;
   const rows = record(payload)?.data;
   if (!Array.isArray(rows)) return null;
+  let bestMatch: EveLayerZeroStatus | null = null;
 
   for (const value of rows) {
     const message = record(value);
@@ -53,31 +61,37 @@ export function resolveEveLayerZeroStatus(
     const destinationState = String(record(message?.destination)?.status ?? "").toUpperCase();
     const destinationTx = transactionHash(record(record(message?.destination)?.tx)?.txHash);
     const guid = transactionHash(message?.guid);
+    let candidate: EveLayerZeroStatus;
     if (statusName === "DELIVERED" && destinationState === "SUCCEEDED" && destinationTx) {
-      return { status: "filled", ...(guid ? { guid } : {}), destinationTxnRef: destinationTx };
-    }
-    if (statusName === "CONFIRMING") {
-      return {
+      candidate = { status: "filled", ...(guid ? { guid } : {}), destinationTxnRef: destinationTx };
+    } else if (statusName === "CONFIRMING") {
+      candidate = {
         status: "received",
         ...(guid ? { guid } : {}),
         ...(destinationTx ? { destinationTxnRef: destinationTx } : {}),
       };
-    }
-    if (
+    } else if (
       ["FAILED", "BLOCKED", "PAYLOAD_STORED", "APPLICATION_BURNED", "APPLICATION_SKIPPED"].includes(
         statusName
       )
     ) {
-      return {
+      candidate = {
         status: "attention",
         ...(guid ? { guid } : {}),
         ...(destinationTx ? { destinationTxnRef: destinationTx } : {}),
         error: String(record(message?.status)?.message ?? "LayerZero delivery needs attention."),
       };
+    } else {
+      candidate = { status: "pending", ...(guid ? { guid } : {}) };
     }
-    return { status: "pending", ...(guid ? { guid } : {}) };
+    if (
+      !bestMatch ||
+      layerZeroStatusPrecedence[candidate.status] > layerZeroStatusPrecedence[bestMatch.status]
+    ) {
+      bestMatch = candidate;
+    }
   }
-  return null;
+  return bestMatch;
 }
 
 function parseRpcUrl(value: string | undefined): string | null {

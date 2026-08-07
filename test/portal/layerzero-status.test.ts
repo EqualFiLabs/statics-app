@@ -12,24 +12,23 @@ const guid = `0x${"12".repeat(32)}` as const;
 const destinationTxnRef = `0x${"34".repeat(32)}` as const;
 const recipient = "0x0000000000000000000000000000000000000001" as const;
 
-function scanPayload(status = "DELIVERED") {
+function scanPayload(...statuses: string[]) {
+  const requestedStatuses = statuses.length > 0 ? statuses : ["DELIVERED"];
   return {
-    data: [
-      {
-        pathway: {
-          srcEid: 30_184,
-          dstEid: 30_416,
-          sender: { address: "0x160407eFa8556D4CDbf53b543EB36d860ac5a171" },
-          receiver: { address: "0x12Fa0ec31BE30677Fa38274b3AFBc2A0fCE7648F" },
-        },
-        guid,
-        status: { name: status, message: "message status" },
-        destination: {
-          status: status === "DELIVERED" ? "SUCCEEDED" : "WAITING",
-          tx: { txHash: destinationTxnRef },
-        },
+    data: requestedStatuses.map((status) => ({
+      pathway: {
+        srcEid: 30_184,
+        dstEid: 30_416,
+        sender: { address: "0x160407eFa8556D4CDbf53b543EB36d860ac5a171" },
+        receiver: { address: "0x12Fa0ec31BE30677Fa38274b3AFBc2A0fCE7648F" },
       },
-    ],
+      guid,
+      status: { name: status, message: "message status" },
+      destination: {
+        status: status === "DELIVERED" ? "SUCCEEDED" : "WAITING",
+        tx: { txHash: destinationTxnRef },
+      },
+    })),
   };
 }
 
@@ -49,6 +48,21 @@ describe("LayerZero EVE status", () => {
     ).toBeNull();
     expect(
       resolveEveLayerZeroStatus(scanPayload("BLOCKED"), {
+        originChainId: 8_453,
+        destinationChainId: 4_663,
+      })
+    ).toMatchObject({ status: "attention" });
+  });
+
+  it("selects the most advanced matching status regardless of scan order", () => {
+    expect(
+      resolveEveLayerZeroStatus(scanPayload("CONFIRMING", "BLOCKED", "DELIVERED"), {
+        originChainId: 8_453,
+        destinationChainId: 4_663,
+      })
+    ).toEqual({ status: "filled", guid, destinationTxnRef });
+    expect(
+      resolveEveLayerZeroStatus(scanPayload("CONFIRMING", "BLOCKED"), {
         originChainId: 8_453,
         destinationChainId: 4_663,
       })
