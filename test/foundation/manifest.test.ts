@@ -212,9 +212,9 @@ describe("deployment source selection", () => {
     expect(state.status === "unavailable" && state.reason).toMatch(/chain 8453/);
   });
 
-  it("fails closed after the legacy manifest is removed", () => {
-    // The environment path is the thing being contained: setting these on a
-    // build machine must not configure a public network.
+  it("uses the reviewed Genesis manifest instead of public environment addresses", () => {
+    // Public network addresses come only from the checked-in manifest. Build
+    // machine values cannot replace the reviewed release.
     const state = readDollarDeployment({
       NEXT_PUBLIC_APP_ENV: "development",
       NEXT_PUBLIC_STATICS_CHAIN_ID: "46630",
@@ -222,7 +222,12 @@ describe("deployment source selection", () => {
       NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: address("2"),
     });
 
-    expect(state.status).toBe("unavailable");
+    expect(state.status).toBe("configured");
+    if (state.status === "configured") {
+      expect(state.deployment.source).toBe("checked-in-manifest");
+      expect(state.deployment.contracts.diamond).not.toBe(address("1"));
+      expect(state.deployment.contracts.core).not.toBe(address("2"));
+    }
   });
 
   it("still reports nothing configured when no deployment is set at all", () => {

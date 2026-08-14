@@ -260,13 +260,17 @@ describe("Dollar deployment configuration", () => {
     ).rejects.toThrow("bound to a different PoolManager");
   });
 
-  it("does not let environment values replace a missing reviewed public deployment", () => {
+  it("does not let environment values replace the reviewed public deployment", () => {
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
       NEXT_PUBLIC_STATICS_CHAIN_ID: "46630",
     });
 
-    expect(state.status).toBe("unavailable");
+    expect(state.status).toBe("configured");
+    if (state.status === "configured") {
+      expect(state.deployment.source).toBe("checked-in-manifest");
+      expect(state.deployment.contracts.diamond).not.toBe(address);
+    }
   });
 
   it("requires a checked-in manifest outside development", () => {

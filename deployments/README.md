@@ -6,11 +6,10 @@ was deployed at it and to the recorded deployment commit. The `source` block
 also names the reachable public Statics commit and canonical deployment artifact
 that preserve the public provenance record without relabeling deployed bytecode.
 
-The prior Robinhood deployment used the obsolete schema and has intentionally
-been removed. The next `46630.json` will be generated after the Genesis release
-is deployed. It will bind the unified Statics deployment, fixed STATICS token,
-Genesis NFT/renderer/avatar stack, USDG profile, and Robinhood Uniswap v4
-dependencies to their runtime code hashes.
+`46630.json` records the clean-break Genesis release. It binds the unified
+Statics deployment, fixed STATICS token, Genesis NFT/renderer/avatar stack,
+USDG profile, and Robinhood Uniswap v4 dependencies to runtime code hashes read
+from the live chain. The obsolete pre-Genesis manifest remains excluded.
 
 ## Generating one
 

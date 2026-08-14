@@ -10,4 +10,8 @@
  */
 import type { DeploymentManifest } from "@/lib/dollar/manifest";
 
-export const deploymentManifests: Readonly<Record<number, DeploymentManifest>> = {};
+import chain46630 from "./46630.json";
+
+export const deploymentManifests: Readonly<Record<number, DeploymentManifest>> = {
+  46630: chain46630 as DeploymentManifest,
+};
