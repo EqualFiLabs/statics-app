@@ -124,7 +124,7 @@ test.describe("Dollar DApp foundation", () => {
     await page.goto("/app/baskets/0");
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.goto("/app/create");
-    await expect(page.getByRole("heading", { name: "Basket creation unavailable" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
@@ -187,7 +187,7 @@ test.describe("Dollar DApp foundation", () => {
   test("fails basket creation closed without a reviewed deployment", async ({ page }) => {
     await page.goto("/app/create");
 
-    await expect(page.getByRole("heading", { name: "Basket creation unavailable" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
     await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
   });
 
