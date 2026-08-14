@@ -204,6 +204,7 @@
     "stale": "Basket data is temporarily unavailable. Showing the last received state.",
     "emptyTitle": "No baskets yet",
     "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. Launch the first index from Create basket.",
+    "viewPolicy": "Create basket",
     "underlyings": "Underlyings",
     "totalSupply": "Total supply",
     "yourBalance": "Your balance",

@@ -204,6 +204,7 @@
     "stale": "篮子数据暂时不可用，正在显示最近收到的状态。",
     "emptyTitle": "尚无篮子",
     "emptyDescription": "篮子是一组固定资产，可以作为一个整体买卖。可从创建篮子页面发行第一个指数。",
+    "viewPolicy": "创建篮子",
     "underlyings": "底层资产",
     "totalSupply": "总供应量",
     "yourBalance": "你的余额",
