@@ -11,15 +11,16 @@ describe("vendored Statics SDK", () => {
       readFileSync(resolve(root, "vendor/statics-sdk/provenance.json"), "utf8")
     ) as {
       protocolCommit: string;
-      source: { repository: string; path: string };
+      source: { repository: string; path: string; commit: string };
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
       checksums: Record<string, string>;
     };
     expect(provenance.protocolCommit).toMatch(/^[a-f0-9]{40}$/);
     expect(provenance.source).toEqual({
-      repository: "https://github.com/EqualFiLabs/statics",
-      path: "sdk",
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: expect.stringMatching(/^[a-f0-9]{40}$/),
     });
     expect(["clean", "dirty"]).toContain(provenance.sdkTreeState);
     expect(Object.keys(provenance.sourceChecksums).sort()).toEqual([

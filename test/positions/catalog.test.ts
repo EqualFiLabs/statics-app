@@ -66,6 +66,7 @@ describe("PositionNFT catalog discovery", () => {
         if (functionName === "positionRewardAssets") {
           return Promise.resolve(args?.[0] === 1n ? [dollar] : []);
         }
+        if (functionName === "linkedGenesis") return Promise.resolve(0n);
         if (functionName === "positionPortfolioCounts") {
           return Promise.resolve({
             basketCount: 0n,
@@ -144,6 +145,7 @@ describe("PositionNFT catalog discovery", () => {
           });
         }
         if (functionName === "positionRewardAssets") return Promise.resolve([dollar]);
+        if (functionName === "linkedGenesis") return Promise.resolve(0n);
         if (functionName === "positionPortfolioCounts") {
           return Promise.resolve({
             basketCount: 0n,
