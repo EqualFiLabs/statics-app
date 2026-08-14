@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl";
 import {
   basketTokenAbi,
   buildClosePositionCall,
+  buildCheckpointRewardAssetsCall,
   buildDepositBasketCollateralCall,
   buildOptInRewardAssetsCall,
   buildOptOutRewardAssetsCall,
@@ -45,6 +46,10 @@ import { deriveSurfaceState } from "@/lib/surface-state";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import {
+  checkpointRewardAssetBatches,
+  rewardAssetsNeedingCheckpoint,
+} from "@/lib/positions/staking";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -277,6 +282,23 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     const token = catalog.data.stakingToken;
     const amountLabel = `${stakeAmountInput} ${token.symbol}`;
     const diamond = deploymentState.deployment.contracts.diamond;
+    const checkpoint = async (assets: readonly Address[]) => {
+      const required = await rewardAssetsNeedingCheckpoint(
+        publicClient!,
+        deploymentState.deployment,
+        assets
+      );
+      for (const batch of checkpointRewardAssetBatches(required)) {
+        await sendTransaction({
+          kind: "checkpoint-rewards",
+          label: `Checkpoint ${batch.length} reward asset${batch.length === 1 ? "" : "s"}`,
+          amount: `${batch.length} assets`,
+          to: diamond,
+          data: buildCheckpointRewardAssetsCall(batch),
+        });
+      }
+    };
+    await checkpoint(position.selectedRewardAssets);
     if (stakeMode === "stake") {
       if (catalog.data.stakingTokenBalance < stakeAmount) {
         throw new Error(`The wallet does not hold enough ${token.symbol}.`);
@@ -319,6 +341,20 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const changeRewardSelection = async (asset: Address, selected: boolean) => {
     if (!position || deploymentState.status !== "configured") return;
     const candidate = catalog.data?.rewardCandidates.find((item) => item.token.address === asset);
+    const required = await rewardAssetsNeedingCheckpoint(
+      publicClient!,
+      deploymentState.deployment,
+      [asset]
+    );
+    for (const batch of checkpointRewardAssetBatches(required)) {
+      await sendTransaction({
+        kind: "checkpoint-rewards",
+        label: `Checkpoint ${candidate?.token.symbol || "reward asset"}`,
+        amount: candidate?.token.symbol || asset,
+        to: deploymentState.deployment.contracts.diamond,
+        data: buildCheckpointRewardAssetsCall(batch),
+      });
+    }
     await sendTransaction({
       kind: selected ? "opt-out-reward-assets" : "opt-in-reward-assets",
       label: `${selected ? "Remove" : "Select"} ${candidate?.token.symbol || "reward asset"}`,

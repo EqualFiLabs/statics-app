@@ -27,8 +27,10 @@ function snapshot(overrides: Partial<StakingSnapshot> = {}): StakingSnapshot {
 const selection = (t: ReturnType<typeof token>, pending: bigint, eligibleAt: bigint) => ({
   token: t,
   selected: true,
-  eligibleStake: 0n,
-  pendingStake: pending,
+  actualEligibleStake: 0n,
+  actualPendingStake: pending,
+  effectiveEligibleWeight: 0n,
+  effectivePendingWeight: pending,
   eligibleAt,
 });
 
@@ -38,6 +40,7 @@ describe("stake maturity", () => {
       <StakeMaturity
         snapshot={snapshot({
           stakedBalance: 100n * 10n ** 18n,
+          selections: [selection(wbtc, 40n * 10n ** 18n, laterToday)],
           maturing: [selection(wbtc, 40n * 10n ** 18n, laterToday)],
         })}
         stakingToken={weth}
@@ -77,7 +80,15 @@ describe("stake maturity", () => {
   it("confirms everything is earning once nothing is pending", () => {
     render(
       <StakeMaturity
-        snapshot={snapshot({ earning: [{ ...selection(wbtc, 0n, 0n), eligibleStake: 100n }] })}
+        snapshot={snapshot({
+          earning: [
+            {
+              ...selection(wbtc, 0n, 0n),
+              actualEligibleStake: 100n,
+              effectiveEligibleWeight: 100n,
+            },
+          ],
+        })}
         stakingToken={weth}
         now={now}
       />

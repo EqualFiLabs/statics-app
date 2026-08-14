@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getAddress, isAddress } from "viem";
 
-import { activeLoan, v4Position } from "ponder:schema";
+import { activeLoan, genesisNft, v4Position } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 
 const app = new Hono();
@@ -59,6 +59,42 @@ app.get("/wallets/:owner/v4-positions", async (context) => {
   const page = rows.slice(0, limit);
   return context.json({
     items: page.map((row) => ({ id: row.id.toString() })),
+    nextCursor: rows.length > limit && page.length ? encodeCursor(page.at(-1)!.id) : null,
+  });
+});
+
+app.get("/wallets/:owner/genesis", async (context) => {
+  const rawOwner = context.req.param("owner");
+  const limit = readLimit(context.req.query("limit"));
+  const cursor = decodeCursor(context.req.query("cursor"));
+  if (!isAddress(rawOwner) || limit === 0)
+    return context.json({ error: "Invalid owner or limit." }, 400);
+  if (context.req.query("cursor") && cursor === null)
+    return context.json({ error: "Invalid cursor." }, 400);
+  const rows = await db
+    .select({
+      id: genesisNft.id,
+      tier: genesisNft.tier,
+      multiplierBps: genesisNft.multiplierBps,
+      linkedPositionId: genesisNft.linkedPositionId,
+    })
+    .from(genesisNft)
+    .where(
+      and(
+        eq(genesisNft.owner, getAddress(rawOwner)),
+        cursor === null ? undefined : gt(genesisNft.id, cursor)
+      )
+    )
+    .orderBy(asc(genesisNft.id))
+    .limit(limit + 1);
+  const page = rows.slice(0, limit);
+  return context.json({
+    items: page.map((row) => ({
+      id: row.id.toString(),
+      tier: row.tier,
+      multiplierBps: row.multiplierBps,
+      linkedPositionId: row.linkedPositionId.toString(),
+    })),
     nextCursor: rows.length > limit && page.length ? encodeCursor(page.at(-1)!.id) : null,
   });
 });

@@ -52,6 +52,7 @@ export type PositionRecord = Readonly<{
   closable: boolean;
   collateral: readonly PositionCollateral[];
   stakedBalance: bigint;
+  linkedGenesisId: bigint;
   claimAssetCount: bigint;
   selectedRewardAssets: readonly Address[];
   rewards: readonly PositionReward[];
@@ -108,39 +109,47 @@ async function readOwnedPosition(
   baskets: readonly BasketRecord[],
   blockNumber: bigint
 ): Promise<PositionRecord> {
-  const [state, closable, stake, selectedRewardAssets, portfolio] = await Promise.all([
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "positionState",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "isPositionClosable",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      account: wallet,
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "stakePosition",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      account: wallet,
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "positionRewardAssets",
-      args: [positionId],
-      blockNumber,
-    }),
-    loadPositionPortfolio(publicClient, deployment.contracts.diamond, positionId, blockNumber),
-  ]);
+  const [state, closable, stake, selectedRewardAssets, linkedGenesisId, portfolio] =
+    await Promise.all([
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "positionState",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "isPositionClosable",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        account: wallet,
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "stakePosition",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        account: wallet,
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "positionRewardAssets",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "linkedGenesis",
+        args: [positionId],
+        blockNumber,
+      }),
+      loadPositionPortfolio(publicClient, deployment.contracts.diamond, positionId, blockNumber),
+    ]);
   if (!state.exists) {
     throw new Error(`Position #${positionId.toString()} disappeared from the owner index.`);
   }
@@ -196,6 +205,7 @@ async function readOwnedPosition(
     closable,
     collateral: collateral.filter((item): item is PositionCollateral => item !== null),
     stakedBalance: stake.stakedBalance,
+    linkedGenesisId,
     claimAssetCount: stake.claimAssetCount,
     selectedRewardAssets: normalizedSelectedRewardAssets,
     rewards: rewardMetadata.map((token, index) => ({

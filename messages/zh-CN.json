@@ -33,6 +33,7 @@
     "groups": {
       "overview": "概览",
       "earn": "赚取",
+      "genesis": "Genesis",
       "assets": "资产",
       "manage": "管理",
       "account": "账户"
@@ -42,6 +43,7 @@
       "earn": "赚取",
       "liquidity": "流动性",
       "baskets": "篮子",
+      "create": "创建篮子",
       "dollar": "美元",
       "positions": "头寸",
       "loans": "贷款",
@@ -114,6 +116,12 @@
       "title": "你的奖励",
       "description": "质押一个头寸以获得协议费用分成。选择希望赚取的资产并领取累积奖励。"
     },
+    "genesis": {
+      "label": "Genesis",
+      "status": "Genesis",
+      "title": "Genesis 质押加成",
+      "description": "燃烧 STATICS 激活 Genesis NFT，再将其绑定到一个 Position，以提高该 Position 的奖励权重。"
+    },
     "liquidity": {
       "label": "流动性",
       "status": "流动性",
@@ -121,10 +129,10 @@
       "description": "提供资产供其他用户交易，并赚取一部分交易费。查看你的池子及其收益。"
     },
     "create": {
-      "label": "启动政策",
-      "status": "治理管理",
-      "title": "篮子启动政策",
-      "description": "测试网测试期间不开放公开创建篮子。了解治理启动流程并浏览现有篮子。"
+      "label": "创建篮子",
+      "status": "创建",
+      "title": "发行指数篮子",
+      "description": "选择固定资产组合，为规范池提供资金，并赚取创建者的交换费份额。"
     },
     "activity": {
       "label": "活动",
@@ -189,25 +197,12 @@
   },
   "baskets": {
     "subject": "篮子",
-    "launchPolicy": "启动政策",
-    "stewardControlled": "篮子启动由管理员控制",
-    "launchDescription": "Robinhood 测试网测试期间不开放公开创建篮子。启动仍使用相同的有支持篮子和规范池流程，但经审查的交易由 Statics 治理执行。",
-    "governedLaunch": "治理启动",
-    "meaning": "这意味着什么",
-    "noPublicTransaction": "不提供公开创建交易",
-    "existingRemainOpen": "任何人仍可铸造、赎回、交易和使用现有篮子。",
-    "reviewedParameters": "每个新篮子都使用经审查的支持资产和规范池参数启动。",
-    "canEnableLater": "未来可通过协议创建费用开放公开启动。",
-    "availableNow": "当前可用",
-    "useCatalog": "使用实时篮子目录",
-    "inspectDescription": "查看每个篮子的组成、状态、费用和规范流动性。",
     "browse": "浏览篮子",
     "title": "Statics 篮子",
     "discovered": "已发现 {count} 个",
     "stale": "篮子数据暂时不可用，正在显示最近收到的状态。",
     "emptyTitle": "尚无篮子",
-    "emptyDescription": "篮子是一组固定资产，可以作为一个整体买卖。新篮子目前由管理员控制启动。",
-    "viewPolicy": "查看启动政策",
+    "emptyDescription": "篮子是一组固定资产，可以作为一个整体买卖。可从创建篮子页面发行第一个指数。",
     "underlyings": "底层资产",
     "totalSupply": "总供应量",
     "yourBalance": "你的余额",

@@ -33,6 +33,7 @@
     "groups": {
       "overview": "Overview",
       "earn": "Earn",
+      "genesis": "Genesis",
       "assets": "Assets",
       "manage": "Manage",
       "account": "Account"
@@ -42,6 +43,7 @@
       "earn": "Earn",
       "liquidity": "Liquidity",
       "baskets": "Baskets",
+      "create": "Create basket",
       "dollar": "Dollar",
       "positions": "Positions",
       "loans": "Loans",
@@ -114,6 +116,12 @@
       "title": "Your rewards",
       "description": "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up."
     },
+    "genesis": {
+      "label": "Genesis",
+      "status": "Genesis",
+      "title": "Genesis staking boost",
+      "description": "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight."
+    },
     "liquidity": {
       "label": "Liquidity",
       "status": "Liquidity",
@@ -121,10 +129,10 @@
       "description": "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned."
     },
     "create": {
-      "label": "Launch policy",
-      "status": "Governed",
-      "title": "Basket launch policy",
-      "description": "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available."
+      "label": "Create basket",
+      "status": "Create",
+      "title": "Launch an index basket",
+      "description": "Choose a fixed asset bundle, fund its trading pools, and earn the creator share of its swap fees."
     },
     "activity": {
       "label": "Activity",
@@ -189,25 +197,12 @@
   },
   "baskets": {
     "subject": "baskets",
-    "launchPolicy": "Launch policy",
-    "stewardControlled": "Basket launches are steward-controlled",
-    "launchDescription": "Public basket creation is closed during the Robinhood testnet beta. Launches use the same backed basket and canonical-pool flow, but the reviewed transaction is executed through Statics governance.",
-    "governedLaunch": "Governed launch",
-    "meaning": "What this means",
-    "noPublicTransaction": "No public creation transaction is offered",
-    "existingRemainOpen": "Existing baskets remain open to anyone to mint, redeem, trade, and use.",
-    "reviewedParameters": "Each new basket launches with reviewed backing and canonical pool parameters.",
-    "canEnableLater": "Public launches can be enabled later through the protocol creation fee.",
-    "availableNow": "Available now",
-    "useCatalog": "Use the live basket catalog",
-    "inspectDescription": "Inspect each basket's constituents, status, fees, and canonical liquidity.",
     "browse": "Browse baskets",
     "title": "Statics baskets",
     "discovered": "{count} discovered",
     "stale": "Basket data is temporarily unavailable. Showing the last received state.",
     "emptyTitle": "No baskets yet",
-    "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. New launches are currently steward-controlled.",
-    "viewPolicy": "View launch policy",
+    "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. Launch the first index from Create basket.",
     "underlyings": "Underlyings",
     "totalSupply": "Total supply",
     "yourBalance": "Your balance",

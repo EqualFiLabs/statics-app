@@ -5,9 +5,10 @@ import { parseAbi, type Address, type PublicClient } from "viem";
 /**
  * Resolves the artwork for an NFT, when it has any.
  *
- * Statics positions return self-contained onchain JSON and SVG metadata. Other
- * collections can still omit metadata or depend on an unavailable gateway, so
- * no resolution step throws and callers retain a deliberate placeholder.
+ * Statics Genesis NFTs return self-contained onchain JSON and SVG metadata.
+ * PositionNFT metadata is intentionally text-only, while other collections can
+ * omit metadata or depend on an unavailable gateway, so no resolution step
+ * throws and callers retain a deliberate placeholder.
  *
  * Metadata can arrive three ways and all three are common:
  *   data:  -- encoded inline, typical of fully onchain collections

@@ -118,6 +118,7 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         href: "/app/rewards",
         tabLabel: "Earn",
       },
+      { label: "Genesis", messageKey: "genesis", enabled: true, href: "/app/genesis" },
       { label: "Liquidity", messageKey: "liquidity", enabled: true, href: "/app/liquidity" },
     ],
   },
@@ -132,6 +133,7 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         href: "/app/baskets",
         tabLabel: "Baskets",
       },
+      { label: "Create basket", messageKey: "create", enabled: true, href: "/app/create" },
       {
         label: "Dollar",
         messageKey: "dollar",

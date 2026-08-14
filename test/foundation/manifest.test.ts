@@ -36,9 +36,11 @@ function manifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManife
       weth: entry("6", "6"),
       oracle: entry("7", "7"),
     },
-    positionMetadata: {
-      renderer: entry("8", "8"),
-      avatarSvg: entry("9", "9"),
+    genesis: {
+      token: entry("8", "8"),
+      collection: entry("9", "9"),
+      renderer: entry("a", "a"),
+      avatarSvg: entry("b", "b"),
     },
     liquidity: null,
     pegged: null,
@@ -57,7 +59,8 @@ describe("deployment manifest", () => {
     expect(deployment.source).toBe("checked-in-manifest");
     expect(deployment.contracts.diamond).toBe(address("1"));
     expect(deployment.runtimeCodeHashes.diamond).toBe(hash("1"));
-    expect(deployment.positionMetadata?.renderer).toBe(address("8"));
+    expect(deployment.genesis?.token).toBe(address("8"));
+    expect(deployment.genesis?.collection).toBe(address("9"));
   });
 
   it("refuses a manifest written against a different schema", () => {
@@ -148,16 +151,18 @@ describe("deployment manifest", () => {
     ).toThrow("must match protocolCommit");
   });
 
-  it("requires both code-bound Position metadata contracts", () => {
+  it("requires every code-bound Genesis contract", () => {
     const broken = manifest();
     expect(() =>
       parseDeploymentManifest({
         ...broken,
-        positionMetadata: {
-          renderer: broken.positionMetadata.renderer,
-        } as DeploymentManifest["positionMetadata"],
+        genesis: {
+          token: broken.genesis.token,
+          collection: broken.genesis.collection,
+          renderer: broken.genesis.renderer,
+        } as DeploymentManifest["genesis"],
       })
-    ).toThrow(/positionMetadata\.avatarSvg is missing/);
+    ).toThrow(/genesis\.avatarSvg is missing/);
   });
 
   it("requires every liquidity contract once liquidity is present", () => {
@@ -207,7 +212,7 @@ describe("deployment source selection", () => {
     expect(state.status === "unavailable" && state.reason).toMatch(/chain 8453/);
   });
 
-  it("uses the checked-in manifest instead of public environment addresses", () => {
+  it("fails closed after the legacy manifest is removed", () => {
     // The environment path is the thing being contained: setting these on a
     // build machine must not configure a public network.
     const state = readDollarDeployment({
@@ -217,11 +222,7 @@ describe("deployment source selection", () => {
       NEXT_PUBLIC_STATICS_DOLLAR_CORE_ADDRESS: address("2"),
     });
 
-    expect(state.status).toBe("configured");
-    if (state.status === "configured") {
-      expect(state.deployment.source).toBe("checked-in-manifest");
-      expect(state.deployment.contracts.diamond).not.toBe(address("1"));
-    }
+    expect(state.status).toBe("unavailable");
   });
 
   it("still reports nothing configured when no deployment is set at all", () => {

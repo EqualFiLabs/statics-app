@@ -16,7 +16,6 @@ import {
   maximumLiquidityForAmounts,
   quoteRangeAmounts,
   staticsAbi,
-  staticsLiquidityManagerAbi,
   staticsSwapFeeHookAbi,
   v4PositionManagerReadAbi,
   v4StateViewReadAbi,
@@ -52,6 +51,7 @@ export type CanonicalPoolRecord = Readonly<{
   poolId: Hex;
   key: V4PoolKey;
   decommissioned: boolean;
+  /** The installed manager validates the protocol pool registry dynamically. */
   managerSynced: boolean;
   sqrtPriceX96: bigint;
   currentTick: number;
@@ -326,74 +326,58 @@ async function loadPool(
   ) {
     throw new Error("Canonical pool configuration does not match its verified deployment.");
   }
-  const [
-    assetToken,
-    slot0,
-    managerHash,
-    decommissioned,
-    globalFees,
-    poolFees,
-    pending0,
-    pending1,
-    locked,
-  ] = await Promise.all([
-    loadTokenMetadata(publicClient, asset, undefined, blockNumber),
-    publicClient.readContract({
-      address: liquidity.contracts.stateView,
-      abi: v4StateViewReadAbi,
-      functionName: "getSlot0",
-      args: [configured.poolId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.liquidityManager,
-      abi: staticsLiquidityManagerAbi,
-      functionName: "canonicalPoolHash",
-      args: [basket.basketId, asset],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "poolDecommissioned",
-      args: [configured.poolId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "feeConfiguration",
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "poolFeeConfiguration",
-      args: [configured.poolId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "pendingPermanentLiquidity",
-      args: [configured.poolId, getAddress(configured.currency0)],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "pendingPermanentLiquidity",
-      args: [configured.poolId, getAddress(configured.currency1)],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: liquidity.contracts.swapFeeHook,
-      abi: staticsSwapFeeHookAbi,
-      functionName: "lockedLiquidity",
-      args: [configured.poolId],
-      blockNumber,
-    }),
-  ]);
+  const [assetToken, slot0, decommissioned, globalFees, poolFees, pending0, pending1, locked] =
+    await Promise.all([
+      loadTokenMetadata(publicClient, asset, undefined, blockNumber),
+      publicClient.readContract({
+        address: liquidity.contracts.stateView,
+        abi: v4StateViewReadAbi,
+        functionName: "getSlot0",
+        args: [configured.poolId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "poolDecommissioned",
+        args: [configured.poolId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "feeConfiguration",
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "poolFeeConfiguration",
+        args: [configured.poolId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "pendingPermanentLiquidity",
+        args: [configured.poolId, getAddress(configured.currency0)],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "pendingPermanentLiquidity",
+        args: [configured.poolId, getAddress(configured.currency1)],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: liquidity.contracts.swapFeeHook,
+        abi: staticsSwapFeeHookAbi,
+        functionName: "lockedLiquidity",
+        args: [configured.poolId],
+        blockNumber,
+      }),
+    ]);
   const effective = poolFees.overridden ? poolFees : { ...globalFees, overridden: false };
   return {
     basketId: basket.basketId,
@@ -404,19 +388,19 @@ async function loadPool(
     poolId: configured.poolId,
     key,
     decommissioned,
-    managerSynced: managerHash === configured.poolId,
+    managerSynced: true,
     sqrtPriceX96: slot0[0],
     currentTick: slot0[1],
     lpFee: slot0[3],
     hookFees: {
       inputFeeBps: BigInt(effective.inputFeeBps),
       outputFeeBps: BigInt(effective.outputFeeBps),
-      polShareBps: BigInt(effective.polShareBps),
+      lockedLiquidityShareBps: BigInt(effective.lockedLiquidityShareBps),
       liquidityProviderShareBps: BigInt(effective.liquidityProviderShareBps),
-      // The single staker share split into basket and Statics stakers when
-      // the hook moved to five-way routing (protocol 4c3fa06).
       basketStakerShareBps: BigInt(effective.basketStakerShareBps),
       staticsStakerShareBps: BigInt(effective.staticsStakerShareBps),
+      stonkBrokersShareBps: BigInt(effective.stonkBrokersShareBps),
+      indexCreatorShareBps: BigInt(effective.indexCreatorShareBps),
       treasuryShareBps: BigInt(effective.treasuryShareBps),
       overridden: effective.overridden,
     },

@@ -22,6 +22,7 @@ const approvalDisclosureRoutes = [
   "/app/positions",
   "/app/loans",
   "/app/rewards",
+  "/app/genesis",
   "/app/liquidity",
 ] as const;
 

@@ -2,7 +2,7 @@ import { ponder } from "ponder:registry";
 import { staticsAbi } from "@statics-protocol/sdk";
 import { getAddress } from "viem";
 
-import { activeLoan, v4Position } from "ponder:schema";
+import { activeLoan, genesisNft, v4Position } from "ponder:schema";
 
 ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -61,4 +61,72 @@ ponder.on("PositionManager:Transfer", async ({ event, context }) => {
       owner: getAddress(event.args.to),
       updatedAtBlock: event.block.number,
     });
+});
+
+ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
+  for (let id = event.args.fromTokenId; id <= event.args.toTokenId; id += 1n) {
+    await context.db.insert(genesisNft).values({
+      id,
+      owner: getAddress(event.args.toAddress),
+      tier: 0,
+      multiplierBps: 10_000,
+      linkedPositionId: 0n,
+      updatedAtBlock: event.block.number,
+    });
+  }
+});
+
+ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
+  if (event.args.to === "0x0000000000000000000000000000000000000000") {
+    await context.db.delete(genesisNft, { id: event.args.tokenId });
+    return;
+  }
+  await context.db
+    .insert(genesisNft)
+    .values({
+      id: event.args.tokenId,
+      owner: getAddress(event.args.to),
+      tier: 0,
+      multiplierBps: 10_000,
+      linkedPositionId: 0n,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({
+      owner: getAddress(event.args.to),
+      tier: 0,
+      multiplierBps: 10_000,
+      linkedPositionId: 0n,
+      updatedAtBlock: event.block.number,
+    });
+});
+
+ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
+  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+    tier: Number(event.args.newTier),
+    multiplierBps: Number(event.args.multiplierBps),
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("Statics:GenesisLinked", async ({ event, context }) => {
+  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+    linkedPositionId: event.args.positionId,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("Statics:GenesisUnlinked", async ({ event, context }) => {
+  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+    linkedPositionId: 0n,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("Statics:GenesisActivationReset", async ({ event, context }) => {
+  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+    tier: 0,
+    multiplierBps: 10_000,
+    linkedPositionId: 0n,
+    updatedAtBlock: event.block.number,
+  });
 });

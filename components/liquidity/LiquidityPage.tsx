@@ -1196,17 +1196,25 @@ function LiquidityRuntime() {
                     <dd>{item.decommissioned ? "Exit only" : "Live from creation"}</dd>
                   </div>
                   <div>
-                    <dt>Manager</dt>
-                    <dd>{item.managerSynced ? "Synced" : "Not synced"}</dd>
+                    <dt>Revenue split</dt>
+                    <dd>
+                      {Number(item.hookFees.lockedLiquidityShareBps) / 100}% locked liquidity ·{" "}
+                      {Number(item.hookFees.liquidityProviderShareBps) / 100}% LPs ·{" "}
+                      {Number(item.hookFees.basketStakerShareBps) / 100}% Basket stakers ·{" "}
+                      {Number(item.hookFees.staticsStakerShareBps) / 100}% STATICS stakers ·{" "}
+                      {Number(item.hookFees.stonkBrokersShareBps) / 100}% StonkBrokers ·{" "}
+                      {Number(item.hookFees.indexCreatorShareBps) / 100}% creator ·{" "}
+                      {Number(item.hookFees.treasuryShareBps) / 100}% treasury
+                    </dd>
                   </div>
                   <div>
-                    <dt>Pending POL</dt>
+                    <dt>Pending locked liquidity</dt>
                     <dd>
                       {item.pending0.toString()} / {item.pending1.toString()}
                     </dd>
                   </div>
                   <div>
-                    <dt>Locked POL</dt>
+                    <dt>Locked liquidity</dt>
                     <dd>{item.lockedLiquidity.toString()}</dd>
                   </div>
                 </dl>

@@ -4,6 +4,7 @@ This Ponder service indexes only data the UI cannot enumerate cheaply from curre
 
 - active loan IDs for public recovery discovery;
 - current Uniswap v4 PositionManager NFT ownership.
+- Genesis NFT ownership, activation tier, multiplier, and PositionNFT link state.
 
 Balances, loan terms, ownership, eligibility, and every value used to build a transaction are re-read from the configured contracts. The index is discovery infrastructure, not protocol authority.
 

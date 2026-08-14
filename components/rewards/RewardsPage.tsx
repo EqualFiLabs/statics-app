@@ -18,6 +18,7 @@ import {
   basketTokenAbi,
   buildClaimRewardsCall,
   buildClaimBasketRewardsCall,
+  buildCheckpointRewardAssetsCall,
   buildCreateAndStakeCall,
   buildStakeCall,
   staticsAbi,
@@ -26,7 +27,12 @@ import {
 import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
-import { loadStakingSnapshot } from "@/lib/positions/staking";
+import { ProtocolRevenueCard } from "@/components/rewards/ProtocolRevenueCard";
+import {
+  checkpointRewardAssetBatches,
+  loadStakingSnapshot,
+  rewardAssetsNeedingCheckpoint,
+} from "@/lib/positions/staking";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -225,6 +231,23 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
             args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
+      }
+      if (targetPosition) {
+        const required = await rewardAssetsNeedingCheckpoint(
+          publicClient,
+          deploymentState.deployment,
+          targetPosition.selectedRewardAssets
+        );
+        for (const batch of checkpointRewardAssetBatches(required)) {
+          await executeProtocolTransaction({
+            ...common,
+            kind: "checkpoint-rewards",
+            label: `Checkpoint ${batch.length} reward asset${batch.length === 1 ? "" : "s"}`,
+            amount: `${batch.length} assets`,
+            to: diamond,
+            data: buildCheckpointRewardAssetsCall(batch),
+          });
+        }
       }
       await executeProtocolTransaction({
         ...common,
@@ -761,6 +784,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           </Link>
         </div>
       </section>
+      <ProtocolRevenueCard />
     </div>
   );
 }

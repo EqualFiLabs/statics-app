@@ -2,14 +2,14 @@
 
 The public web application for Statics, built with Next.js 16, React 19, Privy, Wagmi, Viem, and
 the vendored Statics SDK. It combines a wallet-independent marketing surface with a route-scoped
-DApp for Statics Dollar, basket tokens, positions, lending, rewards, canonical liquidity, and
+DApp for Statics Dollar, basket tokens, positions, lending, rewards, protocol liquidity, and
 multichain funding.
 
 ## Release status
 
 - **Environment:** Public testnet beta
 - **Network:** Robinhood Chain Testnet (`46630`)
-- **Deployment source:** [`deployments/46630.json`](deployments/46630.json)
+- **Deployment source:** awaiting the Genesis-economy Robinhood Testnet redeployment manifest
 - **Review status:** Internal review
 - **License:** Business Source License 1.1
 
@@ -36,11 +36,13 @@ against that manifest.
   LayerZero EVE bridge between Base and Robinhood Chain.
 - `/app/dollar` — ETH/WETH deposits, recombination, and Risk Share supply.
 - `/app/dollar?profile=USDG` — pegged Statics Dollar profile.
-- `/app/baskets` — basket discovery, creation, conversion, and canonical swaps.
+- `/app/baskets` — basket discovery, creation, conversion, and protocol swaps.
 - `/app/positions` — PositionNFT custody and collateral management.
+- `/app/genesis` — activate one of 5,555 Genesis NFTs by burning STATICS and link it to a Position for increased reward weight.
+- `/app/create` — permissionlessly configure, fund, and launch an index basket.
+- `/app/rewards` — claim Position, Basket, creator, and permissionless partner-distribution rewards.
 - `/app/loans` — proportional self-backed lending.
-- `/app/rewards` — staking, reward selection, and claims.
-- `/app/liquidity` — canonical pools and user LP positions.
+- `/app/liquidity` — protocol pools and user LP positions.
 - `/app/activity` — wallet-scoped EVM, Solana, bridge, and protocol activity.
 
 ## Requirements

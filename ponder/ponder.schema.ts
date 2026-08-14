@@ -22,3 +22,16 @@ export const v4Position = onchainTable(
   }),
   (table) => ({ owner: index().on(table.owner, table.id) })
 );
+
+export const genesisNft = onchainTable(
+  "genesis_nft",
+  (table) => ({
+    id: table.bigint().primaryKey(),
+    owner: table.hex().notNull(),
+    tier: table.integer().notNull(),
+    multiplierBps: table.integer().notNull(),
+    linkedPositionId: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ owner: index().on(table.owner, table.id) })
+);

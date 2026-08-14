@@ -33,6 +33,7 @@
     "groups": {
       "overview": "Resumen",
       "earn": "Ganar",
+      "genesis": "Genesis",
       "assets": "Activos",
       "manage": "Gestionar",
       "account": "Cuenta"
@@ -42,6 +43,7 @@
       "earn": "Ganar",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
+      "create": "Crear cesta",
       "dollar": "Dólar",
       "positions": "Posiciones",
       "loans": "Préstamos",
@@ -114,6 +116,12 @@
       "title": "Tus recompensas",
       "description": "Haz staking de una posición para obtener una parte de las comisiones del protocolo. Elige en qué activos quieres ganar y reclama lo acumulado."
     },
+    "genesis": {
+      "label": "Genesis",
+      "status": "Genesis",
+      "title": "Impulso de staking Genesis",
+      "description": "Activa un NFT Genesis quemando STATICS y enlázalo a una Posición para aumentar su peso de recompensas."
+    },
     "liquidity": {
       "label": "Liquidez",
       "status": "Liquidez",
@@ -121,10 +129,10 @@
       "description": "Aporta activos para que otras personas puedan operar y gana una parte de las comisiones. Revisa tus pools y lo que han generado."
     },
     "create": {
-      "label": "Política de lanzamiento",
-      "status": "Gobernado",
-      "title": "Política de lanzamiento de cestas",
-      "description": "La creación pública de cestas está cerrada durante la beta de prueba. Consulta cómo funcionan los lanzamientos gobernados y explora las cestas disponibles."
+      "label": "Crear cesta",
+      "status": "Crear",
+      "title": "Lanzar una cesta índice",
+      "description": "Elige un paquete fijo de activos, financia sus pools canónicos y gana la parte del creador de las comisiones de swap."
     },
     "activity": {
       "label": "Actividad",
@@ -189,25 +197,12 @@
   },
   "baskets": {
     "subject": "cestas",
-    "launchPolicy": "Política de lanzamiento",
-    "stewardControlled": "Los lanzamientos de cestas están controlados por administradores",
-    "launchDescription": "La creación pública de cestas está cerrada durante la beta de prueba de Robinhood. Los lanzamientos usan el mismo flujo de respaldo y pools canónicos, pero la transacción revisada se ejecuta mediante la gobernanza de Statics.",
-    "governedLaunch": "Lanzamiento gobernado",
-    "meaning": "Qué significa",
-    "noPublicTransaction": "No se ofrece una transacción pública de creación",
-    "existingRemainOpen": "Cualquiera puede seguir acuñando, canjeando, negociando y usando las cestas existentes.",
-    "reviewedParameters": "Cada cesta nueva se lanza con respaldo y parámetros de pool canónico revisados.",
-    "canEnableLater": "Los lanzamientos públicos pueden habilitarse más adelante mediante la comisión de creación del protocolo.",
-    "availableNow": "Disponible ahora",
-    "useCatalog": "Usa el catálogo activo de cestas",
-    "inspectDescription": "Consulta los componentes, el estado, las comisiones y la liquidez canónica de cada cesta.",
     "browse": "Explorar cestas",
     "title": "Cestas Statics",
     "discovered": "{count} encontradas",
     "stale": "Los datos de las cestas no están disponibles temporalmente. Se muestra el último estado recibido.",
     "emptyTitle": "Aún no hay cestas",
-    "emptyDescription": "Una cesta es un conjunto fijo de activos que puedes comprar o vender como una unidad. Los nuevos lanzamientos están controlados actualmente por administradores.",
-    "viewPolicy": "Ver política de lanzamiento",
+    "emptyDescription": "Una cesta es un conjunto fijo de activos que puedes comprar o vender como una unidad. Lanza el primer índice desde Crear cesta.",
     "underlyings": "Subyacentes",
     "totalSupply": "Oferta total",
     "yourBalance": "Tu saldo",

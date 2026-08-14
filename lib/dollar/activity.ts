@@ -72,7 +72,13 @@ export type DollarActivityKind =
   | "borrow-loan"
   | "repay-loan"
   | "extend-loan"
-  | "recover-loan";
+  | "recover-loan"
+  | "checkpoint-rewards"
+  | "activate-genesis"
+  | "link-genesis"
+  | "unlink-genesis"
+  | "claim-creator-revenue"
+  | "distribute-partner-revenue";
 
 /** Wall clock for an activity record. Impure, so it stays out of components. */
 export function activityTimestamp(): number {

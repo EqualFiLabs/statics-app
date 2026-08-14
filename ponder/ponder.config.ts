@@ -1,7 +1,7 @@
 import { createConfig } from "ponder";
 import { getAddress } from "viem";
 
-import { staticsAbi, v4PositionManagerReadAbi } from "@statics-protocol/sdk";
+import { staticsAbi, staticsGenesisAbi, v4PositionManagerReadAbi } from "@statics-protocol/sdk";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -34,6 +34,12 @@ export default createConfig({
       abi: v4PositionManagerReadAbi,
       address: getAddress(required("PONDER_POSITION_MANAGER_ADDRESS")),
       startBlock: startBlock("PONDER_POSITION_MANAGER_START_BLOCK"),
+    },
+    StaticsGenesis: {
+      chain: "robinhood",
+      abi: staticsGenesisAbi,
+      address: getAddress(required("PONDER_STATICS_GENESIS_ADDRESS")),
+      startBlock: startBlock("PONDER_STATICS_GENESIS_START_BLOCK"),
     },
   },
 });

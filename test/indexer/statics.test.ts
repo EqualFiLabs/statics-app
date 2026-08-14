@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadRecoverableLoanIds, loadWalletV4PositionIds } from "@/lib/indexer/statics";
+import {
+  loadRecoverableLoanIds,
+  loadWalletGenesis,
+  loadWalletV4PositionIds,
+} from "@/lib/indexer/statics";
 
 const wallet = "0x0000000000000000000000000000000000000001" as const;
 
@@ -49,5 +53,27 @@ describe("Statics indexer client", () => {
     await expect(loadRecoverableLoanIds(100n, "https://indexer.example")).rejects.toThrow(
       "invalid ID"
     );
+  });
+
+  it("loads indexed Genesis activation and link state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            items: [{ id: "420", tier: 3, multiplierBps: 12_000, linkedPositionId: "9" }],
+            nextCursor: null,
+          })
+        )
+      )
+    );
+    await expect(loadWalletGenesis(wallet, "https://indexer.example")).resolves.toEqual([
+      {
+        id: 420n,
+        tier: 3,
+        multiplierBps: 12_000,
+        linkedPositionId: 9n,
+      },
+    ]);
   });
 });

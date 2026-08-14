@@ -5283,3 +5283,41 @@
     width: 100%;
   }
 }
+.genesis-page,
+.genesis-grid,
+.genesis-action {
+  display: grid;
+  gap: 1rem;
+}
+
+.genesis-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+}
+
+.genesis-summary div,
+.genesis-card-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.genesis-summary span,
+.genesis-warning {
+  color: var(--muted);
+}
+
+.genesis-grid {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.genesis-card select {
+  width: 100%;
+}
+
+.genesis-contracts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}

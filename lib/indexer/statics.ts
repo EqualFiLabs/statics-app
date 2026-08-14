@@ -8,6 +8,13 @@ type IdPage = Readonly<{
   nextCursor: string | null;
 }>;
 
+export type IndexedGenesis = Readonly<{
+  id: bigint;
+  tier: number;
+  multiplierBps: number;
+  linkedPositionId: bigint;
+}>;
+
 function configuredIndexerUrl(): string | null {
   const value = process.env.NEXT_PUBLIC_STATICS_INDEXER_URL?.trim();
   if (!value) return null;
@@ -67,4 +74,39 @@ export async function loadWalletV4PositionIds(
     `/wallets/${getAddress(owner)}/v4-positions`,
     indexerUrl === undefined ? configuredIndexerUrl() : indexerUrl
   );
+}
+
+export async function loadWalletGenesis(
+  owner: Address,
+  indexerUrl = configuredIndexerUrl()
+): Promise<readonly IndexedGenesis[]> {
+  if (!indexerUrl) throw new Error("No Statics indexer is configured.");
+  const values: IndexedGenesis[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const url = new URL(`${indexerUrl}/wallets/${getAddress(owner)}/genesis`);
+    url.searchParams.set("limit", String(DEFAULT_PAGE_SIZE));
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
+    const body = (await response.json()) as {
+      items: { id: string; tier: number; multiplierBps: number; linkedPositionId: string }[];
+      nextCursor: string | null;
+    };
+    if (!Array.isArray(body.items))
+      throw new Error("The Statics indexer returned an invalid page.");
+    values.push(
+      ...body.items.map((item) => ({
+        id: parseId(item.id),
+        tier: item.tier,
+        multiplierBps: item.multiplierBps,
+        linkedPositionId: parseId(item.linkedPositionId),
+      }))
+    );
+    if (!body.nextCursor) return values;
+    if (body.nextCursor === cursor)
+      throw new Error("The Statics indexer returned a stalled cursor.");
+    cursor = body.nextCursor;
+  }
+  throw new Error("The Statics indexer exceeded its pagination limit.");
 }

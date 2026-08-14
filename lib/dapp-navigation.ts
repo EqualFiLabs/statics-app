@@ -80,6 +80,13 @@ const routePresentations = {
     description:
       "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
   },
+  genesis: {
+    label: "Genesis",
+    status: "Genesis",
+    title: "Genesis staking boost",
+    description:
+      "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight.",
+  },
   liquidity: {
     label: "Liquidity",
     status: "Liquidity",
@@ -88,11 +95,11 @@ const routePresentations = {
       "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
   },
   create: {
-    label: "Launch policy",
-    status: "Governed",
-    title: "Basket launch policy",
+    label: "Create basket",
+    status: "Create",
+    title: "Launch an index basket",
     description:
-      "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available.",
+      "Choose a fixed asset bundle, fund its trading pools, and earn the creator share of its swap fees.",
   },
   activity: {
     label: "Activity",
@@ -121,6 +128,7 @@ export function getDappRouteId(pathname: string): DappRouteId {
   if (pathname.startsWith("/app/positions")) return "positions";
   if (pathname.startsWith("/app/loans")) return "loans";
   if (pathname.startsWith("/app/rewards")) return "rewards";
+  if (pathname.startsWith("/app/genesis")) return "genesis";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";
   if (pathname.startsWith("/app/tools")) return "tools";

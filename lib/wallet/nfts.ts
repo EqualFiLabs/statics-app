@@ -84,7 +84,10 @@ export function describePositionNft(position: PositionRecord, diamond: Address):
           ? `${plural(position.unresolvedObligationCount, "unresolved obligation")}`
           : "Empty position",
     carries,
-    blockedReason: null,
+    blockedReason:
+      position.linkedGenesisId !== 0n
+        ? `Unlink Genesis #${position.linkedGenesisId.toString()} before transferring this PositionNFT.`
+        : null,
   };
 }
 
