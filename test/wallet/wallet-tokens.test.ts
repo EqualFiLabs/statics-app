@@ -39,7 +39,7 @@ describe("default Statics wallet tokens", () => {
     const deployment = {
       status: "configured",
       deployment: { chainId: 46_630, contracts: { dollar: dollarAddress } },
-    } as DollarDeploymentState;
+    } as unknown as DollarDeploymentState;
     const dollar = defaultWalletTokens(46_630, deployment).find(
       (token) => token.address.toLowerCase() === dollarAddress.toLowerCase()
     );

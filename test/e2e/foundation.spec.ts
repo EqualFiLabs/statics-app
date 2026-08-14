@@ -124,9 +124,7 @@ test.describe("Dollar DApp foundation", () => {
     await page.goto("/app/baskets/0");
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.goto("/app/create");
-    await expect(
-      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Basket creation unavailable" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
@@ -138,6 +136,9 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/rewards");
     await expect(page).toHaveURL(/\/app\/rewards$/);
+
+    await navigateDapp(page, "/app/genesis");
+    await expect(page).toHaveURL(/\/app\/genesis$/);
 
     await navigateDapp(page, "/app/liquidity");
     await expect(page).toHaveURL(/\/app\/liquidity$/);
@@ -183,17 +184,11 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("keeps governed basket creation informational", async ({ page }) => {
+  test("fails basket creation closed without a reviewed deployment", async ({ page }) => {
     await page.goto("/app/create");
 
-    await expect(
-      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /create basket/i })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Browse baskets" })).toHaveAttribute(
-      "href",
-      "/app/baskets"
-    );
+    await expect(page.getByRole("heading", { name: "Basket creation unavailable" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {
@@ -223,6 +218,7 @@ test.describe("Dollar DApp foundation", () => {
       "/app/positions/1042",
       "/app/loans",
       "/app/rewards",
+      "/app/genesis",
       "/app/liquidity",
       "/app/faucet",
       "/app/tools",

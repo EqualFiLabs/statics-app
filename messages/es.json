@@ -41,6 +41,7 @@
     "items": {
       "overview": "Resumen",
       "earn": "Ganar",
+      "genesis": "Genesis",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
       "create": "Crear cesta",

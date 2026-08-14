@@ -45,6 +45,12 @@ function describeGenesisError(error: unknown): string {
 }
 
 export function GenesisPage() {
+  if (deploymentState.status !== "configured" || !deploymentState.deployment.genesis)
+    return <UnconfiguredSurface subject="Genesis" />;
+  return <GenesisWalletGate />;
+}
+
+function GenesisWalletGate() {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Genesis" />;
   return <GenesisRuntime />;

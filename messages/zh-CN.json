@@ -41,6 +41,7 @@
     "items": {
       "overview": "概览",
       "earn": "赚取",
+      "genesis": "Genesis",
       "liquidity": "流动性",
       "baskets": "篮子",
       "create": "创建篮子",

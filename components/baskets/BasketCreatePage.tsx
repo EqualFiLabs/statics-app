@@ -32,6 +32,8 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
+const configuredDeployment =
+  deploymentState.status === "configured" ? deploymentState.deployment : null;
 
 type ConstituentDraft = {
   asset: string;
@@ -49,6 +51,17 @@ const emptyConstituent = (): ConstituentDraft => ({
 });
 
 export function BasketCreatePage() {
+  if (!configuredDeployment) return <UnconfiguredSurface subject="Basket creation" />;
+  return <BasketCreateWalletGate />;
+}
+
+function BasketCreateWalletGate() {
+  const wallet = useWalletState();
+  if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Basket creation" />;
+  return <BasketCreateRuntime />;
+}
+
+function BasketCreateRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const wallet =
@@ -69,29 +82,23 @@ export function BasketCreatePage() {
   const [error, setError] = useState<string | null>(null);
 
   const creation = useQuery({
-    queryKey: [
-      "basket-creation-fee",
-      deploymentState.status === "configured" ? deploymentState.deployment.protocolCommit : null,
-    ],
+    queryKey: ["basket-creation-fee", configuredDeployment?.protocolCommit ?? null],
     enabled:
-      deploymentState.status === "configured" &&
+      Boolean(configuredDeployment) &&
       Boolean(publicClient) &&
       walletState.status === "ready" &&
       walletState.isTargetChain,
     queryFn: async () => {
-      if (!publicClient || deploymentState.status !== "configured")
-        throw new Error("No verified deployment.");
-      await verifyDollarDeployment(publicClient, deploymentState.deployment);
+      if (!publicClient || !configuredDeployment) throw new Error("No verified deployment.");
+      await verifyDollarDeployment(publicClient, configuredDeployment);
       return publicClient.readContract({
-        address: deploymentState.deployment.contracts.diamond,
+        address: configuredDeployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "creationFee",
       });
     },
   });
 
-  if (deploymentState.status !== "configured")
-    return <UnconfiguredSurface subject="Basket creation" />;
   if (!wallet)
     return (
       <EmptyState
@@ -186,7 +193,8 @@ export function BasketCreatePage() {
         block.timestamp + 3_600n,
         creation.data
       );
-      const diamond = deploymentState.deployment.contracts.diamond;
+      const deployment = configuredDeployment!;
+      const diamond = deployment.contracts.diamond;
       const steps = await Promise.all(
         addresses.map(async (address, index) => ({
           id: `approve-${address}`,
@@ -202,7 +210,7 @@ export function BasketCreatePage() {
             executeProtocolTransaction({
               publicClient,
               wallet,
-              chainId: deploymentState.deployment.chainId,
+              chainId: deployment.chainId,
               kind: "approve-basket-asset",
               label: `Approve ${metadata[index]!.symbol} for basket launch`,
               amount: `${constituents[index]!.maximum} ${metadata[index]!.symbol}`,
@@ -228,7 +236,7 @@ export function BasketCreatePage() {
               executeProtocolTransaction({
                 publicClient,
                 wallet,
-                chainId: deploymentState.deployment.chainId,
+                chainId: deployment.chainId,
                 kind: "create-basket",
                 label: `Launch ${symbol.trim().toUpperCase()} basket`,
                 amount: `${formatEther(creation.data)} ETH creation fee plus reviewed constituent funding`,
