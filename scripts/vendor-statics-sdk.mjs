@@ -10,21 +10,30 @@ if (!configuredProtocolRoot) {
   throw new Error("STATICS_PROTOCOL_REPOSITORY must name a clean public Statics checkout.");
 }
 const protocolRoot = resolve(repositoryRoot, configuredProtocolRoot);
+const configuredSdkRoot = process.env.STATICS_SDK_REPOSITORY?.trim();
 const sourceRepository =
   process.env.STATICS_PROTOCOL_SOURCE_URL?.trim() || "https://github.com/EqualFiLabs/statics";
 const sourceUrl = new URL(sourceRepository);
 if (sourceUrl.protocol !== "https:" || sourceUrl.username || sourceUrl.password) {
   throw new Error("STATICS_PROTOCOL_SOURCE_URL must be a credential-free HTTPS URL.");
 }
-const sdkRoot = resolve(protocolRoot, "sdk");
+const sdkSourceUrl = new URL(
+  process.env.STATICS_SDK_SOURCE_URL?.trim() || "https://github.com/EqualFiLabs/statics-sdk"
+);
+if (sdkSourceUrl.protocol !== "https:" || sdkSourceUrl.username || sdkSourceUrl.password) {
+  throw new Error("STATICS_SDK_SOURCE_URL must be a credential-free HTTPS URL.");
+}
+const sdkRoot = configuredSdkRoot
+  ? resolve(repositoryRoot, configuredSdkRoot)
+  : resolve(protocolRoot, "sdk");
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
 
 const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: protocolRoot,
   encoding: "utf8",
 }).trim();
-const sdkTreeState = execFileSync("git", ["status", "--porcelain", "--", "sdk"], {
-  cwd: protocolRoot,
+const sdkTreeState = execFileSync("git", ["status", "--porcelain"], {
+  cwd: sdkRoot,
   encoding: "utf8",
 }).trim()
   ? "dirty"
@@ -81,8 +90,14 @@ writeFileSync(
     {
       protocolCommit,
       source: {
-        repository: sourceUrl.toString().replace(/\/$/u, ""),
-        path: "sdk",
+        repository: configuredSdkRoot
+          ? sdkSourceUrl.toString().replace(/\/$/u, "")
+          : sourceUrl.toString().replace(/\/$/u, ""),
+        path: configuredSdkRoot ? "." : "sdk",
+        commit: execFileSync("git", ["rev-parse", "HEAD"], {
+          cwd: sdkRoot,
+          encoding: "utf8",
+        }).trim(),
       },
       sdkTreeState,
       sourceChecksums,
