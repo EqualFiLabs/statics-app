@@ -18,10 +18,10 @@ describe("DApp route presentation", () => {
     ["/app/dollar", "Dollar", "Get Statics Dollar"],
     ["/app/baskets", "Baskets", "Baskets"],
     ["/app/create", "Create basket", "Launch an index basket"],
-    ["/app/positions", "Positions", "Your positions"],
+    ["/app/positions", "Position NFT", "Your Position NFTs"],
     ["/app/loans", "Loans", "Your loans"],
     ["/app/rewards", "Rewards", "Your rewards"],
-    ["/app/genesis", "Genesis", "Genesis staking boost"],
+    ["/app/genesis", "Genesis NFT", "Manage your Genesis NFTs"],
     ["/app/liquidity", "Liquidity", "Provide liquidity"],
     ["/app/activity", "Activity", "Your activity"],
     ["/app/tools", "Tools", "Approval tools"],
@@ -31,7 +31,7 @@ describe("DApp route presentation", () => {
 
   it("inherits parent presentation for detail routes", () => {
     expect(getDappRoutePresentation("/app/baskets/42").label).toBe("Baskets");
-    expect(getDappRoutePresentation("/app/positions/1042").label).toBe("Positions");
+    expect(getDappRoutePresentation("/app/positions/1042").label).toBe("Position NFT");
   });
 
   it("falls back to overview for an unknown application route", () => {

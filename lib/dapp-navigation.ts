@@ -60,9 +60,9 @@ const routePresentations = {
       "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
-    label: "Positions",
-    status: "Positions",
-    title: "Your positions",
+    label: "Position NFT",
+    status: "Position NFT",
+    title: "Your Position NFTs",
     description:
       "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
   },
@@ -81,9 +81,9 @@ const routePresentations = {
       "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
   },
   genesis: {
-    label: "Genesis",
-    status: "Genesis",
-    title: "Genesis staking boost",
+    label: "Genesis NFT",
+    status: "Genesis NFT",
+    title: "Manage your Genesis NFTs",
     description:
       "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight.",
   },

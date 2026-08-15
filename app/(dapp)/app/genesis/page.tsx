@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { GenesisPage } from "@/components/genesis/GenesisPage";
 
 export const metadata: Metadata = {
-  title: "Genesis | Statics",
+  title: "Genesis NFT | Statics",
   description:
     "Activate a Statics Genesis NFT and link it to one PositionNFT for increased reward weight.",
 };

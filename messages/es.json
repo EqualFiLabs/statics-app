@@ -33,7 +33,6 @@
     "groups": {
       "overview": "Resumen",
       "earn": "Ganar",
-      "genesis": "Genesis",
       "assets": "Activos",
       "manage": "Gestionar",
       "account": "Cuenta"
@@ -41,12 +40,12 @@
     "items": {
       "overview": "Resumen",
       "earn": "Ganar",
-      "genesis": "Genesis",
+      "genesis": "Genesis NFT",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
       "create": "Crear cesta",
       "dollar": "Dólar",
-      "positions": "Posiciones",
+      "positions": "Position NFT",
       "loans": "Préstamos",
       "wallet": "Billetera",
       "faucet": "Faucet",
@@ -100,9 +99,9 @@
       "description": "Compra o vende un conjunto fijo de activos como una sola unidad. Verás exactamente qué contiene una cesta antes de comprar."
     },
     "positions": {
-      "label": "Posiciones",
-      "status": "Posiciones",
-      "title": "Tus posiciones",
+      "label": "Position NFT",
+      "status": "Position NFT",
+      "title": "Tus Position NFTs",
       "description": "Cada posición reúne tus cestas, préstamos y dólares. Gestiona la garantía, el staking y las recompensas desde aquí."
     },
     "loans": {
@@ -118,9 +117,9 @@
       "description": "Haz staking de una posición para obtener una parte de las comisiones del protocolo. Elige en qué activos quieres ganar y reclama lo acumulado."
     },
     "genesis": {
-      "label": "Genesis",
-      "status": "Genesis",
-      "title": "Impulso de staking Genesis",
+      "label": "Genesis NFT",
+      "status": "Genesis NFT",
+      "title": "Gestiona tus Genesis NFTs",
       "description": "Activa un NFT Genesis quemando STATICS y enlázalo a una Posición para aumentar su peso de recompensas."
     },
     "liquidity": {
@@ -365,7 +364,7 @@
     "confirmBridge": "Confirmar puente"
   },
   "positions": {
-    "subject": "posiciones",
+    "subject": "Position NFTs",
     "collateralLabel": "BasketTokens de esta posición",
     "collateralDescription": "Estos BasketTokens pertenecen a este PositionNFT. El Diamond los mantiene en custodia mientras generan comisiones de cesta y respaldan préstamos.",
     "noCollateral": "No hay BasketTokens depositados.",
@@ -379,7 +378,7 @@
     "switchNetwork": "Cambiar a {network}",
     "walletLoading": "Cargando billetera…",
     "creatingPosition": "Creando posición…",
-    "title": "Tus posiciones",
+    "title": "Tus Position NFTs",
     "description": "Una posición reúne tu garantía, staking, recompensas, préstamos y liquidez. Al mover la posición, todo lo que contiene se mueve con ella.",
     "creationFee": "Abrir una posición nueva cuesta {fee} ETH. Reutilizar una propia es gratis.",
     "stale": "Los datos de las posiciones no están disponibles temporalmente. Se muestra el último estado recibido.",

@@ -33,7 +33,6 @@
     "groups": {
       "overview": "概览",
       "earn": "赚取",
-      "genesis": "Genesis",
       "assets": "资产",
       "manage": "管理",
       "account": "账户"
@@ -41,12 +40,12 @@
     "items": {
       "overview": "概览",
       "earn": "赚取",
-      "genesis": "Genesis",
+      "genesis": "Genesis NFT",
       "liquidity": "流动性",
       "baskets": "篮子",
       "create": "创建篮子",
       "dollar": "美元",
-      "positions": "头寸",
+      "positions": "Position NFT",
       "loans": "贷款",
       "wallet": "钱包",
       "faucet": "水龙头",
@@ -100,9 +99,9 @@
       "description": "将一组固定资产作为一个整体买卖。购买前可查看篮子中包含的确切资产。"
     },
     "positions": {
-      "label": "头寸",
-      "status": "头寸",
-      "title": "你的头寸",
+      "label": "Position NFT",
+      "status": "Position NFT",
+      "title": "你的 Position NFTs",
       "description": "每个头寸汇集你的篮子、贷款和美元。在这里管理抵押品、质押和奖励。"
     },
     "loans": {
@@ -118,9 +117,9 @@
       "description": "质押一个头寸以获得协议费用分成。选择希望赚取的资产并领取累积奖励。"
     },
     "genesis": {
-      "label": "Genesis",
-      "status": "Genesis",
-      "title": "Genesis 质押加成",
+      "label": "Genesis NFT",
+      "status": "Genesis NFT",
+      "title": "管理你的 Genesis NFTs",
       "description": "燃烧 STATICS 激活 Genesis NFT，再将其绑定到一个 Position，以提高该 Position 的奖励权重。"
     },
     "liquidity": {
@@ -365,7 +364,7 @@
     "confirmBridge": "确认跨链"
   },
   "positions": {
-    "subject": "头寸",
+    "subject": "Position NFTs",
     "collateralLabel": "此头寸持有的 BasketTokens",
     "collateralDescription": "这些 BasketTokens 属于此 PositionNFT。Diamond 托管它们，使其赚取篮子费用并支持贷款。",
     "noCollateral": "尚未存入 BasketTokens。",
@@ -379,7 +378,7 @@
     "switchNetwork": "切换到 {network}",
     "walletLoading": "正在加载钱包…",
     "creatingPosition": "正在创建头寸…",
-    "title": "你的头寸",
+    "title": "你的 Position NFTs",
     "description": "一个头寸汇集你的抵押品、质押、奖励、贷款和流动性。转移头寸时，其中的一切都会随之转移。",
     "creationFee": "新建头寸需支付 {fee} ETH。复用已有头寸免费。",
     "stale": "头寸数据暂时不可用，正在显示最近收到的状态。",

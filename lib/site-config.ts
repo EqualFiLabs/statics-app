@@ -118,7 +118,6 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         href: "/app/rewards",
         tabLabel: "Earn",
       },
-      { label: "Genesis", messageKey: "genesis", enabled: true, href: "/app/genesis" },
       { label: "Liquidity", messageKey: "liquidity", enabled: true, href: "/app/liquidity" },
     ],
   },
@@ -147,7 +146,18 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
     label: "Manage",
     messageKey: "manage",
     items: [
-      { label: "Positions", messageKey: "positions", enabled: true, href: "/app/positions" },
+      {
+        label: "Position NFT",
+        messageKey: "positions",
+        enabled: true,
+        href: "/app/positions",
+      },
+      {
+        label: "Genesis NFT",
+        messageKey: "genesis",
+        enabled: true,
+        href: "/app/genesis",
+      },
       { label: "Loans", messageKey: "loans", enabled: true, href: "/app/loans" },
     ],
   },

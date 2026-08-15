@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { getDappRoutePresentation } from "@/lib/dapp-navigation";
 import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import english from "@/messages/en.json";
+import spanish from "@/messages/es.json";
+import chinese from "@/messages/zh-CN.json";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -117,12 +120,12 @@ describe("sidebar completeness", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
       "Earn",
-      "Genesis",
       "Liquidity",
       "Baskets",
       "Create basket",
       "Dollar",
-      "Positions",
+      "Position NFT",
+      "Genesis NFT",
       "Loans",
       "Wallet",
       "Faucet",
@@ -133,7 +136,18 @@ describe("sidebar completeness", () => {
 
   it("keeps position management directly discoverable", () => {
     const manage = appNavigationGroups.find((group) => group.label === "Manage");
-    expect(manage?.items.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
+    expect(manage?.items.map((item) => item.href)).toEqual([
+      "/app/positions",
+      "/app/genesis",
+      "/app/loans",
+    ]);
+  });
+
+  it("uses the exact NFT product labels in every locale", () => {
+    for (const messages of [english, spanish, chinese]) {
+      expect(messages.navigation.items.positions).toBe("Position NFT");
+      expect(messages.navigation.items.genesis).toBe("Genesis NFT");
+    }
   });
 
   it("keeps account plumbing grouped rather than promoted", () => {
