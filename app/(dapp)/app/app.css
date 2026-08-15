@@ -196,6 +196,28 @@
   overflow: hidden;
 }
 
+/* Form field */
+
+.ui-field {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.ui-field input,
+.ui-field select {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 0.85rem;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font: inherit;
+  border-radius: var(--radius-md);
+}
+
 /* Section headings */
 
 .ui-section-title {
@@ -5341,24 +5363,43 @@
   gap: 1rem;
 }
 
-.genesis-summary div,
 .genesis-card-heading {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+  align-items: flex-start;
 }
 
-.genesis-summary span,
+.genesis-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.genesis-card-heading > div {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+}
+
+.genesis-summary .ui-stat__value {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.genesis-action > p {
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
 .genesis-warning {
-  color: var(--muted);
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
 }
 
 .genesis-grid {
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-}
-
-.genesis-card select {
-  width: 100%;
 }
 
 .genesis-contracts {

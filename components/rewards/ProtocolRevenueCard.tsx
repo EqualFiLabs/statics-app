@@ -160,7 +160,7 @@ export function ProtocolRevenueCard() {
               minimumReceived = null;
             }
             return (
-              <article className="dapp-card" key={token.address}>
+              <article className="ui-card" key={token.address}>
                 <h3>{token.symbol}</h3>
                 <p>Creator credit: {formatUnits(creatorCredit, token.decimals)}</p>
                 <label>

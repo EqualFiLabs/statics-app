@@ -216,18 +216,18 @@ function GenesisRuntime() {
 
   return (
     <div className="genesis-page">
-      <div className="genesis-summary dapp-card">
-        <div>
-          <span>STATICS balance</span>
-          <strong>{formatEther(portfolio.data.balance)} STATICS</strong>
+      <div className="genesis-summary ui-card">
+        <div className="ui-stat">
+          <span className="ui-stat__label">STATICS balance</span>
+          <strong className="ui-stat__value">{formatEther(portfolio.data.balance)} STATICS</strong>
         </div>
-        <div>
-          <span>Genesis collection</span>
-          <strong>5,555 fixed NFTs</strong>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Genesis collection</span>
+          <strong className="ui-stat__value">5,555 fixed NFTs</strong>
         </div>
-        <div>
-          <span>Activation</span>
-          <strong>Burned STATICS; resets on transfer</strong>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Activation</span>
+          <strong className="ui-stat__value">Burned STATICS; resets on transfer</strong>
         </div>
       </div>
       {error && (
@@ -248,11 +248,11 @@ function GenesisRuntime() {
           const needsApproval = portfolio.data.allowance < cost;
           const actionKey = id.toString();
           return (
-            <article className="dapp-card genesis-card" key={actionKey}>
+            <article className="ui-card genesis-card" key={actionKey}>
               <div className="genesis-card-heading">
                 <div>
-                  <h2>Genesis #{actionKey}</h2>
-                  <span>
+                  <h2 className="ui-section-title">Genesis #{actionKey}</h2>
+                  <span className="ui-pill">
                     Tier {currentTier} · {(Number(state.multiplierBps) / 10_000).toFixed(2)}×
                   </span>
                 </div>
@@ -270,10 +270,12 @@ function GenesisRuntime() {
                   }}
                 />
               </div>
-              <p>{linked ? `Linked to Position #${state.linkedPositionId}` : "Not linked"}</p>
+              <p className="ui-section-subtitle">
+                {linked ? `Linked to Position #${state.linkedPositionId}` : "Not linked"}
+              </p>
               {currentTier < 4 && (
                 <div className="genesis-action">
-                  <label>
+                  <label className="ui-field">
                     Activate through tier
                     <select
                       value={target}
@@ -297,6 +299,7 @@ function GenesisRuntime() {
                   <p>Burn cost: {formatEther(cost)} STATICS</p>
                   {needsApproval ? (
                     <button
+                      className="ui-button ui-button--primary ui-button--block"
                       disabled={busy !== null}
                       onClick={() =>
                         void act(actionKey, async () => {
@@ -323,6 +326,7 @@ function GenesisRuntime() {
                     </button>
                   ) : (
                     <button
+                      className="ui-button ui-button--primary ui-button--block"
                       disabled={busy !== null || portfolio.data.balance < cost}
                       onClick={() =>
                         void act(actionKey, async () => {
@@ -343,6 +347,7 @@ function GenesisRuntime() {
               )}
               {linked ? (
                 <button
+                  className="ui-button ui-button--secondary ui-button--block"
                   disabled={busy !== null}
                   onClick={() =>
                     void act(actionKey, async () => {
@@ -360,7 +365,7 @@ function GenesisRuntime() {
                 </button>
               ) : (
                 <div className="genesis-action">
-                  <label>
+                  <label className="ui-field">
                     Position
                     <select
                       value={selectedPosition}
@@ -379,6 +384,7 @@ function GenesisRuntime() {
                     </select>
                   </label>
                   <button
+                    className="ui-button ui-button--primary ui-button--block"
                     disabled={busy !== null || currentTier === 0 || !selectedPosition}
                     onClick={() =>
                       void act(actionKey, async () => {
@@ -409,7 +415,7 @@ function GenesisRuntime() {
           );
         })}
       </div>
-      <div className="genesis-contracts dapp-card">
+      <div className="genesis-contracts ui-card">
         <AddressDisplay
           address={genesisDeployment.collection}
           chainId={deployment.chainId}

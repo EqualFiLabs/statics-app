@@ -270,7 +270,7 @@ function BasketCreateRuntime() {
 
   return (
     <div className="creation-workspace">
-      <section className="dapp-card">
+      <section className="ui-card">
         <p className="dapp-section-label">Permissionless launch</p>
         <h2>Configure and fund an index</h2>
         <p>
@@ -282,7 +282,7 @@ function BasketCreateRuntime() {
           {creation.data === undefined ? "Loading…" : `${formatEther(creation.data)} ETH`}
         </p>
       </section>
-      <section className="dapp-card creation-form">
+      <section className="ui-card creation-form">
         <label>
           Basket name
           <input value={name} onChange={(event) => setName(event.target.value)} />
