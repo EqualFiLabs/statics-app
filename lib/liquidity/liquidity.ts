@@ -14,6 +14,8 @@ import {
   BasketStatus,
   decodePositionInfo,
   maximumLiquidityForAmounts,
+  quoteBorrow,
+  quoteBorrowAndProvideLiquidity,
   quoteRangeAmounts,
   staticsAbi,
   staticsSwapFeeHookAbi,
@@ -94,6 +96,23 @@ export type WalletLiquidityQuote = Readonly<{
 export type MaximumWalletLiquidity = Readonly<{
   inputAmount: bigint;
   limitingIndex: LiquidityTokenIndex;
+}>;
+
+export type BorrowLiquidityAllocation = Readonly<{
+  poolId: Hex;
+  asset: TokenMetadata;
+  weightPercent: number;
+  liquidity: bigint;
+  basketAmount: bigint;
+  assetAmount: bigint;
+  principal: bigint;
+  refund: bigint;
+}>;
+
+export type BorrowLiquidityPlan = Readonly<{
+  utilizationPercent: number;
+  allocations: readonly BorrowLiquidityAllocation[];
+  quote: ReturnType<typeof quoteBorrowAndProvideLiquidity>;
 }>;
 
 export type LiquidityCatalog = Readonly<{
@@ -211,7 +230,7 @@ export function borrowedLiquidityDeadline(blockTimestamp: bigint): bigint {
 export function borrowedLiquidityReadiness(
   basket: Pick<BasketRecord, "constituents"> | undefined,
   pools: readonly CanonicalPoolRecord[],
-  rawLiquidity: Readonly<Record<string, string>>
+  plan: BorrowLiquidityPlan | null
 ): string | null {
   if (!basket || pools.length !== basket.constituents.length) {
     return "Every basket underlying needs a canonical pool.";
@@ -220,13 +239,145 @@ export function borrowedLiquidityReadiness(
   if (unavailable) {
     return "Every canonical pool must be live and synced to the liquidity manager.";
   }
-  const invalidInput = pools.some((pool) => {
-    const input = rawLiquidity[pool.poolId] ?? "";
-    return !/^\d+$/.test(input) || BigInt(input) <= 0n || BigInt(input) > (1n << 128n) - 1n;
+  return plan ? null : "Enter collateral shares to calculate an executable liquidity plan.";
+}
+
+/**
+ * Converts a borrow quote into an executable, proportional full-range LP plan.
+ *
+ * Each pool first gets its own principal-constrained upper bound. Advanced
+ * weights shape those bounds; a common binary-searched scale then preserves
+ * that strategy while accounting for the extra constituent backing required
+ * to mint the basket side of every pool. Utilization is applied last.
+ */
+export function calculateBorrowLiquidityPlan({
+  basket,
+  sharesIn,
+  pools,
+  weights = {},
+  utilizationPercent = 100,
+  deadline,
+  slippageBps = 50n,
+}: {
+  basket: BasketRecord;
+  sharesIn: bigint;
+  pools: readonly CanonicalPoolRecord[];
+  weights?: Readonly<Record<string, number>>;
+  utilizationPercent?: number;
+  deadline: bigint;
+  slippageBps?: bigint;
+}): BorrowLiquidityPlan | null {
+  if (
+    sharesIn <= 0n ||
+    pools.length !== basket.constituents.length ||
+    !Number.isInteger(utilizationPercent) ||
+    utilizationPercent < 1 ||
+    utilizationPercent > 100
+  ) {
+    return null;
+  }
+  const snapshot = basketLiquiditySnapshot(basket);
+  let borrow: ReturnType<typeof quoteBorrow>;
+  try {
+    borrow = quoteBorrow(snapshot, sharesIn);
+  } catch {
+    return null;
+  }
+  const bases = pools.map((pool) => {
+    const principal =
+      borrow.principals.find(
+        (item) => item.asset.toLowerCase() === pool.asset.address.toLowerCase()
+      )?.amount ?? 0n;
+    const weightPercent = weights[pool.poolId] ?? 100;
+    if (!Number.isInteger(weightPercent) || weightPercent < 1 || weightPercent > 100) return null;
+    const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
+    const assetIsCurrency0 = pool.key.currency0 === pool.asset.address;
+    const maximum = maximumLiquidityForAmounts(
+      pool.sqrtPriceX96,
+      tickLower,
+      tickUpper,
+      assetIsCurrency0 ? principal : MAX_POSITION_AMOUNT,
+      assetIsCurrency0 ? MAX_POSITION_AMOUNT : principal
+    );
+    const weighted = (maximum * BigInt(weightPercent)) / 100n;
+    if (weighted <= 0n) return null;
+    return { pool, principal, weightPercent, tickLower, tickUpper, weighted };
   });
-  return invalidInput
-    ? "Enter positive raw liquidity within the uint128 limit for every pool."
-    : null;
+  if (bases.some((item) => item === null)) return null;
+  const validBases = bases as readonly NonNullable<(typeof bases)[number]>[];
+  const SCALE = 1_000_000n;
+  const inputsAt = (scale: bigint) =>
+    validBases.map(({ pool, tickLower, tickUpper, weighted }) => ({
+      asset: pool.asset.address,
+      currency0: pool.key.currency0,
+      currency1: pool.key.currency1,
+      sqrtPriceX96: pool.sqrtPriceX96,
+      tickLower,
+      tickUpper,
+      liquidity: (weighted * scale) / SCALE,
+      deadline,
+    }));
+  const executable = (scale: bigint) => {
+    const inputs = inputsAt(scale);
+    if (inputs.some((input) => input.liquidity <= 0n)) return false;
+    try {
+      quoteBorrowAndProvideLiquidity(snapshot, sharesIn, inputs, slippageBps);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let low = 0n;
+  let high = SCALE;
+  while (low < high) {
+    const midpoint = (low + high + 1n) >> 1n;
+    if (executable(midpoint)) low = midpoint;
+    else high = midpoint - 1n;
+  }
+  if (low === 0n) return null;
+  const utilizedScale = (low * BigInt(utilizationPercent)) / 100n;
+  const inputs = inputsAt(utilizedScale);
+  if (inputs.some((input) => input.liquidity <= 0n)) return null;
+  let quote: ReturnType<typeof quoteBorrowAndProvideLiquidity>;
+  try {
+    quote = quoteBorrowAndProvideLiquidity(snapshot, sharesIn, inputs, slippageBps);
+  } catch {
+    return null;
+  }
+  return {
+    utilizationPercent,
+    quote,
+    allocations: validBases.map(({ pool, principal, weightPercent }, index) => {
+      const quotedPool = quote.pools[index]!;
+      const amounts = quoteRangeAmounts(
+        pool.sqrtPriceX96,
+        quotedPool.tickLower,
+        quotedPool.tickUpper,
+        quotedPool.liquidity
+      );
+      const assetAmount =
+        pool.key.currency0.toLowerCase() === pool.asset.address.toLowerCase()
+          ? amounts.amount0
+          : amounts.amount1;
+      const basketAmount =
+        pool.key.currency0.toLowerCase() === pool.asset.address.toLowerCase()
+          ? amounts.amount1
+          : amounts.amount0;
+      const total = quote.totalPrincipalRequirements.find(
+        (item) => item.asset.toLowerCase() === pool.asset.address.toLowerCase()
+      );
+      return {
+        poolId: pool.poolId,
+        asset: pool.asset,
+        weightPercent,
+        liquidity: quotedPool.liquidity,
+        basketAmount,
+        assetAmount,
+        principal,
+        refund: total?.refund ?? 0n,
+      };
+    }),
+  };
 }
 
 export function liquidityPositionActions(

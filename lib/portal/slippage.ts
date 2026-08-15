@@ -22,8 +22,10 @@ export const PORTAL_SLIPPAGE_PRESETS = [0.5, 2] as const;
 export const MIN_PORTAL_SLIPPAGE_PERCENT = 0.01;
 export const MAX_PORTAL_SLIPPAGE_PERCENT = 5;
 
+// Kept at the original key so existing users retain their preference. The
+// value now protects every Statics protocol quote, not only Portal routes.
 const storageKey = "statics:portal:slippage";
-const storageEvent = "statics-portal-slippage-changed";
+const storageEvent = "statics-protocol-slippage-changed";
 
 export function isValidSlippagePercent(value: number): boolean {
   return (
