@@ -34,7 +34,10 @@ export default defineConfig({
   webServer: {
     command: "npm run start -- --hostname 127.0.0.1 --port 4173",
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
+    // The foundation suite asserts the fail-closed, unconfigured build. Never
+    // reuse a developer's connected server, whose public env is intentionally
+    // different from this fixture.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
