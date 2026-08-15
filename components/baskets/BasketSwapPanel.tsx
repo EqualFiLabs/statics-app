@@ -23,13 +23,12 @@ import {
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
+import { describeBasketError, minimumWithSlippage, type BasketRecord } from "@/lib/baskets/baskets";
+import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
 import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
-  describeBasketError,
-  minimumWithSlippage,
-  parseSlippageBps,
-  type BasketRecord,
-} from "@/lib/baskets/baskets";
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
 import {
   readClientDollarDeployment,
   verifyDollarDeployment,
@@ -45,6 +44,8 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { applyPercent } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -61,14 +62,12 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const queryClient = useQueryClient();
+  const protocolSlippage = useProtocolSlippage();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [assetIndex, setAssetIndex] = useState(0);
   const [direction, setDirection] = useState<"asset-in" | "basket-in">("asset-in");
   const [amountInput, setAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const constituent = basket.constituents[assetIndex] ?? basket.constituents[0]!;
@@ -81,7 +80,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   } catch {
     amount = 0n;
   }
-  const slippageBps = parseSlippageBps(slippageInput);
+  const slippageBps = slippagePercentToBps(protocolSlippage);
 
   const pool = useQuery({
     queryKey: ["canonical-swap-pool", basket.basketId.toString(), constituent.token.address],
@@ -478,20 +477,15 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             symbol: inputToken.symbol,
           })}
         </small>
+        <AmountShortcuts
+          disabled={pending || inputBalance <= 0n}
+          label={t("amountShortcuts")}
+          onSelect={(percent) =>
+            setAmountInput(display(applyPercent(inputBalance, percent), inputToken.decimals))
+          }
+        />
       </label>
-      <label className="basket-field">
-        <span>{t("slippage")}</span>
-        <div>
-          <input
-            value={slippageInput}
-            onChange={(event) => setSlippageInput(event.target.value)}
-            inputMode="decimal"
-            disabled={pending}
-          />
-          <strong>%</strong>
-        </div>
-        <small>{t("slippageHelp")}</small>
-      </label>
+      <ProtocolSlippageControl />
       <div className="basket-quote">
         <span>{t("v4Quote")}</span>
         <strong>

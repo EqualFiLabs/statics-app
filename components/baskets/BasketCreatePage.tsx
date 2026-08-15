@@ -9,18 +9,20 @@ import {
   isAddress,
   parseEventLogs,
   parseUnits,
+  type Address,
 } from "viem";
 import { usePublicClient } from "wagmi";
 
-import {
-  basketTokenAbi,
-  buildCreateBasketTransaction,
-  encodeSqrtPriceAssetPerBasketX96,
-  staticsAbi,
-} from "@statics-protocol/sdk";
+import { basketTokenAbi, buildCreateBasketTransaction, staticsAbi } from "@statics-protocol/sdk";
 
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
-import { loadTokenMetadata } from "@/lib/baskets/baskets";
+import {
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
+import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { calculateBasketLaunchQuote, type BasketLaunchQuote } from "@/lib/baskets/creation";
+import { loadTokenMetadata, type TokenMetadata } from "@/lib/baskets/baskets";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   executeProtocolActionPlan,
@@ -29,6 +31,9 @@ import {
 } from "@/lib/protocol/action-plan";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { bpsToPercentInput, formatTokenAmount, percentInputToBps } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
+import { searchTokenList, type TokenListEntry } from "@/lib/token-list";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -36,19 +41,19 @@ const configuredDeployment =
   deploymentState.status === "configured" ? deploymentState.deployment : null;
 
 type ConstituentDraft = {
-  asset: string;
+  asset: Address;
   bundle: string;
   price: string;
-  liquidity: string;
-  maximum: string;
+  seed: string;
 };
-const emptyConstituent = (): ConstituentDraft => ({
-  asset: "",
-  bundle: "1",
-  price: "1",
-  liquidity: "1",
-  maximum: "2",
-});
+
+type AssetRuntime = {
+  metadata: TokenMetadata;
+  walletBalance: bigint;
+  allowance: bigint;
+};
+
+const steps = ["Identity", "Assets & composition", "Starting pools", "Economics", "Review"];
 
 export function BasketCreatePage() {
   if (!configuredDeployment) return <UnconfiguredSurface subject="Basket creation" />;
@@ -64,18 +69,26 @@ function BasketCreateWalletGate() {
 function BasketCreateRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
+  const protocolSlippage = useProtocolSlippage();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
+  const chainId = configuredDeployment!.chainId;
+  const walletTokens = useWalletTokens(chainId);
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
-  const [constituents, setConstituents] = useState<ConstituentDraft[]>([emptyConstituent()]);
+  const [constituents, setConstituents] = useState<ConstituentDraft[]>([]);
+  const [tokenSearch, setTokenSearch] = useState("");
+  const [customAddress, setCustomAddress] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+  const [advancedEconomics, setAdvancedEconomics] = useState(false);
   const [mintFee, setMintFee] = useState("0.001");
   const [redemptionFee, setRedemptionFee] = useState("0.001");
-  const [flashFeeBps, setFlashFeeBps] = useState("5");
-  const [originationFeeBps, setOriginationFeeBps] = useState("100");
-  const [extensionFeeBps, setExtensionFeeBps] = useState("25");
-  const [ltvBps, setLtvBps] = useState("7500");
-  const [recoveryBps, setRecoveryBps] = useState("500");
+  const [flashFeePercent, setFlashFeePercent] = useState(bpsToPercentInput(5));
+  const [originationFeePercent, setOriginationFeePercent] = useState(bpsToPercentInput(100));
+  const [extensionFeePercent, setExtensionFeePercent] = useState(bpsToPercentInput(25));
+  const [ltvPercent, setLtvPercent] = useState(bpsToPercentInput(7_500));
+  const [recoveryPercent, setRecoveryPercent] = useState(bpsToPercentInput(500));
   const [loanDurationDays, setLoanDurationDays] = useState("30");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<ProtocolActionProgress | null>(null);
@@ -83,11 +96,7 @@ function BasketCreateRuntime() {
 
   const creation = useQuery({
     queryKey: ["basket-creation-fee", configuredDeployment?.protocolCommit ?? null],
-    enabled:
-      Boolean(configuredDeployment) &&
-      Boolean(publicClient) &&
-      walletState.status === "ready" &&
-      walletState.isTargetChain,
+    enabled: Boolean(publicClient) && walletState.status === "ready" && walletState.isTargetChain,
     queryFn: async () => {
       if (!publicClient || !configuredDeployment) throw new Error("No verified deployment.");
       await verifyDollarDeployment(publicClient, configuredDeployment);
@@ -99,136 +108,194 @@ function BasketCreateRuntime() {
     },
   });
 
-  if (!wallet)
+  const assets = useQuery({
+    queryKey: [
+      "basket-launch-assets",
+      configuredDeployment?.protocolCommit,
+      wallet,
+      constituents.map((item) => item.asset).join(","),
+    ],
+    enabled: Boolean(publicClient && wallet && constituents.length),
+    queryFn: async (): Promise<readonly AssetRuntime[]> => {
+      if (!publicClient || !wallet || !configuredDeployment) return [];
+      return Promise.all(
+        constituents.map(async ({ asset }) => {
+          const [metadata, walletBalance, allowance] = await Promise.all([
+            loadTokenMetadata(publicClient, asset),
+            publicClient.readContract({
+              address: asset,
+              abi: basketTokenAbi,
+              functionName: "balanceOf",
+              args: [wallet],
+            }),
+            publicClient.readContract({
+              address: asset,
+              abi: basketTokenAbi,
+              functionName: "allowance",
+              args: [wallet, configuredDeployment.contracts.diamond],
+            }),
+          ]);
+          return { metadata, walletBalance, allowance };
+        })
+      );
+    },
+  });
+
+  if (!wallet) {
     return (
       <EmptyState
         title="Connect your wallet"
         description="Connect to configure, fund, and launch an index basket."
       />
     );
+  }
 
-  const update = (index: number, field: keyof ConstituentDraft, value: string) => {
+  const addAsset = (token: Pick<TokenListEntry, "address">) => {
+    const address = getAddress(token.address);
+    if (constituents.some((row) => row.asset === address)) return;
+    setConstituents((current) => [
+      ...current,
+      { asset: address, bundle: "1", price: "1", seed: "1" },
+    ]);
+    setTokenSearch("");
+    setCustomAddress("");
+    setError(null);
+  };
+
+  const update = (index: number, field: "bundle" | "price" | "seed", value: string) => {
     setConstituents((current) =>
       current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
     );
     setError(null);
   };
 
+  const makeQuote = (runtime: readonly AssetRuntime[] | undefined): BasketLaunchQuote | null => {
+    if (!runtime || runtime.length !== constituents.length) return null;
+    try {
+      return calculateBasketLaunchQuote(
+        constituents.map((row, index) => ({
+          address: row.asset,
+          symbol: runtime[index]!.metadata.symbol,
+          decimals: runtime[index]!.metadata.decimals,
+          bundleAmount: parseUnits(row.bundle, runtime[index]!.metadata.decimals),
+          assetPerBasket: parseUnits(row.price, runtime[index]!.metadata.decimals),
+          seedAssetAmount: parseUnits(row.seed, runtime[index]!.metadata.decimals),
+          walletBalance: runtime[index]!.walletBalance,
+        })),
+        parseUnits(mintFee, 18),
+        BigInt(slippagePercentToBps(protocolSlippage))
+      );
+    } catch {
+      return null;
+    }
+  };
+
+  const quote = makeQuote(assets.data);
+  const economics = {
+    flash: percentInputToBps(flashFeePercent),
+    origination: percentInputToBps(originationFeePercent),
+    extension: percentInputToBps(extensionFeePercent),
+    ltv: percentInputToBps(ltvPercent, 95),
+    recovery: percentInputToBps(recoveryPercent),
+  };
+  const durationDays = Number(loanDurationDays);
+  const economicsValid =
+    Object.values(economics).every((value) => value !== null) &&
+    Number.isSafeInteger(durationDays) &&
+    durationDays > 0 &&
+    (economics.ltv ?? 0) + Math.ceil(((economics.ltv ?? 0) * (economics.recovery ?? 0)) / 10_000) <=
+      10_000;
+  const identityValid = Boolean(name.trim()) && /^[A-Za-z][A-Za-z0-9-]{1,10}$/.test(symbol.trim());
+  const assetsValid =
+    constituents.length > 0 &&
+    constituents.length <= 16 &&
+    Boolean(assets.data?.every((item) => item.metadata.metadataAvailable)) &&
+    constituents.every((row) => {
+      try {
+        return parseUnits(row.bundle, 18) > 0n;
+      } catch {
+        return false;
+      }
+    });
+  const poolsValid = quote !== null;
+  const approvalCount =
+    quote?.assets.filter(
+      (item, index) => (assets.data?.[index]?.allowance ?? 0n) < item.maximumAmount
+    ).length ?? 0;
+  const hasShortfall = Boolean(quote?.assets.some((item) => item.shortfall > 0n));
+
+  const nextAllowed = [identityValid, assetsValid, poolsValid, economicsValid, false][step];
+
   const launch = async () => {
-    if (!publicClient || creation.data === undefined) return;
+    if (!publicClient || creation.data === undefined || !configuredDeployment) return;
     setBusy(true);
     setError(null);
     setProgress(null);
     try {
-      if (!name.trim() || !/^[A-Za-z][A-Za-z0-9-]{1,10}$/.test(symbol.trim()))
-        throw new Error("Enter a basket name and a 2-11 character symbol.");
-      if (!constituents.length || constituents.length > 16)
-        throw new Error("A basket needs between 1 and 16 constituents.");
-      if (constituents.some((row) => !isAddress(row.asset)))
-        throw new Error("Every constituent needs a valid token address.");
-      const addresses = constituents.map((row) => getAddress(row.asset));
-      if (new Set(addresses).size !== addresses.length)
-        throw new Error("Each constituent token may appear only once.");
-      const bps = {
-        flash: Number(flashFeeBps),
-        origination: Number(originationFeeBps),
-        extension: Number(extensionFeeBps),
-        ltv: Number(ltvBps),
-        recovery: Number(recoveryBps),
-      };
-      if (Object.values(bps).some((value) => !Number.isInteger(value) || value < 0))
-        throw new Error("Fee, LTV, and recovery settings must be whole non-negative BPS values.");
-      if (bps.flash > 10_000 || bps.origination > 10_000 || bps.extension > 10_000)
-        throw new Error("Fee settings cannot exceed 10,000 BPS.");
-      if (bps.ltv > 9_500) throw new Error("Loan-to-value cannot exceed 9,500 BPS.");
-      if (bps.recovery > 10_000 || bps.ltv + Math.ceil((bps.ltv * bps.recovery) / 10_000) > 10_000)
-        throw new Error("The recovery penalty is too high for the selected loan-to-value.");
-      const durationDays = Number(loanDurationDays);
-      if (!Number.isSafeInteger(durationDays) || durationDays <= 0 || durationDays > 49_710_269)
-        throw new Error("Loan duration must be a positive whole number of days.");
-      const mintFeeShares = parseUnits(mintFee, 18);
-      const redemptionFeeShares = parseUnits(redemptionFee, 18);
-      if (mintFeeShares < 0n || redemptionFeeShares < 0n)
-        throw new Error("Mint and redemption fees cannot be negative.");
-      const metadata = await Promise.all(
-        addresses.map((address) => loadTokenMetadata(publicClient, address))
-      );
-      const bundleAmounts = constituents.map((row, index) =>
-        parseUnits(row.bundle, metadata[index]!.decimals)
-      );
-      const maxAmountsIn = constituents.map((row, index) =>
-        parseUnits(row.maximum, metadata[index]!.decimals)
-      );
-      const pools = constituents.map((row, index) => ({
-        sqrtPriceAssetPerBasketX96: encodeSqrtPriceAssetPerBasketX96(
-          parseUnits(row.price, metadata[index]!.decimals),
-          10n ** 18n
-        ),
-        pairedAssetAmount: parseUnits(row.liquidity, metadata[index]!.decimals),
-      }));
-      if (
-        bundleAmounts.some((value) => value <= 0n) ||
-        maxAmountsIn.some((value) => value <= 0n) ||
-        pools.some((pool) => pool.pairedAssetAmount <= 0n)
-      )
-        throw new Error("Bundle, price, liquidity, and maximum funding values must be positive.");
-      const block = await publicClient.getBlock();
+      if (!identityValid) throw new Error("Enter a basket name and a 2-11 character symbol.");
+      if (!economicsValid) throw new Error("Review the basket economics and loan safety limits.");
+      const refreshed = await assets.refetch();
+      const freshQuote = makeQuote(refreshed.data);
+      if (!freshQuote) throw new Error("A fresh launch quote could not be calculated.");
+      if (freshQuote.assets.some((item) => item.shortfall > 0n)) {
+        throw new Error("Your wallet does not hold enough of every launch asset.");
+      }
+      const block = await publicClient.getBlock({ blockTag: "latest" });
       const transaction = buildCreateBasketTransaction(
         {
           name: name.trim(),
           symbol: symbol.trim().toUpperCase(),
-          assets: addresses,
-          bundleAmounts,
-          mintFeeTiers: [{ minActionShares: 0n, feeShares: mintFeeShares }],
-          redemptionFeeTiers: [{ minActionShares: 0n, feeShares: redemptionFeeShares }],
-          flashFeeBps: bps.flash,
-          originationFeeBps: bps.origination,
-          extensionFeeBps: bps.extension,
-          ltvBps: bps.ltv,
-          recoveryPenaltyBps: bps.recovery,
-          loanDuration: durationDays * 24 * 60 * 60,
+          assets: freshQuote.assets.map((item) => item.address),
+          bundleAmounts: freshQuote.assets.map((item) => item.bundleAmount),
+          mintFeeTiers: [{ minActionShares: 0n, feeShares: parseUnits(mintFee, 18) }],
+          redemptionFeeTiers: [{ minActionShares: 0n, feeShares: parseUnits(redemptionFee, 18) }],
+          flashFeeBps: economics.flash!,
+          originationFeeBps: economics.origination!,
+          extensionFeeBps: economics.extension!,
+          ltvBps: economics.ltv!,
+          recoveryPenaltyBps: economics.recovery!,
+          loanDuration: durationDays * 86_400,
         },
-        pools,
-        maxAmountsIn,
-        block.timestamp + 3_600n,
+        freshQuote.assets.map((item) => ({
+          sqrtPriceAssetPerBasketX96: item.sqrtPriceAssetPerBasketX96,
+          pairedAssetAmount: item.seedAssetAmount,
+        })),
+        freshQuote.assets.map((item) => item.maximumAmount),
+        block.timestamp + 1_200n,
         creation.data
       );
-      const deployment = configuredDeployment!;
-      const diamond = deployment.contracts.diamond;
-      const steps = await Promise.all(
-        addresses.map(async (address, index) => ({
-          id: `approve-${address}`,
-          label: `Approve ${metadata[index]!.symbol}`,
-          isSatisfied: async () =>
-            (await publicClient.readContract({
-              address,
-              abi: basketTokenAbi,
-              functionName: "allowance",
-              args: [wallet, diamond],
-            })) >= maxAmountsIn[index]!,
-          run: () =>
-            executeProtocolTransaction({
-              publicClient,
-              wallet,
-              chainId: deployment.chainId,
-              kind: "approve-basket-asset",
-              label: `Approve ${metadata[index]!.symbol} for basket launch`,
-              amount: `${constituents[index]!.maximum} ${metadata[index]!.symbol}`,
-              to: address,
-              data: encodeFunctionData({
-                abi: basketTokenAbi,
-                functionName: "approve",
-                args: [diamond, MAX_ERC20_ALLOWANCE],
-              }),
-              sendTransaction: walletState.sendEvmTransaction,
-              describeError: (caught) =>
-                caught instanceof Error ? caught.message : "Approval failed.",
-            }).then(() => undefined),
-        }))
-      );
+      const diamond = configuredDeployment.contracts.diamond;
       await executeProtocolActionPlan(
         [
-          ...steps,
+          ...freshQuote.assets.map((item, index) => ({
+            id: `approve-${item.address}`,
+            label: `Approve ${item.symbol}`,
+            isSatisfied: async () =>
+              (await publicClient.readContract({
+                address: item.address,
+                abi: basketTokenAbi,
+                functionName: "allowance",
+                args: [wallet, diamond],
+              })) >= item.maximumAmount,
+            run: () =>
+              executeProtocolTransaction({
+                publicClient,
+                wallet,
+                chainId,
+                kind: "approve-basket-asset",
+                label: `Approve ${item.symbol}`,
+                amount: `${formatTokenAmount(item.maximumAmount, item.decimals)} ${item.symbol}`,
+                to: item.address,
+                data: encodeFunctionData({
+                  abi: basketTokenAbi,
+                  functionName: "approve",
+                  args: [diamond, MAX_ERC20_ALLOWANCE],
+                }),
+                sendTransaction: walletState.sendEvmTransaction,
+                describeError: (caught) =>
+                  caught instanceof Error ? caught.message : "Approval failed.",
+              }).then(() => undefined),
+          })),
           {
             id: "launch",
             label: "Launch and fund basket",
@@ -236,10 +303,10 @@ function BasketCreateRuntime() {
               executeProtocolTransaction({
                 publicClient,
                 wallet,
-                chainId: deployment.chainId,
+                chainId,
                 kind: "create-basket",
                 label: `Launch ${symbol.trim().toUpperCase()} basket`,
-                amount: `${formatEther(creation.data)} ETH creation fee plus reviewed constituent funding`,
+                amount: `${formatEther(creation.data)} ETH plus reviewed asset funding`,
                 to: diamond,
                 data: transaction.data,
                 value: transaction.value,
@@ -253,8 +320,9 @@ function BasketCreateRuntime() {
                     logs: receipt.logs,
                     strict: true,
                   });
-                  if (!created.some((event) => getAddress(event.args.creator) === wallet))
+                  if (!created.some((event) => getAddress(event.args.creator) === wallet)) {
                     throw new Error("The receipt did not contain the reviewed basket creation.");
+                  }
                 },
               }).then(() => undefined),
           },
@@ -268,184 +336,407 @@ function BasketCreateRuntime() {
     }
   };
 
+  const catalogMatches = [
+    ...walletTokens.tokens,
+    ...searchTokenList(
+      chainId,
+      tokenSearch,
+      constituents.map((item) => item.asset)
+    ),
+  ]
+    .filter(
+      (token, index, all) =>
+        all.findIndex(
+          (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
+        ) === index
+    )
+    .filter((token) => {
+      const query = tokenSearch.trim().toLowerCase();
+      return (
+        !query ||
+        token.symbol.toLowerCase().includes(query) ||
+        token.name.toLowerCase().includes(query) ||
+        token.address.toLowerCase().includes(query)
+      );
+    })
+    .slice(0, 8);
+
   return (
     <div className="creation-workspace">
       <section className="ui-card">
         <p className="dapp-section-label">Permissionless launch</p>
-        <h2>Configure and fund an index</h2>
+        <h2>Launch an index basket</h2>
         <p>
-          The creation fee is paid entirely to treasury. Your basket earns the configured 5% creator
-          share of swap fees, which you claim from Rewards.
+          Choose a fixed bundle, seed one permanent pool per asset, and review every immutable
+          setting before signing.
         </p>
         <p>
-          <strong>Current creation fee:</strong>{" "}
-          {creation.data === undefined ? "Loading…" : `${formatEther(creation.data)} ETH`}
+          <strong>Creation fee:</strong>{" "}
+          {creation.data === undefined ? "Loading…" : `${formatEther(creation.data)} ETH`} · creator
+          earns 5% of basket swap fees
         </p>
       </section>
-      <section className="ui-card creation-form">
-        <label>
-          Basket name
-          <input value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Symbol
-          <input
-            value={symbol}
-            onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-            maxLength={11}
-          />
-        </label>
-        {constituents.map((row, index) => (
-          <fieldset key={index}>
-            <legend>Constituent {index + 1}</legend>
-            <label>
-              Token address
-              <input
-                value={row.asset}
-                onChange={(event) => update(index, "asset", event.target.value)}
-                placeholder="0x…"
-              />
-            </label>
-            <label>
-              Tokens per basket
-              <input
-                inputMode="decimal"
-                value={row.bundle}
-                onChange={(event) => update(index, "bundle", event.target.value)}
-              />
-            </label>
-            <label>
-              Initial asset price per basket
-              <input
-                inputMode="decimal"
-                value={row.price}
-                onChange={(event) => update(index, "price", event.target.value)}
-              />
-            </label>
-            <label>
-              Initial pool funding
-              <input
-                inputMode="decimal"
-                value={row.liquidity}
-                onChange={(event) => update(index, "liquidity", event.target.value)}
-              />
-            </label>
-            <label>
-              Maximum token spend
-              <input
-                inputMode="decimal"
-                value={row.maximum}
-                onChange={(event) => update(index, "maximum", event.target.value)}
-              />
-            </label>
-            {constituents.length > 1 && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  setConstituents((current) => current.filter((_, item) => item !== index))
-                }
-              >
-                Remove constituent
-              </button>
-            )}
-          </fieldset>
+
+      <ol className="creation-steps">
+        {steps.map((label, index) => (
+          <li key={label} className={step === index ? "is-current" : undefined}>
+            <button
+              type="button"
+              disabled={index > step}
+              aria-current={step === index ? "step" : undefined}
+              onClick={() => index < step && setStep(index)}
+            >
+              <span>{index + 1}</span> {label}
+            </button>
+          </li>
         ))}
-        <button
-          type="button"
-          disabled={busy || constituents.length >= 16}
-          onClick={() => setConstituents((current) => [...current, emptyConstituent()])}
-        >
-          Add constituent
-        </button>
-        <label>
-          Flat mint fee (BasketToken)
-          <input
-            inputMode="decimal"
-            value={mintFee}
-            onChange={(event) => setMintFee(event.target.value)}
-          />
-        </label>
-        <label>
-          Flat redemption fee (BasketToken)
-          <input
-            inputMode="decimal"
-            value={redemptionFee}
-            onChange={(event) => setRedemptionFee(event.target.value)}
-          />
-        </label>
-        <label>
-          Flash fee BPS
-          <input
-            inputMode="numeric"
-            value={flashFeeBps}
-            onChange={(event) => setFlashFeeBps(event.target.value)}
-          />
-        </label>
-        <label>
-          Loan origination fee BPS
-          <input
-            inputMode="numeric"
-            value={originationFeeBps}
-            onChange={(event) => setOriginationFeeBps(event.target.value)}
-          />
-        </label>
-        <label>
-          Loan extension fee BPS
-          <input
-            inputMode="numeric"
-            value={extensionFeeBps}
-            onChange={(event) => setExtensionFeeBps(event.target.value)}
-          />
-        </label>
-        <label>
-          Loan-to-value BPS
-          <input
-            inputMode="numeric"
-            value={ltvBps}
-            onChange={(event) => setLtvBps(event.target.value)}
-          />
-        </label>
-        <label>
-          Recovery penalty BPS
-          <input
-            inputMode="numeric"
-            value={recoveryBps}
-            onChange={(event) => setRecoveryBps(event.target.value)}
-          />
-        </label>
-        <label>
-          Loan duration (days)
-          <input
-            inputMode="numeric"
-            value={loanDurationDays}
-            onChange={(event) => setLoanDurationDays(event.target.value)}
-          />
-        </label>
-        <div className="creation-review">
-          <h3>Immutable launch review</h3>
-          <p>
-            {constituents.length} constituents · {mintFee || "0"} BasketToken mint fee ·{" "}
-            {redemptionFee || "0"} BasketToken redemption fee · {flashFeeBps || "0"} BPS flash fee ·{" "}
-            {originationFeeBps || "0"} BPS origination fee · {extensionFeeBps || "0"} BPS extension
-            fee · {loanDurationDays || "0"}-day loans.
-          </p>
-        </div>
+      </ol>
+
+      <section className="ui-card creation-form">
+        {step === 0 && (
+          <div className="remaining-form-grid">
+            <label className="basket-field">
+              <span>Basket name</span>
+              <input value={name} onChange={(event) => setName(event.target.value)} />
+              <small>The descriptive name shown throughout Statics.</small>
+            </label>
+            <label className="basket-field">
+              <span>Symbol</span>
+              <input
+                value={symbol}
+                maxLength={11}
+                onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+              />
+              <small>2–11 characters, beginning with a letter.</small>
+            </label>
+          </div>
+        )}
+
+        {step === 1 && (
+          <>
+            <label className="basket-field">
+              <span>Find a token</span>
+              <input
+                value={tokenSearch}
+                placeholder="Search by name or symbol"
+                onChange={(event) => setTokenSearch(event.target.value)}
+              />
+            </label>
+            <div className="creation-token-results">
+              {catalogMatches.map((token) => (
+                <button key={token.address} type="button" onClick={() => addAsset(token)}>
+                  <strong>{token.symbol}</strong>
+                  <span>{token.name}</span>
+                  <small>{token.address}</small>
+                </button>
+              ))}
+            </div>
+            <details
+              open={showCustom}
+              onToggle={(event) => setShowCustom(event.currentTarget.open)}
+            >
+              <summary>Advanced: add a custom token</summary>
+              <div className="protocol-address-input">
+                <input
+                  value={customAddress}
+                  placeholder="0x…"
+                  onChange={(event) => setCustomAddress(event.target.value.trim())}
+                />
+                <button
+                  type="button"
+                  disabled={!isAddress(customAddress) || constituents.length >= 16}
+                  onClick={() => isAddress(customAddress) && addAsset({ address: customAddress })}
+                >
+                  Validate and add
+                </button>
+              </div>
+            </details>
+            <div className="creation-assets">
+              {constituents.map((row, index) => {
+                const metadata = assets.data?.[index]?.metadata;
+                return (
+                  <article key={row.asset}>
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{metadata?.symbol ?? "Checking token…"}</strong>
+                      <small>{metadata?.name ?? row.asset}</small>
+                      {metadata && !metadata.metadataAvailable && (
+                        <small className="dapp-inline-error">
+                          This address is not a readable ERC-20.
+                        </small>
+                      )}
+                    </div>
+                    <label>
+                      Tokens in 1 {symbol || "basket"}
+                      <input
+                        inputMode="decimal"
+                        value={row.bundle}
+                        onChange={(event) => update(index, "bundle", event.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setConstituents((current) => current.filter((_, item) => item !== index))
+                      }
+                    >
+                      Remove
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <p>
+              Set a human starting price and the asset amount to seed. Statics calculates the
+              BasketToken side and locks the resulting full-range liquidity permanently.
+            </p>
+            <div className="creation-assets">
+              {constituents.map((row, index) => {
+                const metadata = assets.data?.[index]?.metadata;
+                const assetQuote = quote?.assets[index];
+                return (
+                  <article key={row.asset}>
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{metadata?.symbol ?? "Token"}</strong>
+                      <small>
+                        Wallet:{" "}
+                        {metadata
+                          ? formatTokenAmount(assets.data![index]!.walletBalance, metadata.decimals)
+                          : "—"}
+                      </small>
+                    </div>
+                    <div>
+                      <label>
+                        1 {symbol || "BASKET"} = X {metadata?.symbol ?? "asset"}
+                        <input
+                          inputMode="decimal"
+                          value={row.price}
+                          onChange={(event) => update(index, "price", event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Seed {metadata?.symbol ?? "asset"}
+                        <input
+                          inputMode="decimal"
+                          value={row.seed}
+                          onChange={(event) => update(index, "seed", event.target.value)}
+                        />
+                      </label>
+                      {assetQuote && (
+                        <small>
+                          Pool receives {formatTokenAmount(assetQuote.poolBasketAmount, 18)}{" "}
+                          {symbol || "BASKET"} +{" "}
+                          {formatTokenAmount(assetQuote.poolAssetAmount, assetQuote.decimals)}{" "}
+                          {assetQuote.symbol}
+                        </small>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <ProtocolSlippageControl />
+          </>
+        )}
+
+        {step === 3 && (
+          <div className="creation-economics">
+            <section>
+              <p className="dapp-section-label">Standard economics</p>
+              <h3>Balanced defaults</h3>
+              <p>Mint 0.001 · redeem 0.001 · flash 0.05% · origination 1% · extension 0.25%</p>
+              <p>Maximum LTV 75% · recovery penalty 5% · duration 30 days</p>
+              <label className="protocol-checkbox">
+                <input
+                  type="checkbox"
+                  checked={advancedEconomics}
+                  onChange={(event) => setAdvancedEconomics(event.target.checked)}
+                />
+                Customize immutable economics
+              </label>
+            </section>
+            {advancedEconomics && (
+              <section className="remaining-form-grid">
+                <EconomicInput
+                  label="Mint fee (BasketToken)"
+                  value={mintFee}
+                  onChange={setMintFee}
+                />
+                <EconomicInput
+                  label="Redemption fee (BasketToken)"
+                  value={redemptionFee}
+                  onChange={setRedemptionFee}
+                />
+                <EconomicInput
+                  label="Flash fee"
+                  value={flashFeePercent}
+                  onChange={setFlashFeePercent}
+                  percent
+                />
+                <EconomicInput
+                  label="Loan origination fee"
+                  value={originationFeePercent}
+                  onChange={setOriginationFeePercent}
+                  percent
+                />
+                <EconomicInput
+                  label="Loan extension fee"
+                  value={extensionFeePercent}
+                  onChange={setExtensionFeePercent}
+                  percent
+                />
+                <EconomicInput
+                  label="Maximum loan-to-value"
+                  value={ltvPercent}
+                  onChange={setLtvPercent}
+                  percent
+                />
+                <EconomicInput
+                  label="Recovery penalty"
+                  value={recoveryPercent}
+                  onChange={setRecoveryPercent}
+                  percent
+                />
+                <EconomicInput
+                  label="Loan duration (days)"
+                  value={loanDurationDays}
+                  onChange={setLoanDurationDays}
+                />
+              </section>
+            )}
+            {!economicsValid && (
+              <p className="dapp-inline-error" role="alert">
+                Enter valid percentages. Maximum LTV plus its recovery penalty must remain fully
+                collateralized.
+              </p>
+            )}
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="creation-review">
+            <section>
+              <p className="dapp-section-label">Immutable basket</p>
+              <h3>
+                {name} ({symbol})
+              </h3>
+              <ul>
+                <li>{constituents.length} fixed constituents</li>
+                <li>
+                  Initial supply: {quote ? formatTokenAmount(quote.basketShares, 18) : "—"} {symbol}
+                </li>
+                <li>Creator revenue share: 5% of this basket's swap fees</li>
+                <li>
+                  Creation fee:{" "}
+                  {creation.data === undefined ? "—" : `${formatEther(creation.data)} ETH`}
+                </li>
+                <li>
+                  {approvalCount} token approval{approvalCount === 1 ? "" : "s"} required
+                </li>
+              </ul>
+            </section>
+            <section>
+              <p className="dapp-section-label">Funding</p>
+              <h3>Maximum wallet debit</h3>
+              <ul>
+                {quote?.assets.map((item) => (
+                  <li key={item.address}>
+                    <strong>
+                      {formatTokenAmount(item.maximumAmount, item.decimals)} {item.symbol}
+                    </strong>
+                    <small>
+                      pool {formatTokenAmount(item.poolAssetAmount, item.decimals)} · backing{" "}
+                      {formatTokenAmount(item.backingAmount, item.decimals)}
+                      {item.shortfall > 0n
+                        ? ` · short ${formatTokenAmount(item.shortfall, item.decimals)}`
+                        : " · funded"}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <details className="liquidity-position-diagnostics">
+              <summary>Technical details</summary>
+              <p>
+                Flash {flashFeePercent}% · origination {originationFeePercent}% · extension{" "}
+                {extensionFeePercent}% · LTV {ltvPercent}% · recovery {recoveryPercent}% ·{" "}
+                {loanDurationDays} days
+              </p>
+            </details>
+          </div>
+        )}
+
         {progress && <p role="status">{protocolActionProgressLabel(progress)}</p>}
         {error && (
           <div className="dapp-error" role="alert">
             {error}
           </div>
         )}
-        <button
-          className="dollar-submit"
-          type="button"
-          disabled={busy || creation.data === undefined}
-          onClick={() => void launch()}
-        >
-          {busy ? "Launching…" : "Review wallet prompts and launch"}
-        </button>
+        <div className="creation-footer">
+          <button
+            type="button"
+            disabled={busy || step === 0}
+            onClick={() => setStep((current) => current - 1)}
+          >
+            Back
+          </button>
+          {step < steps.length - 1 ? (
+            <button
+              className="creation-next"
+              type="button"
+              disabled={busy || !nextAllowed}
+              onClick={() => setStep((current) => current + 1)}
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              className="dollar-submit"
+              type="button"
+              disabled={busy || !quote || hasShortfall || creation.data === undefined}
+              onClick={() => void launch()}
+            >
+              {busy
+                ? "Launching and verifying…"
+                : hasShortfall
+                  ? "Fund wallet to launch"
+                  : "Launch basket"}
+            </button>
+          )}
+        </div>
       </section>
     </div>
+  );
+}
+
+function EconomicInput({
+  label,
+  value,
+  onChange,
+  percent = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  percent?: boolean;
+}) {
+  return (
+    <label className="basket-field">
+      <span>{label}</span>
+      <div className={percent ? "protocol-percent-input" : undefined}>
+        <input
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {percent && <span>%</span>}
+      </div>
+    </label>
   );
 }

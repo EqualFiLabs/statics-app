@@ -25,18 +25,21 @@ import {
 } from "@statics-protocol/sdk";
 
 import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
   basketStatusLabel,
   deriveBasketActionAvailability,
   describeBasketError,
   loadBasketCatalog,
   maximumWithSlippage,
   minimumWithSlippage,
-  parseSlippageBps,
   validateBasketCollateralSimulation,
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
+import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import {
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
 import {
   positionSelection,
   recommendedMintSelection,
@@ -45,6 +48,7 @@ import {
   type BasketConversionSelection,
 } from "@/lib/baskets/conversion-navigation";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
+import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
@@ -56,6 +60,8 @@ import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { applyPercent } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -63,10 +69,6 @@ function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
   const shortFraction = fraction.slice(0, precision).replace(/0+$/, "");
   return shortFraction ? `${whole}.${shortFraction}` : whole;
-}
-
-function shortAddress(address: Address): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 function feeTierLabel(
@@ -119,6 +121,7 @@ function BasketDetailRuntime({
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocolSlippage = useProtocolSlippage();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<"mint" | "redeem" | "swap">(initialAction);
@@ -126,9 +129,6 @@ function BasketDetailRuntime({
     null
   );
   const [amountInput, setAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   let amount = 0n;
@@ -137,7 +137,7 @@ function BasketDetailRuntime({
   } catch {
     amount = 0n;
   }
-  const slippageBps = parseSlippageBps(slippageInput);
+  const slippageBps = slippagePercentToBps(protocolSlippage);
 
   const positions = useQuery({
     queryKey: protocolQueryKeys.positionCatalog(
@@ -539,9 +539,12 @@ function BasketDetailRuntime({
             Basket #{basket.basketId.toString()} · {basketStatusLabel(basket.status)}
           </p>
           <h2>{basket.name}</h2>
-          <p>
-            {basket.symbol} · {shortAddress(basket.token.address)}
-          </p>
+          <p>{basket.symbol}</p>
+          <AddressDisplay
+            address={basket.token.address}
+            chainId={deploymentState.deployment.chainId}
+            label={basket.symbol}
+          />
         </div>
         <dl>
           <div>
@@ -554,7 +557,12 @@ function BasketDetailRuntime({
           </div>
           <div>
             <dt>{t("creator")}</dt>
-            <dd title={basket.creator}>{shortAddress(basket.creator)}</dd>
+            <dd>
+              <AddressDisplay
+                address={basket.creator}
+                chainId={deploymentState.deployment.chainId}
+              />
+            </dd>
           </div>
         </dl>
       </section>
@@ -575,9 +583,11 @@ function BasketDetailRuntime({
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <strong>{constituent.token.symbol}</strong>
-                  <small title={constituent.token.address}>
-                    {constituent.token.name} · {shortAddress(constituent.token.address)}
-                  </small>
+                  <small>{constituent.token.name}</small>
+                  <AddressDisplay
+                    address={constituent.token.address}
+                    chainId={deploymentState.deployment.chainId}
+                  />
                   {!constituent.token.metadataAvailable && (
                     <small className="is-warning">{t("metadataUnavailable")}</small>
                   )}
@@ -630,24 +640,15 @@ function BasketDetailRuntime({
                   placeholder="0.00"
                   disabled={pending}
                 />
+                <AmountShortcuts
+                  disabled={pending || sourceBalance <= 0n}
+                  label={t("amountShortcuts")}
+                  onSelect={(percent) =>
+                    setAmountInput(displayAmount(applyPercent(sourceBalance, percent), 18, 18))
+                  }
+                />
               </label>
-              <label className="basket-field">
-                <span>{t("slippage")}</span>
-                <div>
-                  <input
-                    value={slippageInput}
-                    onChange={(event) => {
-                      setSlippageInput(event.target.value);
-                      setActionError(null);
-                    }}
-                    inputMode="decimal"
-                    aria-describedby="basket-slippage-help"
-                    disabled={pending}
-                  />
-                  <strong>%</strong>
-                </div>
-                <small id="basket-slippage-help">{t("slippageHelp")}</small>
-              </label>
+              <ProtocolSlippageControl />
               <label className="basket-field">
                 <span>{mode === "mint" ? t("receiveIn") : t("redeemFrom")}</span>
                 <select
