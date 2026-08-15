@@ -7,11 +7,11 @@
   "protocolCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics",
-    "publicCommit": "9b978669063feb1004058d4230c989eee83f692c",
+    "publicCommit": "15b278ce4ed5717096966c103abb7d5bc710a7a3",
     "deploymentArtifact": "deployments/robinhood-testnet-46630-statics-genesis.json",
     "recordedDeploymentCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16"
   },
-  "generatedAt": "2026-08-14T18:48:54.166Z",
+  "generatedAt": "2026-08-15T11:11:46.831Z",
   "contracts": {
     "diamond": {
       "address": "0xd41199E3A980dBcC5D3fB3fbD7B973cf255F474E",
@@ -105,5 +105,8 @@
       "runtimeCodeHash": "0xa857db54d9b01b50490fb464d00b35a531d4637ce7b3a2d45e33dfaa10d5e662"
     }
   },
-  "faucet": null
+  "faucet": {
+    "address": "0xC00BE4eC9D2AF217DdD2989695249208CfD459eA",
+    "runtimeCodeHash": "0xa0903aaf8ebd61099837a652bbb657ed715196ae265306f05b030b8facf7f103"
+  }
 }
