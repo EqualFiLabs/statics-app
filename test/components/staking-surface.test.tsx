@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@/test/render";
+import { useState } from "react";
+import { fireEvent, render, screen, within } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
 
 import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
+import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import type { StakingSnapshot } from "@/lib/positions/staking";
 
 const token = (symbol: string, last: string) => ({
@@ -186,5 +188,49 @@ describe("reward asset picker", () => {
 
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+});
+
+describe("position reward selection editor", () => {
+  function DraftEditor({ onSave }: { onSave: () => void }) {
+    const [selected, setSelected] = useState<readonly `0x${string}`[]>([]);
+    return (
+      <RewardSelectionEditor
+        candidates={[{ token: wbtc, sources: ["Fee history"] }]}
+        confirmed={[]}
+        selected={selected}
+        rewards={[]}
+        maximum={64n}
+        chainId={46_630}
+        changeCount={selected.length}
+        disabled={false}
+        saving={false}
+        onToggle={(asset) =>
+          setSelected((current) =>
+            current.includes(asset) ? current.filter((item) => item !== asset) : [...current, asset]
+          )
+        }
+        onSave={onSave}
+      />
+    );
+  }
+
+  it("highlights card choices locally and waits for the explicit batch save", () => {
+    const onSave = vi.fn();
+    render(<DraftEditor onSave={onSave} />);
+
+    const card = screen.getByText("WBTC").closest("article");
+    expect(card).not.toHaveClass("is-selected");
+    expect(screen.getByRole("button", { name: "Save 0 reward changes" })).toBeDisabled();
+
+    fireEvent.click(within(card!).getByRole("button", { name: "Select reward" }));
+
+    expect(card).toHaveClass("is-selected", "is-changed");
+    expect(screen.getByText("Will be selected")).toBeInTheDocument();
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save 1 reward change" }));
+    expect(onSave).toHaveBeenCalledOnce();
   });
 });

@@ -369,13 +369,13 @@ export async function loadPositionCatalog(
  * Reloads the complete position catalog at the transaction's confirmed block
  * and rejects until the requested reward membership is authoritative there.
  */
-export async function loadConfirmedRewardSelection(
+export async function loadConfirmedRewardSelections(
   publicClient: PublicClient,
   deployment: DollarDeployment,
   wallet: Address,
   positionId: bigint,
-  asset: Address,
-  expectedSelected: boolean,
+  expectedSelected: readonly Address[],
+  expectedUnselected: readonly Address[],
   blockNumber: bigint
 ): Promise<PositionCatalog> {
   const catalog = await loadPositionCatalog(publicClient, deployment, wallet, blockNumber);
@@ -383,8 +383,11 @@ export async function loadConfirmedRewardSelection(
   if (!position) {
     throw new Error("This PositionNFT is no longer owned by the connected wallet.");
   }
-  if (position.selectedRewardAssets.includes(asset) !== expectedSelected) {
-    throw new Error("The confirmed reward selection is not yet available from the read RPC.");
+  const selected = new Set(position.selectedRewardAssets.map((asset) => getAddress(asset)));
+  const missingSelection = expectedSelected.some((asset) => !selected.has(getAddress(asset)));
+  const retainedSelection = expectedUnselected.some((asset) => selected.has(getAddress(asset)));
+  if (missingSelection || retainedSelection) {
+    throw new Error("The confirmed reward selections are not yet available from the read RPC.");
   }
   return catalog;
 }

@@ -30,10 +30,11 @@ import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar
 import {
   canClosePosition,
   describePositionError,
-  loadConfirmedRewardSelection,
+  loadConfirmedRewardSelections,
   loadPositionCatalog,
   unlockedCollateral,
   validateCustomRewardAsset,
+  type RewardCandidate,
 } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
@@ -41,6 +42,7 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
+import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { useAppLocale } from "@/i18n/client";
@@ -49,11 +51,20 @@ import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import {
   checkpointRewardAssetBatches,
   rewardAssetsNeedingCheckpoint,
+  rewardSelectionActionPlan,
+  rewardSelectionChanges,
+  toggleRewardSelection,
 } from "@/lib/positions/staking";
 
 const deploymentState = readClientDollarDeployment();
 
 type CollateralMode = "deposit" | "withdraw";
+
+type RewardSelectionDraft = Readonly<{
+  key: string;
+  assets: readonly Address[];
+  customCandidates: readonly RewardCandidate[];
+}>;
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -92,6 +103,9 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const [stakeMode, setStakeMode] = useState<"stake" | "unstake">("stake");
   const [stakeAmountInput, setStakeAmountInput] = useState("");
   const [customRewardAddress, setCustomRewardAddress] = useState("");
+  const [rewardSelectionDraft, setRewardSelectionDraft] = useState<RewardSelectionDraft | null>(
+    null
+  );
 
   const catalogQueryKey = protocolQueryKeys.positionCatalog(
     deploymentState.status === "configured" ? deploymentState.deployment.protocolCommit : undefined,
@@ -114,6 +128,23 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     },
   });
   const position = catalog.data?.positions.find((candidate) => candidate.positionId === positionId);
+  const rewardDraftKey = `${wallet ?? "disconnected"}:${positionId.toString()}`;
+  const activeRewardDraft =
+    rewardSelectionDraft?.key === rewardDraftKey ? rewardSelectionDraft : null;
+  const draftRewardAssets = activeRewardDraft?.assets ?? position?.selectedRewardAssets ?? [];
+  const rewardChanges = rewardSelectionChanges(
+    position?.selectedRewardAssets ?? [],
+    draftRewardAssets
+  );
+  const rewardChangeCount = rewardChanges.additions.length + rewardChanges.removals.length;
+  const displayedRewardCandidates = useMemo(() => {
+    const candidates = [...(catalog.data?.rewardCandidates ?? [])];
+    const known = new Set(candidates.map((candidate) => candidate.token.address));
+    for (const candidate of activeRewardDraft?.customCandidates ?? []) {
+      if (!known.has(candidate.token.address)) candidates.push(candidate);
+    }
+    return candidates.sort((left, right) => left.token.symbol.localeCompare(right.token.symbol));
+  }, [activeRewardDraft?.customCandidates, catalog.data?.rewardCandidates]);
   const basket = catalog.data?.baskets.find(
     (candidate) => candidate.basketId.toString() === basketIdInput
   );
@@ -180,21 +211,21 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     }
   };
 
-  const verifyRewardSelection = async (
+  const verifyRewardSelections = async (
     receipt: TransactionReceipt,
-    asset: Address,
-    expectedSelected: boolean
+    expectedSelected: readonly Address[],
+    expectedUnselected: readonly Address[]
   ) => {
     if (!publicClient || !wallet || deploymentState.status !== "configured") {
       throw new Error("The connected PositionNFT is unavailable.");
     }
-    const confirmedCatalog = await loadConfirmedRewardSelection(
+    const confirmedCatalog = await loadConfirmedRewardSelections(
       publicClient,
       deploymentState.deployment,
       wallet,
       positionId,
-      asset,
       expectedSelected,
+      expectedUnselected,
       receipt.blockNumber
     );
     queryClient.setQueryData(catalogQueryKey, confirmedCatalog);
@@ -338,33 +369,96 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     setStakeAmountInput("");
   };
 
-  const changeRewardSelection = async (asset: Address, selected: boolean) => {
-    if (!position || deploymentState.status !== "configured") return;
-    const candidate = catalog.data?.rewardCandidates.find((item) => item.token.address === asset);
-    const required = await rewardAssetsNeedingCheckpoint(
-      publicClient!,
-      deploymentState.deployment,
-      [asset]
-    );
-    for (const batch of checkpointRewardAssetBatches(required)) {
-      await sendTransaction({
-        kind: "checkpoint-rewards",
-        label: `Checkpoint ${candidate?.token.symbol || "reward asset"}`,
-        amount: candidate?.token.symbol || asset,
-        to: deploymentState.deployment.contracts.diamond,
-        data: buildCheckpointRewardAssetsCall(batch),
-      });
+  const updateRewardSelectionDraft = (
+    assets: readonly Address[],
+    customCandidates = activeRewardDraft?.customCandidates ?? []
+  ) => {
+    if (!position || !catalog.data) return;
+    const changes = rewardSelectionChanges(position.selectedRewardAssets, assets);
+    if (changes.additions.length === 0 && changes.removals.length === 0) {
+      setRewardSelectionDraft(null);
+      return;
     }
-    await sendTransaction({
-      kind: selected ? "opt-out-reward-assets" : "opt-in-reward-assets",
-      label: `${selected ? "Remove" : "Select"} ${candidate?.token.symbol || "reward asset"}`,
-      amount: candidate?.token.symbol || asset,
-      to: deploymentState.deployment.contracts.diamond,
-      data: selected
-        ? buildOptOutRewardAssetsCall(position.positionId, [asset])
-        : buildOptInRewardAssetsCall(position.positionId, [asset]),
-      verifyConfirmation: (receipt) => verifyRewardSelection(receipt, asset, !selected),
+    const selected = new Set(assets);
+    setRewardSelectionDraft({
+      key: rewardDraftKey,
+      assets,
+      customCandidates: customCandidates.filter((candidate) =>
+        selected.has(candidate.token.address)
+      ),
     });
+  };
+
+  const stageRewardSelection = (asset: Address) => {
+    if (!catalog.data) return;
+    try {
+      updateRewardSelectionDraft(
+        toggleRewardSelection(draftRewardAssets, asset, catalog.data.maximumRewardAssets)
+      );
+      setActionError(null);
+    } catch (error) {
+      setActionError(describePositionError(error));
+    }
+  };
+
+  const saveRewardSelections = async () => {
+    if (
+      !position ||
+      !activeRewardDraft ||
+      !catalog.data ||
+      !publicClient ||
+      deploymentState.status !== "configured"
+    ) {
+      throw new Error("Choose at least one reward selection change.");
+    }
+    const changes = rewardSelectionChanges(position.selectedRewardAssets, activeRewardDraft.assets);
+    if (changes.additions.length === 0 && changes.removals.length === 0) return;
+
+    const diamond = deploymentState.deployment.contracts.diamond;
+    let completed = false;
+    try {
+      const required = await rewardAssetsNeedingCheckpoint(
+        publicClient,
+        deploymentState.deployment,
+        [...changes.removals, ...changes.additions]
+      );
+      for (const batch of checkpointRewardAssetBatches(required)) {
+        await sendTransaction({
+          kind: "checkpoint-rewards",
+          label: `Checkpoint ${batch.length} reward asset${batch.length === 1 ? "" : "s"}`,
+          amount: `${batch.length} assets`,
+          to: diamond,
+          data: buildCheckpointRewardAssetsCall(batch),
+        });
+      }
+      for (const action of rewardSelectionActionPlan(
+        position.selectedRewardAssets,
+        activeRewardDraft.assets
+      )) {
+        const adding = action.kind === "add";
+        await sendTransaction({
+          kind: adding ? "opt-in-reward-assets" : "opt-out-reward-assets",
+          label: `${adding ? "Select" : "Remove"} ${action.assets.length} reward asset${action.assets.length === 1 ? "" : "s"}`,
+          amount: `${action.assets.length} assets`,
+          to: diamond,
+          data: adding
+            ? buildOptInRewardAssetsCall(position.positionId, action.assets)
+            : buildOptOutRewardAssetsCall(position.positionId, action.assets),
+          verifyConfirmation: (receipt) =>
+            verifyRewardSelections(
+              receipt,
+              adding ? action.assets : [],
+              adding ? changes.removals : action.assets
+            ),
+        });
+      }
+      completed = true;
+    } finally {
+      await catalog.refetch();
+      if (completed) {
+        setRewardSelectionDraft((current) => (current?.key === rewardDraftKey ? null : current));
+      }
+    }
   };
 
   const addCustomReward = async () => {
@@ -374,17 +468,20 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     const metadata = await validateCustomRewardAsset(
       publicClient,
       customRewardAddress,
-      position.selectedRewardAssets,
+      draftRewardAssets,
       catalog.data.maximumRewardAssets
     );
-    await sendTransaction({
-      kind: "opt-in-reward-assets",
-      label: `Select ${metadata.symbol}`,
-      amount: metadata.symbol,
-      to: deploymentState.deployment.contracts.diamond,
-      data: buildOptInRewardAssetsCall(position.positionId, [metadata.address]),
-      verifyConfirmation: (receipt) => verifyRewardSelection(receipt, metadata.address, true),
-    });
+    const nextAssets = toggleRewardSelection(
+      draftRewardAssets,
+      metadata.address,
+      catalog.data.maximumRewardAssets
+    );
+    updateRewardSelectionDraft(nextAssets, [
+      ...(activeRewardDraft?.customCandidates ?? []).filter(
+        (candidate) => candidate.token.address !== metadata.address
+      ),
+      { token: metadata, sources: [t("customSource")] },
+    ]);
     setCustomRewardAddress("");
   };
 
@@ -624,58 +721,19 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
       </div>
 
       <section className="position-panel position-rewards">
-        <div className="position-section-heading">
-          <div>
-            <p className="dapp-section-label">{t("selectedRewards")}</p>
-            <h3>{t("chooseAssets", { count: catalog.data.maximumRewardAssets.toString() })}</h3>
-          </div>
-          <span>{t("selectedCount", { count: position.selectedRewardAssets.length })}</span>
-        </div>
-        <div className="reward-grid">
-          {catalog.data.rewardCandidates.map((candidate) => {
-            const selected = position.selectedRewardAssets.includes(candidate.token.address);
-            const reward = position.rewards.find(
-              (item) => item.token.address === candidate.token.address
-            );
-            return (
-              <article
-                key={candidate.token.address}
-                className={selected ? "is-selected" : undefined}
-              >
-                <div>
-                  <strong>{candidate.token.symbol}</strong>
-                  <span>{candidate.sources.join(" · ")}</span>
-                </div>
-                <AddressDisplay
-                  address={candidate.token.address}
-                  chainId={deploymentState.deployment.chainId}
-                  label={t("token")}
-                />
-                <p>
-                  Pending: {displayAmount(reward?.pending ?? 0n, candidate.token.decimals)}{" "}
-                  {candidate.token.symbol}
-                </p>
-                <button
-                  type="button"
-                  disabled={pendingAction !== null}
-                  onClick={() =>
-                    void runAction(
-                      `reward-${candidate.token.address}`,
-                      () => changeRewardSelection(candidate.token.address, selected),
-                      false
-                    )
-                  }
-                >
-                  {pendingAction === `reward-${candidate.token.address}`
-                    ? t("waitingShort")
-                    : selected
-                      ? t("removeSelection")
-                      : t("selectReward")}
-                </button>
-              </article>
-            );
-          })}
-        </div>
+        <RewardSelectionEditor
+          candidates={displayedRewardCandidates}
+          confirmed={position.selectedRewardAssets}
+          selected={draftRewardAssets}
+          rewards={position.rewards}
+          maximum={catalog.data.maximumRewardAssets}
+          chainId={deploymentState.deployment.chainId}
+          changeCount={rewardChangeCount}
+          disabled={pendingAction !== null}
+          saving={pendingAction === "save-reward-selections"}
+          onToggle={stageRewardSelection}
+          onSave={() => void runAction("save-reward-selections", saveRewardSelections, false)}
+        />
         <div className="custom-reward">
           <label className="basket-field">
             <span>{t("customReward")}</span>
@@ -697,7 +755,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
             disabled={pendingAction !== null || customRewardAddress.length === 0}
             onClick={() => void runAction("custom-reward", addCustomReward, false)}
           >
-            {pendingAction === "custom-reward" ? t("waiting") : t("selectAddress")}
+            {pendingAction === "custom-reward" ? t("validatingAddress") : t("stageAddress")}
           </button>
         </div>
         <p className="dollar-warning">{t("historicalWarning")}</p>

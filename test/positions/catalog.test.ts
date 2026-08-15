@@ -21,7 +21,7 @@ vi.mock("@/lib/baskets/baskets", async (importOriginal) => {
   };
 });
 
-import { loadConfirmedRewardSelection, loadPositionCatalog } from "@/lib/positions/positions";
+import { loadConfirmedRewardSelections, loadPositionCatalog } from "@/lib/positions/positions";
 
 const wallet = "0x0000000000000000000000000000000000000001" as Address;
 const diamond = "0x0000000000000000000000000000000000000010" as Address;
@@ -175,7 +175,7 @@ describe("PositionNFT catalog discovery", () => {
     } as DollarDeployment;
 
     await expect(
-      loadConfirmedRewardSelection(publicClient, deployment, wallet, 1n, dollar, true, 50n)
+      loadConfirmedRewardSelections(publicClient, deployment, wallet, 1n, [dollar], [], 50n)
     ).resolves.toMatchObject({
       currentBlock: 50n,
       positions: [expect.objectContaining({ selectedRewardAssets: [dollar] })],
@@ -183,7 +183,7 @@ describe("PositionNFT catalog discovery", () => {
     expect(publicClient.getBlock).toHaveBeenCalledWith({ blockNumber: 50n });
 
     await expect(
-      loadConfirmedRewardSelection(publicClient, deployment, wallet, 1n, dollar, false, 50n)
-    ).rejects.toThrow("confirmed reward selection is not yet available");
+      loadConfirmedRewardSelections(publicClient, deployment, wallet, 1n, [], [dollar], 50n)
+    ).rejects.toThrow("confirmed reward selections are not yet available");
   });
 });

@@ -5,6 +5,9 @@ import {
   formatMaturity,
   groupByMaturity,
   rankRewardCandidates,
+  rewardSelectionActionPlan,
+  rewardSelectionChanges,
+  toggleRewardSelection,
   type RewardSelection,
 } from "@/lib/positions/staking";
 
@@ -92,6 +95,47 @@ describe("staking maturity", () => {
 
     expect(formatMaturity(laterToday, now)).not.toMatch(/2026/);
     expect(formatMaturity(tomorrow, now)).toMatch(/2026/);
+  });
+});
+
+describe("reward selection drafts", () => {
+  it("computes additions and removals without duplicating assets", () => {
+    expect(
+      rewardSelectionChanges(
+        [wbtc.address, weth.address],
+        [weth.address, usdc.address, usdc.address]
+      )
+    ).toEqual({ additions: [usdc.address], removals: [wbtc.address] });
+  });
+
+  it("toggles locally and permits a replacement at the selection cap", () => {
+    const withoutWbtc = toggleRewardSelection([wbtc.address, weth.address], wbtc.address, 2n);
+    expect(withoutWbtc).toEqual([weth.address]);
+    expect(toggleRewardSelection(withoutWbtc, usdc.address, 2n)).toEqual([
+      weth.address,
+      usdc.address,
+    ]);
+  });
+
+  it("plans removals before additions so a full position can replace assets", () => {
+    expect(
+      rewardSelectionActionPlan([wbtc.address, weth.address], [weth.address, usdc.address])
+    ).toEqual([
+      { kind: "remove", assets: [wbtc.address] },
+      { kind: "add", assets: [usdc.address] },
+    ]);
+  });
+
+  it("recomputes only unfinished work after a partially confirmed batch", () => {
+    expect(rewardSelectionActionPlan([weth.address], [weth.address, usdc.address])).toEqual([
+      { kind: "add", assets: [usdc.address] },
+    ]);
+  });
+
+  it("rejects additions beyond the selection cap", () => {
+    expect(() => toggleRewardSelection([wbtc.address, weth.address], usdc.address, 2n)).toThrow(
+      "2 asset maximum"
+    );
   });
 });
 

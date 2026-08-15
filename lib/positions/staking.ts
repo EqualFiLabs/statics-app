@@ -192,6 +192,61 @@ export const VISIBLE_REWARD_CANDIDATES = 6;
 
 export const MAX_REWARD_CHECKPOINT_BATCH = 8;
 
+export type RewardSelectionChanges = Readonly<{
+  additions: readonly Address[];
+  removals: readonly Address[];
+}>;
+
+export type RewardSelectionAction = Readonly<{
+  kind: "add" | "remove";
+  assets: readonly Address[];
+}>;
+
+function canonicalRewardAssets(assets: readonly Address[]): Address[] {
+  return [...new Set(assets.map((asset) => getAddress(asset)))];
+}
+
+export function rewardSelectionChanges(
+  confirmed: readonly Address[],
+  draft: readonly Address[]
+): RewardSelectionChanges {
+  const confirmedAssets = canonicalRewardAssets(confirmed);
+  const draftAssets = canonicalRewardAssets(draft);
+  const confirmedSet = new Set(confirmedAssets);
+  const draftSet = new Set(draftAssets);
+  return {
+    additions: draftAssets.filter((asset) => !confirmedSet.has(asset)),
+    removals: confirmedAssets.filter((asset) => !draftSet.has(asset)),
+  };
+}
+
+export function toggleRewardSelection(
+  selected: readonly Address[],
+  asset: Address,
+  maximum: bigint
+): readonly Address[] {
+  const current = canonicalRewardAssets(selected);
+  const canonicalAsset = getAddress(asset);
+  if (current.includes(canonicalAsset)) {
+    return current.filter((candidate) => candidate !== canonicalAsset);
+  }
+  if (BigInt(current.length) >= maximum) {
+    throw new Error(`This position already selected the ${maximum.toString()} asset maximum.`);
+  }
+  return [...current, canonicalAsset];
+}
+
+export function rewardSelectionActionPlan(
+  confirmed: readonly Address[],
+  draft: readonly Address[]
+): readonly RewardSelectionAction[] {
+  const changes = rewardSelectionChanges(confirmed, draft);
+  const actions: RewardSelectionAction[] = [];
+  if (changes.removals.length > 0) actions.push({ kind: "remove", assets: changes.removals });
+  if (changes.additions.length > 0) actions.push({ kind: "add", assets: changes.additions });
+  return actions;
+}
+
 export async function rewardAssetsNeedingCheckpoint(
   publicClient: PublicClient,
   deployment: DollarDeployment,
