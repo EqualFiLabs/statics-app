@@ -409,8 +409,8 @@ function GenesisRuntime() {
                 </div>
               )}
               <p className="genesis-warning">
-                Unlink before transfer. A transfer keeps the NFT but resets its activation to tier
-                0.
+                Unlink before transfer. A transfer keeps the Position NFT but resets its activation
+                to tier 0.
               </p>
             </article>
           );
