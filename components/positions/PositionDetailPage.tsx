@@ -41,7 +41,7 @@ import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
@@ -153,6 +153,16 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const existingCollateral = position?.collateral.find(
     (item) => item.basket.basketId === basket?.basketId
   );
+  const collateralAvailable =
+    collateralMode === "deposit"
+      ? (basket?.walletBalance ?? 0n)
+      : existingCollateral
+        ? unlockedCollateral(existingCollateral)
+        : 0n;
+  const stakingAvailable =
+    stakeMode === "stake"
+      ? (catalog.data?.stakingTokenBalance ?? 0n)
+      : (position?.stakedBalance ?? 0n);
   const collateralAmount = useMemo(
     () => parseAmount(collateralAmountInput, 18, locale),
     [collateralAmountInput, locale]
@@ -622,18 +632,14 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               {existingCollateral ? displayAmount(unlockedCollateral(existingCollateral)) : "0"}
             </small>
             {basket && (
-              <AmountShortcuts
+              <AmountPercentageSlider
+                amount={collateralAmount}
+                maximum={collateralAvailable}
                 disabled={pendingAction !== null}
                 label={t("amountShortcuts")}
                 onSelect={(percent) => {
-                  const available =
-                    collateralMode === "deposit"
-                      ? basket.walletBalance
-                      : existingCollateral
-                        ? unlockedCollateral(existingCollateral)
-                        : 0n;
                   setCollateralAmountInput(
-                    formatUnits(applyPercent(available, percent), basket.token.decimals)
+                    formatUnits(applyPercent(collateralAvailable, percent), basket.token.decimals)
                   );
                   setActionError(null);
                 }}
@@ -720,14 +726,17 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               placeholder="0.00"
               disabled={pendingAction !== null}
             />
-            <AmountShortcuts
+            <AmountPercentageSlider
+              amount={stakeAmount}
+              maximum={stakingAvailable}
               disabled={pendingAction !== null}
               label={t("amountShortcuts")}
               onSelect={(percent) => {
-                const available =
-                  stakeMode === "stake" ? catalog.data.stakingTokenBalance : position.stakedBalance;
                 setStakeAmountInput(
-                  formatUnits(applyPercent(available, percent), catalog.data.stakingToken.decimals)
+                  formatUnits(
+                    applyPercent(stakingAvailable, percent),
+                    catalog.data.stakingToken.decimals
+                  )
                 );
                 setActionError(null);
               }}

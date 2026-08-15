@@ -18,13 +18,13 @@ import {
 
 import {
   canonicalSwapPoolKey,
-  buildSwapTokenApproval,
+  buildMaximumSwapTokenApproval,
   isCurrentCanonicalSwapQuote,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
 import { describeBasketError, minimumWithSlippage, type BasketRecord } from "@/lib/baskets/baskets";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -37,6 +37,7 @@ import {
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import {
+  MAX_ERC20_ALLOWANCE,
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
   hasUsablePermit2Allowance,
@@ -255,9 +256,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           chainId: deploymentState.deployment.chainId,
           kind: "approve-swap",
           label: `Enable ${inputToken.symbol} swaps`,
-          amount: `${display(amount, inputToken.decimals)} ${inputToken.symbol}`,
+          amount: `Maximum ${inputToken.symbol}`,
           to: inputToken.address,
-          data: buildSwapTokenApproval(liquidity.contracts.permit2, amount),
+          data: buildMaximumSwapTokenApproval(liquidity.contracts.permit2),
           sendTransaction: walletState.sendEvmTransaction,
           describeError: describeBasketError,
           verifyConfirmation: async () => {
@@ -267,7 +268,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
               functionName: "allowance",
               args: [wallet, liquidity.contracts.permit2],
             });
-            if (allowance < amount) throw new Error("The Permit2 allowance is still insufficient.");
+            if (allowance !== MAX_ERC20_ALLOWANCE) {
+              throw new Error("The confirmed Permit2 token approval is not maximum.");
+            }
           },
         });
         await permit2Approval.refetch();
@@ -477,7 +480,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             symbol: inputToken.symbol,
           })}
         </small>
-        <AmountShortcuts
+        <AmountPercentageSlider
+          amount={amount}
+          maximum={inputBalance}
           disabled={pending || inputBalance <= 0n}
           label={t("amountShortcuts")}
           onSelect={(percent) =>

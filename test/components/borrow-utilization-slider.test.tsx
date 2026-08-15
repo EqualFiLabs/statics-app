@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
 
 import { BorrowUtilizationSlider } from "@/components/loans/BorrowUtilizationSlider";
+import { AmountPercentageSlider, amountPercentage } from "@/components/protocol/PercentageSlider";
 
 describe("borrow utilization slider", () => {
   it("shows evenly defined allocation marks and reports slider changes", () => {
@@ -24,7 +25,27 @@ describe("borrow utilization slider", () => {
   it("describes the maximum position without exposing 100 as the primary label", () => {
     render(<BorrowUtilizationSlider value={100} onChange={vi.fn()} />);
 
-    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "Maximum");
-    expect(screen.getByText("Maximum")).toBeInTheDocument();
+    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "Max");
+    expect(screen.getByText("Max", { selector: "output" })).toBeInTheDocument();
+  });
+
+  it("tracks typed amounts and treats a gas-reserved selection as Max", () => {
+    expect(amountPercentage(50n, 100n)).toBe(50);
+    expect(amountPercentage(99n, 100n, 99n)).toBe(100);
+
+    const onSelect = vi.fn();
+    render(
+      <AmountPercentageSlider
+        amount={75n}
+        maximum={100n}
+        label="Use available balance"
+        onSelect={onSelect}
+      />
+    );
+
+    const slider = screen.getByRole("slider", { name: "Use available balance" });
+    expect(slider).toHaveValue("75");
+    fireEvent.change(slider, { target: { value: "100" } });
+    expect(onSelect).toHaveBeenCalledWith(100);
   });
 });

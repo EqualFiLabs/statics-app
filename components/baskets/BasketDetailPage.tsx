@@ -35,7 +35,7 @@ import {
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -641,7 +641,9 @@ function BasketDetailRuntime({
                   disabled={pending}
                 />
                 {mode === "redeem" && (
-                  <AmountShortcuts
+                  <AmountPercentageSlider
+                    amount={amount}
+                    maximum={sourceBalance}
                     disabled={pending || sourceBalance <= 0n}
                     label={t("amountShortcuts")}
                     onSelect={(percent) =>

@@ -145,6 +145,23 @@ describe("protocol transaction execution", () => {
     ).toBe("Approve reviewed amount");
   });
 
+  it("describes a maximum swap approval from its calldata instead of its route kind", () => {
+    const spender = "0000000000000000000000000000000000000003";
+    const maximumData = `0x095ea7b3${"0".repeat(24)}${spender}${"f".repeat(64)}` as Hex;
+
+    expect(
+      defaultProtocolPresentation({
+        kind: "approve-swap",
+        label: "Enable canonical swaps",
+        amount: "Maximum TPA1",
+        data: maximumData,
+      })
+    ).toMatchObject({
+      buttonText: "Approve unlimited spending",
+      description: expect.stringContaining("unlimited token spending"),
+    });
+  });
+
   it("does not request a signature when simulation validation fails", async () => {
     const sendTransaction = vi.fn();
     const failure = new Error("Invalid simulated output");

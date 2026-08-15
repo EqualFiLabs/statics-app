@@ -26,7 +26,7 @@ import {
 } from "@statics-protocol/sdk";
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { BorrowUtilizationSlider } from "@/components/loans/BorrowUtilizationSlider";
 import {
   ProtocolSlippageControl,
@@ -1138,6 +1138,7 @@ function LoansRuntime({
               positionId={position?.positionId.toString() ?? ""}
               basketId={basket?.basketId.toString() ?? ""}
               sharesInput={sharesInput}
+              shares={shares}
               wallet={wallet}
               chainId={deploymentState.deployment.chainId}
               quote={currentBorrowQuote}
@@ -1267,6 +1268,7 @@ function BorrowFields({
   positionId,
   basketId,
   sharesInput,
+  shares,
   wallet,
   chainId,
   quote,
@@ -1289,6 +1291,7 @@ function BorrowFields({
   positionId: string;
   basketId: string;
   sharesInput: string;
+  shares: bigint;
   wallet: Address | null;
   chainId: number;
   quote: BorrowQuote | undefined;
@@ -1374,8 +1377,10 @@ function BorrowFields({
               : "—"}
           </small>
           {collateral && (
-            <AmountShortcuts
-              label="Collateral amount shortcuts"
+            <AmountPercentageSlider
+              amount={shares}
+              maximum={collateral.depositedShares - collateral.lockedShares}
+              label="Use unlocked collateral"
               onSelect={(percent) =>
                 onShares(
                   displayAmount(

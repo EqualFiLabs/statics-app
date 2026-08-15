@@ -76,7 +76,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { applyPercent } from "@/lib/protocol/ux";
 
 const deploymentState = readClientDollarDeployment();
@@ -1191,7 +1191,12 @@ function DollarActionPanel({
                       disabled={anyPending}
                     />
                   </div>
-                  <AmountShortcuts
+                  <AmountPercentageSlider
+                    amount={amount}
+                    maximum={balance}
+                    maximumSelection={
+                      mode === "deposit" && asset === "ETH" ? applyPercent(balance, 99) : balance
+                    }
                     disabled={anyPending || supplyUnavailable}
                     label={t("amountShortcuts")}
                     onSelect={(percent) => {

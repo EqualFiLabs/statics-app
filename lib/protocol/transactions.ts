@@ -17,6 +17,7 @@ import {
   type ProtocolReplacementReason,
 } from "@/lib/dollar/activity";
 import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import {
   announceProtocolTransactionConfirmed,
   retryConfirmationVerification,
@@ -124,12 +125,13 @@ function calldataUint(data: Hex, wordIndex: number): bigint | null {
 export function defaultProtocolPresentation(
   request: Pick<ProtocolTransactionRequest, "kind" | "label" | "amount" | "data">
 ): ProtocolTransactionPresentation {
-  const isMaximumTokenApproval = maximumTokenApprovalKinds.has(request.kind);
   const isOperatorApproval = operatorApprovalKinds.has(request.kind);
   const isPermit2Approval = request.kind === "approve-permit2";
   const isBoundedApproval = request.kind === "approve-swap" || request.kind === "approve-bridge";
   const isErc20Approval = request.data.startsWith(erc20ApproveSelector);
   const erc20Allowance = isErc20Approval ? calldataUint(request.data, 1) : null;
+  const isMaximumTokenApproval =
+    maximumTokenApprovalKinds.has(request.kind) || erc20Allowance === MAX_ERC20_ALLOWANCE;
   const spender = isPermit2Approval
     ? request.data.startsWith(permit2ApproveSelector)
       ? calldataAddress(request.data, 1)

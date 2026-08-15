@@ -1,7 +1,6 @@
 import { getAddress, isAddress, zeroAddress, type Address } from "viem";
 
 export const BPS_SCALE = 10_000n;
-export const AMOUNT_SHORTCUTS = [25, 50, 75, 100] as const;
 
 export function applyPercent(value: bigint, percent: number): bigint {
   if (!Number.isInteger(percent) || percent < 0 || percent > 100) {

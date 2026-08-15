@@ -46,7 +46,7 @@ import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { AddressInput } from "@/components/protocol/AddressInput";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { applyPercent, parseRecipientAddress } from "@/lib/protocol/ux";
 
 const erc20Abi = [
@@ -906,7 +906,12 @@ function SendDialog({
           />
           {asset?.balance !== null && asset?.balance !== undefined && (
             <>
-              <AmountShortcuts
+              <AmountPercentageSlider
+                amount={amountRaw}
+                maximum={asset.balance}
+                maximumSelection={
+                  asset.kind === "native" ? applyPercent(asset.balance, 99) : asset.balance
+                }
                 label={t("amountShortcuts")}
                 disabled={pending}
                 onSelect={(percent) => {

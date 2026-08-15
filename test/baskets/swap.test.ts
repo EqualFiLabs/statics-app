@@ -5,7 +5,7 @@ import { basketTokenAbi } from "@statics-protocol/sdk";
 
 import {
   canonicalSwapPoolKey,
-  buildSwapTokenApproval,
+  buildMaximumSwapTokenApproval,
   isCurrentCanonicalSwapQuote,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
@@ -41,9 +41,12 @@ describe("canonical basket swaps", () => {
     expect(isCurrentCanonicalSwapQuote(quote, 26n, token0, "asset-in")).toBe(false);
   });
 
-  it("bounds the token approval to the reviewed swap amount", () => {
+  it("approves Permit2 once with the maximum ERC20 allowance", () => {
     expect(
-      decodeFunctionData({ abi: basketTokenAbi, data: buildSwapTokenApproval(token1, 25n) })
-    ).toMatchObject({ functionName: "approve", args: [token1, 25n] });
+      decodeFunctionData({ abi: basketTokenAbi, data: buildMaximumSwapTokenApproval(token1) })
+    ).toMatchObject({
+      functionName: "approve",
+      args: [token1, (1n << 256n) - 1n],
+    });
   });
 });
