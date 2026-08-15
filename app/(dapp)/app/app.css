@@ -4260,6 +4260,105 @@
   gap: 0.9rem;
 }
 
+.borrow-utilization-slider {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+
+.borrow-utilization-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--app-text);
+}
+
+.borrow-utilization-heading output {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.borrow-utilization-slider input[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 1.6rem;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.borrow-utilization-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--borrow-utilization),
+    var(--app-border) var(--borrow-utilization) 100%
+  );
+}
+
+.borrow-utilization-slider input[type="range"]::-webkit-slider-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: -0.425rem;
+  appearance: none;
+  border: 3px solid var(--app-raised);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.borrow-utilization-slider input[type="range"]::-moz-range-track {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-border);
+}
+
+.borrow-utilization-slider input[type="range"]::-moz-range-progress {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.borrow-utilization-slider input[type="range"]::-moz-range-thumb {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 3px solid var(--app-raised);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.borrow-utilization-slider input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.borrow-utilization-marks {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  color: var(--app-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+.borrow-utilization-marks span {
+  text-align: center;
+}
+
+.borrow-utilization-marks span:first-child {
+  text-align: left;
+}
+
+.borrow-utilization-marks span:last-child {
+  text-align: right;
+}
+
 .borrow-liquidity-preview {
   padding: 1rem;
   border: 1px solid var(--app-border);

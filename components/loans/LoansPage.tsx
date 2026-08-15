@@ -27,6 +27,7 @@ import {
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { BorrowUtilizationSlider } from "@/components/loans/BorrowUtilizationSlider";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -237,7 +238,9 @@ function LoansRuntime({
           ? "Canonical pool state is unavailable."
           : !liquidityCatalog.data
             ? "Loading canonical pool state…"
-            : borrowedLiquidityReadiness(basket, borrowPools, borrowLiquidityPlan);
+            : borrowLiquidityUtilization === 0
+              ? "Move the allocation slider above 0 to create liquidity positions."
+              : borrowedLiquidityReadiness(basket, borrowPools, borrowLiquidityPlan);
 
   const ownedLoans = catalog.data?.ownedLoans ?? [];
   const recoveryLoans = [
@@ -1401,22 +1404,7 @@ function BorrowFields({
             entire loan.
           </p>
           <div className="borrow-liquidity-controls">
-            <div className="basket-field">
-              <span>Use of available borrowed principal</span>
-              <div className="protocol-amount-shortcuts" aria-label="Liquidity utilization">
-                {[25, 50, 75, 100].map((percent) => (
-                  <button
-                    key={percent}
-                    type="button"
-                    className={utilizationPercent === percent ? "is-selected" : undefined}
-                    aria-pressed={utilizationPercent === percent}
-                    onClick={() => onUtilization(percent)}
-                  >
-                    {percent === 100 ? "Max" : `${percent}%`}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <BorrowUtilizationSlider value={utilizationPercent} onChange={onUtilization} />
             <label className="protocol-checkbox">
               <input
                 type="checkbox"
