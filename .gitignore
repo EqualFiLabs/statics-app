@@ -21,6 +21,7 @@ test-results/
 cache/
 .cache/
 .local/
+/ponder/.ponder/
 
 # Editors and operating systems
 .DS_Store
