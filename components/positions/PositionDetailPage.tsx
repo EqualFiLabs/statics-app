@@ -402,13 +402,10 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   };
 
   const saveRewardSelections = async () => {
-    if (
-      !position ||
-      !activeRewardDraft ||
-      !catalog.data ||
-      !publicClient ||
-      deploymentState.status !== "configured"
-    ) {
+    if (!position || !catalog.data || !publicClient || deploymentState.status !== "configured") {
+      throw new Error("The connected PositionNFT is unavailable.");
+    }
+    if (!activeRewardDraft) {
       throw new Error("Choose at least one reward selection change.");
     }
     const changes = rewardSelectionChanges(position.selectedRewardAssets, activeRewardDraft.assets);
