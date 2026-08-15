@@ -185,6 +185,7 @@ function GenesisRuntime() {
 
   const checkpointPosition = async (positionId: bigint) => {
     const selected = await publicClient!.readContract({
+      account: wallet,
       address: deployment.contracts.diamond,
       abi: staticsAbi,
       functionName: "positionRewardAssets",
