@@ -640,13 +640,15 @@ function BasketDetailRuntime({
                   placeholder="0.00"
                   disabled={pending}
                 />
-                <AmountShortcuts
-                  disabled={pending || sourceBalance <= 0n}
-                  label={t("amountShortcuts")}
-                  onSelect={(percent) =>
-                    setAmountInput(displayAmount(applyPercent(sourceBalance, percent), 18, 18))
-                  }
-                />
+                {mode === "redeem" && (
+                  <AmountShortcuts
+                    disabled={pending || sourceBalance <= 0n}
+                    label={t("amountShortcuts")}
+                    onSelect={(percent) =>
+                      setAmountInput(displayAmount(applyPercent(sourceBalance, percent), 18, 18))
+                    }
+                  />
+                )}
               </label>
               <ProtocolSlippageControl />
               <label className="basket-field">

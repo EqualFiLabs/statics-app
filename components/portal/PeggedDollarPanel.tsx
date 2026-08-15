@@ -548,11 +548,18 @@ export function PeggedDollarPanel({
           <dt>{t("protocolFee")}</dt>
           <dd>{quote ? display(quote.feeAmount, 6, "USDG") : "--"}</dd>
         </div>
-        <div>
-          <dt>{t("profile")}</dt>
-          <dd>{deployment?.pegged ? `#${deployment.pegged.profileId.toString()}` : "--"}</dd>
-        </div>
       </dl>
+      {deployment?.pegged && (
+        <details className="liquidity-position-diagnostics">
+          <summary>{t("technicalDetails")}</summary>
+          <dl>
+            <div>
+              <dt>{t("profile")}</dt>
+              <dd>#{deployment.pegged.profileId.toString()}</dd>
+            </div>
+          </dl>
+        </details>
+      )}
       {reviewing && quote && (
         <div className="portal-review">
           <div>

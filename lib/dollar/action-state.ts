@@ -2,6 +2,23 @@ export const DOLLAR_MINT_PAUSE = 1n << 0n;
 /** PairingVaultFacet.PAUSE_PAIRING_FILLS -- pausable without pausing minting. */
 export const DOLLAR_PAIRING_FILL_PAUSE = 1n << 2n;
 
+export type DollarPauseStatus = Readonly<{
+  kind: "none" | "mint" | "redemption" | "additional";
+  mask?: bigint;
+}>;
+
+export function dollarPauseStatuses(mask: bigint): readonly DollarPauseStatus[] {
+  if (mask === 0n) return [{ kind: "none" }];
+  const statuses: DollarPauseStatus[] = [];
+  if ((mask & DOLLAR_MINT_PAUSE) !== 0n) statuses.push({ kind: "mint" });
+  if ((mask & DOLLAR_PAIRING_FILL_PAUSE) !== 0n) statuses.push({ kind: "redemption" });
+  const known = DOLLAR_MINT_PAUSE | DOLLAR_PAIRING_FILL_PAUSE;
+  if ((mask & ~known) !== 0n) {
+    statuses.push({ kind: "additional", mask: mask & ~known });
+  }
+  return statuses;
+}
+
 export type DollarActionMode = "deposit" | "recombine" | "redeem" | "supply" | "unsupply";
 export type DollarCollateralChoice = "ETH" | "WETH";
 export type DollarQuoteState = "idle" | "refreshing" | "ready" | "error";
@@ -245,10 +262,10 @@ export function deriveDollarActionAvailability({
     kind: "execute",
     label:
       mode === "deposit"
-        ? `Deposit ${asset}`
+        ? `Mint Dollar and Risk with ${asset}`
         : mode === "redeem"
-          ? `Redeem for ${asset}`
-          : `Recombine to ${asset}`,
+          ? `Redeem Dollar for ${asset}`
+          : `Withdraw collateral to ${asset}`,
     reason: null,
     executable: true,
   };

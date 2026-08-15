@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatUnits, getAddress, parseUnits } from "viem";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePublicClient } from "wagmi";
 
 import {
@@ -19,6 +20,7 @@ import { useWalletState } from "@/providers/wallet-context";
 const deploymentState = readClientDollarDeployment();
 
 export function ProtocolRevenueCard() {
+  const t = useTranslations("protocolRevenue");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const wallet =
@@ -26,6 +28,7 @@ export function ProtocolRevenueCard() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creatorMinimums, setCreatorMinimums] = useState<Record<string, string>>({});
+  const [creatorAdvanced, setCreatorAdvanced] = useState<Record<string, boolean>>({});
 
   const revenue = useQuery({
     queryKey: [
@@ -133,12 +136,9 @@ export function ProtocolRevenueCard() {
     <section className="position-panel">
       <div className="position-section-heading">
         <div>
-          <p className="dapp-section-label">Protocol revenue</p>
-          <h2>Creator and partner rewards</h2>
-          <p>
-            Index creators pull their 5% share. Anyone may distribute StonkBrokers revenue and
-            receive the configured caller tip.
-          </p>
+          <p className="dapp-section-label">{t("sectionLabel")}</p>
+          <h2>{t("title")}</h2>
+          <p>{t("description")}</p>
         </div>
       </div>
       {error && (
@@ -147,35 +147,56 @@ export function ProtocolRevenueCard() {
         </div>
       )}
       {revenue.isLoading ? (
-        <p>Loading revenue…</p>
+        <p>{t("loading")}</p>
       ) : revenue.data?.rows.length ? (
         <div className="position-grid">
           {revenue.data.rows.map(({ token, creatorCredit, partnerAccrued }) => {
             const minimumText =
               creatorMinimums[token.address] ?? formatUnits(creatorCredit, token.decimals);
+            const advanced = creatorAdvanced[token.address] ?? false;
             let minimumReceived: bigint | null = null;
             try {
-              minimumReceived = parseUnits(minimumText, token.decimals);
+              minimumReceived = advanced ? parseUnits(minimumText, token.decimals) : creatorCredit;
             } catch {
               minimumReceived = null;
             }
             return (
               <article className="ui-card" key={token.address}>
                 <h3>{token.symbol}</h3>
-                <p>Creator credit: {formatUnits(creatorCredit, token.decimals)}</p>
-                <label>
-                  Minimum received
-                  <input
-                    inputMode="decimal"
-                    value={minimumText}
-                    onChange={(event) =>
-                      setCreatorMinimums((current) => ({
-                        ...current,
-                        [token.address]: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
+                <p>{t("creatorCredit", { amount: formatUnits(creatorCredit, token.decimals) })}</p>
+                <p>{t("fullCredit")}</p>
+                <details className="liquidity-position-diagnostics">
+                  <summary>{t("advancedTolerance")}</summary>
+                  <label className="protocol-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={advanced}
+                      onChange={(event) =>
+                        setCreatorAdvanced((current) => ({
+                          ...current,
+                          [token.address]: event.target.checked,
+                        }))
+                      }
+                    />
+                    {t("transferFeeToken")}
+                  </label>
+                  {advanced && (
+                    <label>
+                      {t("minimumReceived")}
+                      <input
+                        inputMode="decimal"
+                        value={minimumText}
+                        onChange={(event) =>
+                          setCreatorMinimums((current) => ({
+                            ...current,
+                            [token.address]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  )}
+                  <p className="dapp-help">{t("toleranceHelp")}</p>
+                </details>
                 <button
                   disabled={
                     busy !== null ||
@@ -193,14 +214,12 @@ export function ProtocolRevenueCard() {
                     )
                   }
                 >
-                  {busy === `creator-${token.address}` ? "Claiming…" : "Claim creator revenue"}
+                  {busy === `creator-${token.address}` ? t("claiming") : t("claimCreator")}
                 </button>
-                <p className="dapp-help">
-                  Lower this only if the token charges a transfer fee; a failed transfer keeps the
-                  credit available.
+                <p>
+                  {t("partnerAccrued", { amount: formatUnits(partnerAccrued, token.decimals) })}
                 </p>
-                <p>StonkBrokers accrued: {formatUnits(partnerAccrued, token.decimals)}</p>
-                <p>Caller tip: {Number(revenue.data.tipBps) / 100}%</p>
+                <p>{t("callerTip", { percent: Number(revenue.data.tipBps) / 100 })}</p>
                 <button
                   disabled={busy !== null || partnerAccrued === 0n}
                   onClick={() =>
@@ -216,16 +235,14 @@ export function ProtocolRevenueCard() {
                     )
                   }
                 >
-                  {busy === `partner-${token.address}`
-                    ? "Distributing…"
-                    : "Distribute and earn tip"}
+                  {busy === `partner-${token.address}` ? t("distributing") : t("distribute")}
                 </button>
               </article>
             );
           })}
         </div>
       ) : (
-        <p>No creator or partner revenue is currently claimable.</p>
+        <p>{t("empty")}</p>
       )}
     </section>
   );

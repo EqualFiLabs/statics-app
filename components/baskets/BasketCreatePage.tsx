@@ -1,12 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   encodeFunctionData,
   formatEther,
   getAddress,
-  isAddress,
   parseEventLogs,
   parseUnits,
   type Address,
@@ -31,7 +31,12 @@ import {
 } from "@/lib/protocol/action-plan";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
-import { bpsToPercentInput, formatTokenAmount, percentInputToBps } from "@/lib/protocol/ux";
+import {
+  bpsToPercentInput,
+  formatTokenAmount,
+  parseRecipientAddress,
+  percentInputToBps,
+} from "@/lib/protocol/ux";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { searchTokenList, type TokenListEntry } from "@/lib/token-list";
 import { useWalletState } from "@/providers/wallet-context";
@@ -53,8 +58,6 @@ type AssetRuntime = {
   allowance: bigint;
 };
 
-const steps = ["Identity", "Assets & composition", "Starting pools", "Economics", "Review"];
-
 export function BasketCreatePage() {
   if (!configuredDeployment) return <UnconfiguredSurface subject="Basket creation" />;
   return <BasketCreateWalletGate />;
@@ -67,6 +70,7 @@ function BasketCreateWalletGate() {
 }
 
 function BasketCreateRuntime() {
+  const t = useTranslations("creation");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const protocolSlippage = useProtocolSlippage();
@@ -122,18 +126,22 @@ function BasketCreateRuntime() {
         constituents.map(async ({ asset }) => {
           const [metadata, walletBalance, allowance] = await Promise.all([
             loadTokenMetadata(publicClient, asset),
-            publicClient.readContract({
-              address: asset,
-              abi: basketTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            }),
-            publicClient.readContract({
-              address: asset,
-              abi: basketTokenAbi,
-              functionName: "allowance",
-              args: [wallet, configuredDeployment.contracts.diamond],
-            }),
+            publicClient
+              .readContract({
+                address: asset,
+                abi: basketTokenAbi,
+                functionName: "balanceOf",
+                args: [wallet],
+              })
+              .catch(() => 0n),
+            publicClient
+              .readContract({
+                address: asset,
+                abi: basketTokenAbi,
+                functionName: "allowance",
+                args: [wallet, configuredDeployment.contracts.diamond],
+              })
+              .catch(() => 0n),
           ]);
           return { metadata, walletBalance, allowance };
         })
@@ -142,12 +150,7 @@ function BasketCreateRuntime() {
   });
 
   if (!wallet) {
-    return (
-      <EmptyState
-        title="Connect your wallet"
-        description="Connect to configure, fund, and launch an index basket."
-      />
-    );
+    return <EmptyState title={t("connectTitle")} description={t("connectDescription")} />;
   }
 
   const addAsset = (token: Pick<TokenListEntry, "address">) => {
@@ -199,7 +202,14 @@ function BasketCreateRuntime() {
     recovery: percentInputToBps(recoveryPercent),
   };
   const durationDays = Number(loanDurationDays);
+  let flatFeesValid = false;
+  try {
+    flatFeesValid = parseUnits(mintFee, 18) >= 0n && parseUnits(redemptionFee, 18) >= 0n;
+  } catch {
+    flatFeesValid = false;
+  }
   const economicsValid =
+    flatFeesValid &&
     Object.values(economics).every((value) => value !== null) &&
     Number.isSafeInteger(durationDays) &&
     durationDays > 0 &&
@@ -235,6 +245,9 @@ function BasketCreateRuntime() {
       if (!identityValid) throw new Error("Enter a basket name and a 2-11 character symbol.");
       if (!economicsValid) throw new Error("Review the basket economics and loan safety limits.");
       const refreshed = await assets.refetch();
+      if (!refreshed.data?.every((item) => item.metadata.metadataAvailable)) {
+        throw new Error("Every launch asset must remain a readable ERC-20.");
+      }
       const freshQuote = makeQuote(refreshed.data);
       if (!freshQuote) throw new Error("A fresh launch quote could not be calculated.");
       if (freshQuote.assets.some((item) => item.shortfall > 0n)) {
@@ -267,7 +280,7 @@ function BasketCreateRuntime() {
       const diamond = configuredDeployment.contracts.diamond;
       await executeProtocolActionPlan(
         [
-          ...freshQuote.assets.map((item, index) => ({
+          ...freshQuote.assets.map((item) => ({
             id: `approve-${item.address}`,
             label: `Approve ${item.symbol}`,
             isSatisfied: async () =>
@@ -359,21 +372,31 @@ function BasketCreateRuntime() {
         token.address.toLowerCase().includes(query)
       );
     })
+    .filter(
+      (token) =>
+        !constituents.some(
+          (constituent) => constituent.asset.toLowerCase() === token.address.toLowerCase()
+        )
+    )
     .slice(0, 8);
+  const steps = [
+    t("stepIdentity"),
+    t("stepAssets"),
+    t("stepPools"),
+    t("stepEconomics"),
+    t("stepReview"),
+  ];
 
   return (
     <div className="creation-workspace">
       <section className="ui-card">
-        <p className="dapp-section-label">Permissionless launch</p>
-        <h2>Launch an index basket</h2>
+        <p className="dapp-section-label">{t("permissionless")}</p>
+        <h2>{t("title")}</h2>
+        <p>{t("description")}</p>
         <p>
-          Choose a fixed bundle, seed one permanent pool per asset, and review every immutable
-          setting before signing.
-        </p>
-        <p>
-          <strong>Creation fee:</strong>{" "}
-          {creation.data === undefined ? "Loading…" : `${formatEther(creation.data)} ETH`} · creator
-          earns 5% of basket swap fees
+          <strong>{t("creationFee")}</strong>{" "}
+          {creation.data === undefined ? t("loading") : `${formatEther(creation.data)} ETH`} ·{" "}
+          {t("creatorShare")}
         </p>
       </section>
 
@@ -396,18 +419,18 @@ function BasketCreateRuntime() {
         {step === 0 && (
           <div className="remaining-form-grid">
             <label className="basket-field">
-              <span>Basket name</span>
+              <span>{t("basketName")}</span>
               <input value={name} onChange={(event) => setName(event.target.value)} />
-              <small>The descriptive name shown throughout Statics.</small>
+              <small>{t("basketNameHelp")}</small>
             </label>
             <label className="basket-field">
-              <span>Symbol</span>
+              <span>{t("symbol")}</span>
               <input
                 value={symbol}
                 maxLength={11}
                 onChange={(event) => setSymbol(event.target.value.toUpperCase())}
               />
-              <small>2–11 characters, beginning with a letter.</small>
+              <small>{t("symbolHelp")}</small>
             </label>
           </div>
         )}
@@ -415,10 +438,10 @@ function BasketCreateRuntime() {
         {step === 1 && (
           <>
             <label className="basket-field">
-              <span>Find a token</span>
+              <span>{t("findToken")}</span>
               <input
                 value={tokenSearch}
-                placeholder="Search by name or symbol"
+                placeholder={t("searchPlaceholder")}
                 onChange={(event) => setTokenSearch(event.target.value)}
               />
             </label>
@@ -435,7 +458,7 @@ function BasketCreateRuntime() {
               open={showCustom}
               onToggle={(event) => setShowCustom(event.currentTarget.open)}
             >
-              <summary>Advanced: add a custom token</summary>
+              <summary>{t("customToken")}</summary>
               <div className="protocol-address-input">
                 <input
                   value={customAddress}
@@ -444,10 +467,13 @@ function BasketCreateRuntime() {
                 />
                 <button
                   type="button"
-                  disabled={!isAddress(customAddress) || constituents.length >= 16}
-                  onClick={() => isAddress(customAddress) && addAsset({ address: customAddress })}
+                  disabled={!parseRecipientAddress(customAddress) || constituents.length >= 16}
+                  onClick={() => {
+                    const address = parseRecipientAddress(customAddress);
+                    if (address) addAsset({ address });
+                  }}
                 >
-                  Validate and add
+                  {t("validateAdd")}
                 </button>
               </div>
             </details>
@@ -458,16 +484,14 @@ function BasketCreateRuntime() {
                   <article key={row.asset}>
                     <span>{index + 1}</span>
                     <div>
-                      <strong>{metadata?.symbol ?? "Checking token…"}</strong>
+                      <strong>{metadata?.symbol ?? t("checkingToken")}</strong>
                       <small>{metadata?.name ?? row.asset}</small>
                       {metadata && !metadata.metadataAvailable && (
-                        <small className="dapp-inline-error">
-                          This address is not a readable ERC-20.
-                        </small>
+                        <small className="dapp-inline-error">{t("unreadableToken")}</small>
                       )}
                     </div>
                     <label>
-                      Tokens in 1 {symbol || "basket"}
+                      {t("tokensInBasket", { symbol: symbol || t("basketFallback") })}
                       <input
                         inputMode="decimal"
                         value={row.bundle}
@@ -480,7 +504,7 @@ function BasketCreateRuntime() {
                         setConstituents((current) => current.filter((_, item) => item !== index))
                       }
                     >
-                      Remove
+                      {t("remove")}
                     </button>
                   </article>
                 );
@@ -491,10 +515,7 @@ function BasketCreateRuntime() {
 
         {step === 2 && (
           <>
-            <p>
-              Set a human starting price and the asset amount to seed. Statics calculates the
-              BasketToken side and locks the resulting full-range liquidity permanently.
-            </p>
+            <p>{t("poolsHelp")}</p>
             <div className="creation-assets">
               {constituents.map((row, index) => {
                 const metadata = assets.data?.[index]?.metadata;
@@ -503,9 +524,9 @@ function BasketCreateRuntime() {
                   <article key={row.asset}>
                     <span>{index + 1}</span>
                     <div>
-                      <strong>{metadata?.symbol ?? "Token"}</strong>
+                      <strong>{metadata?.symbol ?? t("tokenFallback")}</strong>
                       <small>
-                        Wallet:{" "}
+                        {t("wallet")}{" "}
                         {metadata
                           ? formatTokenAmount(assets.data![index]!.walletBalance, metadata.decimals)
                           : "—"}
@@ -513,7 +534,10 @@ function BasketCreateRuntime() {
                     </div>
                     <div>
                       <label>
-                        1 {symbol || "BASKET"} = X {metadata?.symbol ?? "asset"}
+                        {t("priceLabel", {
+                          basket: symbol || "BASKET",
+                          asset: metadata?.symbol ?? t("assetFallback"),
+                        })}
                         <input
                           inputMode="decimal"
                           value={row.price}
@@ -521,7 +545,7 @@ function BasketCreateRuntime() {
                         />
                       </label>
                       <label>
-                        Seed {metadata?.symbol ?? "asset"}
+                        {t("seedLabel", { asset: metadata?.symbol ?? t("assetFallback") })}
                         <input
                           inputMode="decimal"
                           value={row.seed}
@@ -530,10 +554,15 @@ function BasketCreateRuntime() {
                       </label>
                       {assetQuote && (
                         <small>
-                          Pool receives {formatTokenAmount(assetQuote.poolBasketAmount, 18)}{" "}
-                          {symbol || "BASKET"} +{" "}
-                          {formatTokenAmount(assetQuote.poolAssetAmount, assetQuote.decimals)}{" "}
-                          {assetQuote.symbol}
+                          {t("poolReceives", {
+                            basketAmount: formatTokenAmount(assetQuote.poolBasketAmount, 18),
+                            basket: symbol || "BASKET",
+                            assetAmount: formatTokenAmount(
+                              assetQuote.poolAssetAmount,
+                              assetQuote.decimals
+                            ),
+                            asset: assetQuote.symbol,
+                          })}
                         </small>
                       )}
                     </div>
@@ -548,63 +577,72 @@ function BasketCreateRuntime() {
         {step === 3 && (
           <div className="creation-economics">
             <section>
-              <p className="dapp-section-label">Standard economics</p>
-              <h3>Balanced defaults</h3>
-              <p>Mint 0.001 · redeem 0.001 · flash 0.05% · origination 1% · extension 0.25%</p>
-              <p>Maximum LTV 75% · recovery penalty 5% · duration 30 days</p>
+              <p className="dapp-section-label">{t("standardEconomics")}</p>
+              <h3>{t("balancedDefaults")}</h3>
+              <p>{t("feeDefaults")}</p>
+              <p>{t("loanDefaults")}</p>
               <label className="protocol-checkbox">
                 <input
                   type="checkbox"
                   checked={advancedEconomics}
-                  onChange={(event) => setAdvancedEconomics(event.target.checked)}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    setAdvancedEconomics(enabled);
+                    if (!enabled) {
+                      setMintFee("0.001");
+                      setRedemptionFee("0.001");
+                      setFlashFeePercent("0.05");
+                      setOriginationFeePercent("1");
+                      setExtensionFeePercent("0.25");
+                      setLtvPercent("75");
+                      setRecoveryPercent("5");
+                      setLoanDurationDays("30");
+                    }
+                  }}
                 />
-                Customize immutable economics
+                {t("customizeEconomics")}
               </label>
             </section>
             {advancedEconomics && (
               <section className="remaining-form-grid">
+                <EconomicInput label={t("mintFee")} value={mintFee} onChange={setMintFee} />
                 <EconomicInput
-                  label="Mint fee (BasketToken)"
-                  value={mintFee}
-                  onChange={setMintFee}
-                />
-                <EconomicInput
-                  label="Redemption fee (BasketToken)"
+                  label={t("redemptionFee")}
                   value={redemptionFee}
                   onChange={setRedemptionFee}
                 />
                 <EconomicInput
-                  label="Flash fee"
+                  label={t("flashFee")}
                   value={flashFeePercent}
                   onChange={setFlashFeePercent}
                   percent
                 />
                 <EconomicInput
-                  label="Loan origination fee"
+                  label={t("originationFee")}
                   value={originationFeePercent}
                   onChange={setOriginationFeePercent}
                   percent
                 />
                 <EconomicInput
-                  label="Loan extension fee"
+                  label={t("extensionFee")}
                   value={extensionFeePercent}
                   onChange={setExtensionFeePercent}
                   percent
                 />
                 <EconomicInput
-                  label="Maximum loan-to-value"
+                  label={t("maximumLtv")}
                   value={ltvPercent}
                   onChange={setLtvPercent}
                   percent
                 />
                 <EconomicInput
-                  label="Recovery penalty"
+                  label={t("recoveryPenalty")}
                   value={recoveryPercent}
                   onChange={setRecoveryPercent}
                   percent
                 />
                 <EconomicInput
-                  label="Loan duration (days)"
+                  label={t("loanDuration")}
                   value={loanDurationDays}
                   onChange={setLoanDurationDays}
                 />
@@ -612,8 +650,7 @@ function BasketCreateRuntime() {
             )}
             {!economicsValid && (
               <p className="dapp-inline-error" role="alert">
-                Enter valid percentages. Maximum LTV plus its recovery penalty must remain fully
-                collateralized.
+                {t("economicsInvalid")}
               </p>
             )}
           </div>
@@ -622,28 +659,29 @@ function BasketCreateRuntime() {
         {step === 4 && (
           <div className="creation-review">
             <section>
-              <p className="dapp-section-label">Immutable basket</p>
+              <p className="dapp-section-label">{t("immutableBasket")}</p>
               <h3>
                 {name} ({symbol})
               </h3>
               <ul>
-                <li>{constituents.length} fixed constituents</li>
+                <li>{t("fixedAssets", { count: constituents.length })}</li>
                 <li>
-                  Initial supply: {quote ? formatTokenAmount(quote.basketShares, 18) : "—"} {symbol}
+                  {t("initialSupply", {
+                    amount: quote ? formatTokenAmount(quote.basketShares, 18) : "—",
+                    symbol,
+                  })}
                 </li>
-                <li>Creator revenue share: 5% of this basket's swap fees</li>
+                <li>{t("creatorRevenue")}</li>
                 <li>
-                  Creation fee:{" "}
+                  {t("creationFee")}{" "}
                   {creation.data === undefined ? "—" : `${formatEther(creation.data)} ETH`}
                 </li>
-                <li>
-                  {approvalCount} token approval{approvalCount === 1 ? "" : "s"} required
-                </li>
+                <li>{t("approvalsRequired", { count: approvalCount })}</li>
               </ul>
             </section>
             <section>
-              <p className="dapp-section-label">Funding</p>
-              <h3>Maximum wallet debit</h3>
+              <p className="dapp-section-label">{t("funding")}</p>
+              <h3>{t("maximumDebit")}</h3>
               <ul>
                 {quote?.assets.map((item) => (
                   <li key={item.address}>
@@ -651,22 +689,32 @@ function BasketCreateRuntime() {
                       {formatTokenAmount(item.maximumAmount, item.decimals)} {item.symbol}
                     </strong>
                     <small>
-                      pool {formatTokenAmount(item.poolAssetAmount, item.decimals)} · backing{" "}
-                      {formatTokenAmount(item.backingAmount, item.decimals)}
-                      {item.shortfall > 0n
-                        ? ` · short ${formatTokenAmount(item.shortfall, item.decimals)}`
-                        : " · funded"}
+                      {t("fundingBreakdown", {
+                        pool: formatTokenAmount(item.poolAssetAmount, item.decimals),
+                        backing: formatTokenAmount(item.backingAmount, item.decimals),
+                        status:
+                          item.shortfall > 0n
+                            ? t("short", {
+                                amount: formatTokenAmount(item.shortfall, item.decimals),
+                              })
+                            : t("funded"),
+                      })}
                     </small>
                   </li>
                 ))}
               </ul>
             </section>
             <details className="liquidity-position-diagnostics">
-              <summary>Technical details</summary>
+              <summary>{t("technicalDetails")}</summary>
               <p>
-                Flash {flashFeePercent}% · origination {originationFeePercent}% · extension{" "}
-                {extensionFeePercent}% · LTV {ltvPercent}% · recovery {recoveryPercent}% ·{" "}
-                {loanDurationDays} days
+                {t("economicsSummary", {
+                  flash: flashFeePercent,
+                  origination: originationFeePercent,
+                  extension: extensionFeePercent,
+                  ltv: ltvPercent,
+                  recovery: recoveryPercent,
+                  days: loanDurationDays,
+                })}
               </p>
             </details>
           </div>
@@ -684,7 +732,7 @@ function BasketCreateRuntime() {
             disabled={busy || step === 0}
             onClick={() => setStep((current) => current - 1)}
           >
-            Back
+            {t("back")}
           </button>
           {step < steps.length - 1 ? (
             <button
@@ -693,7 +741,7 @@ function BasketCreateRuntime() {
               disabled={busy || !nextAllowed}
               onClick={() => setStep((current) => current + 1)}
             >
-              Continue
+              {t("continue")}
             </button>
           ) : (
             <button
@@ -702,11 +750,7 @@ function BasketCreateRuntime() {
               disabled={busy || !quote || hasShortfall || creation.data === undefined}
               onClick={() => void launch()}
             >
-              {busy
-                ? "Launching and verifying…"
-                : hasShortfall
-                  ? "Fund wallet to launch"
-                  : "Launch basket"}
+              {busy ? t("launching") : hasShortfall ? t("fundWallet") : t("launch")}
             </button>
           )}
         </div>

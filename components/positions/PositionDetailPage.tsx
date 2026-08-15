@@ -41,6 +41,7 @@ import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { useWalletState } from "@/providers/wallet-context";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
@@ -48,6 +49,7 @@ import { deriveSurfaceState } from "@/lib/surface-state";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { applyPercent } from "@/lib/protocol/ux";
 import {
   checkpointRewardAssetBatches,
   rewardAssetsNeedingCheckpoint,
@@ -619,6 +621,24 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               Wallet: {basket ? displayAmount(basket.walletBalance) : "0"} · Position unlocked:{" "}
               {existingCollateral ? displayAmount(unlockedCollateral(existingCollateral)) : "0"}
             </small>
+            {basket && (
+              <AmountShortcuts
+                disabled={pendingAction !== null}
+                label={t("amountShortcuts")}
+                onSelect={(percent) => {
+                  const available =
+                    collateralMode === "deposit"
+                      ? basket.walletBalance
+                      : existingCollateral
+                        ? unlockedCollateral(existingCollateral)
+                        : 0n;
+                  setCollateralAmountInput(
+                    formatUnits(applyPercent(available, percent), basket.token.decimals)
+                  );
+                  setActionError(null);
+                }}
+              />
+            )}
           </label>
           <button
             className="dollar-submit"
@@ -699,6 +719,18 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
               inputMode="decimal"
               placeholder="0.00"
               disabled={pendingAction !== null}
+            />
+            <AmountShortcuts
+              disabled={pendingAction !== null}
+              label={t("amountShortcuts")}
+              onSelect={(percent) => {
+                const available =
+                  stakeMode === "stake" ? catalog.data.stakingTokenBalance : position.stakedBalance;
+                setStakeAmountInput(
+                  formatUnits(applyPercent(available, percent), catalog.data.stakingToken.decimals)
+                );
+                setActionError(null);
+              }}
             />
           </label>
           <p className="position-cooldown">{t("maturityDescription")}</p>

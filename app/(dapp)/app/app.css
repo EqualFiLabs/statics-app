@@ -2843,6 +2843,68 @@
   font-size: var(--text-caption);
 }
 
+.protocol-amount-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.protocol-amount-shortcuts button,
+.protocol-address-input button {
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-muted);
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.protocol-amount-shortcuts button:hover,
+.protocol-address-input button:hover,
+.protocol-amount-shortcuts button.is-selected {
+  border-color: var(--accent);
+  color: var(--app-text);
+}
+
+.protocol-address-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
+.protocol-address-input input {
+  min-width: 0;
+}
+
+.protocol-checkbox {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.protocol-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.15rem;
+  accent-color: var(--accent);
+}
+
+.protocol-percent-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.protocol-percent-input > span {
+  color: var(--app-text-muted);
+}
+
 .protocol-address strong {
   color: var(--app-text);
   font-weight: 500;
@@ -4107,7 +4169,7 @@
 
 .creation-steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
   padding: 0;
   margin: 10px 0 0;
@@ -4154,11 +4216,93 @@
 
 .creation-assets article {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) minmax(180px, 0.45fr);
+  grid-template-columns: 32px minmax(0, 1fr) minmax(220px, 0.65fr) auto;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0;
   border-top: 1px solid var(--app-border);
+}
+
+.creation-token-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.creation-token-results button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.25rem 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+  color: var(--app-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.creation-token-results button span,
+.creation-token-results button small {
+  color: var(--app-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.creation-token-results button small {
+  grid-column: 1 / -1;
+}
+
+.borrow-liquidity-controls,
+.borrow-liquidity-preview,
+.dollar-action-groups {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.borrow-liquidity-preview {
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-raised);
+}
+
+.borrow-liquidity-preview h4,
+.borrow-liquidity-preview p,
+.borrow-liquidity-preview ul {
+  margin: 0;
+}
+
+.borrow-liquidity-preview ul {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+
+.borrow-liquidity-preview li {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.borrow-liquidity-preview span,
+.borrow-liquidity-preview small,
+.dollar-action-groups > section > span {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+.dollar-action-groups > section > span {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.dollar-action-groups .dollar-tabs {
+  margin: 0;
 }
 
 .creation-assets article > span,
@@ -5318,12 +5462,28 @@
     font-size: var(--text-caption);
   }
 
+  .creation-steps {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(130px, 1fr);
+    overflow-x: auto;
+  }
+
+  .creation-token-results {
+    grid-template-columns: 1fr;
+  }
+
   .creation-assets article {
     grid-template-columns: 24px minmax(0, 1fr);
   }
 
   .creation-assets article label {
     grid-column: 2;
+  }
+
+  .creation-assets article > button {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .creation-footer {

@@ -44,6 +44,10 @@ import type { WalletToken } from "@/lib/wallet-tokens";
 import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { AddressInput } from "@/components/protocol/AddressInput";
+import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { AmountShortcuts } from "@/components/protocol/AmountShortcuts";
+import { applyPercent, parseRecipientAddress } from "@/lib/protocol/ux";
 
 const erc20Abi = [
   {
@@ -617,7 +621,7 @@ function TokenBrowser({
                 <strong>{token.symbol}</strong>
                 <small>{token.name}</small>
               </span>
-              <code>{`${token.address.slice(0, 6)}…${token.address.slice(-4)}`}</code>
+              <code>{token.address}</code>
             </button>
           ))}
           {available.length === 0 && <p>--</p>}
@@ -788,11 +792,11 @@ function SendDialog({
     amountRaw = 0n;
   }
   const valid =
-    Boolean(asset && isAddress(recipient) && amountRaw > 0n) &&
+    Boolean(asset && parseRecipientAddress(recipient) && amountRaw > 0n) &&
     (asset?.balance === null || amountRaw <= asset.balance);
 
   const confirm = async () => {
-    if (!asset || !isAddress(recipient) || !wallet.address || !valid || pending) return;
+    if (!asset || !parseRecipientAddress(recipient) || !wallet.address || !valid || pending) return;
     setPending(true);
     setError(null);
     try {
@@ -877,18 +881,17 @@ function SendDialog({
             ))}
           </select>
         </label>
-        <label className="portal-field">
-          <span>{t("recipient")}</span>
-          <input
-            value={recipient}
-            placeholder="0x…"
-            onChange={(event) => {
-              setRecipient(event.target.value);
-              setReviewing(false);
-              setError(null);
-            }}
-          />
-        </label>
+        <AddressInput
+          id="wallet-send-recipient"
+          label={t("recipient")}
+          value={recipient}
+          chainId={wallet.fundingChainId}
+          onChange={(value) => {
+            setRecipient(value);
+            setReviewing(false);
+            setError(null);
+          }}
+        />
         <label className="portal-field">
           <span>{t("amount")}</span>
           <input
@@ -901,6 +904,21 @@ function SendDialog({
               setError(null);
             }}
           />
+          {asset?.balance !== null && asset?.balance !== undefined && (
+            <>
+              <AmountShortcuts
+                label={t("amountShortcuts")}
+                disabled={pending}
+                onSelect={(percent) => {
+                  const safePercent = asset.kind === "native" && percent === 100 ? 99 : percent;
+                  setAmount(formatUnits(applyPercent(asset.balance!, safePercent), asset.decimals));
+                  setReviewing(false);
+                  setError(null);
+                }}
+              />
+              {asset.kind === "native" && <small>{t("nativeMaxReserve")}</small>}
+            </>
+          )}
         </label>
         {reviewing && asset && (
           <div className="portal-review">
@@ -909,7 +927,12 @@ function SendDialog({
                 {amount} {asset.symbol}
               </span>
               <strong>→</strong>
-              <span>{`${recipient.slice(0, 6)}…${recipient.slice(-4)}`}</span>
+              {parseRecipientAddress(recipient) && (
+                <AddressDisplay
+                  address={parseRecipientAddress(recipient)!}
+                  chainId={wallet.fundingChainId}
+                />
+              )}
             </div>
           </div>
         )}
@@ -1019,19 +1042,19 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
           <strong>{t("movesMore")}</strong> {t("cannotUndo", { assets: nft.carries.join(", ") })}
         </p>
       )}
-      <label className="basket-field">
-        <span>{t("sendTo")}</span>
-        <input
+      {chainId && (
+        <AddressInput
+          id={`nft-recipient-${nft.contract}-${nft.tokenId.toString()}`}
+          label={t("sendTo")}
           value={recipient}
-          onChange={(event) => {
-            setRecipient(event.target.value);
+          chainId={chainId}
+          disabled={pending}
+          onChange={(value) => {
+            setRecipient(value);
             setError(null);
           }}
-          placeholder="0x…"
-          spellCheck={false}
-          disabled={pending}
         />
-      </label>
+      )}
       {error && (
         <p className="dapp-inline-error" role="alert">
           {error}

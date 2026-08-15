@@ -1629,11 +1629,8 @@ function LoanDetails({
               {mode === "extend" && extensionQuote && (
                 <small>
                   Required{" "}
-                  {displayAmount(
-                    extensionQuote.requiredFees[index] ?? 0n,
-                    asset.token.decimals
-                  )}{" "}
-                  · no refund above quote
+                  {displayAmount(extensionQuote.requiredFees[index] ?? 0n, asset.token.decimals)} ·
+                  no refund above quote
                 </small>
               )}
             </li>
