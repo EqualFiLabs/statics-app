@@ -12,6 +12,11 @@
     "planned": "计划中",
     "comingSoon": "{label} 链接即将推出"
   },
+  "nftArtwork": {
+    "viewFullSize": "查看 {name} 的完整尺寸",
+    "title": "{name} 图像",
+    "alt": "{name} 的完整尺寸图像"
+  },
   "metadata": {
     "title": "Statics Protocol",
     "titleTemplate": "{page} | Statics Protocol",

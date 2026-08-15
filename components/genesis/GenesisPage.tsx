@@ -258,6 +258,7 @@ function GenesisRuntime() {
                 </div>
                 <NftArtwork
                   chainId={deployment.chainId}
+                  expandable
                   nft={{
                     kind: "collection",
                     tokenId: id,

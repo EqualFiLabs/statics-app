@@ -12,6 +12,11 @@
     "planned": "Planeado",
     "comingSoon": "El enlace {label} estará disponible próximamente"
   },
+  "nftArtwork": {
+    "viewFullSize": "Ver {name} a tamaño completo",
+    "title": "Ilustración de {name}",
+    "alt": "Ilustración a tamaño completo de {name}"
+  },
   "metadata": {
     "title": "Statics Protocol",
     "titleTemplate": "{page} | Statics Protocol",

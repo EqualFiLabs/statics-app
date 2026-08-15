@@ -2,9 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Droplets, Image as ImageIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { usePublicClient } from "wagmi";
 
+import { NftArtworkDialog } from "@/components/wallet/NftArtworkDialog";
 import { resolveNftImage } from "@/lib/wallet/nft-image";
 import type { WalletNft } from "@/lib/wallet/nfts";
 
@@ -16,9 +18,19 @@ import type { WalletNft } from "@/lib/wallet/nfts";
  * self-contained artwork, while the placeholder remains the ordinary fallback
  * for collections that do not.
  */
-export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }) {
+export function NftArtwork({
+  nft,
+  chainId,
+  expandable = false,
+}: {
+  nft: WalletNft;
+  chainId: number;
+  expandable?: boolean;
+}) {
   const publicClient = usePublicClient({ chainId });
+  const t = useTranslations("nftArtwork");
   const [failed, setFailed] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const image = useQuery({
     queryKey: ["nft-image", chainId, nft.contract, nft.tokenId.toString()],
@@ -32,7 +44,7 @@ export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }
   });
 
   if (image.data && !failed) {
-    return (
+    const artwork = (
       /* eslint-disable-next-line @next/next/no-img-element --
          Arbitrary remote hosts: next/image would need every collection's
          domain allow-listed up front, which is impossible for user-added
@@ -44,6 +56,22 @@ export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }
         loading="lazy"
         onError={() => setFailed(true)}
       />
+    );
+    if (!expandable) return artwork;
+    return (
+      <>
+        <button
+          className="wallet-nft-art-trigger"
+          type="button"
+          aria-label={t("viewFullSize", { name: nft.name })}
+          onClick={() => setViewerOpen(true)}
+        >
+          {artwork}
+        </button>
+        {viewerOpen && (
+          <NftArtworkDialog name={nft.name} src={image.data} onClose={() => setViewerOpen(false)} />
+        )}
+      </>
     );
   }
 

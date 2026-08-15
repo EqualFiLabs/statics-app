@@ -1258,6 +1258,27 @@
   background: var(--app-raised);
 }
 
+.wallet-nft-art-trigger {
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: var(--radius-md);
+}
+
+.wallet-nft-art-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.wallet-nft-art-trigger .wallet-nft-art {
+  display: block;
+}
+
 .wallet-nft-art.is-placeholder {
   display: flex;
   align-items: center;
@@ -1902,6 +1923,30 @@
 
 .wallet-dialog.is-wide {
   width: min(760px, 100%);
+}
+
+.nft-artwork-dialog {
+  width: min(960px, 100%);
+  overflow: hidden;
+}
+
+.nft-artwork-dialog-content {
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: calc(100vh - 2rem);
+}
+
+.nft-artwork-dialog-content h2 {
+  padding-right: 3rem;
+}
+
+.nft-artwork-full {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 8rem);
+  object-fit: contain;
+  background: var(--app-raised);
+  border-radius: var(--radius-md);
 }
 
 .wallet-dialog-close {
