@@ -17,6 +17,7 @@ import {
 } from "@statics-protocol/sdk";
 
 import { loadBasketCatalog, loadTokenMetadata } from "@/lib/baskets/baskets";
+import type { LaunchDeployment } from "@/lib/deployments/types";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
 import {
   MAX_ERC20_ALLOWANCE,
@@ -83,6 +84,91 @@ function addDefinition(
     purposes: current
       ? [...new Set([...current.purposes, definition.purpose])]
       : [definition.purpose],
+  });
+}
+
+export function launchApprovalDefinitions(
+  deployment: LaunchDeployment
+): readonly ApprovalDefinition[] {
+  const definitions = new Map<string, ApprovalDefinition>();
+  const statics = {
+    address: deployment.contracts.statics,
+    symbol: "STATICS",
+    name: "Statics",
+  };
+  const weth = {
+    address: deployment.contracts.weth,
+    symbol: "WETH",
+    name: "Wrapped Ether",
+  };
+  const addErc20 = (
+    token: typeof statics,
+    spender: Address,
+    spenderLabel: string,
+    purpose: string
+  ) =>
+    addDefinition(definitions, {
+      kind: "erc20",
+      authorityContract: token.address,
+      token: token.address,
+      tokenSymbol: token.symbol,
+      tokenName: token.name,
+      spender,
+      spenderLabel,
+      purpose,
+    });
+
+  addErc20(statics, deployment.contracts.vault, "Genesis Vault", "Acquire Genesis NFTs");
+  addErc20(
+    statics,
+    deployment.contracts.activationRegistry,
+    "Genesis Activation Registry",
+    "Activate Genesis tiers"
+  );
+  for (const token of [statics, weth]) {
+    addErc20(token, deployment.contracts.permit2, "Permit2", "Canonical STATICS market swaps");
+    addDefinition(definitions, {
+      kind: "permit2",
+      authorityContract: deployment.contracts.permit2,
+      token: token.address,
+      tokenSymbol: token.symbol,
+      tokenName: token.name,
+      spender: deployment.contracts.universalRouter,
+      spenderLabel: "Uniswap Universal Router",
+      purpose: "Canonical STATICS market swaps",
+    });
+  }
+  return [...definitions.values()];
+}
+
+export async function loadLaunchApprovalInventory(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment,
+  wallet: Address
+): Promise<readonly ApprovalRecord[]> {
+  const records = await Promise.all(
+    launchApprovalDefinitions(deployment).map(async (definition): Promise<ApprovalRecord> => {
+      if (definition.kind === "erc20") {
+        const allowance = await publicClient.readContract({
+          address: definition.authorityContract,
+          abi: basketTokenAbi,
+          functionName: "allowance",
+          args: [wallet, definition.spender],
+        });
+        return { ...definition, allowance };
+      }
+      const [allowance, expiration] = await publicClient.readContract({
+        address: definition.authorityContract,
+        abi: permit2AllowanceAbi,
+        functionName: "allowance",
+        args: [wallet, definition.token, definition.spender],
+      });
+      return { ...definition, allowance, expiration };
+    })
+  );
+  return records.sort((left, right) => {
+    const symbol = left.tokenSymbol.localeCompare(right.tokenSymbol);
+    return symbol || left.spenderLabel.localeCompare(right.spenderLabel);
   });
 }
 

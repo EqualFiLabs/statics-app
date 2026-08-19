@@ -601,6 +601,20 @@
   flex: 1 1 20rem;
 }
 
+.launch-overview,
+.launch-overview-hero,
+.launch-overview-actions {
+  display: grid;
+  gap: 1rem;
+}
+
+.launch-overview-hero h2,
+.launch-overview-hero p,
+.launch-overview-actions h2,
+.launch-overview-actions p {
+  margin: 0;
+}
+
 .locale-switcher--dapp-mobile {
   display: none;
 }

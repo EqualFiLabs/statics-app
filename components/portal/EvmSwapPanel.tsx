@@ -11,6 +11,7 @@ import {
   type EvmSwapToken,
 } from "@/lib/portal/uniswap";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
@@ -74,7 +75,8 @@ export function EvmSwapPanel() {
   const wallet = useWalletState();
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const walletTokens = useWalletTokens(wallet.fundingChainId);
+  const { active } = useDeployment();
+  const walletTokens = useWalletTokens(wallet.fundingChainId, active.deployment);
   const tokens = useMemo(
     () => [
       ...getDefaultEvmSwapTokens(wallet.fundingChainId).filter((token) => token.kind === "native"),

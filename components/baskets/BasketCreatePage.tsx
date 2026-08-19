@@ -21,6 +21,7 @@ import {
   useProtocolSlippage,
 } from "@/components/protocol/ProtocolSlippage";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { calculateBasketLaunchQuote, type BasketLaunchQuote } from "@/lib/baskets/creation";
 import { loadTokenMetadata, type TokenMetadata } from "@/lib/baskets/baskets";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
@@ -77,7 +78,8 @@ function BasketCreateRuntime() {
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const chainId = configuredDeployment!.chainId;
-  const walletTokens = useWalletTokens(chainId);
+  const { active } = useDeployment();
+  const walletTokens = useWalletTokens(chainId, active.deployment);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");

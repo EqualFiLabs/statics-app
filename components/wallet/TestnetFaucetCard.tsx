@@ -16,6 +16,7 @@ import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import type { WalletToken } from "@/lib/wallet-tokens";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
 const deploymentState = readClientDollarDeployment();
@@ -58,7 +59,8 @@ export function TestnetFaucetCard() {
   const deployment = deploymentState.status === "configured" ? deploymentState.deployment : null;
   const faucet = deployment?.faucet;
   const faucetChainId = deployment?.chainId ?? 46_630;
-  const { tokens, addTokens } = useWalletTokens(faucetChainId);
+  const { active } = useDeployment();
+  const { tokens, addTokens } = useWalletTokens(faucetChainId, active.deployment);
   const [snapshot, setSnapshot] = useState<FaucetSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);

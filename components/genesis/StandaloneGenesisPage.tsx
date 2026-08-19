@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { encodeFunctionData, formatEther, getAddress, parseEventLogs, type Address } from "viem";
+import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import {
@@ -29,8 +29,8 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
   configuredIndexerUrlForDeployment,
   loadLaunchGenesisInventoryIds,
-  loadWalletLaunchGenesisIds,
 } from "@/lib/indexer/statics";
+import { discoverWalletGenesisIds } from "@/lib/genesis/discovery";
 import { useWalletState } from "@/providers/wallet-context";
 
 type GenesisView = "explore" | "mine" | "rewards";
@@ -41,49 +41,6 @@ function describeGenesisError(error: unknown): string {
   if (message.includes("GenesisLocked")) return "Unlink this Genesis NFT before continuing.";
   if (message.includes("NotGenesisOwner")) return "This wallet no longer owns that Genesis NFT.";
   return message || "The Genesis transaction failed.";
-}
-
-async function walletGenesisIds(
-  publicClient: NonNullable<ReturnType<typeof usePublicClient>>,
-  deployment: LaunchDeployment,
-  owner: Address
-): Promise<bigint[]> {
-  const indexed = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId)
-    ? await loadWalletLaunchGenesisIds(owner, deployment.descriptor.deploymentId).catch(() => [])
-    : [];
-  const logs = await publicClient.getLogs({
-    address: deployment.contracts.genesis,
-    event: staticsGenesisAbi.find(
-      (entry) => entry.type === "event" && entry.name === "Transfer"
-    ) as Extract<(typeof staticsGenesisAbi)[number], { type: "event"; name: "Transfer" }>,
-    args: { to: owner },
-    fromBlock: deployment.deploymentStartBlock,
-    toBlock: "latest",
-  });
-  const ids = [
-    ...new Set(
-      [
-        ...indexed,
-        ...parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" }).map(
-          (log) => log.args.tokenId
-        ),
-      ].map(String)
-    ),
-  ].map(BigInt);
-  const current = await publicClient.multicall({
-    allowFailure: true,
-    contracts: ids.map((id) => ({
-      address: deployment.contracts.genesis,
-      abi: staticsGenesisAbi,
-      functionName: "ownerOf" as const,
-      args: [id] as const,
-    })),
-  });
-  return ids.filter(
-    (_, index) =>
-      current[index]?.status === "success" &&
-      String(current[index].result).toLowerCase() === owner.toLowerCase()
-  );
 }
 
 export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
@@ -190,7 +147,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     enabled: Boolean(publicClient && wallet) && view !== "explore",
     queryFn: async () => {
       if (!publicClient || !wallet) return [];
-      const ids = await walletGenesisIds(publicClient, deployment, wallet);
+      const ids = await discoverWalletGenesisIds(publicClient, deployment, wallet);
       return Promise.all(
         ids.map(async (id) => {
           const [tier, multiplierBps, registered, weight, pendingStatics, pendingWeth, approved] =

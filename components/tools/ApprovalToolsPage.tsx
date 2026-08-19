@@ -8,14 +8,11 @@ import { useNow, useTranslations } from "next-intl";
 
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import {
-  readClientDollarDeployment,
-  verifyDollarDeployment,
-  verifyLiquidityDeployment,
-} from "@/lib/dollar/deployment";
+import { verifyDollarDeployment, verifyLiquidityDeployment } from "@/lib/dollar/deployment";
 import {
   buildApprovalUpdate,
   loadApprovalInventory,
+  loadLaunchApprovalInventory,
   readApprovalState,
   type ApprovalRecord,
 } from "@/lib/protocol/approval-inventory";
@@ -31,8 +28,9 @@ import {
 } from "@/lib/protocol/presentation";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
+import type { StaticsDeployment } from "@/lib/deployments/types";
 
-const deploymentState = readClientDollarDeployment();
 const APPROVAL_REFRESH_INTERVAL_MS = 60_000;
 
 function approvalKindLabel(kind: ApprovalRecord["kind"]): string {
@@ -49,6 +47,7 @@ function describeApprovalError(cause: unknown): string {
 export function ApprovalToolsPage() {
   const t = useTranslations("tools");
   const wallet = useWalletState();
+  const { active } = useDeployment();
   if (wallet.status === "unconfigured") {
     return (
       <SurfaceEmptyState
@@ -58,13 +57,25 @@ export function ApprovalToolsPage() {
       />
     );
   }
-  return <ApprovalToolsRuntime />;
+  if (!active.deployment) {
+    return (
+      <SurfaceEmptyState
+        state="unconfigured"
+        subject={t("title")}
+        empty={{
+          title: t("unavailable"),
+          description: active.descriptor.unavailableReason ?? t("noDeployment"),
+        }}
+      />
+    );
+  }
+  return <ApprovalToolsRuntime deployment={active.deployment} />;
 }
 
-function ApprovalToolsRuntime() {
+function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment }) {
   const t = useTranslations("tools");
   const walletState = useWalletState();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const walletClient = useWalletClient();
   const now = useNow({ updateInterval: APPROVAL_REFRESH_INTERVAL_MS });
   const wallet =
@@ -78,13 +89,11 @@ function ApprovalToolsRuntime() {
   const approvals = useQuery({
     queryKey: [
       "approval-tools",
-      deploymentState.status === "configured"
-        ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
+      deployment.descriptor.deploymentId,
+      deployment.kind === "launch" ? deployment.protocolCommit : deployment.protocol.protocolCommit,
       wallet,
     ],
     enabled:
-      deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
       walletState.status === "ready" &&
@@ -93,14 +102,17 @@ function ApprovalToolsRuntime() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     queryFn: async () => {
-      if (!publicClient || !wallet || deploymentState.status !== "configured") {
+      if (!publicClient || !wallet) {
         throw new Error("No verified Statics deployment is configured.");
       }
-      await verifyDollarDeployment(publicClient, deploymentState.deployment);
-      if (deploymentState.deployment.liquidity) {
-        await verifyLiquidityDeployment(publicClient, deploymentState.deployment);
+      if (deployment.kind === "launch") {
+        return loadLaunchApprovalInventory(publicClient, deployment, wallet);
       }
-      return loadApprovalInventory(publicClient, deploymentState.deployment, wallet);
+      await verifyDollarDeployment(publicClient, deployment.protocol);
+      if (deployment.protocol.liquidity) {
+        await verifyLiquidityDeployment(publicClient, deployment.protocol);
+      }
+      return loadApprovalInventory(publicClient, deployment.protocol, wallet);
     },
   });
 
@@ -135,10 +147,6 @@ function ApprovalToolsRuntime() {
       />
     );
   }
-  if (deploymentState.status !== "configured") {
-    return <EmptyState title={t("unavailable")} description={t("noDeployment")} />;
-  }
-
   const records = approvals.data ?? [];
   const currentTimestamp = approvalClockTimestamp(now);
   const active = records.filter(
@@ -178,7 +186,8 @@ function ApprovalToolsRuntime() {
             )
           : approval.kind === "operator"
             ? approvalPresentation(
-                approval.token === deploymentState.deployment.contracts.risk
+                deployment.kind === "protocol" &&
+                  approval.token === deployment.protocol.contracts.risk
                   ? erc1155OperatorPermission({
                       asset: approval.tokenName,
                       spender: approval.spender,
@@ -199,7 +208,7 @@ function ApprovalToolsRuntime() {
     await executeProtocolTransaction({
       publicClient,
       wallet,
-      chainId: deploymentState.deployment.chainId,
+      chainId: deployment.descriptor.chainId,
       kind: enabled ? "set-app-approval" : "revoke-app-approval",
       label: `${enabled ? "Set maximum" : "Revoke"} ${approval.tokenSymbol} approval`,
       amount: `${approvalKindLabel(approval.kind)} for ${approval.spenderLabel}`,
@@ -323,7 +332,7 @@ function ApprovalToolsRuntime() {
                 <span>{approval.spenderLabel}</span>
                 <AddressDisplay
                   address={approval.spender}
-                  chainId={deploymentState.deployment.chainId}
+                  chainId={deployment.descriptor.chainId}
                   label={t("spender")}
                 />
                 <small>{approval.purposes.join(" · ")}</small>

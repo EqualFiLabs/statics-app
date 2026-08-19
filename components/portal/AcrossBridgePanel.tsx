@@ -19,6 +19,7 @@ import {
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { useSolanaAssets } from "@/hooks/useSolanaAssets";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import {
@@ -191,7 +192,8 @@ export function AcrossBridgePanel() {
   // The Statics deployment is where most people are heading, so it opens as the
   // destination -- but it is now a default rather than the only option.
   const staticsDestination = readAcrossDestination();
-  const walletTokens = useWalletTokens(wallet.fundingChainId);
+  const { active } = useDeployment();
+  const walletTokens = useWalletTokens(wallet.fundingChainId, active.deployment);
   const supportedEvmChains = useMemo(
     () => new Set(wallet.fundingNetworks.map((network) => network.chainId)),
     [wallet.fundingNetworks]

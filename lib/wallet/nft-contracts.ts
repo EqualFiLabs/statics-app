@@ -1,6 +1,7 @@
 "use client";
 
 import { getAddress, isAddress, parseAbi, type Address, type PublicClient } from "viem";
+import type { StaticsDeployment } from "@/lib/deployments/types";
 
 /**
  * ERC-721 collections a person has added by address.
@@ -106,29 +107,65 @@ function parseStoredCollection(entry: unknown): NftCollection | null {
   return null;
 }
 
-export function nftCollectionStorageKey(chainId: number) {
-  return `statics:wallet:nfts:${chainId}`;
+export function nftCollectionStorageKey(chainId: number, deploymentId = "shared") {
+  return `statics:wallet:nfts:${chainId}:${deploymentId}`;
 }
 
-export function loadNftCollections(chainId: number): NftCollection[] {
-  if (typeof window === "undefined") return [];
+function defaultNftCollections(
+  chainId: number,
+  deployment?: StaticsDeployment | null
+): NftCollection[] {
+  if (!deployment || deployment.descriptor.chainId !== chainId) return [];
+  const address =
+    deployment.kind === "launch"
+      ? deployment.contracts.genesis
+      : deployment.protocol.genesis?.collection;
+  return address
+    ? [{ address, name: "Statics Genesis", symbol: "GENESIS", standard: "erc721" }]
+    : [];
+}
+
+export function loadNftCollections(
+  chainId: number,
+  deployment?: StaticsDeployment | null
+): NftCollection[] {
+  const defaults = defaultNftCollections(chainId, deployment);
+  if (typeof window === "undefined") return defaults;
   try {
-    const raw = window.localStorage.getItem(nftCollectionStorageKey(chainId));
-    if (!raw) return [];
+    const raw = window.localStorage.getItem(
+      nftCollectionStorageKey(chainId, deployment?.descriptor.deploymentId)
+    );
+    if (!raw) return defaults;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((entry) => {
+    const stored = parsed.flatMap((entry) => {
       const collection = parseStoredCollection(entry);
       return collection ? [collection] : [];
     });
+    return [...defaults, ...stored].filter(
+      (collection, index, collections) =>
+        collections.findIndex(
+          (candidate) =>
+            candidate.address.toLowerCase() === collection.address.toLowerCase() &&
+            candidate.standard === collection.standard &&
+            candidate.tokenId === collection.tokenId
+        ) === index
+    );
   } catch {
-    return [];
+    return defaults;
   }
 }
 
-export function saveNftCollections(chainId: number, collections: readonly NftCollection[]): void {
+export function saveNftCollections(
+  chainId: number,
+  collections: readonly NftCollection[],
+  deploymentId = "shared"
+): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(nftCollectionStorageKey(chainId), JSON.stringify(collections));
+  window.localStorage.setItem(
+    nftCollectionStorageKey(chainId, deploymentId),
+    JSON.stringify(collections)
+  );
   window.dispatchEvent(new Event(storageEvent));
 }
 

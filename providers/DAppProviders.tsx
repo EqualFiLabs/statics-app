@@ -71,7 +71,7 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
   nativeSymbol: network.chain.nativeCurrency.symbol,
   supportsUniswap: network.supportsUniswap,
 }));
-const FUNDING_CHAIN_STORAGE_KEY = "statics:funding-chain";
+const fundingChainStorageKey = (deploymentId: string) => `statics:funding-chain:${deploymentId}`;
 
 function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
   if (!wallet?.chainId) return null;
@@ -93,7 +93,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const { wallets: solanaWallets, ready: solanaWalletsReady } = useSolanaWallets();
   const [busyAction, setBusyAction] = useState<WalletState["busyAction"]>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [fundingChainId, setFundingChainId] = useState(8_453);
+  const [fundingChainId, setFundingChainId] = useState(active.descriptor.chainId);
   const [locallyDisconnected, setLocallyDisconnected] = useState(false);
   const [preferredWalletAddress, setPreferredWalletAddress] = useState<string>();
   const [waitingForPrivyWallet, setWaitingForPrivyWallet] = useState(false);
@@ -125,13 +125,17 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const stored = Number(window.localStorage.getItem(FUNDING_CHAIN_STORAGE_KEY));
+      const stored = Number(
+        window.localStorage.getItem(fundingChainStorageKey(active.descriptor.deploymentId))
+      );
       if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
         setFundingChainId(stored);
+      } else {
+        setFundingChainId(active.descriptor.chainId);
       }
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
+  }, [active.descriptor.chainId, active.descriptor.deploymentId]);
 
   useEffect(() => {
     if (!requestedExternalAddress) return;
@@ -273,7 +277,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           const nextNetwork = getFundingNetwork(nextChainId);
           if (!nextNetwork) throw new Error("Choose a supported funding network.");
           setFundingChainId(nextChainId);
-          window.localStorage.setItem(FUNDING_CHAIN_STORAGE_KEY, String(nextChainId));
+          window.localStorage.setItem(
+            fundingChainStorageKey(active.descriptor.deploymentId),
+            String(nextChainId)
+          );
           if (!selectedWallet) return;
           await selectedWallet.switchChain(nextChainId);
         }),
@@ -361,6 +368,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
+      active.descriptor.deploymentId,
       promptExternalWallet,
       privyError,
       reconnectPrivyWallet,
@@ -427,8 +435,10 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
 
 function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
   const { active } = useDeployment();
-  const [fundingChainId, setFundingChainId] = useState(8_453);
-  const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
+  const [fundingChainId, setFundingChainId] = useState(active.descriptor.chainId);
+  const fundingNetwork =
+    getFundingNetwork(fundingChainId) ?? getFundingNetwork(active.descriptor.chainId)!;
+  useEffect(() => setFundingChainId(active.descriptor.chainId), [active.descriptor.chainId]);
   const value = useMemo<WalletState>(
     () => ({
       ...defaultWalletState,

@@ -11,6 +11,7 @@ import {
   getEveBridgeDeployment,
 } from "@/lib/portal/eve-bridge";
 import { getTokenListEntry } from "@/lib/token-list";
+import type { StaticsDeployment } from "@/lib/deployments/types";
 
 export type WalletToken = Readonly<{
   address: Address;
@@ -23,13 +24,13 @@ export type WalletToken = Readonly<{
 
 const storageEvent = "statics-wallet-tokens-changed";
 
-export function walletTokenStorageKey(chainId: number) {
-  return `statics:wallet:tokens:${chainId}`;
+export function walletTokenStorageKey(chainId: number, deploymentId = "shared") {
+  return `statics:wallet:tokens:${chainId}:${deploymentId}`;
 }
 
 export function defaultWalletTokens(
   chainId: number,
-  deployment: DollarDeploymentState = readClientDollarDeployment()
+  deployment: DollarDeploymentState | StaticsDeployment = readClientDollarDeployment()
 ): WalletToken[] {
   const defaults: WalletToken[] = getDefaultEvmSwapTokens(chainId)
     .filter((token) => token.kind === "erc20")
@@ -54,10 +55,35 @@ export function defaultWalletTokens(
       isDefault: true,
     });
   }
-  if (deployment.status === "configured" && deployment.deployment.chainId === chainId) {
-    if (deployment.deployment.pegged) {
+  const protocolDeployment =
+    "kind" in deployment && deployment.kind === "protocol"
+      ? deployment.protocol
+      : "status" in deployment && deployment.status === "configured"
+        ? deployment.deployment
+        : null;
+  const launchDeployment = "kind" in deployment && deployment.kind === "launch" ? deployment : null;
+  if (launchDeployment?.descriptor.chainId === chainId) {
+    defaults.push(
+      {
+        address: launchDeployment.contracts.statics,
+        symbol: "STATICS",
+        name: "Statics",
+        decimals: 18,
+        isDefault: true,
+      },
+      {
+        address: launchDeployment.contracts.weth,
+        symbol: "WETH",
+        name: "Wrapped Ether",
+        decimals: 18,
+        isDefault: true,
+      }
+    );
+  }
+  if (protocolDeployment?.chainId === chainId) {
+    if (protocolDeployment.pegged) {
       defaults.push({
-        address: deployment.deployment.pegged.collateral,
+        address: protocolDeployment.pegged.collateral,
         symbol: "USDG",
         name: "Global Dollar",
         decimals: 6,
@@ -65,7 +91,7 @@ export function defaultWalletTokens(
       });
     }
     defaults.push({
-      address: deployment.deployment.contracts.dollar,
+      address: protocolDeployment.contracts.dollar,
       symbol: "USDstx",
       name: "Statics Dollar",
       decimals: 18,
@@ -78,12 +104,17 @@ export function defaultWalletTokens(
   );
 }
 
-export function loadWalletTokens(chainId: number): WalletToken[] {
-  if (typeof window === "undefined") return defaultWalletTokens(chainId);
+export function loadWalletTokens(
+  chainId: number,
+  deployment?: StaticsDeployment | null
+): WalletToken[] {
+  const deploymentId = deployment?.descriptor.deploymentId ?? "shared";
+  if (typeof window === "undefined")
+    return defaultWalletTokens(chainId, deployment ?? readClientDollarDeployment());
   let stored: WalletToken[] = [];
   try {
     const parsed: unknown = JSON.parse(
-      window.localStorage.getItem(walletTokenStorageKey(chainId)) ?? "[]"
+      window.localStorage.getItem(walletTokenStorageKey(chainId, deploymentId)) ?? "[]"
     );
     if (Array.isArray(parsed)) {
       stored = parsed.flatMap((value): WalletToken[] => {
@@ -119,7 +150,10 @@ export function loadWalletTokens(chainId: number): WalletToken[] {
   } catch {
     stored = [];
   }
-  return [...defaultWalletTokens(chainId), ...stored].filter(
+  return [
+    ...defaultWalletTokens(chainId, deployment ?? readClientDollarDeployment()),
+    ...stored,
+  ].filter(
     (token, index, tokens) =>
       tokens.findIndex(
         (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
@@ -127,9 +161,13 @@ export function loadWalletTokens(chainId: number): WalletToken[] {
   );
 }
 
-export function saveWalletTokens(chainId: number, tokens: readonly WalletToken[]) {
+export function saveWalletTokens(
+  chainId: number,
+  tokens: readonly WalletToken[],
+  deploymentId = "shared"
+) {
   window.localStorage.setItem(
-    walletTokenStorageKey(chainId),
+    walletTokenStorageKey(chainId, deploymentId),
     JSON.stringify(tokens.filter((token) => !token.isDefault))
   );
   window.dispatchEvent(new CustomEvent(storageEvent));

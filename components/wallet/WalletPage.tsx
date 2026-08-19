@@ -30,7 +30,6 @@ import {
   verifyNftTransfer,
   type WalletNft,
 } from "@/lib/wallet/nfts";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { portalRequested, walletPortalUrl, withoutWalletPortal } from "@/lib/portal/navigation";
 import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
@@ -48,6 +47,7 @@ import { AddressInput } from "@/components/protocol/AddressInput";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { applyPercent, parseRecipientAddress } from "@/lib/protocol/ux";
+import { useDeployment } from "@/providers/deployment-context";
 
 const erc20Abi = [
   {
@@ -80,8 +80,6 @@ const erc20Abi = [
   },
 ] as const;
 
-const deploymentState = readClientDollarDeployment();
-
 type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | "nft" | "add-nft" | null;
 /** Tokens and NFTs are both holdings; activity is a route, linked rather than duplicated. */
 type WalletTab = "tokens" | "nfts";
@@ -99,10 +97,12 @@ function displayBalance(value: AssetBalance, decimals: number) {
 export function WalletPage() {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  const deployment = active.deployment;
+  const protocolDeployment = deployment?.kind === "protocol" ? deployment.protocol : null;
   const network = getFundingNetwork(wallet.fundingChainId);
-  const nftChainId =
-    deploymentState.status === "configured" ? deploymentState.deployment.chainId : null;
-  const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
+  const nftChainId = deployment?.descriptor.chainId ?? null;
+  const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId, deployment);
   const [modal, setModalState] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
   const [tab, setTab] = useState<WalletTab>("tokens");
@@ -175,15 +175,10 @@ export function WalletPage() {
       // Risk shares only exist on the Statics chain, so they are read only
       // while that chain is the one being viewed. Listing a Statics balance
       // under a Base heading would misstate where the money is.
-      if (
-        deploymentState.status === "configured" &&
-        deploymentState.deployment.chainId === wallet.fundingChainId
-      ) {
-        const shares = await loadRiskShareBalances(
-          publicClient,
-          deploymentState.deployment,
-          account
-        ).catch(() => []);
+      if (protocolDeployment && protocolDeployment.chainId === wallet.fundingChainId) {
+        const shares = await loadRiskShareBalances(publicClient, protocolDeployment, account).catch(
+          () => []
+        );
         if (currentRefresh === refreshId.current) setRiskShares(shares);
       } else {
         setRiskShares([]);
@@ -995,8 +990,8 @@ function SendDialog({
 function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }) {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
-  const chainId =
-    deploymentState.status === "configured" ? deploymentState.deployment.chainId : undefined;
+  const { active } = useDeployment();
+  const chainId = active.deployment?.descriptor.chainId;
   const publicClient = usePublicClient(chainId ? { chainId } : undefined);
   const walletClient = useWalletClient(chainId ? { chainId } : undefined);
   const [recipient, setRecipient] = useState("");
@@ -1092,7 +1087,8 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
 function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: () => void }) {
   const t = useTranslations("wallet");
   const publicClient = usePublicClient({ chainId });
-  const { addCollection } = useWalletNftCollections(chainId);
+  const { active } = useDeployment();
+  const { addCollection } = useWalletNftCollections(chainId, active.deployment);
   const [address, setAddress] = useState("");
   const [tokenId, setTokenId] = useState("");
   const [pending, setPending] = useState(false);

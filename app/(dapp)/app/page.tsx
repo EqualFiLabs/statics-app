@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DollarOverview } from "@/components/dollar/DollarPage";
+import { DeploymentOverview } from "@/components/overview/DeploymentOverview";
 
 export const metadata: Metadata = {
   title: "DApp",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DAppOverviewPage() {
-  return <DollarOverview />;
+  return <DeploymentOverview />;
 }
