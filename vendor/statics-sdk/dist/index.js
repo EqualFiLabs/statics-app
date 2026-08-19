@@ -94,6 +94,9 @@ export const staticsGenesisAbi = parseAbi([
     "event Unlocked(uint256 tokenId)",
 ]);
 export const staticsGenesisVaultAbi = parseAbi([
+    "function statics() view returns (address)",
+    "function genesis() view returns (address)",
+    "function finalized() view returns (bool)",
     "function buyGenesis(uint256 tokenId, address receiver) payable",
     "function redeemGenesis(uint256 tokenId, address receiver)",
     "function quoteGenesisPurchase() view returns (uint256 staticsPrice, uint256 nativeFee)",
@@ -111,6 +114,7 @@ export const staticsGenesisVaultAbi = parseAbi([
     "event GenesisRedeemed(address indexed owner, address indexed receiver, uint256 indexed tokenId, uint256 price)",
 ]);
 export const genesisActivationRegistryAbi = parseAbi([
+    "function statics() view returns (address)",
     "function genesisCollection() view returns (address)",
     "function tierOf(uint256 genesisId) view returns (uint8)",
     "function multiplierBps(uint256 genesisId) view returns (uint16)",
@@ -141,6 +145,13 @@ export const staticsFeeReceiverAbi = parseAbi([
     "event DistributorAccepted(address indexed previousDistributor, address indexed newDistributor)",
 ]);
 export const genesisLaunchDistributorAbi = parseAbi([
+    "function feeReceiver() view returns (address)",
+    "function genesis() view returns (address)",
+    "function activationRegistry() view returns (address)",
+    "function statics() view returns (address)",
+    "function numeraire() view returns (address)",
+    "function vault() view returns (address)",
+    "function treasury() view returns (address)",
     "function registerGenesis(uint256 genesisId)",
     "function accrue() returns (uint256 staticsAmount, uint256 numeraireAmount)",
     "function claimGenesis(uint256 genesisId, address asset, address receiver) returns (uint256 amount)",

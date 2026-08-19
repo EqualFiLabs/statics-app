@@ -477,6 +477,30 @@ export declare const staticsGenesisAbi: readonly [{
     }];
 }];
 export declare const staticsGenesisVaultAbi: readonly [{
+    readonly name: "statics";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "genesis";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "finalized";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
     readonly name: "buyGenesis";
     readonly type: "function";
     readonly stateMutability: "payable";
@@ -667,6 +691,14 @@ export declare const staticsGenesisVaultAbi: readonly [{
     }];
 }];
 export declare const genesisActivationRegistryAbi: readonly [{
+    readonly name: "statics";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
     readonly name: "genesisCollection";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -971,6 +1003,62 @@ export declare const staticsFeeReceiverAbi: readonly [{
     }];
 }];
 export declare const genesisLaunchDistributorAbi: readonly [{
+    readonly name: "feeReceiver";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "genesis";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "activationRegistry";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "statics";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "numeraire";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "vault";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "treasury";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
     readonly name: "registerGenesis";
     readonly type: "function";
     readonly stateMutability: "nonpayable";

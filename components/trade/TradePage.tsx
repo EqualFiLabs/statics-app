@@ -47,6 +47,7 @@ import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 import type { LaunchDeployment } from "@/lib/deployments/types";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 
 const PERMIT_TTL = 20n * 60n;
 
@@ -106,32 +107,41 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
-      const [liquidity, staticsBalance, wethBalance, ethBalance] = await Promise.all([
-        publicClient.readContract({
-          address: deployment.contracts.stateView,
-          abi: v4StateViewReadAbi,
-          functionName: "getLiquidity",
-          args: [deployment.market.poolId],
-        }),
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.statics,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.weth,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
-        wallet ? publicClient.getBalance({ address: wallet }) : 0n,
-      ]);
-      return { liquidity, staticsBalance, wethBalance, ethBalance };
+      await verifyLaunchDeployment(publicClient, deployment);
+      const [slot0, liquidity, gasPrice, staticsBalance, wethBalance, ethBalance] =
+        await Promise.all([
+          publicClient.readContract({
+            address: deployment.contracts.stateView,
+            abi: v4StateViewReadAbi,
+            functionName: "getSlot0",
+            args: [deployment.market.poolId],
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.stateView,
+            abi: v4StateViewReadAbi,
+            functionName: "getLiquidity",
+            args: [deployment.market.poolId],
+          }),
+          publicClient.getGasPrice(),
+          wallet
+            ? publicClient.readContract({
+                address: deployment.contracts.statics,
+                abi: dopplerStaticsTokenAbi,
+                functionName: "balanceOf",
+                args: [wallet],
+              })
+            : 0n,
+          wallet
+            ? publicClient.readContract({
+                address: deployment.contracts.weth,
+                abi: dopplerStaticsTokenAbi,
+                functionName: "balanceOf",
+                args: [wallet],
+              })
+            : 0n,
+          wallet ? publicClient.getBalance({ address: wallet }) : 0n,
+        ]);
+      return { slot0, liquidity, gasPrice, staticsBalance, wethBalance, ethBalance };
     },
   });
   const inputBalance =
@@ -162,13 +172,13 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
         ),
       });
       if (!result.data) throw new Error("The canonical quoter returned no result.");
-      const [amountOut] = decodeFunctionResult({
+      const [amountOut, gasEstimate] = decodeFunctionResult({
         abi: v4QuoterAbi,
         functionName: "quoteExactInputSingle",
         data: result.data,
       });
       if (amountOut === 0n) throw new Error("This amount produces no output.");
-      return { amount, amountOut, directionIndex };
+      return { amount, amountOut, gasEstimate, directionIndex };
     },
   });
   const currentQuote =
@@ -179,6 +189,31 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
     currentQuote && slippageBps !== null
       ? minimumWithSlippage(currentQuote.amountOut, slippageBps)
       : null;
+  const token1PerToken0 = marketState.data
+    ? Math.pow(1.0001, Number(marketState.data.slot0[1]))
+    : null;
+  const staticsPerWeth =
+    token1PerToken0 === null
+      ? null
+      : deployment.market.poolKey.currency0.toLowerCase() ===
+          deployment.contracts.statics.toLowerCase()
+        ? 1 / token1PerToken0
+        : token1PerToken0;
+  const spotOutputPerInput =
+    staticsPerWeth === null
+      ? null
+      : direction.input === "statics"
+        ? 1 / staticsPerWeth
+        : staticsPerWeth;
+  const quotedOutputPerInput = currentQuote
+    ? Number(formatUnits(currentQuote.amountOut, 18)) / Number(formatUnits(amount, 18))
+    : null;
+  const priceImpact =
+    spotOutputPerInput && quotedOutputPerInput !== null
+      ? Math.max(0, ((spotOutputPerInput - quotedOutputPerInput) / spotOutputPerInput) * 100)
+      : null;
+  const estimatedNetworkCost =
+    currentQuote && marketState.data ? currentQuote.gasEstimate * marketState.data.gasPrice : null;
 
   const submit = async () => {
     if (!publicClient || !wallet || !currentQuote || minimumOut === null || minimumOut === 0n)
@@ -186,6 +221,7 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
     setPending(true);
     setError(null);
     try {
+      await verifyLaunchDeployment(publicClient, deployment);
       const balance =
         direction.input === "eth"
           ? await publicClient.getBalance({ address: wallet })
@@ -210,6 +246,7 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
             publicClient,
             wallet,
             chainId: deployment.descriptor.chainId,
+            deploymentId: deployment.descriptor.deploymentId,
             kind: "approve-swap",
             label: `Enable ${inputSymbol} swaps`,
             amount: `Maximum ${inputSymbol}`,
@@ -230,6 +267,7 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
             publicClient,
             wallet,
             chainId: deployment.descriptor.chainId,
+            deploymentId: deployment.descriptor.deploymentId,
             kind: "approve-permit2",
             label: `Authorize ${inputSymbol} swaps`,
             amount: `Maximum ${inputSymbol}`,
@@ -266,6 +304,15 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
         data: fresh.data,
       });
       if (freshOut < minimumOut) throw new Error("The price moved below your reviewed minimum.");
+      const outputBefore =
+        direction.output === "eth"
+          ? await publicClient.getBalance({ address: wallet })
+          : await publicClient.readContract({
+              address: tokenAddress(deployment, direction.output),
+              abi: dopplerStaticsTokenAbi,
+              functionName: "balanceOf",
+              args: [wallet],
+            });
       const execution = buildV4ExactInputSingleSwap({
         router: deployment.contracts.universalRouter,
         poolKey: poolKeyForLaunch(deployment),
@@ -279,6 +326,7 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
         publicClient,
         wallet,
         chainId: deployment.descriptor.chainId,
+        deploymentId: deployment.descriptor.deploymentId,
         kind: "swap",
         label: `Swap ${inputSymbol} for ${outputSymbol}`,
         amount: `${display(amount)} ${inputSymbol}`,
@@ -287,6 +335,24 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
         value: execution.value,
         sendTransaction: walletState.sendEvmTransaction,
         describeError: describeTradeError,
+        verifyConfirmation: async (receipt) => {
+          const outputAfter =
+            direction.output === "eth"
+              ? await publicClient.getBalance({ address: wallet })
+              : await publicClient.readContract({
+                  address: tokenAddress(deployment, direction.output),
+                  abi: dopplerStaticsTokenAbi,
+                  functionName: "balanceOf",
+                  args: [wallet],
+                });
+          const received =
+            direction.output === "eth"
+              ? outputAfter + receipt.gasUsed * receipt.effectiveGasPrice - outputBefore
+              : outputAfter - outputBefore;
+          if (received < minimumOut) {
+            throw new Error("The confirmed output is below the protected minimum.");
+          }
+        },
       });
       setAmountInput("");
       await queryClient.invalidateQueries({
@@ -384,6 +450,10 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
               Minimum: {display(minimumOut)} {outputSymbol}
             </small>
           )}
+          {priceImpact !== null && <small>Estimated price impact: {priceImpact.toFixed(2)}%</small>}
+          {estimatedNetworkCost !== null && (
+            <small>Estimated network cost: {display(estimatedNetworkCost)} ETH</small>
+          )}
         </div>
         {(error || marketState.error || quote.error) && (
           <p className="dapp-inline-error" role="alert">
@@ -414,6 +484,14 @@ function LaunchTrade({ deployment }: { deployment: LaunchDeployment }) {
           <div>
             <dt>Market</dt>
             <dd>STATICS / WETH</dd>
+          </div>
+          <div>
+            <dt>Current price</dt>
+            <dd>{staticsPerWeth ? `${staticsPerWeth.toPrecision(6)} STATICS / WETH` : "—"}</dd>
+          </div>
+          <div>
+            <dt>Pool fee</dt>
+            <dd>{(deployment.market.poolKey.fee / 10_000).toFixed(2)}%</dd>
           </div>
           <div>
             <dt>Liquidity</dt>

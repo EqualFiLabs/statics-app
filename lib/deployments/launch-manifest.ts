@@ -1,5 +1,7 @@
 import { getAddress, isHash, type Address, type Hex } from "viem";
 
+import { v4PoolId } from "@statics-protocol/sdk";
+
 import type {
   DeploymentDescriptor,
   LaunchContractName,
@@ -77,6 +79,12 @@ export function parseLaunchDeploymentManifest(
         hash(contract.runtimeCodeHash!, `contracts.${name}.runtimeCodeHash`),
       ])
   ) as Partial<Record<LaunchContractName, Hex>>;
+  if (
+    source === "checked-in-manifest" &&
+    Object.keys(runtimeCodeHashes).length !== Object.keys(manifest.contracts).length
+  ) {
+    throw new Error("Every checked-in launch contract requires a reviewed runtime code hash.");
+  }
   const poolKey: LaunchPoolKey = {
     currency0: address(manifest.market.poolKey.currency0, "market.poolKey.currency0"),
     currency1: address(manifest.market.poolKey.currency1, "market.poolKey.currency1"),
@@ -103,6 +111,10 @@ export function parseLaunchDeploymentManifest(
   ) {
     throw new Error("Launch pool must be the manifest STATICS/WETH pair.");
   }
+  const poolId = hash(manifest.market.poolId, "market.poolId");
+  if (v4PoolId(poolKey).toLowerCase() !== poolId.toLowerCase()) {
+    throw new Error("Launch PoolId does not match the canonical PoolKey.");
+  }
 
   const descriptor: DeploymentDescriptor = {
     deploymentId: manifest.deploymentId,
@@ -121,6 +133,6 @@ export function parseLaunchDeploymentManifest(
     source,
     contracts,
     runtimeCodeHashes,
-    market: { poolId: hash(manifest.market.poolId, "market.poolId"), poolKey },
+    market: { poolId, poolKey },
   };
 }

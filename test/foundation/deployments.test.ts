@@ -1,6 +1,8 @@
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
+import { v4PoolId } from "@statics-protocol/sdk";
+
 import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
 import {
   ROBINHOOD_GENESIS_DEPLOYMENT_ID,
@@ -28,6 +30,13 @@ function launchManifest() {
     universalRouter: { address: address("b"), runtimeCodeHash: hash("b") },
     permit2: { address: address("c"), runtimeCodeHash: hash("c") },
   } as const;
+  const poolKey = {
+    currency0: contracts.statics.address,
+    currency1: contracts.weth.address,
+    fee: 10_000,
+    tickSpacing: 8,
+    hooks: zeroAddress,
+  } as const;
   return {
     schemaVersion: 1 as const,
     deploymentId: ROBINHOOD_GENESIS_DEPLOYMENT_ID,
@@ -37,14 +46,8 @@ function launchManifest() {
     protocolCommit: "abc",
     contracts,
     market: {
-      poolId: hash("d"),
-      poolKey: {
-        currency0: contracts.statics.address,
-        currency1: contracts.weth.address,
-        fee: 10_000,
-        tickSpacing: 8,
-        hooks: zeroAddress,
-      },
+      poolId: v4PoolId(poolKey),
+      poolKey,
     },
   };
 }

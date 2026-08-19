@@ -30,6 +30,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
 import type { StaticsDeployment } from "@/lib/deployments/types";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 
 const APPROVAL_REFRESH_INTERVAL_MS = 60_000;
 
@@ -106,6 +107,7 @@ function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment })
         throw new Error("No verified Statics deployment is configured.");
       }
       if (deployment.kind === "launch") {
+        await verifyLaunchDeployment(publicClient, deployment);
         return loadLaunchApprovalInventory(publicClient, deployment, wallet);
       }
       await verifyDollarDeployment(publicClient, deployment.protocol);
@@ -165,6 +167,9 @@ function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment })
       throw new Error("The connected wallet is unavailable.");
     }
     const transaction = buildApprovalUpdate(approval, enabled);
+    if (deployment.kind === "launch") {
+      await verifyLaunchDeployment(publicClient, deployment);
+    }
     const permissionPresentation =
       approval.kind === "erc20"
         ? approvalPresentation(
@@ -209,6 +214,7 @@ function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment })
       publicClient,
       wallet,
       chainId: deployment.descriptor.chainId,
+      deploymentId: deployment.descriptor.deploymentId,
       kind: enabled ? "set-app-approval" : "revoke-app-approval",
       label: `${enabled ? "Set maximum" : "Revoke"} ${approval.tokenSymbol} approval`,
       amount: `${approvalKindLabel(approval.kind)} for ${approval.spenderLabel}`,

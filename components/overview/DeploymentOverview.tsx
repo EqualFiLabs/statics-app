@@ -16,6 +16,7 @@ import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useDeployment } from "@/providers/deployment-context";
 import type { LaunchDeployment } from "@/lib/deployments/types";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 
 export function DeploymentOverview() {
   const { active } = useDeployment();
@@ -51,6 +52,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
+      await verifyLaunchDeployment(publicClient, deployment);
       const [vault, totalWeight, harvestedStatics, harvestedWeth, liquidity] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,

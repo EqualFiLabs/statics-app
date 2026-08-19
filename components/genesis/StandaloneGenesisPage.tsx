@@ -7,6 +7,7 @@ import { usePublicClient } from "wagmi";
 
 import {
   buildActivateGenesisCall,
+  buildAccrueGenesisLaunchRewardsCall,
   buildBuyGenesisTransaction,
   buildClaimGenesisLaunchRewardsCall,
   buildClaimOwnerGenesisLaunchRewardsCall,
@@ -24,6 +25,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
@@ -60,6 +62,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
+      await verifyLaunchDeployment(publicClient, deployment);
       const [quote, accounting, rewardShare, totalWeight, tierCosts, staticsBalance, allowance] =
         await Promise.all([
           publicClient.readContract({
@@ -248,7 +251,11 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     setBusy(key);
     setError(null);
     try {
-      await executeProtocolTransaction(request);
+      await verifyLaunchDeployment(request.publicClient, deployment);
+      await executeProtocolTransaction({
+        ...request,
+        deploymentId: deployment.descriptor.deploymentId,
+      });
       await refresh();
     } catch (cause) {
       setError(describeGenesisError(cause));
@@ -323,14 +330,15 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     key: string,
     label: string,
     data: `0x${string}`,
-    amount: string
+    amount: string,
+    kind: "claim-rewards" | "accrue-genesis-rewards" = "claim-rewards"
   ) => {
     if (!walletAction() || !wallet || !publicClient) return;
     await transact(key, {
       publicClient,
       wallet,
       chainId: deployment.descriptor.chainId,
-      kind: "claim-rewards",
+      kind,
       label,
       amount,
       to: deployment.contracts.launchDistributor,
@@ -654,6 +662,30 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
       {view === "rewards" && wallet && (
         <div className="genesis-reward-layout">
+          <section className="ui-card">
+            <p className="dapp-eyebrow">Permissionless accounting</p>
+            <h2>Update launch rewards</h2>
+            <p>
+              Harvest current market fees and add them to the Genesis reward indexes. This does not
+              claim anyone else&apos;s rewards.
+            </p>
+            <button
+              className="ui-button ui-button--primary"
+              type="button"
+              disabled={busy !== null}
+              onClick={() =>
+                void sendDistributor(
+                  "accrue-launch-rewards",
+                  "Update Genesis launch rewards",
+                  buildAccrueGenesisLaunchRewardsCall(),
+                  "Current market fees",
+                  "accrue-genesis-rewards"
+                )
+              }
+            >
+              {busy === "accrue-launch-rewards" ? "Updating…" : "Update rewards"}
+            </button>
+          </section>
           <section className="ui-card">
             <p className="dapp-eyebrow">Previous-owner claims</p>
             <h2>Rewards kept after transfer</h2>

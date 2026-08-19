@@ -3,16 +3,16 @@
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "17c20d696464b2d80b609f42f32ae8ec721e9cb7"
+    "commit": "c6b7e4efed2a6997e5a1810c76e68f0371f5b5cc"
   },
   "sdkTreeState": "clean",
   "sourceChecksums": {
-    "src/index.ts": "af80db827934f14c118a389aa6dd6b89fba3fa06543926fd30754c4746ce8ab9",
+    "src/index.ts": "31e6302955545a2d4a95cb2bfbb4e59564a9dded861b6414b90bf8dcc9aa7457",
     "package.json": "047657d558934ac444d1d1d5b6e816593b9200cddb62e64703462033b54cb66e"
   },
   "checksums": {
-    "dist/index.js": "01658a45e6ed491e86ec35151ed2f5514a1990655cc01c7dda75cb392c8a6f68",
-    "dist/index.d.ts": "bd611563c61627e9d2b7cc249134be3986b46696ccce0d6d54246d4c8cfd2296",
+    "dist/index.js": "35454a2abb3afd2d446a21942586d480f379c5fddd0cd51f6fa7b67b63382c3d",
+    "dist/index.d.ts": "804ede2bdf40c831e072f0dba7ebc73ed40c9997e4d435155b52edae35664c0e",
     "dist/generated/robinhoodChain.js": "69b5dbcb88d4f77e435c2ceaa7176ab51b727065dc12eb44200748922b48afec",
     "dist/generated/robinhoodChain.d.ts": "f6a12b08c2b8cd85c769583f8ffcc632719c75d638803c17a83f51bcc2984337"
   }

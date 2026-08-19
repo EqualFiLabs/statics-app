@@ -53,6 +53,7 @@ export type DollarActivityKind =
   | "opt-in-reward-assets"
   | "opt-out-reward-assets"
   | "claim-rewards"
+  | "accrue-genesis-rewards"
   | "claim-basket-rewards"
   | "transfer-nft"
   | "create-basket"
