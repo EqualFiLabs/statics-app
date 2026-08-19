@@ -85,7 +85,7 @@ function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | n
 }
 
 function WalletBridge({ children }: { children: React.ReactNode }) {
-  const { active } = useDeployment();
+  const { active, options, selectNetwork } = useDeployment();
   const { ready, authenticated, error: privyError, login, logout } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
@@ -281,6 +281,14 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           if (!selectedWallet) throw new Error("Connect a wallet before switching networks.");
           await selectedWallet.switchChain(targetChain.id);
         }),
+      selectNetwork: (nextChainId) =>
+        runAction("switch", async () => {
+          const next = options.find((option) => option.descriptor.chainId === nextChainId);
+          if (!next) throw new Error("Choose a supported Statics network.");
+          selectNetwork(nextChainId);
+          setFundingChainId(nextChainId);
+          if (selectedWallet) await selectedWallet.switchChain(nextChainId);
+        }),
       selectFundingNetwork: (nextChainId) =>
         runAction("funding-switch", async () => {
           if (localFork && nextChainId !== active.descriptor.chainId) {
@@ -401,6 +409,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       localFork,
       activeFundingNetworks,
       walletKind,
+      options,
+      selectNetwork,
     ]
   );
 
@@ -457,7 +467,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
 }
 
 function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
-  const { active } = useDeployment();
+  const { active, selectNetwork } = useDeployment();
   const [fundingChainId, setFundingChainId] = useState(active.descriptor.chainId);
   const fundingNetwork =
     getFundingNetwork(fundingChainId) ?? getFundingNetwork(active.descriptor.chainId)!;
@@ -473,13 +483,23 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
       fundingChainId,
       fundingNetworkName: fundingNetwork.label,
       fundingNetworks: fundingNetworkSummaries,
+      selectNetwork: async (nextChainId) => {
+        selectNetwork(nextChainId);
+        setFundingChainId(nextChainId);
+      },
       selectFundingNetwork: async (nextChainId) => {
         const nextNetwork = getFundingNetwork(nextChainId);
         if (!nextNetwork) return;
         setFundingChainId(nextChainId);
       },
     }),
-    [active.descriptor.chainId, active.descriptor.network, fundingChainId, fundingNetwork.label]
+    [
+      active.descriptor.chainId,
+      active.descriptor.network,
+      fundingChainId,
+      fundingNetwork.label,
+      selectNetwork,
+    ]
   );
   return (
     <WalletContext.Provider value={value}>

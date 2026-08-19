@@ -17,6 +17,7 @@ const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
 const canonicalPoolId = process.env.PONDER_CANONICAL_POOL_ID?.trim().toLowerCase();
+const genesisVault = process.env.PONDER_GENESIS_VAULT_ADDRESS?.trim().toLowerCase();
 
 ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -82,34 +83,9 @@ ponder.on("PositionManager:Transfer", async ({ event, context }) => {
     });
 });
 
-ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
-  const owner = getAddress(event.args.toAddress);
-  const batchSize = 500n;
-  for (let start = event.args.fromTokenId; start <= event.args.toTokenId; start += batchSize) {
-    const end = start + batchSize - 1n;
-    const cappedEnd = end < event.args.toTokenId ? end : event.args.toTokenId;
-    const values = [];
-    for (let id = start; id <= cappedEnd; id += 1n) {
-      values.push({
-        key: entityKey(id),
-        deploymentId,
-        id,
-        owner,
-        tier: 0,
-        multiplierBps: 10_000,
-        linkedPositionId: 0n,
-        registered: false,
-        effectiveWeight: 0n,
-        updatedAtBlock: event.block.number,
-      });
-    }
-    await context.db.insert(genesisNft).values(values);
-  }
-});
-
 ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
   const key = entityKey(event.args.tokenId);
-  if (event.args.to === zeroAddress) {
+  if (event.args.to === zeroAddress || event.args.to.toLowerCase() === genesisVault) {
     await context.db.delete(genesisNft, { key });
     return;
   }

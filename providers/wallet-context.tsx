@@ -52,6 +52,7 @@ export type WalletState = Readonly<{
   reconnectWallet: () => Promise<void>;
   createWallet: () => Promise<void>;
   switchNetwork: () => Promise<void>;
+  selectNetwork: (chainId: number) => Promise<void>;
   selectFundingNetwork: (chainId: number) => Promise<void>;
   getEthereumProvider: () => Promise<WalletEthereumProvider | null>;
   sendEvmTransaction: (request: ProtocolTransactionSendRequest) => Promise<Hex>;
@@ -88,6 +89,7 @@ export const defaultWalletState: WalletState = {
   reconnectWallet: unavailable,
   createWallet: unavailable,
   switchNetwork: unavailable,
+  selectNetwork: unavailable,
   selectFundingNetwork: unavailable,
   getEthereumProvider: async () => null,
   sendEvmTransaction: unavailableTransaction,

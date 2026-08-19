@@ -1,0 +1,49 @@
+"use client";
+
+import { useState } from "react";
+
+import { EmptyState } from "@/components/common/EmptyState";
+import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
+import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
+import { useDeployment } from "@/providers/deployment-context";
+
+type SwapMode = "token" | "nft";
+
+export function SwapPage() {
+  const { active } = useDeployment();
+  const [mode, setMode] = useState<SwapMode>("token");
+  if (!active.deployment || active.deployment.kind !== "launch") {
+    return (
+      <EmptyState
+        title="Launch market not deployed"
+        description={
+          active.descriptor.unavailableReason ??
+          `The Statics launch is not available on ${active.descriptor.network} yet.`
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="swap-page">
+      <div className="portal-direction-tabs" role="tablist" aria-label="Swap type">
+        {(["token", "nft"] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={mode === item}
+            onClick={() => setMode(item)}
+          >
+            {item === "token" ? "Token" : "NFT"}
+          </button>
+        ))}
+      </div>
+      {mode === "token" ? (
+        <EvmSwapPanel canonicalOnly />
+      ) : (
+        <GenesisVaultSwapPanel deployment={active.deployment} />
+      )}
+    </div>
+  );
+}

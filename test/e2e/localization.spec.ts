@@ -48,6 +48,6 @@ test.describe("localization", () => {
     await page.goto("/app");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics Genesis", level: 1 })).toBeVisible();
   });
 });

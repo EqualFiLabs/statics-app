@@ -120,31 +120,20 @@ async function waitForUrl(url, child, label, attempts = 300) {
   throw new Error(`${label} did not become ready.`);
 }
 
-async function waitForGenesisInventory(child, expected = 5_555) {
+async function waitForGenesisIndexer(child, expectedDeploymentId) {
   for (let attempt = 0; attempt < 600; attempt += 1) {
-    if (child.exitCode !== null)
-      throw new Error("Ponder exited before indexing Genesis inventory.");
+    if (child.exitCode !== null) throw new Error("Ponder exited before indexing Genesis events.");
     try {
-      let cursor = null;
-      let count = 0;
-      do {
-        const url = new URL("/genesis/inventory", indexerUrl);
-        url.searchParams.set("limit", "100");
-        if (cursor) url.searchParams.set("cursor", cursor);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Inventory is not ready.");
-        const payload = await response.json();
-        count += Array.isArray(payload.items) ? payload.items.length : 0;
-        cursor = typeof payload.nextCursor === "string" ? payload.nextCursor : null;
-      } while (cursor);
-      if (count === expected) return;
-      if (count > expected) throw new Error(`Indexed Genesis inventory exceeded ${expected}.`);
+      const response = await fetch(new URL("/genesis/next-available", indexerUrl));
+      if (!response.ok) throw new Error("Genesis indexing is not ready.");
+      const payload = await response.json();
+      if (payload.deploymentId === expectedDeploymentId && payload.tokenId === "1") return;
     } catch {
       // Ponder can report ready before it has completed historical indexing.
     }
     await wait(500);
   }
-  throw new Error(`Ponder did not index all ${expected} vault-owned Genesis NFTs.`);
+  throw new Error("Ponder did not become ready for Genesis ownership discovery.");
 }
 
 async function confirmed(walletClient, publicClient, transaction) {
@@ -542,7 +531,7 @@ try {
     }
   );
   await waitForUrl(`${indexerUrl}/ready`, ponder, "Ponder", 600);
-  await waitForGenesisInventory(ponder);
+  await waitForGenesisIndexer(ponder, manifest.deploymentId);
 
   const nextEnvironment = {
     ...process.env,

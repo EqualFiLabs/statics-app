@@ -9,7 +9,11 @@ import { useTranslations } from "next-intl";
 
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
@@ -18,6 +22,7 @@ import { describePositionError, loadPositionCatalog } from "@/lib/positions/posi
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -30,6 +35,10 @@ function displayAmount(value: bigint, decimals = 18): string {
 export function PositionListPage() {
   const t = useTranslations("positions");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Position NFTs" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
   return <PositionListRuntime />;
 }

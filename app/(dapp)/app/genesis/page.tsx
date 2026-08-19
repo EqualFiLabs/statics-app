@@ -4,8 +4,7 @@ import { GenesisPage } from "@/components/genesis/GenesisPage";
 
 export const metadata: Metadata = {
   title: "Genesis NFT | Statics",
-  description:
-    "Activate a Statics Genesis NFT and link it to one PositionNFT for increased reward weight.",
+  description: "View and activate the Statics Genesis NFTs held by your connected wallet.",
 };
 
 export default function GenesisRoute() {

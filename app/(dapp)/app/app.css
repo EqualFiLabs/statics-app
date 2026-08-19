@@ -521,7 +521,7 @@
   align-items: center;
 }
 
-.dapp-deployment-selector select {
+.dapp-network-selector select {
   max-width: 15rem;
   min-height: var(--control-height-sm);
   padding: 0 2rem 0 0.75rem;
@@ -534,67 +534,12 @@
   cursor: pointer;
 }
 
-.launch-trade-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 0.65fr);
-  gap: 1rem;
-}
-
-.launch-trade-card,
-.launch-trade-notice {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-}
-
-.launch-trade-card h2,
-.launch-trade-card p,
-.launch-trade-notice h3,
-.launch-trade-notice p {
-  margin: 0;
-}
-
-.launch-trade-notice dl {
-  display: grid;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.launch-trade-notice dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--app-border);
-}
-
-.launch-trade-notice dt {
-  color: var(--app-text-muted);
-}
-
-.launch-trade-notice dd {
-  margin: 0;
-  text-align: right;
-}
-
-@media (max-width: 760px) {
-  .launch-trade-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.genesis-pagination,
 .genesis-reward-layout,
 .genesis-reward-layout .ui-inline-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
-}
-
-.genesis-pagination {
-  justify-content: center;
-  margin-top: 1rem;
 }
 
 .genesis-reward-layout > .ui-card {
@@ -1140,7 +1085,8 @@
 }
 
 .wallet-surface,
-.portal-workspace {
+.portal-workspace,
+.swap-page {
   margin-top: 10px;
   border: 1px solid var(--app-border);
   background: var(--app-surface);
@@ -1745,6 +1691,19 @@
   max-width: 760px;
 }
 
+.swap-page {
+  display: grid;
+  max-width: 760px;
+}
+
+.genesis-vault-swap {
+  display: grid;
+}
+
+.genesis-vault-swap > .portal-panel + .portal-panel {
+  border-top: 1px solid var(--app-border);
+}
+
 .portal-workspace.is-compact {
   margin: 0;
   border: 0;
@@ -1782,6 +1741,7 @@
 }
 
 .portal-mode-tabs button[aria-selected="true"],
+.portal-direction-tabs button[aria-selected="true"],
 .portal-direction-tabs button[aria-pressed="true"],
 .portal-chain-tabs button[aria-pressed="true"] {
   border-color: var(--accent);

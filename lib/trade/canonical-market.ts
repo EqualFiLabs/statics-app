@@ -7,6 +7,10 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 
 export type TradeAsset = "eth" | "weth" | "statics";
 export type TradeDirection = Readonly<{ input: TradeAsset; output: TradeAsset }>;
+export type CanonicalToken = Readonly<{
+  address: Address;
+  kind: "native" | "erc20";
+}>;
 
 export const tradeDirections: readonly TradeDirection[] = [
   { input: "eth", output: "statics" },
@@ -19,6 +23,30 @@ export function tradeSymbol(asset: TradeAsset): "ETH" | "WETH" | "STATICS" {
   if (asset === "eth") return "ETH";
   if (asset === "weth") return "WETH";
   return "STATICS";
+}
+
+function canonicalAsset(
+  deployment: LaunchDeployment,
+  token: CanonicalToken | undefined
+): TradeAsset | null {
+  if (!token) return null;
+  if (token.kind === "native") return "eth";
+  if (getAddress(token.address) === getAddress(deployment.contracts.statics)) return "statics";
+  if (getAddress(token.address) === getAddress(deployment.contracts.weth)) return "weth";
+  return null;
+}
+
+export function canonicalTradeDirection(
+  deployment: LaunchDeployment | null,
+  source: CanonicalToken | undefined,
+  destination: CanonicalToken | undefined
+): TradeDirection | null {
+  if (!deployment) return null;
+  const input = canonicalAsset(deployment, source);
+  const output = canonicalAsset(deployment, destination);
+  if (!input || !output || input === output) return null;
+  if (input !== "statics" && output !== "statics") return null;
+  return { input, output };
 }
 
 export function poolKeyForLaunch(deployment: LaunchDeployment): V4PoolKey {

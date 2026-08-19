@@ -15,7 +15,11 @@ import { usePublicClient } from "wagmi";
 
 import { basketTokenAbi, buildCreateBasketTransaction, staticsAbi } from "@statics-protocol/sdk";
 
-import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  EmptyState,
+  ProtocolPendingSurface,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -60,6 +64,10 @@ type AssetRuntime = {
 };
 
 export function BasketCreatePage() {
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Basket creation" />;
+  }
   if (!configuredDeployment) return <UnconfiguredSurface subject="Basket creation" />;
   return <BasketCreateWalletGate />;
 }

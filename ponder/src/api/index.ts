@@ -13,6 +13,7 @@ import {
   v4Position,
 } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
+import { nextAvailableGenesisId } from "../genesis";
 
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
@@ -124,36 +125,15 @@ app.get("/wallets/:owner/genesis", async (context) => {
   });
 });
 
-app.get("/genesis/inventory", async (context) => {
-  const vault = process.env.PONDER_GENESIS_VAULT_ADDRESS;
-  const limit = readLimit(context.req.query("limit"));
-  const cursor = decodeCursor(context.req.query("cursor"));
-  if (!vault || !isAddress(vault) || limit === 0) {
-    return context.json({ error: "Genesis Vault inventory is not configured." }, 503);
-  }
-  if (context.req.query("cursor") && cursor === null) {
-    return context.json({ error: "Invalid cursor." }, 400);
-  }
+app.get("/genesis/next-available", async (context) => {
   const rows = await db
-    .select({ id: genesisNft.id, updatedAtBlock: genesisNft.updatedAtBlock })
+    .select({ id: genesisNft.id })
     .from(genesisNft)
-    .where(
-      and(
-        eq(genesisNft.deploymentId, deploymentId),
-        eq(genesisNft.owner, getAddress(vault)),
-        cursor === null ? undefined : gt(genesisNft.id, cursor)
-      )
-    )
-    .orderBy(asc(genesisNft.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit);
+    .where(eq(genesisNft.deploymentId, deploymentId));
+  const next = nextAvailableGenesisId(rows.map((row) => row.id));
   return context.json({
     deploymentId,
-    items: page.map((row) => ({
-      id: row.id.toString(),
-      updatedAtBlock: row.updatedAtBlock.toString(),
-    })),
-    nextCursor: rows.length > limit && page.length ? encodeCursor(page.at(-1)!.id) : null,
+    tokenId: next?.toString() ?? null,
   });
 });
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   loadRecoverableLoanIds,
-  loadLaunchGenesisInventoryIds,
+  loadNextAvailableGenesisId,
   loadWalletLaunchGenesisIds,
   loadWalletGenesis,
   loadWalletV4PositionIds,
@@ -85,16 +85,15 @@ describe("Statics indexer client", () => {
         new Response(
           JSON.stringify({
             deploymentId: "robinhood-genesis",
-            items: [{ id: "42" }],
-            nextCursor: null,
+            tokenId: "42",
           })
         )
     );
     vi.stubGlobal("fetch", fetch);
 
     await expect(
-      loadLaunchGenesisInventoryIds("robinhood-genesis", "https://mainnet-indexer.example")
-    ).resolves.toEqual([42n]);
+      loadNextAvailableGenesisId("robinhood-genesis", "https://mainnet-indexer.example")
+    ).resolves.toEqual(42n);
     await expect(
       loadWalletLaunchGenesisIds(wallet, "wrong-deployment", "https://mainnet-indexer.example")
     ).rejects.toThrow("different deployment");

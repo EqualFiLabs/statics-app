@@ -30,7 +30,8 @@ against that manifest.
 
 ## Routes
 
-- `/app` — Dollar and portfolio overview.
+- `/app` — launch and portfolio overview.
+- `/app/swap` — canonical ETH/WETH/STATICS swaps and Genesis Vault acquisition/redemption.
 - `/app/wallet` — EVM and Solana assets, transfers, Portal access, and testnet fixture controls.
 - `/app/wallet?modal=portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and the
   LayerZero EVE bridge between Base and Robinhood Chain.
@@ -38,7 +39,8 @@ against that manifest.
 - `/app/dollar?profile=USDG` — pegged Statics Dollar profile.
 - `/app/baskets` — basket discovery, creation, conversion, and protocol swaps.
 - `/app/positions` — PositionNFT custody and collateral management.
-- `/app/genesis` — activate one of 5,555 Genesis NFTs by burning STATICS and link it to a Position for increased reward weight.
+- `/app/genesis` — inspect and activate Genesis NFTs owned by the connected wallet.
+- `/app/genesis-rewards` — register Genesis NFTs and claim their launch-market rewards.
 - `/app/create` — permissionlessly configure, fund, and launch an index basket.
 - `/app/rewards` — claim Position, Basket, creator, and permissionless partner-distribution rewards.
 - `/app/loans` — proportional self-backed lending.

@@ -59,10 +59,7 @@ test.describe("landing foundation", () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
-    // Matches the overview title from lib/dapp-navigation.ts. Its exact wording
-    // is guarded by test/foundation/route-copy.test.ts; this only asserts that
-    // the destination rendered.
-    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics Genesis", level: 1 })).toBeVisible();
   });
 
   test("supports keyboard entry and responsive navigation", async ({ page }, testInfo) => {
@@ -116,6 +113,10 @@ test.describe("Dollar DApp foundation", () => {
     await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
     await page.keyboard.press("Escape");
 
+    await navigateDapp(page, "/app/swap");
+    await expect(page).toHaveURL(/\/app\/swap$/);
+    await expect(page.getByRole("heading", { name: "Launch market not deployed" })).toBeVisible();
+
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
 
@@ -139,6 +140,10 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/genesis");
     await expect(page).toHaveURL(/\/app\/genesis$/);
+
+    await navigateDapp(page, "/app/genesis-rewards");
+    await expect(page).toHaveURL(/\/app\/genesis-rewards$/);
+    await expect(page.getByRole("heading", { name: "Genesis rewards unavailable" })).toBeVisible();
 
     await navigateDapp(page, "/app/liquidity");
     await expect(page).toHaveURL(/\/app\/liquidity$/);

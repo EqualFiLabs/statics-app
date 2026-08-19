@@ -44,7 +44,12 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
-import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  EmptyState,
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
@@ -57,6 +62,7 @@ import {
   rewardSelectionChanges,
   toggleRewardSelection,
 } from "@/lib/positions/staking";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -84,6 +90,10 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Position NFT management" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Position" />;
   return <PositionDetailRuntime positionId={positionId} />;
 }

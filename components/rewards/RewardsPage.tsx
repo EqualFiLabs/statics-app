@@ -24,7 +24,11 @@ import {
   staticsAbi,
 } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
 import { ProtocolRevenueCard } from "@/components/rewards/ProtocolRevenueCard";
@@ -48,6 +52,7 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -67,6 +72,10 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 
 export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Protocol rewards" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
   return <RewardsRuntime initialPositionId={initialPositionId} />;
 }

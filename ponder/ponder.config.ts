@@ -40,7 +40,7 @@ const poolManagerEventsAbi = parseAbi([
 ]);
 
 /**
- * One deployment per process. Run separate launch and testnet protocol
+ * One network per process. Run separate mainnet, testnet, or local-fork
  * instances with different env files; the schema and handlers stay identical.
  * Contracts outside the selected deployment are the zero address and produce
  * no events, avoiding a second code path or cross-chain primary-key collision.

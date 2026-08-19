@@ -32,7 +32,11 @@ import {
   ProtocolSlippageControl,
   useProtocolSlippage,
 } from "@/components/protocol/ProtocolSlippage";
-import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -72,6 +76,7 @@ import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { applyPercent } from "@/lib/protocol/ux";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -119,6 +124,10 @@ export function LoansPage({
   initialBorrowDestination?: BorrowDestination;
 }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Loans" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
   return <LoansRuntime initialBorrowDestination={initialBorrowDestination} />;
 }

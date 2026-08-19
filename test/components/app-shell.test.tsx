@@ -178,7 +178,7 @@ describe("DApp wallet shell", () => {
     expect(screen.queryByRole("button", { name: "Copy Solana address" })).not.toBeInTheDocument();
   });
 
-  it("explains the mismatch and names the chain the wallet is actually on", () => {
+  it("explains a mismatch while keeping the selected Statics network visible", () => {
     renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
@@ -192,9 +192,7 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText(/wrong network/i)).toBeInTheDocument();
     expect(screen.getByText(/switch to Anvil/i)).toBeInTheDocument();
     expect(screen.getByText(/chain 31337/i)).toBeInTheDocument();
-    // The indicator reports the id, because the context carries no name for
-    // whichever chain the wallet actually sits on.
-    expect(screen.getByText("Chain 1")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveValue("46630");
   });
 
   it("names the network and offers no switch once the wallet is on target", () => {
@@ -208,8 +206,9 @@ describe("DApp wallet shell", () => {
       isTargetChain: true,
     });
 
-    // Scoped to the indicator so this cannot pass on some other mention.
-    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveDisplayValue(
+      "Robinhood Chain Testnet"
+    );
     expect(screen.queryByRole("button", { name: "Switch network" })).not.toBeInTheDocument();
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
   });
@@ -221,8 +220,20 @@ describe("DApp wallet shell", () => {
       targetChainId: 31_337,
     });
 
-    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveDisplayValue(
+      "Robinhood Chain Testnet"
+    );
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
+  });
+
+  it("uses the network selector to switch the application and wallet together", () => {
+    const selectNetwork = vi.fn().mockResolvedValue(undefined);
+    renderWithWallet(<AppShell>Overview</AppShell>, { selectNetwork });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Statics network" }), {
+      target: { value: "4663" },
+    });
+    expect(selectNetwork).toHaveBeenCalledWith(4_663);
   });
 
   it("exports embedded wallets from the account dialog", () => {

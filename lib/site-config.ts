@@ -117,10 +117,10 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         capability: "overview",
       },
       {
-        label: "Trade",
-        messageKey: "trade",
+        label: "Swap",
+        messageKey: "swap",
         enabled: true,
-        href: "/app/trade",
+        href: "/app/swap",
         capability: "canonical-statics-market",
       },
     ],
@@ -192,6 +192,13 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         enabled: true,
         href: "/app/genesis",
         capability: "genesis-vault",
+      },
+      {
+        label: "Genesis Rewards",
+        messageKey: "genesisRewards",
+        enabled: true,
+        href: "/app/genesis-rewards",
+        capability: "genesis-launch-rewards",
       },
       {
         label: "Loans",

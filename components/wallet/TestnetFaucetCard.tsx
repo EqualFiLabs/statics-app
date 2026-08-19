@@ -10,6 +10,7 @@ import {
   staticsTestnetFaucetAbi,
 } from "@statics-protocol/sdk";
 
+import { ProtocolPendingSurface } from "@/components/common/EmptyState";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describeDollarError } from "@/lib/dollar/transactions";
 import { getFundingNetwork } from "@/lib/funding-networks";
@@ -53,6 +54,14 @@ export function faucetWalletTokens(assets: readonly FaucetAsset[]): WalletToken[
 }
 
 export function TestnetFaucetCard() {
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Testnet faucet" />;
+  }
+  return <TestnetFaucetRuntime />;
+}
+
+function TestnetFaucetRuntime() {
   const t = useTranslations("faucet");
   const format = useFormatter();
   const wallet = useWalletState();

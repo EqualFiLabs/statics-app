@@ -7,11 +7,16 @@ import { usePublicClient } from "wagmi";
 import { useTranslations } from "next-intl";
 
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
-import { SurfaceBoundary, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolPendingSurface,
+  SurfaceBoundary,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -24,6 +29,10 @@ function displayAmount(value: bigint, decimals = 18): string {
 export function BasketListPage() {
   const t = useTranslations("baskets");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Baskets" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
   return <BasketListRuntime />;
 }

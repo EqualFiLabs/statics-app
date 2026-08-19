@@ -41,7 +41,7 @@
     "mobileMenu": "应用菜单。当前页面：{route}",
     "groups": {
       "overview": "概览",
-      "trade": "交易",
+      "swap": "兑换",
       "earn": "赚取",
       "assets": "资产",
       "manage": "管理",
@@ -49,9 +49,10 @@
     },
     "items": {
       "overview": "概览",
-      "trade": "交易",
+      "swap": "兑换",
       "earn": "赚取",
       "genesis": "Genesis NFT",
+      "genesisRewards": "Genesis 奖励",
       "liquidity": "流动性",
       "baskets": "篮子",
       "create": "创建篮子",
@@ -79,11 +80,11 @@
       "title": "你的资产组合",
       "description": "在一个地方查看你持有的一切：美元余额、头寸、抵押品以及待领取的奖励。"
     },
-    "trade": {
-      "label": "交易",
+    "swap": {
+      "label": "兑换",
       "status": "STATICS 市场",
-      "title": "买入或卖出 STATICS",
-      "description": "通过受保护的链上报价直接在官方 STATICS 市场交易。"
+      "title": "兑换代币和 Genesis NFT",
+      "description": "通过官方池买卖 STATICS，然后用 STATICS 兑换有完全储备支持的 Genesis NFT。"
     },
     "dollar": {
       "label": "美元",
@@ -138,6 +139,12 @@
       "status": "Genesis NFT",
       "title": "管理你的 Genesis NFTs",
       "description": "燃烧 STATICS 激活 Genesis NFT，再将其绑定到一个 Position，以提高该 Position 的奖励权重。"
+    },
+    "genesisRewards": {
+      "label": "Genesis 奖励",
+      "status": "Genesis 奖励",
+      "title": "你的 Genesis 奖励",
+      "description": "注册 Genesis NFT 并领取其 STATICS 市场费用份额。"
     },
     "liquidity": {
       "label": "流动性",
@@ -210,7 +217,9 @@
     "errorDescription": "读取网络时出现问题。你的资金不受影响。",
     "retry": "重试",
     "unavailable": "{subject}不可用",
-    "noDeployment": "未配置部署。"
+    "noDeployment": "未配置部署。",
+    "protocolPending": "{subject}尚未上线",
+    "protocolPendingDescription": "此页面仍可访问。完整的 Statics 协议部署到该网络后，链上操作将会启用。"
   },
   "baskets": {
     "subject": "篮子",

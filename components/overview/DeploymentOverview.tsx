@@ -33,12 +33,11 @@ export function DeploymentOverview() {
           }
         />
         <section className="ui-card launch-overview-actions">
-          <p className="dapp-eyebrow">Available now</p>
-          <h2>Test the complete protocol</h2>
+          <p className="dapp-eyebrow">Selected network</p>
+          <h2>{active.descriptor.network}</h2>
           <p>
-            Choose Robinhood Chain Testnet in the deployment selector to use Baskets, Dollar,
-            Position NFTs, loans, liquidity, and protocol rewards while the standalone mainnet
-            manifest remains intentionally disabled.
+            The same Genesis launch application will be enabled here after its reviewed manifest is
+            published.
           </p>
         </section>
       </div>
@@ -110,7 +109,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           redeemable for its fixed STATICS backing, while registered holders share launch fees.
         </p>
         <div className="ui-inline-actions">
-          <Link className="ui-button ui-button--primary" href="/app/trade">
+          <Link className="ui-button ui-button--primary" href="/app/swap">
             Buy STATICS
           </Link>
           <Link className="ui-button ui-button--secondary" href="/app/genesis">

@@ -64,7 +64,11 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
+import {
+  EmptyState,
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
 import { loadLoanCatalog } from "@/lib/loans/loans";
@@ -78,6 +82,7 @@ import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { applyPercent } from "@/lib/protocol/ux";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -1482,6 +1487,10 @@ function DollarActionPanel({
 
 export function DollarPage({ initialProfile = "ETH" }: { initialProfile?: DollarProfileChoice }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Statics Dollar" />;
+  }
   if (deploymentState.status === "unavailable") {
     return (
       <SurfaceEmptyState

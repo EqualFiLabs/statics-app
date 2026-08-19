@@ -7,11 +7,9 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
-import { EmptyState } from "@/components/common/EmptyState";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { hasCapability } from "@/lib/deployments/registry";
-import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -20,12 +18,14 @@ function formatAddress(address: string): string {
 }
 
 const approvalDisclosureRoutes = [
+  "/app/swap",
   "/app/dollar",
   "/app/baskets",
   "/app/positions",
   "/app/loans",
   "/app/rewards",
   "/app/genesis",
+  "/app/genesis-rewards",
   "/app/liquidity",
 ] as const;
 
@@ -161,19 +161,22 @@ function NetworkIndicator() {
   );
 }
 
-function DeploymentSelector() {
-  const { active, options, selectDeployment } = useDeployment();
+function NetworkSelector() {
+  const { active, options } = useDeployment();
+  const wallet = useWalletState();
+  if (options.length < 2) return null;
   return (
-    <label className="dapp-deployment-selector">
-      <span className="sr-only">Statics deployment</span>
+    <label className="dapp-network-selector">
+      <span className="sr-only">Statics network</span>
       <select
-        aria-label="Statics deployment"
-        value={active.descriptor.deploymentId}
-        onChange={(event) => selectDeployment(event.target.value)}
+        aria-label="Statics network"
+        value={active.descriptor.chainId}
+        disabled={wallet.busyAction !== null}
+        onChange={(event) => void wallet.selectNetwork(Number(event.target.value))}
       >
         {options.map((option) => (
-          <option key={option.descriptor.deploymentId} value={option.descriptor.deploymentId}>
-            {option.descriptor.network} · {option.descriptor.label}
+          <option key={option.descriptor.chainId} value={option.descriptor.chainId}>
+            {option.descriptor.network}
           </option>
         ))}
       </select>
@@ -218,7 +221,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
-  const { active } = useDeployment();
+  const { active, options } = useDeployment();
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -248,12 +251,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showApprovalDisclosure = approvalDisclosureRoutes.some(
     (route) => currentPath === route || currentPath.startsWith(`${route}/`)
   );
-  const routeItem = appNavigation.find(
-    (item) =>
-      item.href === currentPath || (item.href !== "/app" && currentPath.startsWith(`${item.href}/`))
-  );
-  const routeSupported = !routeItem || hasCapability(active.descriptor, routeItem.capability);
-
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
     if (restoreFocus) {
@@ -299,9 +296,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             priority
           />
         </Link>
-        <NetworkIndicator />
+        {options.length < 2 ? <NetworkIndicator /> : null}
         <div className="dapp-header-actions">
-          <DeploymentSelector />
+          <NetworkSelector />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
           <Link className="dapp-return" href="/">
             {tNavigation("site")} <span aria-hidden="true">↗</span>
@@ -334,33 +331,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label={group.messageKey ? tGroups(group.messageKey) : tGroups("overview")}
               >
                 {group.messageKey && <p className="dapp-nav-label">{tGroups(group.messageKey)}</p>}
-                {group.items
-                  .filter((item) => hasCapability(active.descriptor, item.capability))
-                  .map((item, itemIndex) => {
-                    const active =
-                      item.href === currentPath ||
-                      (item.href !== "/app" &&
-                        Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
-                    return item.enabled && item.href ? (
-                      <Link
-                        ref={
-                          groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined
-                        }
-                        key={item.label}
-                        className={`dapp-nav-item${active ? " active" : ""}`}
-                        href={item.href}
-                        aria-current={active ? "page" : undefined}
-                        onClick={() => closeNavigation()}
-                      >
-                        {tItems(item.messageKey)}
-                      </Link>
-                    ) : (
-                      <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                        {tItems(item.messageKey)}
-                        <small>{tCommon("planned")}</small>
-                      </span>
-                    );
-                  })}
+                {group.items.map((item, itemIndex) => {
+                  const currentActive =
+                    item.href === currentPath ||
+                    (item.href !== "/app" &&
+                      Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
+                  return item.enabled && item.href ? (
+                    <Link
+                      ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
+                      key={item.label}
+                      className={`dapp-nav-item${currentActive ? " active" : ""}`}
+                      href={item.href}
+                      aria-current={currentActive ? "page" : undefined}
+                      onClick={() => closeNavigation()}
+                    >
+                      {tItems(item.messageKey)}
+                    </Link>
+                  ) : (
+                    <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                      {tItems(item.messageKey)}
+                      <small>{tCommon("planned")}</small>
+                    </span>
+                  );
+                })}
               </nav>
             ))}
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
@@ -396,40 +389,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </aside>
           )}
 
-          {routeSupported ? (
-            children
-          ) : (
-            <EmptyState
-              title="Not available in this deployment"
-              description={
-                active.descriptor.unavailableReason ??
-                (routeItem?.capability === "canonical-statics-market"
-                  ? `${routeCopy.label} is part of the Robinhood Chain Genesis launch. Choose that deployment to use this feature.`
-                  : `${routeCopy.label} is not part of ${active.descriptor.label} on ${active.descriptor.network}. Choose the testnet full protocol to use this feature.`)
-              }
-            />
-          )}
+          {children}
         </main>
       </div>
 
       <nav className="dapp-tabbar" aria-label={tShell("primary")}>
-        {appTabNavigation
-          .filter((item) => hasCapability(active.descriptor, item.capability))
-          .map((item) => {
-            const active =
-              item.href === currentPath ||
-              (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
-            return (
-              <Link
-                key={item.href}
-                className={`dapp-tab${active ? " active" : ""}`}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-              >
-                {tItems(item.messageKey)}
-              </Link>
-            );
-          })}
+        {appTabNavigation.map((item) => {
+          const currentActive =
+            item.href === currentPath ||
+            (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
+          return (
+            <Link
+              key={item.href}
+              className={`dapp-tab${currentActive ? " active" : ""}`}
+              href={item.href}
+              aria-current={currentActive ? "page" : undefined}
+            >
+              {tItems(item.messageKey)}
+            </Link>
+          );
+        })}
         <button
           ref={navigationToggleRef}
           className="dapp-tab dapp-nav-toggle"

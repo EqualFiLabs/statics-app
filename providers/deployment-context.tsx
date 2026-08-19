@@ -1,9 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
 import {
-  DEPLOYMENT_STORAGE_KEY,
   defaultDeploymentId,
   deploymentRegistry,
   findDeployment,
@@ -13,7 +12,7 @@ import type { DeploymentOption } from "@/lib/deployments/types";
 export type DeploymentContextValue = Readonly<{
   active: DeploymentOption;
   options: readonly DeploymentOption[];
-  selectDeployment: (deploymentId: string) => void;
+  selectNetwork: (chainId: number) => void;
 }>;
 
 const options = deploymentRegistry();
@@ -27,40 +26,20 @@ const initial =
 export const DeploymentContext = createContext<DeploymentContextValue>({
   active: initial,
   options,
-  selectDeployment: () => undefined,
+  selectNetwork: () => undefined,
 });
-
-function requestedDeploymentId(): string | null {
-  const url = new URL(window.location.href);
-  return url.searchParams.get("deployment") || window.localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
-}
 
 export function DeploymentProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(initial);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const requested = requestedDeploymentId();
-      const selected = requested ? findDeployment(options, requested) : null;
-      const resolved = selected ?? initial;
-      setActive(resolved);
-      window.localStorage.setItem(DEPLOYMENT_STORAGE_KEY, resolved.descriptor.deploymentId);
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, []);
 
   const value = useMemo<DeploymentContextValue>(
     () => ({
       active,
       options,
-      selectDeployment: (deploymentId) => {
-        const selected = findDeployment(options, deploymentId);
+      selectNetwork: (chainId) => {
+        const selected = options.find((option) => option.descriptor.chainId === chainId);
         if (!selected) return;
         setActive(selected);
-        window.localStorage.setItem(DEPLOYMENT_STORAGE_KEY, deploymentId);
-        const url = new URL(window.location.href);
-        url.searchParams.set("deployment", deploymentId);
-        window.history.replaceState(window.history.state, "", url);
       },
     }),
     [active]

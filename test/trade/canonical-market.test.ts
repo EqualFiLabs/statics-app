@@ -1,7 +1,12 @@
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { settlementForTrade, tradeDirections, zeroForTrade } from "@/lib/trade/canonical-market";
+import {
+  canonicalTradeDirection,
+  settlementForTrade,
+  tradeDirections,
+  zeroForTrade,
+} from "@/lib/trade/canonical-market";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 
 const statics = getAddress("0x1111111111111111111111111111111111111111");
@@ -61,6 +66,30 @@ describe("canonical STATICS market", () => {
     expect(zeroForTrade(deployment, "statics")).toBe(true);
     expect(zeroForTrade(deployment, "eth")).toBe(false);
     expect(zeroForTrade(deployment, "weth")).toBe(false);
+  });
+
+  it("routes only canonical STATICS pairs through the reviewed PoolKey", () => {
+    expect(
+      canonicalTradeDirection(
+        deployment,
+        { address: zeroAddress, kind: "native" },
+        { address: statics, kind: "erc20" }
+      )
+    ).toEqual({ input: "eth", output: "statics" });
+    expect(
+      canonicalTradeDirection(
+        deployment,
+        { address: statics, kind: "erc20" },
+        { address: weth, kind: "erc20" }
+      )
+    ).toEqual({ input: "statics", output: "weth" });
+    expect(
+      canonicalTradeDirection(
+        deployment,
+        { address: weth, kind: "erc20" },
+        { address: zeroAddress, kind: "native" }
+      )
+    ).toBeNull();
   });
 
   it("uses router wrap and unwrap settlement only for native routes", () => {

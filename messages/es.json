@@ -41,7 +41,7 @@
     "mobileMenu": "Menú de la aplicación. Ruta actual: {route}",
     "groups": {
       "overview": "Resumen",
-      "trade": "Operar",
+      "swap": "Intercambiar",
       "earn": "Ganar",
       "assets": "Activos",
       "manage": "Gestionar",
@@ -49,9 +49,10 @@
     },
     "items": {
       "overview": "Resumen",
-      "trade": "Operar",
+      "swap": "Intercambiar",
       "earn": "Ganar",
       "genesis": "Genesis NFT",
+      "genesisRewards": "Recompensas Genesis",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
       "create": "Crear cesta",
@@ -79,11 +80,11 @@
       "title": "Tu cartera",
       "description": "Todo lo que tienes en un solo lugar: saldo en dólares, posiciones, garantía y recompensas pendientes de reclamar."
     },
-    "trade": {
-      "label": "Operar",
+    "swap": {
+      "label": "Intercambiar",
       "status": "Mercado STATICS",
-      "title": "Compra o vende STATICS",
-      "description": "Opera directamente en el mercado canónico de STATICS con una cotización protegida en cadena."
+      "title": "Intercambia tokens y NFT Genesis",
+      "description": "Compra o vende STATICS en su pool oficial y luego intercambia STATICS por un NFT Genesis respaldado."
     },
     "dollar": {
       "label": "Dólar",
@@ -138,6 +139,12 @@
       "status": "Genesis NFT",
       "title": "Gestiona tus Genesis NFTs",
       "description": "Activa un NFT Genesis quemando STATICS y enlázalo a una Posición para aumentar su peso de recompensas."
+    },
+    "genesisRewards": {
+      "label": "Recompensas Genesis",
+      "status": "Recompensas Genesis",
+      "title": "Tus recompensas Genesis",
+      "description": "Registra NFT Genesis y reclama su parte de las comisiones del mercado STATICS."
     },
     "liquidity": {
       "label": "Liquidez",
@@ -210,7 +217,9 @@
     "errorDescription": "Algo falló al leer la red. Tus fondos no se han visto afectados.",
     "retry": "Intentar de nuevo",
     "unavailable": "{subject} no está disponible",
-    "noDeployment": "No hay ningún despliegue configurado."
+    "noDeployment": "No hay ningún despliegue configurado.",
+    "protocolPending": "{subject} aún no está disponible",
+    "protocolPendingDescription": "Esta página sigue disponible. Sus acciones onchain se habilitarán cuando el protocolo Statics completo se despliegue en esta red."
   },
   "baskets": {
     "subject": "cestas",

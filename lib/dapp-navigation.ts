@@ -24,11 +24,12 @@ const routePresentations = {
     description:
       "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
   },
-  trade: {
-    label: "Trade",
+  swap: {
+    label: "Swap",
     status: "STATICS market",
-    title: "Buy or sell STATICS",
-    description: "Trade directly in the official STATICS market with a protected price quote.",
+    title: "Swap tokens and Genesis NFTs",
+    description:
+      "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Genesis NFT.",
   },
   dollar: {
     label: "Dollar",
@@ -93,6 +94,12 @@ const routePresentations = {
     description:
       "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight.",
   },
+  genesisRewards: {
+    label: "Genesis Rewards",
+    status: "Genesis Rewards",
+    title: "Your Genesis rewards",
+    description: "Register Genesis NFTs and claim their share of STATICS market fees.",
+  },
   liquidity: {
     label: "Liquidity",
     status: "Liquidity",
@@ -125,7 +132,7 @@ const routePresentations = {
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
-  if (pathname.startsWith("/app/trade")) return "trade";
+  if (pathname.startsWith("/app/swap")) return "swap";
   if (pathname.startsWith("/app/wallet")) return "wallet";
   if (pathname.startsWith("/app/faucet")) return "faucet";
   if (pathname.startsWith("/app/portal")) return "portal";
@@ -135,6 +142,7 @@ export function getDappRouteId(pathname: string): DappRouteId {
   if (pathname.startsWith("/app/positions")) return "positions";
   if (pathname.startsWith("/app/loans")) return "loans";
   if (pathname.startsWith("/app/rewards")) return "rewards";
+  if (pathname.startsWith("/app/genesis-rewards")) return "genesisRewards";
   if (pathname.startsWith("/app/genesis")) return "genesis";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";

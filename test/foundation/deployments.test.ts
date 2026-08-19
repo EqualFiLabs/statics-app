@@ -7,7 +7,7 @@ import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest
 import {
   LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
   ROBINHOOD_GENESIS_DEPLOYMENT_ID,
-  ROBINHOOD_TESTNET_PROTOCOL_DEPLOYMENT_ID,
+  ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID,
   defaultDeploymentId,
   deploymentRegistry,
   hasCapability,
@@ -54,9 +54,9 @@ function launchManifest() {
 }
 
 describe("deployment registry", () => {
-  it("defaults production to Genesis and local development to the testnet protocol", () => {
+  it("defaults public builds by network and local development to the fork", () => {
     expect(defaultDeploymentId("production")).toBe(ROBINHOOD_GENESIS_DEPLOYMENT_ID);
-    expect(defaultDeploymentId("development")).toBe(ROBINHOOD_TESTNET_PROTOCOL_DEPLOYMENT_ID);
+    expect(defaultDeploymentId("development")).toBe(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID);
     expect(defaultDeploymentId("development", "robinhood-fork")).toBe(
       LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID
     );
@@ -73,13 +73,12 @@ describe("deployment registry", () => {
       NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
       NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(local),
     };
-    const [fixture, mainnet, testnet] = deploymentRegistry(environment);
+    const [fixture] = deploymentRegistry(environment);
     expect(fixture?.deployment?.kind).toBe("launch");
     if (fixture?.deployment?.kind !== "launch") throw new Error("Expected a launch fixture.");
     expect(fixture.deployment.source).toBe("development-fixture");
     expect(fixture?.descriptor.deploymentId).toBe(LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID);
-    expect(mainnet?.descriptor.available).toBe(false);
-    expect(testnet?.descriptor.chainId).toBe(46_630);
+    expect(deploymentRegistry(environment)).toHaveLength(1);
 
     expect(() => deploymentRegistry({ ...environment, NEXT_PUBLIC_APP_ENV: "production" })).toThrow(
       "only allowed in development"
@@ -110,7 +109,8 @@ describe("deployment registry", () => {
     expect(mainnet?.descriptor.available).toBe(false);
     expect(mainnet?.deployment).toBeNull();
     expect(testnet?.descriptor.chainId).toBe(46_630);
-    expect(hasCapability(testnet!.descriptor, "faucet")).toBe(true);
+    expect(testnet?.descriptor.available).toBe(false);
+    expect(hasCapability(testnet!.descriptor, "faucet")).toBe(false);
   });
 
   it("parses a canonical launch market and rejects a mismatched pair", () => {

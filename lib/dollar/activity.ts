@@ -107,7 +107,7 @@ export type DollarActivity = Readonly<{
 }>;
 
 const activityEvent = "statics-protocol-activity";
-const DEFAULT_ACTIVITY_DEPLOYMENT_ID = "robinhood-testnet-protocol";
+const DEFAULT_ACTIVITY_DEPLOYMENT_ID = "robinhood-testnet-genesis";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
 const aggregateActivityCache = new Map<
   string,
@@ -130,8 +130,7 @@ function storageKey(wallet: Address, chainId: number, deploymentId: string): str
 }
 
 export function activeActivityDeploymentId(): string {
-  if (typeof window === "undefined") return DEFAULT_ACTIVITY_DEPLOYMENT_ID;
-  return window.localStorage.getItem("statics:active-deployment") || DEFAULT_ACTIVITY_DEPLOYMENT_ID;
+  return DEFAULT_ACTIVITY_DEPLOYMENT_ID;
 }
 
 export function readDollarActivity(

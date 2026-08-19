@@ -49,7 +49,12 @@ import {
 } from "@/lib/baskets/conversion-navigation";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  EmptyState,
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
 import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
@@ -61,6 +66,7 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { applyPercent } from "@/lib/protocol/ux";
+import { useDeployment } from "@/providers/deployment-context";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 const deploymentState = readClientDollarDeployment();
@@ -97,6 +103,10 @@ export function BasketDetailPage({
 }) {
   const t = useTranslations("baskets");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Basket management" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("singular")} />;
   return (
     <BasketDetailRuntime

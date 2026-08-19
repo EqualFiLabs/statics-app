@@ -104,15 +104,27 @@ async function loadDeploymentIds(
   throw new Error("The Statics indexer exceeded its pagination limit.");
 }
 
-export function loadLaunchGenesisInventoryIds(
+export async function loadNextAvailableGenesisId(
   deploymentId: string,
   indexerUrl?: string | null
-): Promise<bigint[]> {
-  return loadDeploymentIds(
-    "/genesis/inventory",
-    deploymentId,
-    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl
-  );
+): Promise<bigint | null> {
+  const base =
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
+  if (!base) throw new Error("No indexer is configured for this deployment.");
+  const response = await fetch(`${base}/genesis/next-available`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
+  const body = (await response.json()) as { deploymentId?: string; tokenId?: string | null };
+  if (body.deploymentId !== deploymentId) {
+    throw new Error("The Statics indexer returned data for a different deployment.");
+  }
+  if (body.tokenId === null) return null;
+  if (typeof body.tokenId !== "string") {
+    throw new Error("The Statics indexer returned an invalid Genesis token ID.");
+  }
+  return parseId(body.tokenId);
 }
 
 export function loadWalletLaunchGenesisIds(

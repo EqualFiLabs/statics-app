@@ -30,7 +30,11 @@ import {
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
-import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolPendingSurface,
+  SurfaceEmptyState,
+  UnconfiguredSurface,
+} from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
@@ -61,6 +65,7 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
 
 const deploymentState = readClientDollarDeployment();
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
@@ -288,6 +293,10 @@ export function LiquidityContributionForm({
 
 export function LiquidityPage() {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <ProtocolPendingSurface subject="Protocol liquidity" />;
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
   return <LiquidityRuntime />;
 }
