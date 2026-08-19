@@ -12,6 +12,1389 @@ export declare const Q192: bigint;
 export declare const MAX_UINT256: bigint;
 export declare const MIN_TICK = -887272;
 export declare const MAX_TICK = 887272;
+export declare const STATICS_MAX_SUPPLY: bigint;
+export declare const STATICS_TREASURY_ALLOCATION: bigint;
+export declare const STATICS_DOPPLER_INVENTORY: bigint;
+export declare const DOPPLER_OWNER_FEE_SHARE: bigint;
+export declare const STATICS_FEE_RECEIVER_SHARE: bigint;
+export declare const GENESIS_COLLECTION_SIZE = 5555n;
+export declare const GENESIS_VAULT_PRICE: bigint;
+export declare const GENESIS_FULL_BACKING: bigint;
+export declare const GENESIS_SUPPLY_RESIDUAL: bigint;
+export type DopplerGenesisCurve = {
+    name: "low" | "medium" | "high" | "filler";
+    tickLower: number;
+    tickUpper: number;
+    numPositions: number;
+    shareWad: bigint;
+    staticsAmount: bigint;
+};
+export declare const DOPPLER_GENESIS_FIXTURE: {
+    readonly productionApproved: false;
+    readonly sdkRevision: "daa12c19d849f41ec5126168055935b143948c54";
+    readonly contractsRevision: "86a5200456b148c156d2eb81a893747dd601c3ca";
+    readonly tickSpacing: 100;
+    readonly farTick: -83100;
+    readonly curves: readonly [{
+        readonly name: "low";
+        readonly tickLower: -887200;
+        readonly tickUpper: -142200;
+        readonly numPositions: 11;
+        readonly shareWad: 500000000000000000n;
+        readonly staticsAmount: bigint;
+    }, {
+        readonly name: "medium";
+        readonly tickLower: -222200;
+        readonly tickUpper: -116300;
+        readonly numPositions: 11;
+        readonly shareWad: 250000000000000000n;
+        readonly staticsAmount: bigint;
+    }, {
+        readonly name: "high";
+        readonly tickLower: -176200;
+        readonly tickUpper: -84100;
+        readonly numPositions: 11;
+        readonly shareWad: 240000000000000000n;
+        readonly staticsAmount: bigint;
+    }, {
+        readonly name: "filler";
+        readonly tickLower: -84100;
+        readonly tickUpper: -83000;
+        readonly numPositions: 11;
+        readonly shareWad: 10000000000000000n;
+        readonly staticsAmount: bigint;
+    }];
+};
+export declare const dopplerGenesisModules: {
+    readonly 4663: {
+        readonly airlock: "0xeB7c034704eF8dCd2d32324C1545f62fb4aD0862";
+        readonly tokenFactory: "0x1B37D3a72082029c44b35B604eA473617580b69A";
+        readonly governanceFactory: "0xDB036746d65dD52126b1915F1Adf555E6C5237Cf";
+        readonly poolInitializer: "0x4E3468951D49f2eeA976ed0d6e75FfCB44a9a544";
+        readonly noOpMigrator: "0xBA2F330EDb16CD8056F5988D8CE19bBc63475a0E";
+    };
+    readonly 84532: {
+        readonly airlock: "0x3411306cE66c9469BFf1535BA955503c4BDE1C6E";
+        readonly tokenFactory: "0x89C261c05B5F9B6bCbA07C199B8DeE7CFaD45292";
+        readonly governanceFactory: "0x0902e7C7207dF8ED6303aef4382bCAb181B5fbfA";
+        readonly poolInitializer: "0xBDF938149aC6a781f94FaA0eD45E6A0E984c6544";
+        readonly noOpMigrator: "0xF11066ABBd329aC4BbA39455340539322C222EB0";
+    };
+};
+export declare function getDopplerGenesisModules(chainId: number): {
+    readonly airlock: "0xeB7c034704eF8dCd2d32324C1545f62fb4aD0862";
+    readonly tokenFactory: "0x1B37D3a72082029c44b35B604eA473617580b69A";
+    readonly governanceFactory: "0xDB036746d65dD52126b1915F1Adf555E6C5237Cf";
+    readonly poolInitializer: "0x4E3468951D49f2eeA976ed0d6e75FfCB44a9a544";
+    readonly noOpMigrator: "0xBA2F330EDb16CD8056F5988D8CE19bBc63475a0E";
+} | {
+    readonly airlock: "0x3411306cE66c9469BFf1535BA955503c4BDE1C6E";
+    readonly tokenFactory: "0x89C261c05B5F9B6bCbA07C199B8DeE7CFaD45292";
+    readonly governanceFactory: "0x0902e7C7207dF8ED6303aef4382bCAb181B5fbfA";
+    readonly poolInitializer: "0xBDF938149aC6a781f94FaA0eD45E6A0E984c6544";
+    readonly noOpMigrator: "0xF11066ABBd329aC4BbA39455340539322C222EB0";
+};
+export declare const staticsGenesisAbi: readonly [{
+    readonly name: "COLLECTION_SIZE";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "name";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "symbol";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "mintedSupply";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "vault";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "activationRegistry";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "protocol";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "launchFinalized";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "contractURI";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "externalURLBase";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "owner";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "pendingOwner";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "ownerOf";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "balanceOf";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "getApproved";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "isApprovedForAll";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "address";
+        readonly name: "operator";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "approve";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "setApprovalForAll";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "operator";
+    }, {
+        readonly type: "bool";
+        readonly name: "approved";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "transferFrom";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "from";
+    }, {
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "safeTransferFrom";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "from";
+    }, {
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "safeTransferFrom";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "from";
+    }, {
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }, {
+        readonly type: "bytes";
+        readonly name: "data";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "tokenURI";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "locked";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "royaltyInfo";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "salePrice";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "uint256";
+        readonly name: "royaltyAmount";
+    }];
+}, {
+    readonly name: "getTransferValidator";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+        readonly name: "validator";
+    }];
+}, {
+    readonly name: "getTransferValidationFunction";
+    readonly type: "function";
+    readonly stateMutability: "pure";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "bytes4";
+        readonly name: "functionSignature";
+    }, {
+        readonly type: "bool";
+        readonly name: "isViewFunction";
+    }];
+}, {
+    readonly name: "Transfer";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "from";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "to";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "ConsecutiveTransfer";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "fromTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "toTokenId";
+    }, {
+        readonly type: "address";
+        readonly name: "fromAddress";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "toAddress";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "Approval";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "approved";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "ApprovalForAll";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "operator";
+        readonly indexed: true;
+    }, {
+        readonly type: "bool";
+        readonly name: "approved";
+    }];
+}, {
+    readonly name: "ProtocolBound";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "protocol";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "MetadataUpdate";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "_tokenId";
+    }];
+}, {
+    readonly name: "BatchMetadataUpdate";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "_fromTokenId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "_toTokenId";
+    }];
+}, {
+    readonly name: "Locked";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+}, {
+    readonly name: "Unlocked";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+}];
+export declare const staticsGenesisVaultAbi: readonly [{
+    readonly name: "buyGenesis";
+    readonly type: "function";
+    readonly stateMutability: "payable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "redeemGenesis";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "quoteGenesisPurchase";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsPrice";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nativeFee";
+    }];
+}, {
+    readonly name: "vaultPrice";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "nativeAcquisitionFee";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "nativeFeeRecipient";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "claimableNativeFees";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "recipient";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "totalNativeFeeLiability";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "circulatingGenesis";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "vaultInventory";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "requiredBacking";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "isVaultInventory";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "tokenId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "vaultAccounting";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "vaultPrice";
+        }, {
+            readonly type: "uint256";
+            readonly name: "maximumSupply";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintedSupply";
+        }, {
+            readonly type: "uint256";
+            readonly name: "vaultInventory";
+        }, {
+            readonly type: "uint256";
+            readonly name: "circulatingGenesis";
+        }, {
+            readonly type: "uint256";
+            readonly name: "tokenBacking";
+        }, {
+            readonly type: "uint256";
+            readonly name: "requiredBacking";
+        }, {
+            readonly type: "uint256";
+            readonly name: "tokenCustody";
+        }];
+        readonly name: "accounting";
+    }];
+}, {
+    readonly name: "GenesisPurchased";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "payer";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsPrice";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nativeFee";
+    }];
+}, {
+    readonly name: "GenesisRedeemed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "tokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "price";
+    }];
+}];
+export declare const genesisActivationRegistryAbi: readonly [{
+    readonly name: "genesisCollection";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "tierOf";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+    }];
+}, {
+    readonly name: "multiplierBps";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint16";
+    }];
+}, {
+    readonly name: "tierCost";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "tier";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "activeConsumer";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "pendingConsumer";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "activate";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }, {
+        readonly type: "uint8";
+        readonly name: "targetTier";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "burned";
+    }];
+}, {
+    readonly name: "GenesisActivated";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint8";
+        readonly name: "previousTier";
+    }, {
+        readonly type: "uint8";
+        readonly name: "newTier";
+    }, {
+        readonly type: "uint256";
+        readonly name: "staticsBurned";
+    }];
+}, {
+    readonly name: "GenesisActivationReset";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "previousOwner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "nextOwner";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "TierCostUpdated";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint8";
+        readonly name: "tier";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "previousCost";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newCost";
+    }];
+}];
+export declare const staticsFeeReceiverAbi: readonly [{
+    readonly name: "statics";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "numeraire";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "poolInitializer";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "poolId";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "bytes32";
+    }];
+}, {
+    readonly name: "activeDistributor";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "pendingDistributor";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "address";
+    }];
+}, {
+    readonly name: "cumulativeHarvested";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "cumulativeDistributorAttributed";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "distributor";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "distributorClaimable";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "distributor";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "totalDistributorLiability";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "harvest";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "numeraireAmount";
+    }];
+}, {
+    readonly name: "claimDistributorFees";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "MarketBound";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "statics";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "numeraire";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "FeesHarvested";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "distributor";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cumulativeAmount";
+    }];
+}, {
+    readonly name: "DistributorProposed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "currentDistributor";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "pendingDistributor";
+        readonly indexed: true;
+    }];
+}, {
+    readonly name: "DistributorAccepted";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "previousDistributor";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "newDistributor";
+        readonly indexed: true;
+    }];
+}];
+export declare const genesisLaunchDistributorAbi: readonly [{
+    readonly name: "registerGenesis";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "accrue";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "numeraireAmount";
+    }];
+}, {
+    readonly name: "claimGenesis";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "claimOwnerRewards";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "pendingGenesis";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "registered";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "effectiveWeight";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "ownerClaimable";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "genesisRewardShareBps";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint16";
+    }];
+}, {
+    readonly name: "totalWeight";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "finalized";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "indexedReceiverAttribution";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "rewardBook";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "indexRay";
+        }, {
+            readonly type: "uint256";
+            readonly name: "indexRemainder";
+        }, {
+            readonly type: "uint256";
+            readonly name: "indexedAmount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "crystallizedAmount";
+        }, {
+            readonly type: "uint256";
+            readonly name: "totalClaimable";
+        }, {
+            readonly type: "uint256";
+            readonly name: "totalClaimed";
+        }, {
+            readonly type: "uint256";
+            readonly name: "treasuryClaimable";
+        }];
+        readonly name: "book";
+    }];
+}, {
+    readonly name: "GenesisRegistered";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "weight";
+    }, {
+        readonly type: "uint256";
+        readonly name: "totalWeight";
+    }];
+}, {
+    readonly name: "GenesisWeightChanged";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "previousWeight";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newWeight";
+    }, {
+        readonly type: "uint256";
+        readonly name: "totalWeight";
+    }];
+}, {
+    readonly name: "RevenueAccrued";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "genesisAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "treasuryAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "indexRay";
+    }];
+}, {
+    readonly name: "GenesisRewardsClaimed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}, {
+    readonly name: "OwnerRewardsClaimed";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}];
+export declare const dopplerStaticsTokenAbi: readonly [{
+    readonly name: "name";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "symbol";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}, {
+    readonly name: "decimals";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint8";
+    }];
+}, {
+    readonly name: "totalSupply";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "balanceOf";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "account";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "allowance";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "address";
+        readonly name: "spender";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "approve";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "spender";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "transfer";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "transferFrom";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "from";
+    }, {
+        readonly type: "address";
+        readonly name: "to";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bool";
+    }];
+}, {
+    readonly name: "nonces";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "permit";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "owner";
+    }, {
+        readonly type: "address";
+        readonly name: "spender";
+    }, {
+        readonly type: "uint256";
+        readonly name: "value";
+    }, {
+        readonly type: "uint256";
+        readonly name: "deadline";
+    }, {
+        readonly type: "uint8";
+        readonly name: "v";
+    }, {
+        readonly type: "bytes32";
+        readonly name: "r";
+    }, {
+        readonly type: "bytes32";
+        readonly name: "s";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "burn";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "tokenURI";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "string";
+    }];
+}];
 export declare const BasketStatus: {
     readonly Active: 0;
     readonly Quarantined: 1;
@@ -191,6 +1574,18 @@ export type V4ExactInputSingleRequest = {
     permit?: {
         permitSingle: Permit2PermitSingle;
         signature: Hex;
+    };
+    settlement?: {
+        input: "erc20";
+        output: "erc20";
+    } | {
+        input: "native";
+        output: "erc20";
+        wrappedNative: Address;
+    } | {
+        input: "erc20";
+        output: "native";
+        wrappedNative: Address;
     };
 };
 export type PeggedMintAndRecombineQuote = {
@@ -5868,219 +7263,6 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly indexed: true;
     }];
 }];
-export declare const staticsGenesisAbi: readonly [{
-    readonly name: "COLLECTION_SIZE";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-    }];
-}, {
-    readonly name: "name";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly type: "string";
-    }];
-}, {
-    readonly name: "symbol";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly type: "string";
-    }];
-}, {
-    readonly name: "balanceOf";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "owner";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "uint256";
-    }];
-}, {
-    readonly name: "ownerOf";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "address";
-    }];
-}, {
-    readonly name: "tokenURI";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "string";
-    }];
-}, {
-    readonly name: "getApproved";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "address";
-    }];
-}, {
-    readonly name: "isApprovedForAll";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "owner";
-    }, {
-        readonly type: "address";
-        readonly name: "operator";
-    }];
-    readonly outputs: readonly [{
-        readonly type: "bool";
-    }];
-}, {
-    readonly name: "approve";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "to";
-    }, {
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "setApprovalForAll";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "operator";
-    }, {
-        readonly type: "bool";
-        readonly name: "approved";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "safeTransferFrom";
-    readonly type: "function";
-    readonly stateMutability: "nonpayable";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "from";
-    }, {
-        readonly type: "address";
-        readonly name: "to";
-    }, {
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-    readonly outputs: readonly [];
-}, {
-    readonly name: "protocol";
-    readonly type: "function";
-    readonly stateMutability: "view";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly type: "address";
-    }];
-}, {
-    readonly name: "ConsecutiveTransfer";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "fromTokenId";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint256";
-        readonly name: "toTokenId";
-    }, {
-        readonly type: "address";
-        readonly name: "fromAddress";
-        readonly indexed: true;
-    }, {
-        readonly type: "address";
-        readonly name: "toAddress";
-        readonly indexed: true;
-    }];
-}, {
-    readonly name: "Transfer";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "from";
-        readonly indexed: true;
-    }, {
-        readonly type: "address";
-        readonly name: "to";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint256";
-        readonly name: "tokenId";
-        readonly indexed: true;
-    }];
-}, {
-    readonly name: "Approval";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "owner";
-        readonly indexed: true;
-    }, {
-        readonly type: "address";
-        readonly name: "approved";
-        readonly indexed: true;
-    }, {
-        readonly type: "uint256";
-        readonly name: "tokenId";
-        readonly indexed: true;
-    }];
-}, {
-    readonly name: "ApprovalForAll";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "address";
-        readonly name: "owner";
-        readonly indexed: true;
-    }, {
-        readonly type: "address";
-        readonly name: "operator";
-        readonly indexed: true;
-    }, {
-        readonly type: "bool";
-        readonly name: "approved";
-    }];
-}, {
-    readonly name: "MetadataUpdate";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "tokenId";
-    }];
-}, {
-    readonly name: "BatchMetadataUpdate";
-    readonly type: "event";
-    readonly inputs: readonly [{
-        readonly type: "uint256";
-        readonly name: "fromTokenId";
-    }, {
-        readonly type: "uint256";
-        readonly name: "toTokenId";
-    }];
-}];
 export declare const staticsTokenAbi: readonly [{
     readonly name: "FIXED_SUPPLY";
     readonly type: "function";
@@ -6616,6 +7798,18 @@ export declare const v4StateViewReadAbi: readonly [{
     }, {
         readonly type: "uint24";
         readonly name: "lpFee";
+    }];
+}, {
+    readonly name: "getLiquidity";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "bytes32";
+        readonly name: "poolId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint128";
+        readonly name: "liquidity";
     }];
 }, {
     readonly name: "getPositionInfo";
@@ -9971,6 +11165,15 @@ export declare const staticsDollarErrorAbi: readonly [{
         readonly name: "amount";
     }];
 }];
+export declare function buildBuyGenesisTransaction(tokenId: bigint, receiver: Address, nativeFee: bigint): PreparedTransaction;
+export declare function buildRedeemGenesisCall(tokenId: bigint, receiver: Address): Hex;
+export declare function buildActivateGenesisCall(genesisId: bigint, targetTier: number): Hex;
+export declare function buildActivateGenesisCall(genesisId: bigint, targetTier: number, maxBurn: bigint): Hex;
+export declare function buildRegisterGenesisCall(genesisId: bigint): Hex;
+export declare function buildClaimGenesisLaunchRewardsCall(genesisId: bigint, asset: Address, receiver: Address): Hex;
+export declare function buildClaimOwnerGenesisLaunchRewardsCall(asset: Address, receiver: Address): Hex;
+export declare function buildAccrueGenesisLaunchRewardsCall(): Hex;
+export declare function cumulativeGenesisActivationCost(tierCosts: readonly bigint[], currentTier: number, targetTier: number): bigint;
 export declare function buildCreateBasketTransaction(params: CreateBasketParams, pools: readonly PoolLaunchParams[], maxAmountsIn: readonly bigint[], launchDeadline: bigint, creationFee: bigint): PreparedTransaction;
 export declare function buildTestnetFaucetClaimCall(): Hex;
 export declare function buildApproveV4PositionCall(operator: Address, tokenId: bigint): Hex;
@@ -10044,6 +11247,7 @@ export declare function buildErc20PermitTypedData(params: Erc20PermitTypedDataPa
     };
 };
 export declare function buildQuoteV4ExactInputSingleCall(poolKey: V4PoolKey, zeroForOne: boolean, exactAmount: bigint, hookData?: Hex): Hex;
+export declare function v4PoolId(poolKey: V4PoolKey): Hex;
 export declare function buildV4ExactInputSingleSwap(request: V4ExactInputSingleRequest): SwapExecution;
 export declare function buildMintV4PositionCall(request: V4MintPositionRequest): Hex;
 export declare function buildMintCall(basketId: bigint, shares: bigint, receiver: Address, maxAmountsIn: readonly bigint[]): Hex;
@@ -10064,7 +11268,6 @@ export declare function buildUnstakeCall(positionId: bigint, amount: bigint, rec
 export declare function buildCheckpointRewardAssetsCall(assets: readonly Address[]): Hex;
 export declare function buildLinkGenesisCall(genesisId: bigint, positionId: bigint): Hex;
 export declare function buildUnlinkGenesisCall(genesisId: bigint): Hex;
-export declare function buildActivateGenesisCall(genesisId: bigint, targetTier: number, maxBurn: bigint): Hex;
 export declare function buildClaimCreatorRevenueCall(asset: Address, receiver: Address, minReceived: bigint): Hex;
 export declare function buildDistributePartnerRevenueCall(recipient: Address, asset: Address): Hex;
 export declare function buildBorrowCall(positionId: bigint, basketId: bigint, sharesIn: bigint, receiver: Address): Hex;
