@@ -7,9 +7,12 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
+import { EmptyState } from "@/components/common/EmptyState";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { hasCapability } from "@/lib/deployments/registry";
+import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
@@ -158,6 +161,26 @@ function NetworkIndicator() {
   );
 }
 
+function DeploymentSelector() {
+  const { active, options, selectDeployment } = useDeployment();
+  return (
+    <label className="dapp-deployment-selector">
+      <span className="sr-only">Statics deployment</span>
+      <select
+        aria-label="Statics deployment"
+        value={active.descriptor.deploymentId}
+        onChange={(event) => selectDeployment(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.descriptor.deploymentId} value={option.descriptor.deploymentId}>
+            {option.descriptor.network} · {option.descriptor.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /**
  * A wrong network means every number on the page reads as unavailable, so the
  * fix has to be impossible to miss and reachable at any width -- not a link in
@@ -195,6 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
+  const { active } = useDeployment();
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -215,6 +239,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showApprovalDisclosure = approvalDisclosureRoutes.some(
     (route) => currentPath === route || currentPath.startsWith(`${route}/`)
   );
+  const routeItem = appNavigation.find(
+    (item) =>
+      item.href === currentPath || (item.href !== "/app" && currentPath.startsWith(`${item.href}/`))
+  );
+  const routeSupported = !routeItem || hasCapability(active.descriptor, routeItem.capability);
 
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
@@ -263,6 +292,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <NetworkIndicator />
         <div className="dapp-header-actions">
+          <DeploymentSelector />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
           <Link className="dapp-return" href="/">
             {tNavigation("site")} <span aria-hidden="true">↗</span>
@@ -295,29 +325,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label={group.messageKey ? tGroups(group.messageKey) : tGroups("overview")}
               >
                 {group.messageKey && <p className="dapp-nav-label">{tGroups(group.messageKey)}</p>}
-                {group.items.map((item, itemIndex) => {
-                  const active =
-                    item.href === currentPath ||
-                    (item.href !== "/app" &&
-                      Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
-                  return item.enabled && item.href ? (
-                    <Link
-                      ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
-                      key={item.label}
-                      className={`dapp-nav-item${active ? " active" : ""}`}
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      onClick={() => closeNavigation()}
-                    >
-                      {tItems(item.messageKey)}
-                    </Link>
-                  ) : (
-                    <span key={item.label} className="dapp-nav-item" aria-disabled="true">
-                      {tItems(item.messageKey)}
-                      <small>{tCommon("planned")}</small>
-                    </span>
-                  );
-                })}
+                {group.items
+                  .filter((item) => hasCapability(active.descriptor, item.capability))
+                  .map((item, itemIndex) => {
+                    const active =
+                      item.href === currentPath ||
+                      (item.href !== "/app" &&
+                        Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
+                    return item.enabled && item.href ? (
+                      <Link
+                        ref={
+                          groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined
+                        }
+                        key={item.label}
+                        className={`dapp-nav-item${active ? " active" : ""}`}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        onClick={() => closeNavigation()}
+                      >
+                        {tItems(item.messageKey)}
+                      </Link>
+                    ) : (
+                      <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                        {tItems(item.messageKey)}
+                        <small>{tCommon("planned")}</small>
+                      </span>
+                    );
+                  })}
               </nav>
             ))}
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
@@ -353,26 +387,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </aside>
           )}
 
-          {children}
+          {routeSupported ? (
+            children
+          ) : (
+            <EmptyState
+              title="Not available in this deployment"
+              description={`${routeCopy.label} is not part of ${active.descriptor.label} on ${active.descriptor.network}. Choose the testnet full protocol to use this feature.`}
+            />
+          )}
         </main>
       </div>
 
       <nav className="dapp-tabbar" aria-label={tShell("primary")}>
-        {appTabNavigation.map((item) => {
-          const active =
-            item.href === currentPath ||
-            (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
-          return (
-            <Link
-              key={item.href}
-              className={`dapp-tab${active ? " active" : ""}`}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-            >
-              {tItems(item.messageKey)}
-            </Link>
-          );
-        })}
+        {appTabNavigation
+          .filter((item) => hasCapability(active.descriptor, item.capability))
+          .map((item) => {
+            const active =
+              item.href === currentPath ||
+              (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
+            return (
+              <Link
+                key={item.href}
+                className={`dapp-tab${active ? " active" : ""}`}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+              >
+                {tItems(item.messageKey)}
+              </Link>
+            );
+          })}
         <button
           ref={navigationToggleRef}
           className="dapp-tab dapp-nav-toggle"

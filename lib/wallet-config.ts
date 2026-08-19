@@ -141,17 +141,20 @@ export function readWalletEnvironment(
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
     anvilRpcUrl: configuredAnvilRpc ?? "http://127.0.0.1:8545/",
     defaultChain,
-    supportedChains:
-      appEnvironment === "development"
-        ? ([
-            defaultChain,
-            ...[robinhoodMainnet, robinhoodTestnet, anvil].filter(
-              (chain) => chain.id !== defaultChain.id
-            ),
-          ] as [Chain, ...Chain[]])
-        : ([defaultChain] as const),
+    supportedChains: [
+      defaultChain,
+      ...[robinhoodMainnet, robinhoodTestnet].filter((chain) => chain.id !== defaultChain.id),
+      ...(appEnvironment === "development" && defaultChain.id !== anvil.id ? [anvil] : []),
+    ] as [Chain, ...Chain[]],
     configured: Boolean(appId),
   };
+}
+
+export function getStaticsChain(chainId: number): Chain | null {
+  if (chainId === robinhoodMainnet.id) return robinhoodMainnet;
+  if (chainId === robinhoodTestnet.id) return robinhoodTestnet;
+  if (chainId === anvil.id) return anvil;
+  return null;
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {

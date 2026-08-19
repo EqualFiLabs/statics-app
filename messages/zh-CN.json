@@ -41,6 +41,7 @@
     "mobileMenu": "应用菜单。当前页面：{route}",
     "groups": {
       "overview": "概览",
+      "trade": "交易",
       "earn": "赚取",
       "assets": "资产",
       "manage": "管理",
@@ -76,6 +77,12 @@
       "status": "资产组合",
       "title": "你的资产组合",
       "description": "在一个地方查看你持有的一切：美元余额、头寸、抵押品以及待领取的奖励。"
+    },
+    "trade": {
+      "label": "交易",
+      "status": "STATICS 市场",
+      "title": "买入或卖出 STATICS",
+      "description": "通过受保护的链上报价直接在官方 STATICS 市场交易。"
     },
     "dollar": {
       "label": "美元",

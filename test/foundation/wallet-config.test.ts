@@ -39,7 +39,7 @@ describe("wallet environment", () => {
     });
 
     expect(environment.defaultChain.id).toBe(4_663);
-    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663]);
+    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630]);
   });
 
   it("fails closed outside development when Privy or the RPC is absent", () => {

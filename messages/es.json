@@ -41,6 +41,7 @@
     "mobileMenu": "Menú de la aplicación. Ruta actual: {route}",
     "groups": {
       "overview": "Resumen",
+      "trade": "Operar",
       "earn": "Ganar",
       "assets": "Activos",
       "manage": "Gestionar",
@@ -76,6 +77,12 @@
       "status": "Cartera",
       "title": "Tu cartera",
       "description": "Todo lo que tienes en un solo lugar: saldo en dólares, posiciones, garantía y recompensas pendientes de reclamar."
+    },
+    "trade": {
+      "label": "Operar",
+      "status": "Mercado STATICS",
+      "title": "Compra o vende STATICS",
+      "description": "Opera directamente en el mercado canónico de STATICS con una cotización protegida en cadena."
     },
     "dollar": {
       "label": "Dólar",

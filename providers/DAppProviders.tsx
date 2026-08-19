@@ -27,6 +27,7 @@ import { useAccount } from "wagmi";
 import {
   createWalletTransports,
   getAddressExplorerUrl,
+  getStaticsChain,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
@@ -37,6 +38,7 @@ import {
   subscribeToProtocolReconciliation,
 } from "@/lib/protocol/reconciliation";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
+import { DeploymentProvider, useDeployment } from "./deployment-context";
 import {
   defaultSolanaWalletState,
   SolanaWalletContext,
@@ -78,6 +80,7 @@ function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | n
 }
 
 function WalletBridge({ children }: { children: React.ReactNode }) {
+  const { active } = useDeployment();
   const { ready, authenticated, error: privyError, login, logout } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
@@ -117,7 +120,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
       ? (wagmiAccount.chainId ?? null)
       : null);
-  const targetChain = walletEnvironment.defaultChain;
+  const targetChain = getStaticsChain(active.descriptor.chainId) ?? walletEnvironment.defaultChain;
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
 
   useEffect(() => {
@@ -423,11 +426,14 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
 }
 
 function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
+  const { active } = useDeployment();
   const [fundingChainId, setFundingChainId] = useState(8_453);
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
   const value = useMemo<WalletState>(
     () => ({
       ...defaultWalletState,
+      networkName: active.descriptor.network,
+      targetChainId: active.descriptor.chainId,
       fundingChainId,
       fundingNetworkName: fundingNetwork.label,
       fundingNetworks: fundingNetworkSummaries,
@@ -437,7 +443,7 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
         setFundingChainId(nextChainId);
       },
     }),
-    [fundingChainId, fundingNetwork.label]
+    [active.descriptor.chainId, active.descriptor.network, fundingChainId, fundingNetwork.label]
   );
   return (
     <WalletContext.Provider value={value}>
@@ -471,11 +477,13 @@ export function DAppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ProtocolQueryReconciler />
-      {walletEnvironment.configured ? (
-        <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
-      ) : (
-        <UnconfiguredWalletBridge>{children}</UnconfiguredWalletBridge>
-      )}
+      <DeploymentProvider>
+        {walletEnvironment.configured ? (
+          <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
+        ) : (
+          <UnconfiguredWalletBridge>{children}</UnconfiguredWalletBridge>
+        )}
+      </DeploymentProvider>
     </QueryClientProvider>
   );
 }

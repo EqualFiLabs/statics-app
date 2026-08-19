@@ -24,6 +24,13 @@ const routePresentations = {
     description:
       "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
   },
+  trade: {
+    label: "Trade",
+    status: "STATICS market",
+    title: "Buy or sell STATICS",
+    description:
+      "Trade directly against the canonical STATICS market with a protected onchain quote.",
+  },
   dollar: {
     label: "Dollar",
     status: "Dollar",
@@ -119,6 +126,7 @@ const routePresentations = {
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/trade")) return "trade";
   if (pathname.startsWith("/app/wallet")) return "wallet";
   if (pathname.startsWith("/app/faucet")) return "faucet";
   if (pathname.startsWith("/app/portal")) return "portal";

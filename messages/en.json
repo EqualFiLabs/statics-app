@@ -41,6 +41,7 @@
     "mobileMenu": "Application menu. Current route: {route}",
     "groups": {
       "overview": "Overview",
+      "trade": "Trade",
       "earn": "Earn",
       "assets": "Assets",
       "manage": "Manage",
@@ -76,6 +77,12 @@
       "status": "Portfolio",
       "title": "Your portfolio",
       "description": "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed."
+    },
+    "trade": {
+      "label": "Trade",
+      "status": "STATICS market",
+      "title": "Buy or sell STATICS",
+      "description": "Trade directly against the canonical STATICS market with a protected onchain quote."
     },
     "dollar": {
       "label": "Dollar",

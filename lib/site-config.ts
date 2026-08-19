@@ -67,11 +67,14 @@ export const protocolStatus = {
   audit: "Internal review",
 } as const;
 
+import type { DeploymentCapability } from "@/lib/deployments/types";
+
 export type AppNavigationItem = Readonly<{
   label: string;
   messageKey: string;
   enabled: boolean;
   href: string;
+  capability: DeploymentCapability;
   /**
    * Short label for the mobile tab bar, and the opt-in to appearing there.
    *
@@ -105,7 +108,23 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
   {
     label: null,
     messageKey: null,
-    items: [{ label: "Overview", messageKey: "overview", enabled: true, href: "/app" }],
+    items: [
+      {
+        label: "Overview",
+        messageKey: "overview",
+        enabled: true,
+        href: "/app",
+        capability: "overview",
+      },
+      {
+        label: "Trade",
+        messageKey: "trade",
+        enabled: true,
+        href: "/app/trade",
+        capability: "canonical-statics-market",
+        tabLabel: "Trade",
+      },
+    ],
   },
   {
     label: "Earn",
@@ -116,9 +135,16 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         messageKey: "earn",
         enabled: true,
         href: "/app/rewards",
+        capability: "protocol-rewards",
         tabLabel: "Earn",
       },
-      { label: "Liquidity", messageKey: "liquidity", enabled: true, href: "/app/liquidity" },
+      {
+        label: "Liquidity",
+        messageKey: "liquidity",
+        enabled: true,
+        href: "/app/liquidity",
+        capability: "protocol-liquidity",
+      },
     ],
   },
   {
@@ -130,14 +156,22 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         messageKey: "baskets",
         enabled: true,
         href: "/app/baskets",
+        capability: "baskets",
         tabLabel: "Baskets",
       },
-      { label: "Create basket", messageKey: "create", enabled: true, href: "/app/create" },
+      {
+        label: "Create basket",
+        messageKey: "create",
+        enabled: true,
+        href: "/app/create",
+        capability: "baskets",
+      },
       {
         label: "Dollar",
         messageKey: "dollar",
         enabled: true,
         href: "/app/dollar",
+        capability: "dollar",
         tabLabel: "Dollar",
       },
     ],
@@ -151,14 +185,22 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         messageKey: "positions",
         enabled: true,
         href: "/app/positions",
+        capability: "positions",
       },
       {
         label: "Genesis NFT",
         messageKey: "genesis",
         enabled: true,
         href: "/app/genesis",
+        capability: "genesis-vault",
       },
-      { label: "Loans", messageKey: "loans", enabled: true, href: "/app/loans" },
+      {
+        label: "Loans",
+        messageKey: "loans",
+        enabled: true,
+        href: "/app/loans",
+        capability: "loans",
+      },
     ],
   },
   {
@@ -170,11 +212,30 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         messageKey: "wallet",
         enabled: true,
         href: "/app/wallet",
+        capability: "wallet",
         tabLabel: "Wallet",
       },
-      { label: "Faucet", messageKey: "faucet", enabled: true, href: "/app/faucet" },
-      { label: "Activity", messageKey: "activity", enabled: true, href: "/app/activity" },
-      { label: "Tools", messageKey: "tools", enabled: true, href: "/app/tools" },
+      {
+        label: "Faucet",
+        messageKey: "faucet",
+        enabled: true,
+        href: "/app/faucet",
+        capability: "faucet",
+      },
+      {
+        label: "Activity",
+        messageKey: "activity",
+        enabled: true,
+        href: "/app/activity",
+        capability: "activity",
+      },
+      {
+        label: "Tools",
+        messageKey: "tools",
+        enabled: true,
+        href: "/app/tools",
+        capability: "approval-tools",
+      },
     ],
   },
 ];
