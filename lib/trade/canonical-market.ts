@@ -1,0 +1,67 @@
+import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
+
+import { dopplerStaticsTokenAbi, type V4PoolKey } from "@statics-protocol/sdk";
+
+import type { LaunchDeployment } from "@/lib/deployments/types";
+import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+
+export type TradeAsset = "eth" | "weth" | "statics";
+export type TradeDirection = Readonly<{ input: TradeAsset; output: TradeAsset }>;
+
+export const tradeDirections: readonly TradeDirection[] = [
+  { input: "eth", output: "statics" },
+  { input: "weth", output: "statics" },
+  { input: "statics", output: "weth" },
+  { input: "statics", output: "eth" },
+];
+
+export function tradeSymbol(asset: TradeAsset): "ETH" | "WETH" | "STATICS" {
+  if (asset === "eth") return "ETH";
+  if (asset === "weth") return "WETH";
+  return "STATICS";
+}
+
+export function poolKeyForLaunch(deployment: LaunchDeployment): V4PoolKey {
+  return {
+    currency0: deployment.market.poolKey.currency0,
+    currency1: deployment.market.poolKey.currency1,
+    fee: deployment.market.poolKey.fee,
+    tickSpacing: deployment.market.poolKey.tickSpacing,
+    hooks: deployment.market.poolKey.hooks,
+  };
+}
+
+export function tokenAddress(deployment: LaunchDeployment, asset: TradeAsset): Address {
+  return asset === "statics" ? deployment.contracts.statics : deployment.contracts.weth;
+}
+
+export function zeroForTrade(deployment: LaunchDeployment, input: TradeAsset): boolean {
+  const address = tokenAddress(deployment, input).toLowerCase();
+  if (deployment.market.poolKey.currency0.toLowerCase() === address) return true;
+  if (deployment.market.poolKey.currency1.toLowerCase() === address) return false;
+  throw new Error("The selected input is not part of the reviewed STATICS market.");
+}
+
+export function settlementForTrade(
+  deployment: LaunchDeployment,
+  direction: TradeDirection
+):
+  | Readonly<{ input: "erc20"; output: "erc20" }>
+  | Readonly<{ input: "native"; output: "erc20"; wrappedNative: Address }>
+  | Readonly<{ input: "erc20"; output: "native"; wrappedNative: Address }> {
+  if (direction.input === "eth") {
+    return { input: "native", output: "erc20", wrappedNative: deployment.contracts.weth };
+  }
+  if (direction.output === "eth") {
+    return { input: "erc20", output: "native", wrappedNative: deployment.contracts.weth };
+  }
+  return { input: "erc20", output: "erc20" };
+}
+
+export function maximumTokenApproval(spender: Address): Hex {
+  return encodeFunctionData({
+    abi: dopplerStaticsTokenAbi,
+    functionName: "approve",
+    args: [getAddress(spender), MAX_ERC20_ALLOWANCE],
+  });
+}

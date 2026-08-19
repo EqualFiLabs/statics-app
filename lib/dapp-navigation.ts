@@ -28,8 +28,7 @@ const routePresentations = {
     label: "Trade",
     status: "STATICS market",
     title: "Buy or sell STATICS",
-    description:
-      "Trade directly against the canonical STATICS market with a protected onchain quote.",
+    description: "Trade directly in the official STATICS market with a protected price quote.",
   },
   dollar: {
     label: "Dollar",

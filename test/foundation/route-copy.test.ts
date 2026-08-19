@@ -80,7 +80,7 @@ describe("dapp navigation grouping", () => {
   it("groups every route under a heading, except the home link", () => {
     const [first, ...rest] = appNavigationGroups;
     expect(first.label).toBeNull();
-    expect(first.items.map((item) => item.href)).toEqual(["/app"]);
+    expect(first.items.map((item) => item.href)).toEqual(["/app", "/app/trade"]);
     for (const group of rest) {
       expect(group.label, JSON.stringify(group.items)).toBeTruthy();
       expect(group.items.length).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(13);
+    expect(hrefs).toHaveLength(14);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -119,6 +119,7 @@ describe("sidebar completeness", () => {
   it("keeps the primary menu focused on destination surfaces", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
+      "Trade",
       "Earn",
       "Liquidity",
       "Baskets",

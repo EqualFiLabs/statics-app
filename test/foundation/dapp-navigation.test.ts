@@ -12,6 +12,7 @@ describe("DApp route presentation", () => {
 
   it.each([
     ["/app", "Overview", "Your portfolio"],
+    ["/app/trade", "Trade", "Buy or sell STATICS"],
     ["/app/wallet", "Wallet", "Your wallet"],
     ["/app/faucet", "Faucet", "Get testnet assets"],
     ["/app/portal", "Add funds", "Add funds to Statics"],

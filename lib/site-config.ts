@@ -122,7 +122,6 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         enabled: true,
         href: "/app/trade",
         capability: "canonical-statics-market",
-        tabLabel: "Trade",
       },
     ],
   },

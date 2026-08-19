@@ -16,7 +16,6 @@ export const DEPLOYMENT_STORAGE_KEY = "statics:active-deployment";
 
 const protocolCapabilities = [
   "overview",
-  "canonical-statics-market",
   "genesis-vault",
   "genesis-activation",
   "genesis-position-linking",
