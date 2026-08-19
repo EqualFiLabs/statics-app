@@ -438,7 +438,10 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
   const [fundingChainId, setFundingChainId] = useState(active.descriptor.chainId);
   const fundingNetwork =
     getFundingNetwork(fundingChainId) ?? getFundingNetwork(active.descriptor.chainId)!;
-  useEffect(() => setFundingChainId(active.descriptor.chainId), [active.descriptor.chainId]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setFundingChainId(active.descriptor.chainId), 0);
+    return () => window.clearTimeout(timeout);
+  }, [active.descriptor.chainId]);
   const value = useMemo<WalletState>(
     () => ({
       ...defaultWalletState,

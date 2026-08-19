@@ -81,13 +81,14 @@ describe("Statics indexer client", () => {
 
   it("requires launch responses to match the selected deployment", async () => {
     const fetch = vi.fn().mockImplementation(
-      async () => new Response(
-        JSON.stringify({
-          deploymentId: "robinhood-genesis",
-          items: [{ id: "42" }],
-          nextCursor: null,
-        })
-      )
+      async () =>
+        new Response(
+          JSON.stringify({
+            deploymentId: "robinhood-genesis",
+            items: [{ id: "42" }],
+            nextCursor: null,
+          })
+        )
     );
     vi.stubGlobal("fetch", fetch);
 
