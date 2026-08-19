@@ -26,6 +26,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
@@ -94,7 +95,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 args: [tier],
               })
             )
-          ),
+          ).then(oneIndexedGenesisTierCosts),
           wallet
             ? publicClient.readContract({
                 address: deployment.contracts.statics,
@@ -578,14 +579,16 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               args: [item.id],
                             })
                           );
-                          const currentCosts = await Promise.all(
-                            [1, 2, 3, 4].map((tier) =>
-                              publicClient.readContract({
-                                address: deployment.contracts.activationRegistry,
-                                abi: genesisActivationRegistryAbi,
-                                functionName: "tierCost",
-                                args: [tier],
-                              })
+                          const currentCosts = oneIndexedGenesisTierCosts(
+                            await Promise.all(
+                              [1, 2, 3, 4].map((tier) =>
+                                publicClient.readContract({
+                                  address: deployment.contracts.activationRegistry,
+                                  abi: genesisActivationRegistryAbi,
+                                  functionName: "tierCost",
+                                  args: [tier],
+                                })
+                              )
                             )
                           );
                           const currentCost = cumulativeGenesisActivationCost(
