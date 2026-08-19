@@ -138,6 +138,38 @@ npm run verify:connected:local
 These controls accept only chain `31337`, bounded typed inputs, and exact wallet addresses. They
 cannot submit arbitrary targets or calldata.
 
+## Robinhood mainnet launch fork
+
+The launch application can be exercised against a fresh deployment on a persistent local fork of
+Robinhood mainnet. The coordinator starts loopback-only Anvil, deploys the standalone Genesis and
+Doppler market through Robinhood's existing infrastructure, indexes all 5,555 vault-owned Genesis
+NFTs, and starts Next.js with a generated development-only manifest:
+
+```bash
+export STATICS_PROTOCOL_REPOSITORY=/path/to/statics
+export ROBINHOOD_MAINNET=https://your-server-only-robinhood-rpc.example
+npm run dev:launch-fork
+```
+
+`ROBINHOOD_MAINNET` is relayed through a temporary loopback endpoint so authenticated upstream RPC
+credentials are not exposed in the Anvil process arguments. The generated operator mnemonic and
+private key remain in process memory. Public session metadata, the isolated database, and the
+control socket are ephemeral local state under `.local/launch-fork`; none are written to
+`.env.local` or version control.
+
+While the stack is running:
+
+```bash
+npm run launch-fork:status
+npm run launch-fork:fund-wallet -- 0xYourWallet --eth 10 --statics 100000
+npm run launch-fork:generate-volume -- --eth 1 --cycles 5
+```
+
+These are fork-local balances and transactions. They do not move real ETH or change Robinhood
+mainnet. External bridge and aggregator funding surfaces are disabled in this mode; canonical
+STATICS/WETH trades still use the real Robinhood V4 contracts copied into the fork. The controls
+accept a fixed set of bounded operations and cannot submit arbitrary calldata.
+
 ## Robinhood testnet build
 
 The public beta loads contract addresses only from `deployments/46630.json`. Build configuration

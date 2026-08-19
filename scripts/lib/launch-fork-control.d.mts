@@ -1,0 +1,13 @@
+export type LaunchForkCommand =
+  | { action: "status" }
+  | {
+      action: "fund-wallet";
+      wallet: `0x${string}`;
+      eth: string;
+      weth: string;
+      statics: string;
+    }
+  | { action: "generate-volume"; eth: string; cycles: number };
+
+export function parseLaunchForkControl(action: string, arguments_: string[]): LaunchForkCommand;
+export function validateLaunchForkCommand(command: unknown): LaunchForkCommand;

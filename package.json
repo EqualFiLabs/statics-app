@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:connected": "node scripts/dev-connected.mjs",
+    "dev:launch-fork": "node scripts/dev-launch-fork.mjs",
     "config:privy:local": "node scripts/import-local-privy.mjs",
     "deploy:protocol:local": "node scripts/deploy-local-dollar.mjs",
     "deploy:dollar:local": "node scripts/deploy-local-dollar.mjs",
@@ -19,6 +20,9 @@
     "local:generate-rewards": "node scripts/local-control.mjs generate-rewards",
     "local:generate-lp-fees": "node scripts/local-control.mjs generate-lp-fees",
     "local:seed-recovery": "node scripts/local-control.mjs seed-recovery",
+    "launch-fork:status": "node scripts/launch-fork-control.mjs status",
+    "launch-fork:fund-wallet": "node scripts/launch-fork-control.mjs fund-wallet",
+    "launch-fork:generate-volume": "node scripts/launch-fork-control.mjs generate-volume",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
