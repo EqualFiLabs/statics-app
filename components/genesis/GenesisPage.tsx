@@ -27,6 +27,8 @@ import {
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
+import { StandaloneGenesisPage } from "@/components/genesis/StandaloneGenesisPage";
 
 const deploymentState = readClientDollarDeployment();
 
@@ -45,6 +47,17 @@ function describeGenesisError(error: unknown): string {
 }
 
 export function GenesisPage() {
+  const { active } = useDeployment();
+  if (active.deployment?.kind === "launch") {
+    return <StandaloneGenesisPage deployment={active.deployment} />;
+  }
+  if (active.deployment?.kind !== "protocol") {
+    return <UnconfiguredSurface subject="Genesis" />;
+  }
+  return <ProtocolGenesisPage />;
+}
+
+function ProtocolGenesisPage() {
   if (deploymentState.status !== "configured" || !deploymentState.deployment.genesis)
     return <UnconfiguredSurface subject="Genesis" />;
   return <GenesisWalletGate />;

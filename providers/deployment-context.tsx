@@ -10,7 +10,7 @@ import {
 } from "@/lib/deployments/registry";
 import type { DeploymentOption } from "@/lib/deployments/types";
 
-type DeploymentContextValue = Readonly<{
+export type DeploymentContextValue = Readonly<{
   active: DeploymentOption;
   options: readonly DeploymentOption[];
   selectDeployment: (deploymentId: string) => void;
@@ -24,7 +24,7 @@ const initial =
     throw new Error("At least one Statics deployment option is required.");
   })();
 
-const DeploymentContext = createContext<DeploymentContextValue>({
+export const DeploymentContext = createContext<DeploymentContextValue>({
   active: initial,
   options,
   selectDeployment: () => undefined,
