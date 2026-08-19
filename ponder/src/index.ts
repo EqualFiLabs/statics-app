@@ -7,6 +7,7 @@ import {
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
+  marketSwap,
   v4Position,
 } from "ponder:schema";
 
@@ -15,6 +16,7 @@ if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
 const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
+const canonicalPoolId = process.env.PONDER_CANONICAL_POOL_ID?.trim().toLowerCase();
 
 ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -230,5 +232,24 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
     amount: event.args.amount,
     cumulativeAmount: event.args.cumulativeAmount,
     blockNumber: event.block.number,
+  });
+});
+
+ponder.on("PoolManager:Swap", async ({ event, context }) => {
+  if (!canonicalPoolId || event.args.id.toLowerCase() !== canonicalPoolId) return;
+  await context.db.insert(marketSwap).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    poolId: event.args.id,
+    sender: getAddress(event.args.sender),
+    amount0: event.args.amount0,
+    amount1: event.args.amount1,
+    sqrtPriceX96: event.args.sqrtPriceX96,
+    liquidity: event.args.liquidity,
+    tick: event.args.tick,
+    fee: event.args.fee,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
   });
 });

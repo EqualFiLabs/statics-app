@@ -5,7 +5,8 @@ This Ponder service indexes discovery data that the UI cannot enumerate cheaply:
 - active loans and current Uniswap v4 PositionManager ownership for the full protocol;
 - Genesis ownership, Vault inventory, activation, registration, and effective weight;
 - Genesis and previous-owner launch reward claims; and
-- standalone launch fees harvested into the permanent fee receiver.
+- standalone launch fees harvested into the permanent fee receiver; and
+- canonical STATICS/WETH swap history from the selected PoolManager and PoolId.
 
 Run a separate process and database schema for each deployment. Both processes use the same
 config, schema, handlers, and API; `PONDER_DEPLOYMENT_ID`, `PONDER_CHAIN_ID`, addresses, start

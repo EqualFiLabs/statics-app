@@ -230,11 +230,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeId = getDappRouteId(currentPath);
-  const routeCopy = {
+  let routeCopy = {
     label: tRoutes(`${routeId}.label`),
     title: tRoutes(`${routeId}.title`),
     description: tRoutes(`${routeId}.description`),
   };
+  if (routeId === "overview" && active.descriptor.stage === "launch") {
+    routeCopy = {
+      label: "Overview",
+      title: "Statics Genesis",
+      description: active.descriptor.available
+        ? "Trade STATICS, acquire a fully backed Genesis NFT, activate it, and earn a share of launch fees."
+        : "The standalone Genesis launch will open here after its reviewed Robinhood Chain deployment is published.",
+    };
+  }
   const showOverviewSummary = isDappOverviewPath(currentPath);
   const showApprovalDisclosure = approvalDisclosureRoutes.some(
     (route) => currentPath === route || currentPath.startsWith(`${route}/`)
@@ -392,7 +401,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : (
             <EmptyState
               title="Not available in this deployment"
-              description={`${routeCopy.label} is not part of ${active.descriptor.label} on ${active.descriptor.network}. Choose the testnet full protocol to use this feature.`}
+              description={
+                active.descriptor.unavailableReason ??
+                (routeItem?.capability === "canonical-statics-market"
+                  ? `${routeCopy.label} is part of the Robinhood Chain Genesis launch. Choose that deployment to use this feature.`
+                  : `${routeCopy.label} is not part of ${active.descriptor.label} on ${active.descriptor.network}. Choose the testnet full protocol to use this feature.`)
+              }
             />
           )}
         </main>

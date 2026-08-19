@@ -72,3 +72,23 @@ export const harvestedFee = onchainTable(
   }),
   (table) => ({ asset: index().on(table.deploymentId, table.asset, table.blockNumber) })
 );
+
+export const marketSwap = onchainTable(
+  "market_swap",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    sender: table.hex().notNull(),
+    amount0: table.bigint().notNull(),
+    amount1: table.bigint().notNull(),
+    sqrtPriceX96: table.bigint().notNull(),
+    liquidity: table.bigint().notNull(),
+    tick: table.integer().notNull(),
+    fee: table.integer().notNull(),
+    transactionHash: table.hex().notNull(),
+    blockNumber: table.bigint().notNull(),
+    blockTimestamp: table.bigint().notNull(),
+  }),
+  (table) => ({ market: index().on(table.deploymentId, table.poolId, table.blockNumber) })
+);

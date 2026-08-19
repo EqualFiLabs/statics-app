@@ -48,6 +48,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { applyPercent, parseRecipientAddress } from "@/lib/protocol/ux";
 import { useDeployment } from "@/providers/deployment-context";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 
 const erc20Abi = [
   {
@@ -1007,10 +1008,14 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
     setError(null);
     try {
       const to = getAddress(recipient.trim());
+      if (active.deployment?.kind === "launch") {
+        await verifyLaunchDeployment(publicClient, active.deployment);
+      }
       await executeProtocolTransaction({
         publicClient,
         wallet: sender,
         chainId,
+        deploymentId: active.descriptor.deploymentId,
         kind: "transfer-nft",
         label: `Send ${nft.name}`,
         amount: nft.name,
@@ -1040,6 +1045,11 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
       {nft.carries.length > 0 && (
         <p className="wallet-nft-transfer-warning">
           <strong>{t("movesMore")}</strong> {t("cannotUndo", { assets: nft.carries.join(", ") })}
+        </p>
+      )}
+      {nft.transferWarning && (
+        <p className="wallet-nft-transfer-warning">
+          <strong>Genesis transfer consequence</strong> {nft.transferWarning}
         </p>
       )}
       {chainId && (

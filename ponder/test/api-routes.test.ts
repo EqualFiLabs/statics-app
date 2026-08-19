@@ -7,6 +7,7 @@ vi.mock("ponder:schema", () => ({
   genesisNft: {},
   genesisRewardClaim: {},
   harvestedFee: {},
+  marketSwap: {},
 }));
 
 import app from "../src/api";

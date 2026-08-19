@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { formatEther } from "viem";
+import { formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import {
+  dopplerStaticsTokenAbi,
   genesisLaunchDistributorAbi,
   staticsFeeReceiverAbi,
   staticsGenesisVaultAbi,
@@ -17,6 +18,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { useDeployment } from "@/providers/deployment-context";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { useWalletState } from "@/providers/wallet-context";
 
 export function DeploymentOverview() {
   const { active } = useDeployment();
@@ -47,43 +49,55 @@ export function DeploymentOverview() {
 
 function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
+  const walletState = useWalletState();
+  const wallet =
+    walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const metrics = useQuery({
-    queryKey: ["launch-overview", deployment.descriptor.deploymentId],
+    queryKey: ["launch-overview", deployment.descriptor.deploymentId, wallet],
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
       await verifyLaunchDeployment(publicClient, deployment);
-      const [vault, totalWeight, harvestedStatics, harvestedWeth, liquidity] = await Promise.all([
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "vaultAccounting",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.launchDistributor,
-          abi: genesisLaunchDistributorAbi,
-          functionName: "totalWeight",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.feeReceiver,
-          abi: staticsFeeReceiverAbi,
-          functionName: "cumulativeHarvested",
-          args: [deployment.contracts.statics],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.feeReceiver,
-          abi: staticsFeeReceiverAbi,
-          functionName: "cumulativeHarvested",
-          args: [deployment.contracts.weth],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.stateView,
-          abi: v4StateViewReadAbi,
-          functionName: "getLiquidity",
-          args: [deployment.market.poolId],
-        }),
-      ]);
-      return { vault, totalWeight, harvestedStatics, harvestedWeth, liquidity };
+      const [vault, totalWeight, harvestedStatics, harvestedWeth, liquidity, staticsBalance] =
+        await Promise.all([
+          publicClient.readContract({
+            address: deployment.contracts.vault,
+            abi: staticsGenesisVaultAbi,
+            functionName: "vaultAccounting",
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.launchDistributor,
+            abi: genesisLaunchDistributorAbi,
+            functionName: "totalWeight",
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.feeReceiver,
+            abi: staticsFeeReceiverAbi,
+            functionName: "cumulativeHarvested",
+            args: [deployment.contracts.statics],
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.feeReceiver,
+            abi: staticsFeeReceiverAbi,
+            functionName: "cumulativeHarvested",
+            args: [deployment.contracts.weth],
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.stateView,
+            abi: v4StateViewReadAbi,
+            functionName: "getLiquidity",
+            args: [deployment.market.poolId],
+          }),
+          wallet
+            ? publicClient.readContract({
+                address: deployment.contracts.statics,
+                abi: dopplerStaticsTokenAbi,
+                functionName: "balanceOf",
+                args: [wallet],
+              })
+            : 0n,
+        ]);
+      return { vault, totalWeight, harvestedStatics, harvestedWeth, liquidity, staticsBalance };
     },
   });
   return (
@@ -105,6 +119,20 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
         </div>
       </section>
       <section className="genesis-summary ui-card">
+        <div className="ui-stat">
+          <span className="ui-stat__label">Your STATICS</span>
+          <strong className="ui-stat__value">
+            {wallet && metrics.data ? formatEther(metrics.data.staticsBalance) : "—"}
+          </strong>
+        </div>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Vault backing</span>
+          <strong className="ui-stat__value">
+            {metrics.data
+              ? `${formatEther(metrics.data.vault.tokenBacking)} / ${formatEther(metrics.data.vault.requiredBacking)} STATICS`
+              : "—"}
+          </strong>
+        </div>
         <div className="ui-stat">
           <span className="ui-stat__label">Vault inventory</span>
           <strong className="ui-stat__value">

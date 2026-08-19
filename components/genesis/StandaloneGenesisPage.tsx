@@ -128,7 +128,9 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         ? await loadLaunchGenesisInventoryIds(deployment.descriptor.deploymentId).catch(() => [])
         : [];
       const candidates = indexed.length
-        ? indexed.slice(Math.max(0, inventoryStart - 1), inventoryStart + 11)
+        ? indexed
+            .filter((id) => id >= BigInt(inventoryStart) && id <= BigInt(inventoryStart + 11))
+            .slice(0, 12)
         : inventoryIds;
       const available = await publicClient.multicall({
         allowFailure: true,
@@ -282,16 +284,30 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
   const buy = async (id: bigint) => {
     if (!walletAction() || !wallet || !publicClient || !summary.data) return;
-    const [price, nativeFee] = await publicClient.readContract({
-      address: deployment.contracts.vault,
-      abi: staticsGenesisVaultAbi,
-      functionName: "quoteGenesisPurchase",
-    });
-    if (summary.data.staticsBalance < price) {
+    const [[price, nativeFee], staticsBalance, allowance] = await Promise.all([
+      publicClient.readContract({
+        address: deployment.contracts.vault,
+        abi: staticsGenesisVaultAbi,
+        functionName: "quoteGenesisPurchase",
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.statics,
+        abi: dopplerStaticsTokenAbi,
+        functionName: "balanceOf",
+        args: [wallet],
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.statics,
+        abi: dopplerStaticsTokenAbi,
+        functionName: "allowance",
+        args: [wallet, deployment.contracts.vault],
+      }),
+    ]);
+    if (staticsBalance < price) {
       setError("Buy STATICS first, then return to acquire this Genesis NFT.");
       return;
     }
-    if (summary.data.allowance < price) {
+    if (allowance < price) {
       await transact(`buy-${id}`, {
         publicClient,
         wallet,
@@ -554,13 +570,55 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       onClick={() => {
                         if (!walletAction() || !publicClient || !wallet) return;
                         const activate = async () => {
-                          const allowance = await publicClient.readContract({
-                            address: deployment.contracts.statics,
-                            abi: dopplerStaticsTokenAbi,
-                            functionName: "allowance",
-                            args: [wallet, deployment.contracts.activationRegistry],
-                          });
-                          if (allowance < cost) {
+                          const currentTier = Number(
+                            await publicClient.readContract({
+                              address: deployment.contracts.activationRegistry,
+                              abi: genesisActivationRegistryAbi,
+                              functionName: "tierOf",
+                              args: [item.id],
+                            })
+                          );
+                          const currentCosts = await Promise.all(
+                            [1, 2, 3, 4].map((tier) =>
+                              publicClient.readContract({
+                                address: deployment.contracts.activationRegistry,
+                                abi: genesisActivationRegistryAbi,
+                                functionName: "tierCost",
+                                args: [tier],
+                              })
+                            )
+                          );
+                          const currentCost = cumulativeGenesisActivationCost(
+                            currentCosts,
+                            currentTier,
+                            target
+                          );
+                          if (currentTier !== item.tier || currentCost !== cost) {
+                            setError(
+                              "The activation tier or cost changed. Review the refreshed values before confirming."
+                            );
+                            await refresh();
+                            return;
+                          }
+                          const [balance, allowance] = await Promise.all([
+                            publicClient.readContract({
+                              address: deployment.contracts.statics,
+                              abi: dopplerStaticsTokenAbi,
+                              functionName: "balanceOf",
+                              args: [wallet],
+                            }),
+                            publicClient.readContract({
+                              address: deployment.contracts.statics,
+                              abi: dopplerStaticsTokenAbi,
+                              functionName: "allowance",
+                              args: [wallet, deployment.contracts.activationRegistry],
+                            }),
+                          ]);
+                          if (balance < currentCost) {
+                            setError("Insufficient STATICS for this activation tier.");
+                            return;
+                          }
+                          if (allowance < currentCost) {
                             await transact(`activate-${item.id}`, {
                               publicClient,
                               wallet,
@@ -588,7 +646,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                             chainId: deployment.descriptor.chainId,
                             kind: "activate-genesis",
                             label: `Activate Genesis #${item.id} to tier ${target}`,
-                            amount: `${formatEther(cost)} STATICS burned`,
+                            amount: `${formatEther(currentCost)} STATICS burned`,
                             to: deployment.contracts.activationRegistry,
                             data: buildActivateGenesisCall(item.id, target),
                             sendTransaction: walletState.sendEvmTransaction,

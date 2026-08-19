@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt } from "ponder";
+import { and, asc, desc, eq, gt, lt } from "ponder";
 import { db } from "ponder:api";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -9,6 +9,7 @@ import {
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
+  marketSwap,
   v4Position,
 } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
@@ -209,6 +210,45 @@ app.get("/market/fees", async (context) => {
       amount: row.amount.toString(),
       cumulativeAmount: row.cumulativeAmount.toString(),
       blockNumber: row.blockNumber.toString(),
+    })),
+  });
+});
+
+app.get("/market/swaps", async (context) => {
+  const limit = readLimit(context.req.query("limit"));
+  if (limit === 0) return context.json({ error: "Invalid limit." }, 400);
+  const rows = await db
+    .select({
+      poolId: marketSwap.poolId,
+      sender: marketSwap.sender,
+      amount0: marketSwap.amount0,
+      amount1: marketSwap.amount1,
+      sqrtPriceX96: marketSwap.sqrtPriceX96,
+      liquidity: marketSwap.liquidity,
+      tick: marketSwap.tick,
+      fee: marketSwap.fee,
+      transactionHash: marketSwap.transactionHash,
+      blockNumber: marketSwap.blockNumber,
+      blockTimestamp: marketSwap.blockTimestamp,
+    })
+    .from(marketSwap)
+    .where(eq(marketSwap.deploymentId, deploymentId))
+    .orderBy(desc(marketSwap.blockNumber))
+    .limit(limit);
+  return context.json({
+    deploymentId,
+    items: rows.map((row) => ({
+      poolId: row.poolId,
+      sender: row.sender,
+      amount0: row.amount0.toString(),
+      amount1: row.amount1.toString(),
+      sqrtPriceX96: row.sqrtPriceX96.toString(),
+      liquidity: row.liquidity.toString(),
+      tick: row.tick,
+      fee: row.fee,
+      transactionHash: row.transactionHash,
+      blockNumber: row.blockNumber.toString(),
+      blockTimestamp: row.blockTimestamp.toString(),
     })),
   });
 });

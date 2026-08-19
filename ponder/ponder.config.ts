@@ -1,5 +1,5 @@
 import { createConfig } from "ponder";
-import { getAddress, zeroAddress } from "viem";
+import { getAddress, parseAbi, zeroAddress } from "viem";
 
 import {
   genesisActivationRegistryAbi,
@@ -35,6 +35,9 @@ if (!Number.isSafeInteger(chainId) || chainId <= 0) {
   throw new Error("PONDER_CHAIN_ID must be a positive integer.");
 }
 const deploymentStartBlock = optionalStartBlock("PONDER_DEPLOYMENT_START_BLOCK", 0);
+const poolManagerEventsAbi = parseAbi([
+  "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
+]);
 
 /**
  * One deployment per process. Run separate launch and testnet protocol
@@ -97,6 +100,12 @@ export default createConfig({
         "PONDER_STATICS_FEE_RECEIVER_START_BLOCK",
         deploymentStartBlock
       ),
+    },
+    PoolManager: {
+      chain: "active",
+      abi: poolManagerEventsAbi,
+      address: optionalAddress("PONDER_POOL_MANAGER_ADDRESS"),
+      startBlock: optionalStartBlock("PONDER_POOL_MANAGER_START_BLOCK", deploymentStartBlock),
     },
   },
 });
