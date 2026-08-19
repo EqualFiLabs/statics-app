@@ -604,6 +604,28 @@ mobile widths for:
 Executed local, fork, browser, testnet, and mainnet evidence must be reported
 separately.
 
+### Development-only Robinhood fork harness
+
+The application may accept a generated launch manifest only when both
+`NEXT_PUBLIC_APP_ENV=development` and `NEXT_PUBLIC_APP_NETWORK=robinhood-fork`. The manifest is
+process-local, identifies chain 4663 as a local fixture, and includes a runtime-code hash for every
+address consumed by the launch application. It is never a substitute for the reviewed production
+manifest.
+
+Because the local fork and Robinhood mainnet intentionally share chain ID 4663, chain ID alone is
+not a sufficient wallet-safety boundary. Before submitting a fixture transaction, the application
+must read the fixture STATICS runtime through the signer wallet's provider and compare it to the
+generated manifest. A wallet still connected to public Robinhood therefore fails closed even though
+its chain ID appears correct. Explorer links, third-party aggregator swaps, and external bridges are
+disabled for the fixture; the direct canonical market remains available.
+
+The supported local proof is one coordinator command that starts a loopback-only Robinhood fork,
+deploys the standalone launch contracts through the production-shaped Doppler initializer, starts an
+isolated Ponder instance, waits until all 5,555 vault-owned Genesis NFTs are indexed, and starts the
+application with the generated manifest. Its control socket exposes only status, bounded wallet
+funding, and bounded round-trip canonical trading. Fork funds are explicitly test-only, and the
+upstream RPC credential remains server-side.
+
 ## Implementation sequence
 
 The work should be delivered in bounded slices on top of Statics App PR #26.

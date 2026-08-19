@@ -46,6 +46,14 @@ const poolManagerEventsAbi = parseAbi([
  * no events, avoiding a second code path or cross-chain primary-key collision.
  */
 export default createConfig({
+  ...(process.env.PONDER_DATABASE_DIRECTORY?.trim()
+    ? {
+        database: {
+          kind: "pglite" as const,
+          directory: process.env.PONDER_DATABASE_DIRECTORY.trim(),
+        },
+      }
+    : {}),
   chains: {
     active: {
       id: chainId,

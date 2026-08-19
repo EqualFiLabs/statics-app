@@ -49,6 +49,7 @@
     },
     "items": {
       "overview": "概览",
+      "trade": "交易",
       "earn": "赚取",
       "genesis": "Genesis NFT",
       "liquidity": "流动性",

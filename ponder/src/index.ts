@@ -83,19 +83,27 @@ ponder.on("PositionManager:Transfer", async ({ event, context }) => {
 });
 
 ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
-  for (let id = event.args.fromTokenId; id <= event.args.toTokenId; id += 1n) {
-    await context.db.insert(genesisNft).values({
-      key: entityKey(id),
-      deploymentId,
-      id,
-      owner: getAddress(event.args.toAddress),
-      tier: 0,
-      multiplierBps: 10_000,
-      linkedPositionId: 0n,
-      registered: false,
-      effectiveWeight: 0n,
-      updatedAtBlock: event.block.number,
-    });
+  const owner = getAddress(event.args.toAddress);
+  const batchSize = 500n;
+  for (let start = event.args.fromTokenId; start <= event.args.toTokenId; start += batchSize) {
+    const end = start + batchSize - 1n;
+    const cappedEnd = end < event.args.toTokenId ? end : event.args.toTokenId;
+    const values = [];
+    for (let id = start; id <= cappedEnd; id += 1n) {
+      values.push({
+        key: entityKey(id),
+        deploymentId,
+        id,
+        owner,
+        tier: 0,
+        multiplierBps: 10_000,
+        linkedPositionId: 0n,
+        registered: false,
+        effectiveWeight: 0n,
+        updatedAtBlock: event.block.number,
+      });
+    }
+    await context.db.insert(genesisNft).values(values);
   }
 });
 

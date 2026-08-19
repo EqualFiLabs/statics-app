@@ -130,7 +130,7 @@ function CopyableReference({
   );
 }
 
-function protocolItem(activity: ProtocolActivity): UnifiedActivity {
+function protocolItem(activity: ProtocolActivity, suppressExplorer = false): UnifiedActivity {
   const reference = activity.confirmedHash ?? activity.replacementHash ?? activity.hash;
   return {
     id: `protocol:${activity.id}`,
@@ -141,7 +141,8 @@ function protocolItem(activity: ProtocolActivity): UnifiedActivity {
     statusClass: activity.status,
     createdAt: activity.createdAt,
     reference,
-    explorerUrl: reference ? evmExplorerUrl(activity.chainId, reference) : null,
+    explorerUrl:
+      reference && !suppressExplorer ? evmExplorerUrl(activity.chainId, reference) : null,
     originalReference: activity.replacementHash && activity.hash ? activity.hash : undefined,
     error: activity.error,
   };
@@ -201,6 +202,8 @@ export function ActivityPage() {
   const t = useTranslations("activity");
   const wallet = useWalletState();
   const { active } = useDeployment();
+  const localFork =
+    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
   const solana = useSolanaWalletState();
   const evmAddress =
     wallet.address && isAddress(wallet.address) ? getAddress(wallet.address) : null;
@@ -261,13 +264,13 @@ export function ActivityPage() {
   const activity = useMemo(
     () =>
       [
-        ...protocolActivity.map(protocolItem),
+        ...protocolActivity.map((item) => protocolItem(item, localFork)),
         ...bridgeActivity.map(bridgeItem),
         ...solanaActivity.map(solanaItem),
       ]
         .sort((left, right) => right.createdAt - left.createdAt)
         .slice(0, 100),
-    [bridgeActivity, protocolActivity, solanaActivity]
+    [bridgeActivity, localFork, protocolActivity, solanaActivity]
   );
 
   useEffect(() => {

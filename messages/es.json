@@ -49,6 +49,7 @@
     },
     "items": {
       "overview": "Resumen",
+      "trade": "Operar",
       "earn": "Ganar",
       "genesis": "Genesis NFT",
       "liquidity": "Liquidez",

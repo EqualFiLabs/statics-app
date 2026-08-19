@@ -5,6 +5,7 @@ import { v4PoolId } from "@statics-protocol/sdk";
 
 import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
 import {
+  LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
   ROBINHOOD_GENESIS_DEPLOYMENT_ID,
   ROBINHOOD_TESTNET_PROTOCOL_DEPLOYMENT_ID,
   defaultDeploymentId,
@@ -56,6 +57,52 @@ describe("deployment registry", () => {
   it("defaults production to Genesis and local development to the testnet protocol", () => {
     expect(defaultDeploymentId("production")).toBe(ROBINHOOD_GENESIS_DEPLOYMENT_ID);
     expect(defaultDeploymentId("development")).toBe(ROBINHOOD_TESTNET_PROTOCOL_DEPLOYMENT_ID);
+    expect(defaultDeploymentId("development", "robinhood-fork")).toBe(
+      LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID
+    );
+  });
+
+  it("loads a complete local launch manifest only in explicit development fork mode", () => {
+    const local = {
+      ...launchManifest(),
+      deploymentId: LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
+      network: "Local Robinhood fork",
+    };
+    const environment = {
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
+      NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(local),
+    };
+    const [fixture, mainnet, testnet] = deploymentRegistry(environment);
+    expect(fixture?.deployment?.kind).toBe("launch");
+    if (fixture?.deployment?.kind !== "launch") throw new Error("Expected a launch fixture.");
+    expect(fixture.deployment.source).toBe("development-fixture");
+    expect(fixture?.descriptor.deploymentId).toBe(LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID);
+    expect(mainnet?.descriptor.available).toBe(false);
+    expect(testnet?.descriptor.chainId).toBe(46_630);
+
+    expect(() => deploymentRegistry({ ...environment, NEXT_PUBLIC_APP_ENV: "production" })).toThrow(
+      "only allowed in development"
+    );
+  });
+
+  it("rejects incomplete local runtime identity", () => {
+    const local = launchManifest();
+    const incomplete = {
+      ...local,
+      deploymentId: LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
+      contracts: {
+        ...local.contracts,
+        statics: { address: local.contracts.statics.address },
+      },
+    };
+    expect(() =>
+      deploymentRegistry({
+        NEXT_PUBLIC_APP_ENV: "development",
+        NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
+        NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(incomplete),
+      })
+    ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
   it("keeps mainnet unavailable until a reviewed manifest is checked in", () => {

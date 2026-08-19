@@ -1,7 +1,7 @@
 import { defineChain, http, type Chain, type Transport } from "viem";
 
 export type WalletAppEnvironment = "development" | "staging" | "production";
-export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
+export type WalletNetwork = "robinhood" | "robinhood-testnet" | "robinhood-fork" | "anvil";
 
 const ROBINHOOD_TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com";
 const ROBINHOOD_MAINNET_RPC = "https://rpc.mainnet.chain.robinhood.com";
@@ -58,13 +58,35 @@ function parseNetwork(
   appEnvironment: WalletAppEnvironment
 ): WalletNetwork {
   const network = value || "robinhood-testnet";
-  if (network !== "robinhood" && network !== "robinhood-testnet" && network !== "anvil") {
-    throw new Error("NEXT_PUBLIC_APP_NETWORK must be robinhood, robinhood-testnet, or anvil.");
+  if (
+    network !== "robinhood" &&
+    network !== "robinhood-testnet" &&
+    network !== "robinhood-fork" &&
+    network !== "anvil"
+  ) {
+    throw new Error(
+      "NEXT_PUBLIC_APP_NETWORK must be robinhood, robinhood-testnet, robinhood-fork, or anvil."
+    );
   }
-  if (network === "anvil" && appEnvironment !== "development") {
-    throw new Error("Anvil is only available when NEXT_PUBLIC_APP_ENV is development.");
+  if ((network === "anvil" || network === "robinhood-fork") && appEnvironment !== "development") {
+    throw new Error("Local chains are only available when NEXT_PUBLIC_APP_ENV is development.");
   }
   return network;
+}
+
+function isLoopbackUrl(value: string): boolean {
+  const hostname = new URL(value).hostname.toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+function robinhoodFork(rpcUrl: string): Chain {
+  return defineChain({
+    id: 4_663,
+    name: "Local Robinhood fork",
+    nativeCurrency: { name: "Fork Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [rpcUrl] } },
+    testnet: true,
+  });
 }
 
 function parsePublicRpc(value: string | undefined, variableName: string): string | null {
@@ -90,6 +112,7 @@ export type WalletEnvironment = Readonly<{
   clientId: string | null;
   robinhoodRpcUrl: string;
   robinhoodTestnetRpcUrl: string;
+  robinhoodForkRpcUrl: string | null;
   anvilRpcUrl: string;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
@@ -115,6 +138,10 @@ export function readWalletEnvironment(
     environment.NEXT_PUBLIC_ANVIL_RPC_URL,
     "NEXT_PUBLIC_ANVIL_RPC_URL"
   );
+  const configuredRobinhoodForkRpc = parsePublicRpc(
+    environment.NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL,
+    "NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL"
+  );
 
   if (appEnvironment !== "development" && !appId) {
     throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
@@ -129,9 +156,26 @@ export function readWalletEnvironment(
   ) {
     throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required for Robinhood testnet.");
   }
+  if (network === "robinhood-fork") {
+    if (!configuredRobinhoodForkRpc) {
+      throw new Error("NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL is required for the local fork.");
+    }
+    if (!isLoopbackUrl(configuredRobinhoodForkRpc)) {
+      throw new Error("NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL must be loopback-only.");
+    }
+  }
 
+  const forkChain = configuredRobinhoodForkRpc ? robinhoodFork(configuredRobinhoodForkRpc) : null;
   const defaultChain =
-    network === "anvil" ? anvil : network === "robinhood" ? robinhoodMainnet : robinhoodTestnet;
+    network === "anvil"
+      ? anvil
+      : network === "robinhood-fork"
+        ? forkChain!
+        : network === "robinhood"
+          ? robinhoodMainnet
+          : robinhoodTestnet;
+  const publicRobinhoodChains =
+    network === "robinhood-fork" ? [robinhoodTestnet] : [robinhoodMainnet, robinhoodTestnet];
   return {
     appEnvironment,
     network,
@@ -139,18 +183,26 @@ export function readWalletEnvironment(
     clientId,
     robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
+    robinhoodForkRpcUrl: configuredRobinhoodForkRpc,
     anvilRpcUrl: configuredAnvilRpc ?? "http://127.0.0.1:8545/",
     defaultChain,
     supportedChains: [
       defaultChain,
-      ...[robinhoodMainnet, robinhoodTestnet].filter((chain) => chain.id !== defaultChain.id),
+      ...publicRobinhoodChains.filter((chain) => chain.id !== defaultChain.id),
       ...(appEnvironment === "development" && defaultChain.id !== anvil.id ? [anvil] : []),
     ] as [Chain, ...Chain[]],
     configured: Boolean(appId),
   };
 }
 
-export function getStaticsChain(chainId: number): Chain | null {
+export function getStaticsChain(chainId: number, environment?: WalletEnvironment): Chain | null {
+  if (
+    chainId === robinhoodMainnet.id &&
+    environment?.network === "robinhood-fork" &&
+    environment.defaultChain.id === chainId
+  ) {
+    return environment.defaultChain;
+  }
   if (chainId === robinhoodMainnet.id) return robinhoodMainnet;
   if (chainId === robinhoodTestnet.id) return robinhoodTestnet;
   if (chainId === anvil.id) return anvil;
@@ -160,7 +212,11 @@ export function getStaticsChain(chainId: number): Chain | null {
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
   const batchedHttp = (url: string) => http(url, { batch: { batchSize: 50, wait: 8 } });
   const transports: Record<number, Transport> = {
-    [robinhoodMainnet.id]: batchedHttp(environment.robinhoodRpcUrl),
+    [robinhoodMainnet.id]: batchedHttp(
+      environment.network === "robinhood-fork"
+        ? environment.robinhoodForkRpcUrl!
+        : environment.robinhoodRpcUrl
+    ),
     [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),
   };
   if (environment.appEnvironment === "development") {

@@ -11,6 +11,7 @@ import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
 
 export type PortalMode = "swap" | "bridge";
 
@@ -25,10 +26,32 @@ export function PortalWorkspace({
 }) {
   const t = useTranslations("portal");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  const localFork =
+    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
   const [mode, setMode] = useState<PortalMode>(initialMode);
   const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const slippage = usePortalSlippage();
+
+  if (localFork) {
+    return (
+      <section className={`portal-workspace${compact ? " is-compact" : ""}`}>
+        <div className="portal-panel" role="status">
+          <p className="dapp-section-label">Local fork funding</p>
+          <h2>Use fork-only test funds</h2>
+          <p>
+            External swaps and bridges are disabled in this isolated Robinhood fork. Fund a
+            connected address from this terminal, then use the canonical Trade page.
+          </p>
+          <code>npm run launch-fork:fund-wallet -- 0xYourWallet --eth 10 --statics 100000</code>
+          <Link className="portal-primary-action" href="/app/trade">
+            Open canonical Trade →
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={`portal-workspace${compact ? " is-compact" : ""}`}>

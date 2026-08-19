@@ -32,6 +32,7 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
+import { verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
 import {
   queryMatchesProtocolReconciliation,
@@ -52,6 +53,7 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
   NEXT_PUBLIC_ROBINHOOD_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
   NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
+  NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
 });
 const transports = createWalletTransports(walletEnvironment);
@@ -60,8 +62,8 @@ const wagmiConfig = createConfig({
   transports,
 });
 const privySupportedChains = [
-  ...fundingNetworks.map((network) => network.chain),
   ...walletEnvironment.supportedChains,
+  ...fundingNetworks.map((network) => network.chain),
 ].filter(
   (chain, index, chains) => chains.findIndex((candidate) => candidate.id === chain.id) === index
 );
@@ -71,6 +73,9 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
   nativeSymbol: network.chain.nativeCurrency.symbol,
   supportsUniswap: network.supportsUniswap,
 }));
+const localForkFundingNetworks = [
+  { chainId: 4_663, label: "Local Robinhood fork", nativeSymbol: "ETH", supportsUniswap: false },
+] as const;
 const fundingChainStorageKey = (deploymentId: string) => `statics:funding-chain:${deploymentId}`;
 
 function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
@@ -120,22 +125,26 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
       ? (wagmiAccount.chainId ?? null)
       : null);
-  const targetChain = getStaticsChain(active.descriptor.chainId) ?? walletEnvironment.defaultChain;
+  const targetChain =
+    getStaticsChain(active.descriptor.chainId, walletEnvironment) ?? walletEnvironment.defaultChain;
+  const localFork =
+    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
+  const activeFundingNetworks = localFork ? localForkFundingNetworks : fundingNetworkSummaries;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const stored = Number(
         window.localStorage.getItem(fundingChainStorageKey(active.descriptor.deploymentId))
       );
-      if (Number.isSafeInteger(stored) && isFundingChainId(stored)) {
+      if (!localFork && Number.isSafeInteger(stored) && isFundingChainId(stored)) {
         setFundingChainId(stored);
       } else {
         setFundingChainId(active.descriptor.chainId);
       }
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [active.descriptor.chainId, active.descriptor.deploymentId]);
+  }, [active.descriptor.chainId, active.descriptor.deploymentId, localFork]);
 
   useEffect(() => {
     if (!requestedExternalAddress) return;
@@ -234,10 +243,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
       fundingChainId,
-      fundingNetworkName: fundingNetwork.label,
+      fundingNetworkName: localFork ? "Local Robinhood fork" : fundingNetwork.label,
       fundingWalletOnSelectedChain: chainId === fundingChainId,
-      fundingNetworks: fundingNetworkSummaries,
-      explorerUrl: address ? getAddressExplorerUrl(targetChain, address) : null,
+      fundingNetworks: activeFundingNetworks,
+      explorerUrl: address && !localFork ? getAddressExplorerUrl(targetChain, address) : null,
       error: actionError ?? privyError?.message ?? null,
       busyAction,
       locallyDisconnected,
@@ -274,6 +283,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }),
       selectFundingNetwork: (nextChainId) =>
         runAction("funding-switch", async () => {
+          if (localFork && nextChainId !== active.descriptor.chainId) {
+            throw new Error("External funding networks are disabled in local fork mode.");
+          }
           const nextNetwork = getFundingNetwork(nextChainId);
           if (!nextNetwork) throw new Error("Choose a supported funding network.");
           setFundingChainId(nextChainId);
@@ -295,6 +307,11 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }
         if (chainId !== request.chainId) {
           throw new Error("Switch the connected wallet to the transaction network.");
+        }
+
+        const provider = await selectedWallet.getEthereumProvider();
+        if (localFork && active.deployment?.kind === "launch") {
+          await verifyLocalForkWalletProvider(provider, active.deployment);
         }
 
         if (walletKind === "embedded") {
@@ -327,18 +344,20 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           return result.hash;
         }
 
-        const transactionNetwork = getFundingNetwork(request.chainId);
-        if (!transactionNetwork) throw new Error("The transaction network is not supported.");
-
-        const provider = await selectedWallet.getEthereumProvider();
+        const fundingTransactionNetwork = getFundingNetwork(request.chainId);
+        const transactionChain =
+          request.chainId === active.descriptor.chainId
+            ? targetChain
+            : fundingTransactionNetwork?.chain;
+        if (!transactionChain) throw new Error("The transaction network is not supported.");
         const client = createWalletClient({
           account: request.wallet,
-          chain: transactionNetwork.chain,
+          chain: transactionChain,
           transport: custom(provider),
         });
         return client.sendTransaction({
           account: request.wallet,
-          chain: transactionNetwork.chain,
+          chain: transactionChain,
           to: request.to,
           data: request.data,
           value: request.value,
@@ -368,6 +387,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
+      active.deployment,
+      active.descriptor.chainId,
       active.descriptor.deploymentId,
       promptExternalWallet,
       privyError,
@@ -377,6 +398,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       sendEmbeddedTransaction,
       status,
       targetChain,
+      localFork,
+      activeFundingNetworks,
       walletKind,
     ]
   );
