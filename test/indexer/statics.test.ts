@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   loadRecoverableLoanIds,
+  loadLaunchGenesisInventoryIds,
+  loadWalletLaunchGenesisIds,
   loadWalletGenesis,
   loadWalletV4PositionIds,
 } from "@/lib/indexer/statics";
@@ -75,5 +77,25 @@ describe("Statics indexer client", () => {
         linkedPositionId: 9n,
       },
     ]);
+  });
+
+  it("requires launch responses to match the selected deployment", async () => {
+    const fetch = vi.fn().mockImplementation(
+      async () => new Response(
+        JSON.stringify({
+          deploymentId: "robinhood-genesis",
+          items: [{ id: "42" }],
+          nextCursor: null,
+        })
+      )
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(
+      loadLaunchGenesisInventoryIds("robinhood-genesis", "https://mainnet-indexer.example")
+    ).resolves.toEqual([42n]);
+    await expect(
+      loadWalletLaunchGenesisIds(wallet, "wrong-deployment", "https://mainnet-indexer.example")
+    ).rejects.toThrow("different deployment");
   });
 });

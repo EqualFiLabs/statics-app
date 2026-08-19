@@ -25,6 +25,19 @@ function configuredIndexerUrl(): string | null {
   }
 }
 
+export function configuredIndexerUrlForDeployment(deploymentId: string): string | null {
+  const value =
+    deploymentId === "robinhood-genesis"
+      ? process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL?.trim()
+      : process.env.NEXT_PUBLIC_STATICS_INDEXER_URL?.trim();
+  if (!value) return null;
+  try {
+    return new URL(value).toString().replace(/\/$/, "");
+  } catch {
+    throw new Error("The deployment indexer URL must be a valid URL.");
+  }
+}
+
 function parseId(value: string): bigint {
   if (!/^\d+$/.test(value)) throw new Error("The Statics indexer returned an invalid ID.");
   return BigInt(value);
@@ -54,6 +67,62 @@ async function loadIds(path: string, indexerUrl = configuredIndexerUrl()): Promi
     cursor = body.nextCursor;
   }
   throw new Error("The Statics indexer exceeded its pagination limit.");
+}
+
+async function loadDeploymentIds(
+  path: string,
+  deploymentId: string,
+  indexerUrl = configuredIndexerUrlForDeployment(deploymentId)
+): Promise<bigint[]> {
+  if (!indexerUrl) throw new Error("No indexer is configured for this deployment.");
+  const values: bigint[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const url = new URL(`${indexerUrl}${path}`);
+    url.searchParams.set("limit", String(DEFAULT_PAGE_SIZE));
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
+    const body = (await response.json()) as IdPage & { deploymentId?: string };
+    if (body.deploymentId !== deploymentId) {
+      throw new Error("The Statics indexer returned data for a different deployment.");
+    }
+    if (
+      !Array.isArray(body.items) ||
+      !(body.nextCursor === null || typeof body.nextCursor === "string")
+    ) {
+      throw new Error("The Statics indexer returned an invalid page.");
+    }
+    values.push(...body.items.map((item) => parseId(item.id)));
+    if (!body.nextCursor) return [...new Set(values.map(String))].map(BigInt);
+    if (body.nextCursor === cursor)
+      throw new Error("The Statics indexer returned a stalled cursor.");
+    cursor = body.nextCursor;
+  }
+  throw new Error("The Statics indexer exceeded its pagination limit.");
+}
+
+export function loadLaunchGenesisInventoryIds(
+  deploymentId: string,
+  indexerUrl?: string | null
+): Promise<bigint[]> {
+  return loadDeploymentIds(
+    "/genesis/inventory",
+    deploymentId,
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl
+  );
+}
+
+export function loadWalletLaunchGenesisIds(
+  owner: Address,
+  deploymentId: string,
+  indexerUrl?: string | null
+): Promise<bigint[]> {
+  return loadDeploymentIds(
+    `/wallets/${getAddress(owner)}/genesis`,
+    deploymentId,
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl
+  );
 }
 
 export async function loadRecoverableLoanIds(

@@ -26,6 +26,11 @@ import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import {
+  configuredIndexerUrlForDeployment,
+  loadLaunchGenesisInventoryIds,
+  loadWalletLaunchGenesisIds,
+} from "@/lib/indexer/statics";
 import { useWalletState } from "@/providers/wallet-context";
 
 type GenesisView = "explore" | "mine" | "rewards";
@@ -43,6 +48,9 @@ async function walletGenesisIds(
   deployment: LaunchDeployment,
   owner: Address
 ): Promise<bigint[]> {
+  const indexed = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId)
+    ? await loadWalletLaunchGenesisIds(owner, deployment.descriptor.deploymentId).catch(() => [])
+    : [];
   const logs = await publicClient.getLogs({
     address: deployment.contracts.genesis,
     event: staticsGenesisAbi.find(
@@ -54,9 +62,12 @@ async function walletGenesisIds(
   });
   const ids = [
     ...new Set(
-      parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" }).map((log) =>
-        log.args.tokenId.toString()
-      )
+      [
+        ...indexed,
+        ...parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" }).map(
+          (log) => log.args.tokenId
+        ),
+      ].map(String)
     ),
   ].map(BigInt);
   const current = await publicClient.multicall({
@@ -153,16 +164,22 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     enabled: Boolean(publicClient) && view === "explore",
     queryFn: async () => {
       if (!publicClient) return [];
+      const indexed = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId)
+        ? await loadLaunchGenesisInventoryIds(deployment.descriptor.deploymentId).catch(() => [])
+        : [];
+      const candidates = indexed.length
+        ? indexed.slice(Math.max(0, inventoryStart - 1), inventoryStart + 11)
+        : inventoryIds;
       const available = await publicClient.multicall({
         allowFailure: true,
-        contracts: inventoryIds.map((id) => ({
+        contracts: candidates.map((id) => ({
           address: deployment.contracts.vault,
           abi: staticsGenesisVaultAbi,
           functionName: "isVaultInventory" as const,
           args: [id] as const,
         })),
       });
-      return inventoryIds.filter(
+      return candidates.filter(
         (_, index) => available[index]?.status === "success" && available[index].result === true
       );
     },

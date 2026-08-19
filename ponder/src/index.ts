@@ -1,8 +1,20 @@
 import { ponder } from "ponder:registry";
-import { staticsAbi } from "@statics-protocol/sdk";
-import { getAddress } from "viem";
+import { genesisActivationRegistryAbi, staticsAbi } from "@statics-protocol/sdk";
+import { getAddress, zeroAddress } from "viem";
 
-import { activeLoan, genesisNft, v4Position } from "ponder:schema";
+import {
+  activeLoan,
+  genesisNft,
+  genesisRewardClaim,
+  harvestedFee,
+  v4Position,
+} from "ponder:schema";
+
+const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim();
+if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
+const entityKey = (id: bigint) => `${deploymentId}:${id}`;
+const eventKey = (transactionHash: string, logIndex: number) =>
+  `${deploymentId}:${transactionHash}:${logIndex}`;
 
 ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -13,6 +25,8 @@ ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
     blockNumber: event.block.number,
   });
   await context.db.insert(activeLoan).values({
+    key: entityKey(event.args.loanId),
+    deploymentId,
     id: event.args.loanId,
     positionId: event.args.positionId,
     basketId: event.args.basketId,
@@ -30,7 +44,7 @@ ponder.on("Statics:LoanExtended", async ({ event, context }) => {
     functionName: "recoveryGracePeriod",
     blockNumber: event.block.number,
   });
-  await context.db.update(activeLoan, { id: event.args.loanId }).set({
+  await context.db.update(activeLoan, { key: entityKey(event.args.loanId) }).set({
     maturity,
     recoverableAt: maturity + recoveryGracePeriod,
     updatedAtBlock: event.block.number,
@@ -38,21 +52,24 @@ ponder.on("Statics:LoanExtended", async ({ event, context }) => {
 });
 
 ponder.on("Statics:LoanRepaid", async ({ event, context }) => {
-  await context.db.delete(activeLoan, { id: event.args.loanId });
+  await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
 ponder.on("Statics:LoanRecovered", async ({ event, context }) => {
-  await context.db.delete(activeLoan, { id: event.args.loanId });
+  await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
 ponder.on("PositionManager:Transfer", async ({ event, context }) => {
-  if (event.args.to === "0x0000000000000000000000000000000000000000") {
-    await context.db.delete(v4Position, { id: event.args.tokenId });
+  const key = entityKey(event.args.tokenId);
+  if (event.args.to === zeroAddress) {
+    await context.db.delete(v4Position, { key });
     return;
   }
   await context.db
     .insert(v4Position)
     .values({
+      key,
+      deploymentId,
       id: event.args.tokenId,
       owner: getAddress(event.args.to),
       updatedAtBlock: event.block.number,
@@ -66,29 +83,38 @@ ponder.on("PositionManager:Transfer", async ({ event, context }) => {
 ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
   for (let id = event.args.fromTokenId; id <= event.args.toTokenId; id += 1n) {
     await context.db.insert(genesisNft).values({
+      key: entityKey(id),
+      deploymentId,
       id,
       owner: getAddress(event.args.toAddress),
       tier: 0,
       multiplierBps: 10_000,
       linkedPositionId: 0n,
+      registered: false,
+      effectiveWeight: 0n,
       updatedAtBlock: event.block.number,
     });
   }
 });
 
 ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
-  if (event.args.to === "0x0000000000000000000000000000000000000000") {
-    await context.db.delete(genesisNft, { id: event.args.tokenId });
+  const key = entityKey(event.args.tokenId);
+  if (event.args.to === zeroAddress) {
+    await context.db.delete(genesisNft, { key });
     return;
   }
   await context.db
     .insert(genesisNft)
     .values({
+      key,
+      deploymentId,
       id: event.args.tokenId,
       owner: getAddress(event.args.to),
       tier: 0,
       multiplierBps: 10_000,
       linkedPositionId: 0n,
+      registered: false,
+      effectiveWeight: 0n,
       updatedAtBlock: event.block.number,
     })
     .onConflictDoUpdate({
@@ -101,7 +127,7 @@ ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
 });
 
 ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
-  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: Number(event.args.newTier),
     multiplierBps: Number(event.args.multiplierBps),
     updatedAtBlock: event.block.number,
@@ -109,24 +135,100 @@ ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
 });
 
 ponder.on("Statics:GenesisLinked", async ({ event, context }) => {
-  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: event.args.positionId,
     updatedAtBlock: event.block.number,
   });
 });
 
 ponder.on("Statics:GenesisUnlinked", async ({ event, context }) => {
-  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: 0n,
     updatedAtBlock: event.block.number,
   });
 });
 
 ponder.on("Statics:GenesisActivationReset", async ({ event, context }) => {
-  await context.db.update(genesisNft, { id: event.args.genesisId }).set({
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: 0,
     multiplierBps: 10_000,
     linkedPositionId: 0n,
     updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("GenesisActivationRegistry:GenesisActivated", async ({ event, context }) => {
+  const multiplierBps = await context.client.readContract({
+    address: event.log.address,
+    abi: genesisActivationRegistryAbi,
+    functionName: "multiplierBps",
+    args: [event.args.genesisId],
+    blockNumber: event.block.number,
+  });
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
+    tier: Number(event.args.newTier),
+    multiplierBps: Number(multiplierBps),
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("GenesisActivationRegistry:GenesisActivationReset", async ({ event, context }) => {
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
+    tier: 0,
+    multiplierBps: 10_000,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("GenesisLaunchDistributor:GenesisRegistered", async ({ event, context }) => {
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
+    registered: true,
+    effectiveWeight: event.args.weight,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("GenesisLaunchDistributor:GenesisWeightChanged", async ({ event, context }) => {
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
+    effectiveWeight: event.args.newWeight,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+ponder.on("GenesisLaunchDistributor:GenesisRewardsClaimed", async ({ event, context }) => {
+  await context.db.insert(genesisRewardClaim).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    genesisId: event.args.genesisId,
+    owner: getAddress(event.args.owner),
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    previousOwnerClaim: false,
+    blockNumber: event.block.number,
+  });
+});
+
+ponder.on("GenesisLaunchDistributor:OwnerRewardsClaimed", async ({ event, context }) => {
+  await context.db.insert(genesisRewardClaim).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    genesisId: null,
+    owner: getAddress(event.args.owner),
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    previousOwnerClaim: true,
+    blockNumber: event.block.number,
+  });
+});
+
+ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
+  await context.db.insert(harvestedFee).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    distributor: getAddress(event.args.distributor),
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    cumulativeAmount: event.args.cumulativeAmount,
+    blockNumber: event.block.number,
   });
 });

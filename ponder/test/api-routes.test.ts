@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("ponder:api", () => ({ db: {} }));
-vi.mock("ponder:schema", () => ({ activeLoan: {}, v4Position: {} }));
+vi.mock("ponder:schema", () => ({
+  activeLoan: {},
+  v4Position: {},
+  genesisNft: {},
+  genesisRewardClaim: {},
+  harvestedFee: {},
+}));
 
 import app from "../src/api";
 
