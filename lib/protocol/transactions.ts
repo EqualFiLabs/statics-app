@@ -10,6 +10,7 @@ import {
 } from "viem";
 
 import {
+  activeActivityDeploymentId,
   updateProtocolActivity,
   writeProtocolActivity,
   type ProtocolActivityKind,
@@ -55,6 +56,7 @@ export type ProtocolTransactionRequest = Readonly<{
   publicClient: PublicClient;
   wallet: Address;
   chainId: number;
+  deploymentId?: string;
   kind: ProtocolActivityKind;
   label: string;
   amount: string;
@@ -207,6 +209,7 @@ export async function executeProtocolTransaction(
   request: ProtocolTransactionRequest
 ): Promise<Hex> {
   const id = crypto.randomUUID();
+  const deploymentId = request.deploymentId ?? activeActivityDeploymentId();
   let stage: "simulating" | "signing" | "submitted" | "finished" = "simulating";
   let replacementReason: ProtocolReplacementReason | undefined;
 
@@ -214,6 +217,7 @@ export async function executeProtocolTransaction(
     id,
     wallet: request.wallet,
     chainId: request.chainId,
+    deploymentId,
     kind: request.kind,
     label: request.label,
     amount: request.amount,
@@ -238,7 +242,13 @@ export async function executeProtocolTransaction(
       })
     );
     stage = "signing";
-    updateProtocolActivity(request.wallet, request.chainId, id, { status: "signing" });
+    updateProtocolActivity(
+      request.wallet,
+      request.chainId,
+      id,
+      { status: "signing" },
+      deploymentId
+    );
 
     const hash = await request.sendTransaction({
       wallet: request.wallet,
@@ -250,10 +260,16 @@ export async function executeProtocolTransaction(
       presentation: request.presentation ?? defaultProtocolPresentation(request),
     });
     stage = "submitted";
-    updateProtocolActivity(request.wallet, request.chainId, id, {
-      hash,
-      status: "submitted",
-    });
+    updateProtocolActivity(
+      request.wallet,
+      request.chainId,
+      id,
+      {
+        hash,
+        status: "submitted",
+      },
+      deploymentId
+    );
     // Cross-chain activity needs the source hash before confirmation so a
     // reload cannot make a submitted transfer undiscoverable.
     try {
@@ -268,11 +284,17 @@ export async function executeProtocolTransaction(
       confirmations: 1,
       onReplaced: (replacement) => {
         replacementReason = replacement.reason;
-        updateProtocolActivity(request.wallet, request.chainId, id, {
-          status: "replaced",
-          replacementHash: replacement.transaction.hash,
-          replacementReason,
-        });
+        updateProtocolActivity(
+          request.wallet,
+          request.chainId,
+          id,
+          {
+            status: "replaced",
+            replacementHash: replacement.transaction.hash,
+            replacementReason,
+          },
+          deploymentId
+        );
       },
     });
     if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
@@ -282,11 +304,17 @@ export async function executeProtocolTransaction(
           ? "The submitted transaction was cancelled in the wallet."
           : "The submitted transaction was replaced by a different wallet transaction.";
       stage = "finished";
-      updateProtocolActivity(request.wallet, request.chainId, id, {
-        status: "replaced",
-        confirmedHash: receipt.transactionHash,
-        error: message,
-      });
+      updateProtocolActivity(
+        request.wallet,
+        request.chainId,
+        id,
+        {
+          status: "replaced",
+          confirmedHash: receipt.transactionHash,
+          error: message,
+        },
+        deploymentId
+      );
       throw new Error(message);
     }
 
@@ -310,30 +338,48 @@ export async function executeProtocolTransaction(
           { cause: error }
         );
         stage = "finished";
-        updateProtocolActivity(request.wallet, request.chainId, id, {
-          status: "confirmed-unverified",
-          confirmedHash: receipt.transactionHash,
-          error: verificationError.message,
-        });
+        updateProtocolActivity(
+          request.wallet,
+          request.chainId,
+          id,
+          {
+            status: "confirmed-unverified",
+            confirmedHash: receipt.transactionHash,
+            error: verificationError.message,
+          },
+          deploymentId
+        );
         throw verificationError;
       }
     }
 
     stage = "finished";
-    updateProtocolActivity(request.wallet, request.chainId, id, {
-      status: "confirmed",
-      confirmedHash: receipt.transactionHash,
-    });
+    updateProtocolActivity(
+      request.wallet,
+      request.chainId,
+      id,
+      {
+        status: "confirmed",
+        confirmedHash: receipt.transactionHash,
+      },
+      deploymentId
+    );
     return receipt.transactionHash;
   } catch (error) {
     if (stage === "finished") throw error;
     let status: ProtocolActivityStatus = "failed";
     if (isWalletRejection(error)) status = "rejected";
     else if (stage === "submitted" && isOnchainRevert(error)) status = "reverted";
-    updateProtocolActivity(request.wallet, request.chainId, id, {
-      status,
-      error: request.describeError(error),
-    });
+    updateProtocolActivity(
+      request.wallet,
+      request.chainId,
+      id,
+      {
+        status,
+        error: request.describeError(error),
+      },
+      deploymentId
+    );
     throw error;
   }
 }

@@ -36,6 +36,7 @@ import {
 } from "@/lib/wallet-config";
 import { useSolanaWalletState } from "@/providers/solana-context";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
 
 const emptyProtocolActivity: ProtocolActivity[] = [];
 const emptyBridgeActivity: BridgeActivity[] = [];
@@ -199,6 +200,7 @@ function solanaItem(activity: SolanaActivity): UnifiedActivity {
 export function ActivityPage() {
   const t = useTranslations("activity");
   const wallet = useWalletState();
+  const { active } = useDeployment();
   const solana = useSolanaWalletState();
   const evmAddress =
     wallet.address && isAddress(wallet.address) ? getAddress(wallet.address) : null;
@@ -217,10 +219,11 @@ export function ActivityPage() {
     subscribeProtocolActivity,
     () =>
       evmAddress
-        ? readProtocolActivityAcrossChains(evmAddress, [
-            ...chainIds,
-            ...readActivityChainIds(evmAddress),
-          ])
+        ? readProtocolActivityAcrossChains(
+            evmAddress,
+            [...chainIds, ...readActivityChainIds(evmAddress, active.descriptor.deploymentId)],
+            active.descriptor.deploymentId
+          )
         : emptyProtocolActivity,
     () => emptyProtocolActivity
   );

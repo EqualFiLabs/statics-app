@@ -41,7 +41,9 @@ export function DeploymentProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const requested = requestedDeploymentId();
     const selected = requested ? findDeployment(options, requested) : null;
-    if (selected) setActive(selected);
+    const resolved = selected ?? initial;
+    setActive(resolved);
+    window.localStorage.setItem(DEPLOYMENT_STORAGE_KEY, resolved.descriptor.deploymentId);
   }, []);
 
   const value = useMemo<DeploymentContextValue>(
