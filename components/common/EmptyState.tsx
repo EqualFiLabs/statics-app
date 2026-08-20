@@ -184,18 +184,3 @@ export function UnconfiguredSurface({ subject }: { subject: string }) {
     />
   );
 }
-
-/**
- * A real protocol page rendered during the standalone Genesis phase. The route
- * remains reachable; only the onchain actions that require the future Diamond
- * are unavailable.
- */
-export function ProtocolPendingSurface({ subject }: { subject: string }) {
-  const t = useTranslations("surface");
-  return (
-    <EmptyState
-      title={t("protocolPending", { subject })}
-      description={t("protocolPendingDescription")}
-    />
-  );
-}

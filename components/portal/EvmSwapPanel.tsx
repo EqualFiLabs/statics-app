@@ -111,11 +111,10 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { active } = useDeployment();
   const launch =
-    active.deployment?.kind === "launch" &&
-    active.deployment.descriptor.chainId === wallet.fundingChainId
-      ? active.deployment
+    active.launch && active.launch.descriptor.chainId === wallet.fundingChainId
+      ? active.launch
       : null;
-  const walletTokens = useWalletTokens(wallet.fundingChainId, active.deployment);
+  const walletTokens = useWalletTokens(wallet.fundingChainId, active.protocol ?? active.launch);
   const tokens = useMemo(() => {
     const native = getDefaultEvmSwapTokens(wallet.fundingChainId).filter(
       (token) => token.kind === "native"

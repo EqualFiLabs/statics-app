@@ -28,7 +28,7 @@ function describeError(error: unknown): string {
 
 export function GenesisRewardsPage() {
   const { active } = useDeployment();
-  if (!active.deployment || active.deployment.kind !== "launch") {
+  if (!active.launch) {
     return (
       <EmptyState
         title="Genesis rewards unavailable"
@@ -36,7 +36,7 @@ export function GenesisRewardsPage() {
       />
     );
   }
-  return <GenesisRewardsRuntime deployment={active.deployment} />;
+  return <GenesisRewardsRuntime deployment={active.launch} />;
 }
 
 function GenesisRewardsRuntime({ deployment }: { deployment: LaunchDeployment }) {

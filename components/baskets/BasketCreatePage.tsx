@@ -15,11 +15,11 @@ import { usePublicClient } from "wagmi";
 
 import { basketTokenAbi, buildCreateBasketTransaction, staticsAbi } from "@statics-protocol/sdk";
 
+import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  EmptyState,
-  ProtocolPendingSurface,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -28,7 +28,7 @@ import { useWalletTokens } from "@/hooks/useWalletTokens";
 import { useDeployment } from "@/providers/deployment-context";
 import { calculateBasketLaunchQuote, type BasketLaunchQuote } from "@/lib/baskets/creation";
 import { loadTokenMetadata, type TokenMetadata } from "@/lib/baskets/baskets";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   executeProtocolActionPlan,
   protocolActionProgressLabel,
@@ -46,10 +46,6 @@ import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { searchTokenList, type TokenListEntry } from "@/lib/token-list";
 import { useWalletState } from "@/providers/wallet-context";
 
-const deploymentState = readClientDollarDeployment();
-const configuredDeployment =
-  deploymentState.status === "configured" ? deploymentState.deployment : null;
-
 type ConstituentDraft = {
   asset: Address;
   bundle: string;
@@ -64,12 +60,11 @@ type AssetRuntime = {
 };
 
 export function BasketCreatePage() {
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Basket creation" />;
-  }
-  if (!configuredDeployment) return <UnconfiguredSurface subject="Basket creation" />;
-  return <BasketCreateWalletGate />;
+  return (
+    <ProtocolActionScope>
+      <BasketCreateWalletGate />
+    </ProtocolActionScope>
+  );
 }
 
 function BasketCreateWalletGate() {
@@ -83,11 +78,13 @@ function BasketCreateRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const protocolSlippage = useProtocolSlippage();
+  const protocol = useProtocolSurface();
+  const configuredDeployment = protocol.deployment;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-  const chainId = configuredDeployment!.chainId;
+  const chainId = configuredDeployment.chainId;
   const { active } = useDeployment();
-  const walletTokens = useWalletTokens(chainId, active.deployment);
+  const walletTokens = useWalletTokens(chainId, active.protocol ?? active.launch);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -110,7 +107,11 @@ function BasketCreateRuntime() {
 
   const creation = useQuery({
     queryKey: ["basket-creation-fee", configuredDeployment?.protocolCommit ?? null],
-    enabled: Boolean(publicClient) && walletState.status === "ready" && walletState.isTargetChain,
+    enabled:
+      protocol.available &&
+      Boolean(publicClient) &&
+      walletState.status === "ready" &&
+      walletState.isTargetChain,
     queryFn: async () => {
       if (!publicClient || !configuredDeployment) throw new Error("No verified deployment.");
       await verifyDollarDeployment(publicClient, configuredDeployment);
@@ -129,7 +130,7 @@ function BasketCreateRuntime() {
       wallet,
       constituents.map((item) => item.asset).join(","),
     ],
-    enabled: Boolean(publicClient && wallet && constituents.length),
+    enabled: protocol.available && Boolean(publicClient && wallet && constituents.length),
     queryFn: async (): Promise<readonly AssetRuntime[]> => {
       if (!publicClient || !wallet || !configuredDeployment) return [];
       return Promise.all(

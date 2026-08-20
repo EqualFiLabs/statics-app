@@ -59,7 +59,7 @@ test.describe("landing foundation", () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByRole("heading", { name: "Statics Genesis", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
   });
 
   test("supports keyboard entry and responsive navigation", async ({ page }, testInfo) => {
@@ -125,7 +125,7 @@ test.describe("Dollar DApp foundation", () => {
     await page.goto("/app/baskets/0");
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.goto("/app/create");
-    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
@@ -189,11 +189,33 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("fails basket creation closed without a reviewed deployment", async ({ page }) => {
+  test("keeps basket creation navigable and wallet-gated", async ({ page }) => {
     await page.goto("/app/create");
 
-    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
     await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
+  });
+
+  test("uses the network selector for public and local targets", async ({ page }) => {
+    await page.goto("/app/positions");
+    const selector = page.getByRole("combobox", { name: "Statics network" });
+
+    await expect(selector).toHaveValue("robinhood-testnet");
+    await expect(selector.locator("option")).toHaveText([
+      "Local Anvil",
+      "Robinhood Chain",
+      "Robinhood Chain Testnet",
+    ]);
+    await selector.selectOption("robinhood");
+    await expect(selector).toHaveValue("robinhood");
+    await expect(page.getByRole("heading", { name: "Your Position NFTs" })).toBeVisible();
+    await expect(page.locator(".protocol-action-scope")).toHaveAttribute("aria-disabled", "true");
+
+    await selector.selectOption("anvil");
+    await expect(selector).toHaveValue("anvil");
+
+    await selector.selectOption("robinhood-testnet");
+    await expect(selector).toHaveValue("robinhood-testnet");
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {

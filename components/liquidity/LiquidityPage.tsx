@@ -30,13 +30,12 @@ import {
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  ProtocolPendingSurface,
-  SurfaceEmptyState,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canonicalFullRange,
   canonicalPoolLabel,
@@ -65,9 +64,7 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-import { useDeployment } from "@/providers/deployment-context";
 
-const deploymentState = readClientDollarDeployment();
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
 
 export function lpStakeEligibility(
@@ -293,12 +290,12 @@ export function LiquidityContributionForm({
 
 export function LiquidityPage() {
   const wallet = useWalletState();
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Protocol liquidity" />;
-  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
-  return <LiquidityRuntime />;
+  return (
+    <ProtocolActionScope>
+      <LiquidityRuntime />
+    </ProtocolActionScope>
+  );
 }
 
 function LiquidityRuntime() {
@@ -306,6 +303,8 @@ function LiquidityRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<Mode>("create");
@@ -327,6 +326,7 @@ function LiquidityRuntime() {
       wallet,
     ],
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(deploymentState.deployment.liquidity) &&
       Boolean(publicClient) &&
@@ -1080,10 +1080,9 @@ function LiquidityRuntime() {
     }
   };
 
-  const surfaceState =
-    walletState.status === "unconfigured" ||
-    deploymentState.status === "unavailable" ||
-    !deploymentState.deployment.liquidity
+  const surfaceState = !protocol.available
+    ? "empty"
+    : walletState.status === "unconfigured" || !deploymentState.deployment.liquidity
       ? "unconfigured"
       : deriveSurfaceState({
           walletStatus: walletState.status,

@@ -27,7 +27,7 @@ function configuredIndexerUrl(): string | null {
 
 export function configuredIndexerUrlForDeployment(deploymentId: string): string | null {
   const value =
-    deploymentId === "local-robinhood-genesis"
+    deploymentId === "local-anvil-genesis"
       ? process.env.NEXT_PUBLIC_STATICS_LOCAL_INDEXER_URL?.trim()
       : deploymentId === "robinhood-genesis"
         ? process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL?.trim()

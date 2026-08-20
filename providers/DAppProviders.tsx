@@ -53,7 +53,6 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
   NEXT_PUBLIC_ROBINHOOD_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
   NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
-  NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
 });
 const transports = createWalletTransports(walletEnvironment);
@@ -73,9 +72,6 @@ const fundingNetworkSummaries = fundingNetworks.map((network) => ({
   nativeSymbol: network.chain.nativeCurrency.symbol,
   supportsUniswap: network.supportsUniswap,
 }));
-const localForkFundingNetworks = [
-  { chainId: 4_663, label: "Local Robinhood fork", nativeSymbol: "ETH", supportsUniswap: false },
-] as const;
 const fundingChainStorageKey = (deploymentId: string) => `statics:funding-chain:${deploymentId}`;
 
 function connectedWalletChainId(wallet: ConnectedWallet | undefined): number | null {
@@ -125,12 +121,10 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
       ? (wagmiAccount.chainId ?? null)
       : null);
-  const targetChain =
-    getStaticsChain(active.descriptor.chainId, walletEnvironment) ?? walletEnvironment.defaultChain;
-  const localFork =
-    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
+  const targetChain = getStaticsChain(active.descriptor.chainId) ?? walletEnvironment.defaultChain;
+  const localFork = active.launch?.source === "development-fixture";
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
-  const activeFundingNetworks = localFork ? localForkFundingNetworks : fundingNetworkSummaries;
+  const activeFundingNetworks = fundingNetworkSummaries;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -243,7 +237,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
       fundingChainId,
-      fundingNetworkName: localFork ? "Local Robinhood fork" : fundingNetwork.label,
+      fundingNetworkName: localFork ? "Local Anvil" : fundingNetwork.label,
       fundingWalletOnSelectedChain: chainId === fundingChainId,
       fundingNetworks: activeFundingNetworks,
       explorerUrl: address && !localFork ? getAddressExplorerUrl(targetChain, address) : null,
@@ -281,19 +275,16 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
           if (!selectedWallet) throw new Error("Connect a wallet before switching networks.");
           await selectedWallet.switchChain(targetChain.id);
         }),
-      selectNetwork: (nextChainId) =>
+      selectNetwork: (networkId) =>
         runAction("switch", async () => {
-          const next = options.find((option) => option.descriptor.chainId === nextChainId);
+          const next = options.find((option) => option.networkId === networkId);
           if (!next) throw new Error("Choose a supported Statics network.");
-          selectNetwork(nextChainId);
-          setFundingChainId(nextChainId);
-          if (selectedWallet) await selectedWallet.switchChain(nextChainId);
+          selectNetwork(networkId);
+          setFundingChainId(next.descriptor.chainId);
+          if (selectedWallet) await selectedWallet.switchChain(next.descriptor.chainId);
         }),
       selectFundingNetwork: (nextChainId) =>
         runAction("funding-switch", async () => {
-          if (localFork && nextChainId !== active.descriptor.chainId) {
-            throw new Error("External funding networks are disabled in local fork mode.");
-          }
           const nextNetwork = getFundingNetwork(nextChainId);
           if (!nextNetwork) throw new Error("Choose a supported funding network.");
           setFundingChainId(nextChainId);
@@ -318,8 +309,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }
 
         const provider = await selectedWallet.getEthereumProvider();
-        if (localFork && active.deployment?.kind === "launch") {
-          await verifyLocalForkWalletProvider(provider, active.deployment);
+        if (localFork && active.launch) {
+          await verifyLocalForkWalletProvider(provider, active.launch);
         }
 
         if (walletKind === "embedded") {
@@ -395,7 +386,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
-      active.deployment,
+      active.launch,
       active.descriptor.chainId,
       active.descriptor.deploymentId,
       promptExternalWallet,
@@ -467,7 +458,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
 }
 
 function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
-  const { active, selectNetwork } = useDeployment();
+  const { active, options, selectNetwork } = useDeployment();
   const [fundingChainId, setFundingChainId] = useState(active.descriptor.chainId);
   const fundingNetwork =
     getFundingNetwork(fundingChainId) ?? getFundingNetwork(active.descriptor.chainId)!;
@@ -483,9 +474,11 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
       fundingChainId,
       fundingNetworkName: fundingNetwork.label,
       fundingNetworks: fundingNetworkSummaries,
-      selectNetwork: async (nextChainId) => {
-        selectNetwork(nextChainId);
-        setFundingChainId(nextChainId);
+      selectNetwork: async (networkId) => {
+        const next = options.find((option) => option.networkId === networkId);
+        if (!next) return;
+        selectNetwork(networkId);
+        setFundingChainId(next.descriptor.chainId);
       },
       selectFundingNetwork: async (nextChainId) => {
         const nextNetwork = getFundingNetwork(nextChainId);
@@ -498,6 +491,7 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
       active.descriptor.network,
       fundingChainId,
       fundingNetwork.label,
+      options,
       selectNetwork,
     ]
   );

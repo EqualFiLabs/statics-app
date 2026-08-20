@@ -32,13 +32,13 @@ import {
   ProtocolSlippageControl,
   useProtocolSlippage,
 } from "@/components/protocol/ProtocolSlippage";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  ProtocolPendingSurface,
-  SurfaceEmptyState,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
@@ -76,9 +76,6 @@ import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { applyPercent } from "@/lib/protocol/ux";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
-import { useDeployment } from "@/providers/deployment-context";
-
-const deploymentState = readClientDollarDeployment();
 
 function displayAmount(value: bigint, decimals: number): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -124,12 +121,12 @@ export function LoansPage({
   initialBorrowDestination?: BorrowDestination;
 }) {
   const wallet = useWalletState();
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Loans" />;
-  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
-  return <LoansRuntime initialBorrowDestination={initialBorrowDestination} />;
+  return (
+    <ProtocolActionScope>
+      <LoansRuntime initialBorrowDestination={initialBorrowDestination} />
+    </ProtocolActionScope>
+  );
 }
 
 function LoansRuntime({
@@ -142,6 +139,8 @@ function LoansRuntime({
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const protocolSlippage = useProtocolSlippage();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<LoanMode>("borrow");
@@ -170,6 +169,7 @@ function LoansRuntime({
       wallet,
     ],
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -193,6 +193,7 @@ function LoansRuntime({
       wallet,
     ],
     enabled:
+      protocol.available &&
       mode === "borrow" &&
       borrowDestination === "liquidity" &&
       deploymentState.status === "configured" &&
@@ -263,6 +264,7 @@ function LoansRuntime({
   const borrowQuote = useQuery({
     queryKey: ["loan-borrow-quote", basket?.basketId.toString(), shares.toString()],
     enabled:
+      protocol.available &&
       mode === "borrow" &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -280,6 +282,7 @@ function LoansRuntime({
   const extensionQuote = useQuery({
     queryKey: ["loan-extension-quote", selectedLoan?.loanId.toString()],
     enabled:
+      protocol.available &&
       mode === "extend" &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -969,27 +972,18 @@ function LoansRuntime({
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject="loans"
-        empty={{ title: "Loans unavailable", description: "No deployment is configured." }}
-      />
-    );
-  }
-
   const surfaceState = deriveSurfaceState({
     walletStatus: walletState.status,
     isTargetChain: walletState.isTargetChain,
-    isLoading: catalog.isPending,
+    isLoading: protocol.available && catalog.isPending,
     isError: catalog.isError,
     // Owned loans plus any that are publicly recoverable.
     isEmpty:
+      !protocol.available ||
       (catalog.data?.ownedLoans.length ?? 0) +
         (catalog.data?.publicRecoverableLoans.length ?? 0) ===
-      0,
-    hasData: Boolean(catalog.data),
+        0,
+    hasData: !protocol.available || Boolean(catalog.data),
   });
 
   let primaryLabel = verificationBlocked ? "Refresh protocol state" : action.label;

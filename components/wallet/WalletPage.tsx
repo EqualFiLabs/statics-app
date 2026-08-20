@@ -99,7 +99,7 @@ export function WalletPage() {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
   const { active } = useDeployment();
-  const deployment = active.deployment;
+  const deployment = active.protocol ?? active.launch;
   const protocolDeployment = deployment?.kind === "protocol" ? deployment.protocol : null;
   const network = getFundingNetwork(wallet.fundingChainId);
   const nftChainId = deployment?.descriptor.chainId ?? null;
@@ -992,7 +992,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
   const t = useTranslations("wallet");
   const wallet = useWalletState();
   const { active } = useDeployment();
-  const chainId = active.deployment?.descriptor.chainId;
+  const chainId = active.descriptor.chainId;
   const publicClient = usePublicClient(chainId ? { chainId } : undefined);
   const walletClient = useWalletClient(chainId ? { chainId } : undefined);
   const [recipient, setRecipient] = useState("");
@@ -1008,8 +1008,8 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
     setError(null);
     try {
       const to = getAddress(recipient.trim());
-      if (active.deployment?.kind === "launch") {
-        await verifyLaunchDeployment(publicClient, active.deployment);
+      if (active.launch) {
+        await verifyLaunchDeployment(publicClient, active.launch);
       }
       await executeProtocolTransaction({
         publicClient,
@@ -1098,7 +1098,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
   const t = useTranslations("wallet");
   const publicClient = usePublicClient({ chainId });
   const { active } = useDeployment();
-  const { addCollection } = useWalletNftCollections(chainId, active.deployment);
+  const { addCollection } = useWalletNftCollections(chainId, active.protocol ?? active.launch);
   const [address, setAddress] = useState("");
   const [tokenId, setTokenId] = useState("");
   const [pending, setPending] = useState(false);

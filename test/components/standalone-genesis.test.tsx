@@ -53,7 +53,12 @@ const deployment = {
     },
   },
 } as const satisfies LaunchDeployment;
-const option = { descriptor, deployment } satisfies DeploymentOption;
+const option = {
+  networkId: "robinhood",
+  descriptor,
+  launch: deployment,
+  protocol: null,
+} satisfies DeploymentOption;
 
 describe("standalone Genesis surface", () => {
   it("keeps the Genesis management page focused on owned NFTs", () => {

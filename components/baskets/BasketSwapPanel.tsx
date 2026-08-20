@@ -30,9 +30,9 @@ import {
   useProtocolSlippage,
 } from "@/components/protocol/ProtocolSlippage";
 import {
-  readClientDollarDeployment,
   verifyDollarDeployment,
   verifyLiquidityDeployment,
+  type DollarDeployment,
 } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
@@ -48,15 +48,19 @@ import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { applyPercent } from "@/lib/protocol/ux";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 
-const deploymentState = readClientDollarDeployment();
-
 function display(value: bigint, decimals: number): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
   const short = fraction.slice(0, 6).replace(/0+$/, "");
   return short ? `${whole}.${short}` : whole;
 }
 
-export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
+export function BasketSwapPanel({
+  basket,
+  deployment,
+}: {
+  basket: BasketRecord;
+  deployment: DollarDeployment;
+}) {
   const locale = useAppLocale();
   const t = useTranslations("baskets");
   const walletState = useWalletState();
@@ -64,6 +68,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const walletClient = useWalletClient();
   const queryClient = useQueryClient();
   const protocolSlippage = useProtocolSlippage();
+  const deploymentState = { status: "configured", deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [assetIndex, setAssetIndex] = useState(0);
@@ -84,7 +89,12 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const slippageBps = slippagePercentToBps(protocolSlippage);
 
   const pool = useQuery({
-    queryKey: ["canonical-swap-pool", basket.basketId.toString(), constituent.token.address],
+    queryKey: [
+      "canonical-swap-pool",
+      deployment.protocolCommit,
+      basket.basketId.toString(),
+      constituent.token.address,
+    ],
     enabled: Boolean(publicClient) && deploymentState.status === "configured",
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
@@ -118,6 +128,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const quote = useQuery({
     queryKey: [
       "canonical-swap-quote",
+      deployment.protocolCommit,
       basket.basketId.toString(),
       constituent.token.address,
       direction,
@@ -176,7 +187,13 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       ? minimumWithSlippage(currentQuote.amountOut, slippageBps)
       : null;
   const permit2Approval = useQuery({
-    queryKey: ["canonical-swap-permit2-approval", wallet, inputToken.address, amount.toString()],
+    queryKey: [
+      "canonical-swap-permit2-approval",
+      deployment.protocolCommit,
+      wallet,
+      inputToken.address,
+      amount.toString(),
+    ],
     enabled:
       Boolean(publicClient) &&
       Boolean(wallet) &&

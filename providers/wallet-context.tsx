@@ -5,6 +5,7 @@ import type { ConnectedWallet } from "@privy-io/react-auth";
 import type { Hex } from "viem";
 
 import type { ProtocolTransactionSendRequest } from "@/lib/protocol/transactions";
+import type { StaticsNetworkId } from "@/lib/deployments/types";
 
 export type WalletRuntimeStatus =
   "unconfigured" | "loading" | "signed-out" | "wallet-missing" | "ready" | "error";
@@ -52,7 +53,7 @@ export type WalletState = Readonly<{
   reconnectWallet: () => Promise<void>;
   createWallet: () => Promise<void>;
   switchNetwork: () => Promise<void>;
-  selectNetwork: (chainId: number) => Promise<void>;
+  selectNetwork: (networkId: StaticsNetworkId) => Promise<void>;
   selectFundingNetwork: (chainId: number) => Promise<void>;
   getEthereumProvider: () => Promise<WalletEthereumProvider | null>;
   sendEvmTransaction: (request: ProtocolTransactionSendRequest) => Promise<Hex>;

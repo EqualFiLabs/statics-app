@@ -335,8 +335,8 @@ async function fundWallet(command, context) {
 
 async function verifiedStatus(context) {
   const { manifest, publicClient, appUrl } = context;
-  if ((await publicClient.getChainId()) !== 4_663)
-    throw new Error("The local fork no longer reports chain 4663.");
+  if ((await publicClient.getChainId()) !== 31_337)
+    throw new Error("The local fork no longer reports Anvil chain 31337.");
   for (const [name, contract] of Object.entries(manifest.contracts)) {
     const code = await publicClient.getCode({ address: contract.address });
     if (
@@ -351,7 +351,7 @@ async function verifiedStatus(context) {
   if (!ready.ok) throw new Error("The launch-fork indexer is not ready.");
   return {
     ok: true,
-    chainId: 4_663,
+    chainId: 31_337,
     forkBlock: context.forkBlock.toString(),
     deploymentStartBlock: manifest.deploymentStartBlock,
     operator: account.address,
@@ -498,6 +498,10 @@ try {
     publicClient,
     salt: keccak256(toHex(`STATICS_LAUNCH_FORK:${resolvedForkBlock}:${account.address}`)),
   });
+  // Deploy with Robinhood's chain identity so the production Doppler module
+  // selection remains exact, then expose the interactive fork as ordinary
+  // Anvil. This gives the app three unambiguous selectable network IDs.
+  await publicClient.request({ method: "anvil_setChainId", params: [31_337] });
   // Anvil keeps the fork's finality distance. Finalize deployment blocks before
   // Ponder starts so its historical pass sees constructor and ERC-2309 logs.
   await publicClient.request({ method: "anvil_mine", params: ["0x60"] });
@@ -509,9 +513,9 @@ try {
     DATABASE_PRIVATE_URL: "",
     PONDER_DATABASE_DIRECTORY: ponderData,
     PONDER_DEPLOYMENT_ID: manifest.deploymentId,
-    PONDER_CHAIN_ID: "4663",
+    PONDER_CHAIN_ID: "31337",
     PONDER_DEPLOYMENT_START_BLOCK: manifest.deploymentStartBlock,
-    PONDER_RPC_URL_4663: indexerRelay.url,
+    PONDER_RPC_URL_31337: indexerRelay.url,
     PONDER_STATICS_GENESIS_ADDRESS: manifest.contracts.genesis.address,
     PONDER_GENESIS_VAULT_ADDRESS: manifest.contracts.vault.address,
     PONDER_GENESIS_ACTIVATION_REGISTRY_ADDRESS: manifest.contracts.activationRegistry.address,
@@ -536,8 +540,8 @@ try {
   const nextEnvironment = {
     ...process.env,
     NEXT_PUBLIC_APP_ENV: "development",
-    NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
-    NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: rpcUrl,
+    NEXT_PUBLIC_APP_NETWORK: "anvil",
+    NEXT_PUBLIC_ANVIL_RPC_URL: rpcUrl,
     NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(manifest),
     NEXT_PUBLIC_STATICS_LOCAL_INDEXER_URL: indexerUrl,
   };
@@ -569,9 +573,7 @@ try {
   writeFileSync(sessionPath, `${JSON.stringify(await verifiedStatus(context), null, 2)}\n`, {
     mode: 0o600,
   });
-  process.stdout.write(
-    `Statics launch fork ready at ${appUrl}/app on local Robinhood chain 4663.\n`
-  );
+  process.stdout.write(`Statics launch fork ready at ${appUrl}/app on Local Anvil chain 31337.\n`);
   process.stdout.write("Use npm run launch-fork:status to verify the running session.\n");
   await new Promise((resolveStop, reject) => {
     const stop = () => resolveStop();

@@ -22,8 +22,8 @@ import { useWalletState } from "@/providers/wallet-context";
 
 export function DeploymentOverview() {
   const { active } = useDeployment();
-  if (active.deployment?.kind === "protocol") return <DollarOverview />;
-  if (!active.deployment) {
+  if (active.protocol) return <DollarOverview deployment={active.protocol.protocol} />;
+  if (!active.launch) {
     return (
       <div className="launch-overview">
         <EmptyState
@@ -43,7 +43,7 @@ export function DeploymentOverview() {
       </div>
     );
   }
-  return <LaunchOverview deployment={active.deployment} />;
+  return <LaunchOverview deployment={active.launch} />;
 }
 
 function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {

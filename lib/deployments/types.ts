@@ -77,7 +77,11 @@ export type ProtocolDeployment = Readonly<{
 
 export type StaticsDeployment = LaunchDeployment | ProtocolDeployment;
 
+export type StaticsNetworkId = "anvil" | "robinhood" | "robinhood-testnet";
+
 export type DeploymentOption = Readonly<{
+  networkId: StaticsNetworkId;
   descriptor: DeploymentDescriptor;
-  deployment: StaticsDeployment | null;
+  launch: LaunchDeployment | null;
+  protocol: ProtocolDeployment | null;
 }>;

@@ -17,8 +17,7 @@ export function AddressDisplay({
 }) {
   const [copied, setCopied] = useState(false);
   const { active } = useDeployment();
-  const localFork =
-    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
+  const localFork = active.launch?.source === "development-fixture";
   const explorerUrl = localFork ? null : getAddressExplorerUrlForChain(chainId, address);
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
 

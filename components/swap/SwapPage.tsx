@@ -12,7 +12,7 @@ type SwapMode = "token" | "nft";
 export function SwapPage() {
   const { active } = useDeployment();
   const [mode, setMode] = useState<SwapMode>("token");
-  if (!active.deployment || active.deployment.kind !== "launch") {
+  if (!active.launch) {
     return (
       <EmptyState
         title="Launch market not deployed"
@@ -42,7 +42,7 @@ export function SwapPage() {
       {mode === "token" ? (
         <EvmSwapPanel canonicalOnly />
       ) : (
-        <GenesisVaultSwapPanel deployment={active.deployment} />
+        <GenesisVaultSwapPanel deployment={active.launch} />
       )}
     </div>
   );

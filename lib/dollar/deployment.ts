@@ -316,8 +316,8 @@ export function readDollarDeployment(
   };
 }
 
-export function readClientDollarDeployment(): DollarDeploymentState {
-  return readDollarDeployment({
+export function clientDollarEnvironment(): Record<string, string | undefined> {
+  return {
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_STATICS_CHAIN_ID: process.env.NEXT_PUBLIC_STATICS_CHAIN_ID,
     NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK:
@@ -381,7 +381,11 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_USDG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_USDG_CODE_HASH,
     NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH,
-  });
+  };
+}
+
+export function readClientDollarDeployment(): DollarDeploymentState {
+  return readDollarDeployment(clientDollarEnvironment());
 }
 
 const dollarVerificationCache = new WeakMap<PublicClient, Map<string, Promise<void>>>();

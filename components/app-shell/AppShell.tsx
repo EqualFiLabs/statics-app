@@ -170,12 +170,14 @@ function NetworkSelector() {
       <span className="sr-only">Statics network</span>
       <select
         aria-label="Statics network"
-        value={active.descriptor.chainId}
+        value={active.networkId}
         disabled={wallet.busyAction !== null}
-        onChange={(event) => void wallet.selectNetwork(Number(event.target.value))}
+        onChange={(event) =>
+          void wallet.selectNetwork(event.target.value as typeof active.networkId)
+        }
       >
         {options.map((option) => (
-          <option key={option.descriptor.chainId} value={option.descriptor.chainId}>
+          <option key={option.networkId} value={option.networkId}>
             {option.descriptor.network}
           </option>
         ))}

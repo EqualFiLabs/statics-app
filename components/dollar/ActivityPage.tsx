@@ -202,8 +202,7 @@ export function ActivityPage() {
   const t = useTranslations("activity");
   const wallet = useWalletState();
   const { active } = useDeployment();
-  const localFork =
-    active.deployment?.kind === "launch" && active.deployment.source === "development-fixture";
+  const localFork = active.launch?.source === "development-fixture";
   const solana = useSolanaWalletState();
   const evmAddress =
     wallet.address && isAddress(wallet.address) ? getAddress(wallet.address) : null;

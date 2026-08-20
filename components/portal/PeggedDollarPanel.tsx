@@ -14,7 +14,11 @@ import {
 } from "@statics-protocol/sdk";
 import { useSignTypedData } from "@privy-io/react-auth";
 
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import {
+  readClientDollarDeployment,
+  verifyDollarDeployment,
+  type DollarDeployment,
+} from "@/lib/dollar/deployment";
 import {
   validatePeggedMintSimulation,
   validatePeggedRedemptionSimulation,
@@ -96,9 +100,11 @@ async function walletClients(wallet: ReturnType<typeof useWalletState>) {
 }
 
 export function PeggedDollarPanel({
+  deployment: selectedDeployment,
   embedded = false,
   onPendingChange,
 }: {
+  deployment?: DollarDeployment | null;
   embedded?: boolean;
   onPendingChange?: (pending: boolean) => void;
 }) {
@@ -106,7 +112,9 @@ export function PeggedDollarPanel({
   const locale = useAppLocale();
   const wallet = useWalletState();
   const { signTypedData: signEmbeddedTypedData } = useSignTypedData();
-  const configured = configuredDeploymentState;
+  const configured = selectedDeployment
+    ? ({ status: "configured", deployment: selectedDeployment } as const)
+    : configuredDeploymentState;
   const deployment = configured.status === "configured" ? configured.deployment : null;
   const [direction, setDirection] = useState<Direction>("mint");
   const [amountInput, setAmountInput] = useState("");

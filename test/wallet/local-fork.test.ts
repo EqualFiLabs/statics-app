@@ -33,9 +33,9 @@ function deployment(staticsCode: `0x${string}`) {
   return parseLaunchDeploymentManifest(
     {
       schemaVersion: 1,
-      deploymentId: "local-robinhood-genesis",
-      network: "Local Robinhood fork",
-      chainId: 4_663,
+      deploymentId: "local-anvil-genesis",
+      network: "Local Anvil",
+      chainId: 31_337,
       deploymentStartBlock: "1",
       protocolCommit: "abc",
       contracts,
@@ -48,16 +48,16 @@ function deployment(staticsCode: `0x${string}`) {
 describe("local fork wallet provider", () => {
   it("accepts the signer provider only when it sees the local runtime", async () => {
     const code = "0x6001600055" as const;
-    const request = vi.fn().mockResolvedValueOnce("0x1237").mockResolvedValueOnce(code);
+    const request = vi.fn().mockResolvedValueOnce("0x7a69").mockResolvedValueOnce(code);
     await expect(
       verifyLocalForkWalletProvider({ request }, deployment(code))
     ).resolves.toBeUndefined();
   });
 
   it("rejects a same-chain provider that cannot see the fork deployment", async () => {
-    const request = vi.fn().mockResolvedValueOnce("0x1237").mockResolvedValueOnce("0x");
+    const request = vi.fn().mockResolvedValueOnce("0x7a69").mockResolvedValueOnce("0x");
     await expect(
       verifyLocalForkWalletProvider({ request }, deployment("0x6001600055"))
-    ).rejects.toThrow("public Robinhood instead of this local fork");
+    ).rejects.toThrow("cannot see the Local Anvil deployment");
   });
 });

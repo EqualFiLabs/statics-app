@@ -36,7 +36,7 @@ export function WalletNftPanel({
 }) {
   const wallet = useWalletState();
   const { active } = useDeployment();
-  const deployment = active.deployment;
+  const deployment = active.protocol ?? active.launch;
   const publicClient = usePublicClient({ chainId: active.descriptor.chainId });
 
   const walletAddress =

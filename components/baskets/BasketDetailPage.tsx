@@ -49,15 +49,14 @@ import {
 } from "@/lib/baskets/conversion-navigation";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  EmptyState,
-  ProtocolPendingSurface,
-  SurfaceEmptyState,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { loadPositionCatalog, unlockedCollateral } from "@/lib/positions/positions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -66,10 +65,7 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { applyPercent } from "@/lib/protocol/ux";
-import { useDeployment } from "@/providers/deployment-context";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
-
-const deploymentState = readClientDollarDeployment();
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -103,17 +99,15 @@ export function BasketDetailPage({
 }) {
   const t = useTranslations("baskets");
   const wallet = useWalletState();
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Basket management" />;
-  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("singular")} />;
   return (
-    <BasketDetailRuntime
-      basketId={basketId}
-      initialAction={initialAction}
-      initialPositionId={initialPositionId}
-    />
+    <ProtocolActionScope>
+      <BasketDetailRuntime
+        basketId={basketId}
+        initialAction={initialAction}
+        initialPositionId={initialPositionId}
+      />
+    </ProtocolActionScope>
   );
 }
 
@@ -132,6 +126,8 @@ function BasketDetailRuntime({
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const protocolSlippage = useProtocolSlippage();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<"mint" | "redeem" | "swap">(initialAction);
@@ -157,6 +153,7 @@ function BasketDetailRuntime({
       wallet
     ),
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -177,7 +174,7 @@ function BasketDetailRuntime({
         : undefined,
       wallet
     ),
-    enabled: deploymentState.status === "configured" && Boolean(publicClient),
+    enabled: protocol.available && Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -224,6 +221,7 @@ function BasketDetailRuntime({
   const quote = useQuery({
     queryKey: ["basket-quote", basketId.toString(), mode, amount.toString()],
     enabled:
+      protocol.available &&
       Boolean(publicClient) &&
       deploymentState.status === "configured" &&
       Boolean(basket) &&
@@ -476,15 +474,6 @@ function BasketDetailRuntime({
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject={t("singular")}
-        empty={{ title: t("unavailable"), description: t("noData") }}
-      />
-    );
-  }
   if ((catalog.isPending || catalog.isError) && !catalog.data) {
     return (
       <SurfaceEmptyState
@@ -632,7 +621,7 @@ function BasketDetailRuntime({
             ))}
           </div>
           {mode === "swap" ? (
-            <BasketSwapPanel basket={basket} />
+            <BasketSwapPanel basket={basket} deployment={deploymentState.deployment} />
           ) : (
             <>
               <h3 id="basket-action-title">

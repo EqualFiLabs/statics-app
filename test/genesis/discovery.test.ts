@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/genesis/discovery";
 
-const deploymentId = "local-robinhood-genesis";
+const deploymentId = "local-anvil-genesis";
 const owner = getAddress("0x1111111111111111111111111111111111111111");
 const genesis = getAddress("0x2222222222222222222222222222222222222222");
 const vault = getAddress("0x3333333333333333333333333333333333333333");
@@ -13,8 +13,8 @@ const deployment = {
   descriptor: {
     deploymentId,
     label: "Genesis",
-    network: "Local fork",
-    chainId: 4_663,
+    network: "Local Anvil",
+    chainId: 31_337,
     stage: "launch",
     capabilities: [],
     available: true,

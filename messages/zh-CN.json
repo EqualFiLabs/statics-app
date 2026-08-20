@@ -218,8 +218,7 @@
     "retry": "重试",
     "unavailable": "{subject}不可用",
     "noDeployment": "未配置部署。",
-    "protocolPending": "{subject}尚未上线",
-    "protocolPendingDescription": "此页面仍可访问。完整的 Statics 协议部署到该网络后，链上操作将会启用。"
+    "actionUnavailable": "Statics Protocol 在 {network} 上线后，此操作将启用。"
   },
   "baskets": {
     "subject": "篮子",

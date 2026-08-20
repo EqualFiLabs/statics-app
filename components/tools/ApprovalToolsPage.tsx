@@ -58,7 +58,8 @@ export function ApprovalToolsPage() {
       />
     );
   }
-  if (!active.deployment) {
+  const deployment = active.protocol ?? active.launch;
+  if (!deployment) {
     return (
       <SurfaceEmptyState
         state="unconfigured"
@@ -70,7 +71,7 @@ export function ApprovalToolsPage() {
       />
     );
   }
-  return <ApprovalToolsRuntime deployment={active.deployment} />;
+  return <ApprovalToolsRuntime deployment={deployment} />;
 }
 
 function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment }) {

@@ -218,8 +218,7 @@
     "retry": "Intentar de nuevo",
     "unavailable": "{subject} no está disponible",
     "noDeployment": "No hay ningún despliegue configurado.",
-    "protocolPending": "{subject} aún no está disponible",
-    "protocolPendingDescription": "Esta página sigue disponible. Sus acciones onchain se habilitarán cuando el protocolo Statics completo se despliegue en esta red."
+    "actionUnavailable": "Esta acción se habilitará cuando Statics Protocol esté activo en {network}."
   },
   "baskets": {
     "subject": "cestas",

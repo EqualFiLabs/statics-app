@@ -81,6 +81,22 @@ export function defaultWalletTokens(
     );
   }
   if (protocolDeployment?.chainId === chainId) {
+    if (protocolDeployment.genesis) {
+      defaults.push({
+        address: protocolDeployment.genesis.token,
+        symbol: "STATICS",
+        name: "Statics",
+        decimals: 18,
+        isDefault: true,
+      });
+    }
+    defaults.push({
+      address: protocolDeployment.contracts.weth,
+      symbol: "WETH",
+      name: "Wrapped Ether",
+      decimals: 18,
+      isDefault: true,
+    });
     if (protocolDeployment.pegged) {
       defaults.push({
         address: protocolDeployment.pegged.collateral,

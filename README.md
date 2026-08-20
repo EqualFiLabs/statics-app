@@ -144,8 +144,8 @@ cannot submit arbitrary targets or calldata.
 
 The launch application can be exercised against a fresh deployment on a persistent local fork of
 Robinhood mainnet. The coordinator starts loopback-only Anvil, deploys the standalone Genesis and
-Doppler market through Robinhood's existing infrastructure, indexes all 5,555 vault-owned Genesis
-NFTs, and starts Next.js with a generated development-only manifest:
+Doppler market through Robinhood's existing infrastructure, indexes circulating Genesis state,
+and starts Next.js with a generated development-only manifest:
 
 ```bash
 export STATICS_PROTOCOL_REPOSITORY=/path/to/statics
@@ -168,7 +168,9 @@ npm run launch-fork:generate-volume -- --eth 1 --cycles 5
 ```
 
 These are fork-local balances and transactions. They do not move real ETH or change Robinhood
-mainnet. External bridge and aggregator funding surfaces are disabled in this mode; canonical
+mainnet. Deployment runs under Robinhood identity, then the interactive fork changes to Local
+Anvil chain `31337`. The app's existing network selector can therefore move among Local Anvil,
+Robinhood mainnet, and Robinhood testnet without a second deployment control. Canonical
 STATICS/WETH trades still use the real Robinhood V4 contracts copied into the fork. The controls
 accept a fixed set of bounded operations and cannot submit arbitrary calldata.
 

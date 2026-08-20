@@ -27,14 +27,28 @@ Robinhood mainnet and testnet use the same routes and components. The existing n
 selects the target chain and wallet network. There is no separate deployment selector, deployment
 URL parameter, or deployment preference in browser storage.
 
-Each network has its own reviewed launch manifest and Ponder endpoint. Chain and manifest identity
-remain part of internal cache and database keys so records cannot cross networks. This internal
-isolation is not exposed as a second product-selection model.
+Each network target may have a reviewed launch deployment, a full-protocol deployment, both, or
+neither. Chain and manifest identity remain part of internal cache and database keys so records
+cannot cross networks. This internal isolation is not exposed as a second product-selection model.
 
 Features that require the future Statics Diamond remain present as normal navigation links. Their
-real pages still render, while unavailable value-moving actions are disabled or replaced by that
-page's own clear unavailable state. The application shell does not remove, disable, or intercept a
-route merely because its contracts are not deployed.
+real pages and complete controls still render. Inputs and value-moving buttons whose required
+contracts are absent are visibly disabled, and an accessible tooltip explains when they will be
+enabled. Pages are never replaced by a protocol-pending or unavailable screen merely because the
+Diamond is absent. The application shell does not remove, disable, or intercept such routes.
+
+The network selector uses stable target identities rather than treating a deployment as a second
+environment selector:
+
+```text
+Local Anvil             31337
+Robinhood Chain          4663
+Robinhood Chain Testnet 46630
+```
+
+Development builds expose all three targets from one running application. Production builds omit
+Local Anvil. Selecting a target changes its RPC, manifests, indexer identity, wallet target chain,
+and query namespace together.
 
 ### Swap page reuses the Portal swap card
 
@@ -86,16 +100,23 @@ derived from the bounded collection and circulating exceptions, then rechecked a
 ### Local fork
 
 The local Robinhood fork runs the same Swap, Genesis, rewards, wallet, and Ponder paths used by
-public networks. It must be convenient for iterative browser testing.
+public networks. It must be convenient for iterative browser testing and appears in the existing
+network selector as **Local Anvil**, not as a deployment mode.
+
+The harness initially reports Robinhood chain ID `4663` while the standalone contracts are
+deployed so the reviewed Doppler module configuration remains exact. Before Ponder and the app
+start, the harness changes the local Anvil identity to `31337`. This makes Local Anvil, Robinhood
+mainnet, and Robinhood testnet independently selectable without an RPC collision.
 
 Only these fork-specific protections remain:
 
 - the RPC must be loopback-only;
 - the generated manifest is accepted only in development; and
-- runtime bytecode and canonical bindings are verified because the fork shares mainnet chain ID
-  `4663`.
+- runtime bytecode and canonical bindings are verified before the generated local manifest is
+  accepted.
 
-The fork does not create a user-visible deployment mode, replace pages, or disable canonical swaps.
+The local manifest adds the Anvil target; it never replaces the public targets. The fork does not
+create a user-visible deployment mode, replace pages, or disable canonical swaps.
 
 ## Invariants
 
@@ -106,7 +127,7 @@ The fork does not create a user-visible deployment mode, replace pages, or disab
 4. NFT acquisition rechecks that the displayed token is still Vault inventory before submitting.
 5. Genesis redemption remains subject to ownership, approval, activation-lock, and backing checks.
 6. Mainnet, testnet, and local-fork indexed records cannot collide.
-7. Future feature pages remain navigable; only unavailable actions are disabled.
+7. Future feature pages and their controls remain visible; only unavailable actions are disabled.
 8. Local-fork support cannot be enabled outside development or against a non-loopback RPC.
 
 ## Consequences

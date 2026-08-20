@@ -116,9 +116,9 @@ export async function deployLaunchFork({ protocolRoot, rpcUrl, privateKey, publi
   return {
     manifest: {
       schemaVersion: 1,
-      deploymentId: "local-robinhood-genesis",
-      network: "Local Robinhood fork",
-      chainId: 4_663,
+      deploymentId: "local-anvil-genesis",
+      network: "Local Anvil",
+      chainId: 31_337,
       deploymentStartBlock: deploymentStartBlock.toString(),
       protocolCommit,
       contracts,

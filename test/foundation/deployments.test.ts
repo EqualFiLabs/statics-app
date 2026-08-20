@@ -7,8 +7,7 @@ import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest
 import {
   LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
   ROBINHOOD_GENESIS_DEPLOYMENT_ID,
-  ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID,
-  defaultDeploymentId,
+  defaultNetworkId,
   deploymentRegistry,
   hasCapability,
 } from "@/lib/deployments/registry";
@@ -54,31 +53,35 @@ function launchManifest() {
 }
 
 describe("deployment registry", () => {
-  it("defaults public builds by network and local development to the fork", () => {
-    expect(defaultDeploymentId("production")).toBe(ROBINHOOD_GENESIS_DEPLOYMENT_ID);
-    expect(defaultDeploymentId("development")).toBe(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID);
-    expect(defaultDeploymentId("development", "robinhood-fork")).toBe(
-      LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID
-    );
+  it("defaults public builds by network and local development to testnet", () => {
+    expect(defaultNetworkId("production")).toBe("robinhood");
+    expect(defaultNetworkId("development")).toBe("robinhood-testnet");
+    expect(defaultNetworkId("development", "anvil")).toBe("anvil");
   });
 
-  it("loads a complete local launch manifest only in explicit development fork mode", () => {
+  it("adds a complete local launch manifest without replacing public networks", () => {
     const local = {
       ...launchManifest(),
       deploymentId: LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
-      network: "Local Robinhood fork",
+      network: "Local Anvil",
+      chainId: 31_337,
     };
     const environment = {
       NEXT_PUBLIC_APP_ENV: "development",
-      NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
       NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(local),
     };
-    const [fixture] = deploymentRegistry(environment);
-    expect(fixture?.deployment?.kind).toBe("launch");
-    if (fixture?.deployment?.kind !== "launch") throw new Error("Expected a launch fixture.");
-    expect(fixture.deployment.source).toBe("development-fixture");
+    const options = deploymentRegistry(environment);
+    const fixture = options.find((option) => option.networkId === "anvil");
+    expect(fixture?.launch?.kind).toBe("launch");
+    if (!fixture?.launch) throw new Error("Expected a launch fixture.");
+    expect(fixture.launch.source).toBe("development-fixture");
     expect(fixture?.descriptor.deploymentId).toBe(LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID);
-    expect(deploymentRegistry(environment)).toHaveLength(1);
+    expect(options.map((option) => option.networkId)).toEqual([
+      "anvil",
+      "robinhood",
+      "robinhood-testnet",
+    ]);
 
     expect(() => deploymentRegistry({ ...environment, NEXT_PUBLIC_APP_ENV: "production" })).toThrow(
       "only allowed in development"
@@ -90,6 +93,8 @@ describe("deployment registry", () => {
     const incomplete = {
       ...local,
       deploymentId: LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
+      network: "Local Anvil",
+      chainId: 31_337,
       contracts: {
         ...local.contracts,
         statics: { address: local.contracts.statics.address },
@@ -98,19 +103,19 @@ describe("deployment registry", () => {
     expect(() =>
       deploymentRegistry({
         NEXT_PUBLIC_APP_ENV: "development",
-        NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
+        NEXT_PUBLIC_APP_NETWORK: "anvil",
         NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(incomplete),
       })
     ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
   it("keeps mainnet unavailable until a reviewed manifest is checked in", () => {
-    const [mainnet, testnet] = deploymentRegistry();
+    const [mainnet, testnet] = deploymentRegistry({ NEXT_PUBLIC_APP_ENV: "production" });
     expect(mainnet?.descriptor.available).toBe(false);
-    expect(mainnet?.deployment).toBeNull();
+    expect(mainnet?.launch).toBeNull();
     expect(testnet?.descriptor.chainId).toBe(46_630);
-    expect(testnet?.descriptor.available).toBe(false);
-    expect(hasCapability(testnet!.descriptor, "faucet")).toBe(false);
+    expect(testnet?.protocol).not.toBeNull();
+    expect(hasCapability(testnet!.descriptor, "faucet")).toBe(true);
   });
 
   it("parses a canonical launch market and rejects a mismatched pair", () => {

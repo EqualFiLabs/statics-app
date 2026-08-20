@@ -30,32 +30,32 @@ describe("wallet environment", () => {
     ).toThrow("Local chains are only available");
   });
 
-  it("uses a loopback Robinhood fork without retaining the public chain collision", () => {
+  it("keeps local Anvil distinct from both public Robinhood networks", () => {
     const environment = readWalletEnvironment({
       NEXT_PUBLIC_APP_ENV: "development",
-      NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
-      NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: "http://127.0.0.1:8546",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
+      NEXT_PUBLIC_ANVIL_RPC_URL: "http://127.0.0.1:8546",
     });
 
-    expect(environment.defaultChain.id).toBe(4_663);
-    expect(environment.defaultChain.name).toBe("Local Robinhood fork");
+    expect(environment.defaultChain.id).toBe(31_337);
+    expect(environment.defaultChain.name).toBe("Local Anvil");
     expect(environment.defaultChain.blockExplorers).toBeUndefined();
-    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630, 31_337]);
+    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([31_337, 4_663, 46_630]);
   });
 
-  it("rejects a non-loopback or non-development Robinhood fork", () => {
+  it("rejects a non-loopback or non-development Anvil RPC", () => {
     expect(() =>
       readWalletEnvironment({
         NEXT_PUBLIC_APP_ENV: "development",
-        NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
-        NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: "https://rpc.mainnet.chain.robinhood.com",
+        NEXT_PUBLIC_APP_NETWORK: "anvil",
+        NEXT_PUBLIC_ANVIL_RPC_URL: "https://rpc.mainnet.chain.robinhood.com",
       })
     ).toThrow("loopback-only");
     expect(() =>
       readWalletEnvironment({
         NEXT_PUBLIC_APP_ENV: "production",
-        NEXT_PUBLIC_APP_NETWORK: "robinhood-fork",
-        NEXT_PUBLIC_ROBINHOOD_FORK_RPC_URL: "http://127.0.0.1:8546",
+        NEXT_PUBLIC_APP_NETWORK: "anvil",
+        NEXT_PUBLIC_ANVIL_RPC_URL: "http://127.0.0.1:8546",
       })
     ).toThrow("Local chains are only available");
   });

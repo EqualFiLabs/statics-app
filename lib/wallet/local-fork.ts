@@ -16,7 +16,7 @@ export async function verifyLocalForkWalletProvider(
   if (!expected) throw new Error("The local fork manifest is missing the STATICS runtime hash.");
   const chainId = await request({ method: "eth_chainId" });
   if (Number(BigInt(chainId as Hex)) !== deployment.descriptor.chainId) {
-    throw new Error("The wallet provider is not connected to the local Robinhood fork.");
+    throw new Error("The wallet provider is not connected to Local Anvil.");
   }
   const code = await request({
     method: "eth_getCode",
@@ -28,7 +28,7 @@ export async function verifyLocalForkWalletProvider(
     keccak256(code as Hex).toLowerCase() !== expected.toLowerCase()
   ) {
     throw new Error(
-      "The wallet is using public Robinhood instead of this local fork. Point its Robinhood RPC to the local session before continuing."
+      "The wallet cannot see the Local Anvil deployment. Switch the wallet to the Anvil network before continuing."
     );
   }
 }

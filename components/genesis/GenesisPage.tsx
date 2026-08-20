@@ -17,7 +17,7 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { loadWalletGenesis } from "@/lib/indexer/statics";
 import { loadPositionCatalog } from "@/lib/positions/positions";
 import {
@@ -29,8 +29,6 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
 import { StandaloneGenesisPage } from "@/components/genesis/StandaloneGenesisPage";
-
-const deploymentState = readClientDollarDeployment();
 
 function describeGenesisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -48,28 +46,27 @@ function describeGenesisError(error: unknown): string {
 
 export function GenesisPage() {
   const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <StandaloneGenesisPage deployment={active.deployment} />;
+  if (active.launch) {
+    return <StandaloneGenesisPage deployment={active.launch} />;
   }
-  if (active.deployment?.kind !== "protocol") {
+  if (!active.protocol) {
     return <UnconfiguredSurface subject="Genesis" />;
   }
-  return <ProtocolGenesisPage />;
+  return <ProtocolGenesisPage deployment={active.protocol.protocol} />;
 }
 
-function ProtocolGenesisPage() {
-  if (deploymentState.status !== "configured" || !deploymentState.deployment.genesis)
-    return <UnconfiguredSurface subject="Genesis" />;
-  return <GenesisWalletGate />;
+function ProtocolGenesisPage({ deployment }: { deployment: DollarDeployment }) {
+  if (!deployment.genesis) return <UnconfiguredSurface subject="Genesis" />;
+  return <GenesisWalletGate deployment={deployment} />;
 }
 
-function GenesisWalletGate() {
+function GenesisWalletGate({ deployment }: { deployment: DollarDeployment }) {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Genesis" />;
-  return <GenesisRuntime />;
+  return <GenesisRuntime deployment={deployment} />;
 }
 
-function GenesisRuntime() {
+function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const wallet =
@@ -78,6 +75,7 @@ function GenesisRuntime() {
   const [error, setError] = useState<string | null>(null);
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [positions, setPositions] = useState<Record<string, string>>({});
+  const deploymentState = { status: "configured", deployment } as const;
 
   const portfolio = useQuery({
     queryKey: [
@@ -174,7 +172,6 @@ function GenesisRuntime() {
     );
   }
 
-  const deployment = deploymentState.deployment;
   const genesisDeployment = deployment.genesis!;
   const send = async (
     kind: Parameters<typeof executeProtocolTransaction>[0]["kind"],

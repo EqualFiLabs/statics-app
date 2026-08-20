@@ -218,8 +218,7 @@
     "retry": "Try again",
     "unavailable": "{subject} unavailable",
     "noDeployment": "No deployment is configured.",
-    "protocolPending": "{subject} is not live yet",
-    "protocolPendingDescription": "This page remains available. Its onchain actions will unlock when the full Statics protocol is deployed on this network."
+    "actionUnavailable": "This action will be enabled when Statics Protocol is live on {network}."
   },
   "baskets": {
     "subject": "baskets",

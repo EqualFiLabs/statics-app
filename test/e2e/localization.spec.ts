@@ -27,7 +27,7 @@ test.describe("localization", () => {
     await expect(page).toHaveURL(/\/$/);
     await page.goto("/app/baskets");
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-    await expect(page.getByRole("heading", { name: "Statics 尚未配置", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics 篮子", level: 2 })).toBeVisible();
   });
 
   test("preference cookie takes precedence over the browser language", async ({
@@ -48,6 +48,6 @@ test.describe("localization", () => {
     await page.goto("/app");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("heading", { name: "Statics Genesis", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
   });
 });

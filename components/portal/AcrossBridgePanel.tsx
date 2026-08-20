@@ -193,7 +193,7 @@ export function AcrossBridgePanel() {
   // destination -- but it is now a default rather than the only option.
   const staticsDestination = readAcrossDestination();
   const { active } = useDeployment();
-  const walletTokens = useWalletTokens(wallet.fundingChainId, active.deployment);
+  const walletTokens = useWalletTokens(wallet.fundingChainId, active.protocol ?? active.launch);
   const supportedEvmChains = useMemo(
     () => new Set(wallet.fundingNetworks.map((network) => network.chainId)),
     [wallet.fundingNetworks]

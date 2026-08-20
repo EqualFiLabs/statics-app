@@ -13,13 +13,17 @@ import {
 } from "@statics-protocol/sdk";
 
 import { loadBasketCatalog, loadTokenMetadata } from "@/lib/baskets/baskets";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { useWalletState } from "@/providers/wallet-context";
 
-const deploymentState = readClientDollarDeployment();
-
-export function ProtocolRevenueCard() {
+export function ProtocolRevenueCard({
+  deployment,
+  available = true,
+}: {
+  deployment: DollarDeployment;
+  available?: boolean;
+}) {
   const t = useTranslations("protocolRevenue");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
@@ -29,6 +33,7 @@ export function ProtocolRevenueCard() {
   const [error, setError] = useState<string | null>(null);
   const [creatorMinimums, setCreatorMinimums] = useState<Record<string, string>>({});
   const [creatorAdvanced, setCreatorAdvanced] = useState<Record<string, boolean>>({});
+  const deploymentState = { status: "configured", deployment } as const;
 
   const revenue = useQuery({
     queryKey: [
@@ -37,6 +42,7 @@ export function ProtocolRevenueCard() {
       deploymentState.status === "configured" ? deploymentState.deployment.protocolCommit : null,
     ],
     enabled:
+      available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient && wallet) &&
       walletState.status === "ready" &&

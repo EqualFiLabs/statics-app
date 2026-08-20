@@ -192,7 +192,9 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText(/wrong network/i)).toBeInTheDocument();
     expect(screen.getByText(/switch to Anvil/i)).toBeInTheDocument();
     expect(screen.getByText(/chain 31337/i)).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveValue("46630");
+    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveValue(
+      "robinhood-testnet"
+    );
   });
 
   it("names the network and offers no switch once the wallet is on target", () => {
@@ -231,9 +233,9 @@ describe("DApp wallet shell", () => {
     renderWithWallet(<AppShell>Overview</AppShell>, { selectNetwork });
 
     fireEvent.change(screen.getByRole("combobox", { name: "Statics network" }), {
-      target: { value: "4663" },
+      target: { value: "robinhood" },
     });
-    expect(selectNetwork).toHaveBeenCalledWith(4_663);
+    expect(selectNetwork).toHaveBeenCalledWith("robinhood");
   });
 
   it("exports embedded wallets from the account dialog", () => {

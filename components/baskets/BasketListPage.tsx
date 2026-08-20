@@ -7,18 +7,15 @@ import { usePublicClient } from "wagmi";
 import { useTranslations } from "next-intl";
 
 import { basketStatusLabel, loadBasketCatalog } from "@/lib/baskets/baskets";
+import { SurfaceBoundary, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  ProtocolPendingSurface,
-  SurfaceBoundary,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { useWalletState } from "@/providers/wallet-context";
-import { useDeployment } from "@/providers/deployment-context";
-
-const deploymentState = readClientDollarDeployment();
 
 function displayAmount(value: bigint, decimals = 18): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -29,18 +26,20 @@ function displayAmount(value: bigint, decimals = 18): string {
 export function BasketListPage() {
   const t = useTranslations("baskets");
   const wallet = useWalletState();
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Baskets" />;
-  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
-  return <BasketListRuntime />;
+  return (
+    <ProtocolActionScope>
+      <BasketListRuntime />
+    </ProtocolActionScope>
+  );
 }
 
 function BasketListRuntime() {
   const t = useTranslations("baskets");
   const wallet = useWalletState();
   const publicClient = usePublicClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
   const catalog = useQuery({
@@ -50,7 +49,7 @@ function BasketListRuntime() {
         : undefined,
       walletAddress
     ),
-    enabled: deploymentState.status === "configured" && Boolean(publicClient),
+    enabled: protocol.available && Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -93,7 +92,7 @@ function BasketListRuntime() {
         </p>
       )}
       <SurfaceBoundary
-        state={deploymentState.status === "unavailable" ? "unconfigured" : surfaceState}
+        state={protocol.available ? surfaceState : "empty"}
         subject={t("subject")}
         onRetry={() => void catalog.refetch()}
         empty={{

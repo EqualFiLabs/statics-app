@@ -26,7 +26,7 @@ import {
   buildWithdrawBasketCollateralCall,
 } from "@statics-protocol/sdk";
 
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canClosePosition,
   describePositionError,
@@ -44,12 +44,11 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
+import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
-  EmptyState,
-  ProtocolPendingSurface,
-  SurfaceEmptyState,
-  UnconfiguredSurface,
-} from "@/components/common/EmptyState";
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
@@ -62,9 +61,6 @@ import {
   rewardSelectionChanges,
   toggleRewardSelection,
 } from "@/lib/positions/staking";
-import { useDeployment } from "@/providers/deployment-context";
-
-const deploymentState = readClientDollarDeployment();
 
 type CollateralMode = "deposit" | "withdraw";
 
@@ -90,12 +86,12 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
-  const { active } = useDeployment();
-  if (active.deployment?.kind === "launch") {
-    return <ProtocolPendingSurface subject="Position NFT management" />;
-  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Position" />;
-  return <PositionDetailRuntime positionId={positionId} />;
+  return (
+    <ProtocolActionScope>
+      <PositionDetailRuntime positionId={positionId} />
+    </ProtocolActionScope>
+  );
 }
 
 function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
@@ -105,6 +101,8 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const queryClient = useQueryClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -126,6 +124,7 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
   const catalog = useQuery({
     queryKey: catalogQueryKey,
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -504,15 +503,6 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
     setCustomRewardAddress("");
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject="position"
-        empty={{ title: "Position unavailable", description: "No deployment is configured." }}
-      />
-    );
-  }
   const detailState = deriveSurfaceState({
     walletStatus: walletState.status,
     isTargetChain: walletState.isTargetChain,

@@ -2,22 +2,18 @@
 
 import { createContext, useContext, useMemo, useState } from "react";
 
-import {
-  defaultDeploymentId,
-  deploymentRegistry,
-  findDeployment,
-} from "@/lib/deployments/registry";
-import type { DeploymentOption } from "@/lib/deployments/types";
+import { defaultNetworkId, deploymentRegistry, findDeployment } from "@/lib/deployments/registry";
+import type { DeploymentOption, StaticsNetworkId } from "@/lib/deployments/types";
 
 export type DeploymentContextValue = Readonly<{
   active: DeploymentOption;
   options: readonly DeploymentOption[];
-  selectNetwork: (chainId: number) => void;
+  selectNetwork: (networkId: StaticsNetworkId) => void;
 }>;
 
 const options = deploymentRegistry();
 const initial =
-  findDeployment(options, defaultDeploymentId()) ??
+  findDeployment(options, defaultNetworkId()) ??
   options[0] ??
   (() => {
     throw new Error("At least one Statics deployment option is required.");
@@ -36,8 +32,8 @@ export function DeploymentProvider({ children }: { children: React.ReactNode }) 
     () => ({
       active,
       options,
-      selectNetwork: (chainId) => {
-        const selected = options.find((option) => option.descriptor.chainId === chainId);
+      selectNetwork: (networkId) => {
+        const selected = options.find((option) => option.networkId === networkId);
         if (!selected) return;
         setActive(selected);
       },

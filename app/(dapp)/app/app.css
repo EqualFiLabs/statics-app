@@ -796,6 +796,18 @@
   opacity: 0.5;
 }
 
+.protocol-action-scope > fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.protocol-action-scope.is-disabled :is(button, input, select, textarea) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .dapp-nav-item.active {
   background: var(--accent-wash);
   color: var(--accent);

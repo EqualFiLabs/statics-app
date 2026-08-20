@@ -58,7 +58,12 @@ const deployment = {
     },
   },
 } as const satisfies LaunchDeployment;
-const option = { descriptor, deployment } satisfies DeploymentOption;
+const option = {
+  networkId: "robinhood",
+  descriptor,
+  launch: deployment,
+  protocol: null,
+} satisfies DeploymentOption;
 
 describe("Swap page", () => {
   it("reuses canonical token swapping and switches to the Genesis Vault", () => {
