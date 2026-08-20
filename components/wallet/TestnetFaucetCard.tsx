@@ -66,7 +66,7 @@ function TestnetFaucetRuntime() {
   const { active } = useDeployment();
   const deployment = active.protocol?.protocol ?? null;
   const faucet = deployment?.faucet;
-  const faucetChainId = deployment?.chainId ?? 46_630;
+  const faucetChainId = deployment?.chainId ?? active.descriptor.chainId;
   const { tokens, addTokens } = useWalletTokens(faucetChainId, active.protocol ?? active.launch);
   const [snapshot, setSnapshot] = useState<FaucetSnapshot | null>(null);
   const [loading, setLoading] = useState(false);

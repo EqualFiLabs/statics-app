@@ -80,10 +80,10 @@ function BasketCreateRuntime() {
   const protocolSlippage = useProtocolSlippage();
   const protocol = useProtocolSurface();
   const configuredDeployment = protocol.deployment;
+  const { active } = useDeployment();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-  const chainId = configuredDeployment.chainId;
-  const { active } = useDeployment();
+  const chainId = active.descriptor.chainId;
   const walletTokens = useWalletTokens(chainId, active.protocol ?? active.launch);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
