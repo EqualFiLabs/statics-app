@@ -1,5 +1,7 @@
 import { getAddress } from "viem";
 
+export const LAUNCH_FORK_RPC_PORT = 8_545;
+
 const maximumFunding = { eth: 1_000_000, weth: 1_000_000, statics: 10_000_000 };
 
 function readOption(arguments_, name) {

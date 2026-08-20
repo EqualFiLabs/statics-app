@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  LAUNCH_FORK_RPC_PORT,
   parseLaunchForkControl,
   validateLaunchForkCommand,
 } from "@/scripts/lib/launch-fork-control.mjs";
@@ -8,6 +9,10 @@ import {
 const wallet = "0x1234567890abcdef1234567890abcdef12345678";
 
 describe("launch fork controls", () => {
+  it("uses the standard local Ethereum RPC port", () => {
+    expect(LAUNCH_FORK_RPC_PORT).toBe(8_545);
+  });
+
   it("accepts only bounded typed wallet funding", () => {
     expect(
       parseLaunchForkControl("fund-wallet", [wallet, "--eth", "10", "--statics", "100000"])

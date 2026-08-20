@@ -27,7 +27,6 @@ import { useAccount } from "wagmi";
 import {
   createWalletTransports,
   getAddressExplorerUrl,
-  getStaticsChain,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
@@ -121,7 +120,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
     (wagmiAccount.address?.toLowerCase() === address?.toLowerCase()
       ? (wagmiAccount.chainId ?? null)
       : null);
-  const targetChain = getStaticsChain(active.descriptor.chainId) ?? walletEnvironment.defaultChain;
+  const targetChain =
+    walletEnvironment.supportedChains.find((chain) => chain.id === active.descriptor.chainId) ??
+    walletEnvironment.defaultChain;
   const localFork = active.launch?.source === "development-fixture";
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
   const activeFundingNetworks = fundingNetworkSummaries;

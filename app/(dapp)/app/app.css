@@ -521,6 +521,11 @@
   align-items: center;
 }
 
+.dapp-header-actions {
+  grid-column: -2 / -1;
+  justify-self: end;
+}
+
 .dapp-network-selector select {
   max-width: 15rem;
   min-height: var(--control-height-sm);

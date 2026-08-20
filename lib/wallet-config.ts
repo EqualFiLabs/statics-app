@@ -101,6 +101,16 @@ export type WalletEnvironment = Readonly<{
   configured: boolean;
 }>;
 
+function chainWithRpc(chain: Chain, rpcUrl: string): Chain {
+  return {
+    ...chain,
+    rpcUrls: {
+      ...chain.rpcUrls,
+      default: { http: [rpcUrl] },
+    },
+  };
+}
+
 export function readWalletEnvironment(
   environment: Record<string, string | undefined> = process.env
 ): WalletEnvironment {
@@ -138,8 +148,14 @@ export function readWalletEnvironment(
     throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
   }
 
+  const anvilRpcUrl = configuredAnvilRpc ?? "http://127.0.0.1:8545/";
+  const configuredAnvil = chainWithRpc(anvil, anvilRpcUrl);
   const defaultChain =
-    network === "anvil" ? anvil : network === "robinhood" ? robinhoodMainnet : robinhoodTestnet;
+    network === "anvil"
+      ? configuredAnvil
+      : network === "robinhood"
+        ? robinhoodMainnet
+        : robinhoodTestnet;
   const publicRobinhoodChains = [robinhoodMainnet, robinhoodTestnet];
   return {
     appEnvironment,
@@ -148,22 +164,17 @@ export function readWalletEnvironment(
     clientId,
     robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
-    anvilRpcUrl: configuredAnvilRpc ?? "http://127.0.0.1:8545/",
+    anvilRpcUrl,
     defaultChain,
     supportedChains: [
       defaultChain,
       ...publicRobinhoodChains.filter((chain) => chain.id !== defaultChain.id),
-      ...(appEnvironment === "development" && defaultChain.id !== anvil.id ? [anvil] : []),
+      ...(appEnvironment === "development" && defaultChain.id !== anvil.id
+        ? [configuredAnvil]
+        : []),
     ] as [Chain, ...Chain[]],
     configured: Boolean(appId),
   };
-}
-
-export function getStaticsChain(chainId: number): Chain | null {
-  if (chainId === robinhoodMainnet.id) return robinhoodMainnet;
-  if (chainId === robinhoodTestnet.id) return robinhoodTestnet;
-  if (chainId === anvil.id) return anvil;
-  return null;
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {

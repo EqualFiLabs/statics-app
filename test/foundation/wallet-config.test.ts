@@ -40,7 +40,20 @@ describe("wallet environment", () => {
     expect(environment.defaultChain.id).toBe(31_337);
     expect(environment.defaultChain.name).toBe("Local Anvil");
     expect(environment.defaultChain.blockExplorers).toBeUndefined();
+    expect(environment.defaultChain.rpcUrls.default.http).toEqual(["http://127.0.0.1:8546/"]);
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([31_337, 4_663, 46_630]);
+  });
+
+  it("uses the configured Anvil RPC even when a public network starts selected", () => {
+    const environment = readWalletEnvironment({
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "robinhood-testnet",
+      NEXT_PUBLIC_ANVIL_RPC_URL: "http://127.0.0.1:8546",
+    });
+
+    expect(
+      environment.supportedChains.find((chain) => chain.id === 31_337)?.rpcUrls.default.http
+    ).toEqual(["http://127.0.0.1:8546/"]);
   });
 
   it("rejects a non-loopback or non-development Anvil RPC", () => {

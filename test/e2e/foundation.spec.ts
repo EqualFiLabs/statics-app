@@ -218,6 +218,20 @@ test.describe("Dollar DApp foundation", () => {
     await expect(selector).toHaveValue("robinhood-testnet");
   });
 
+  test("keeps desktop navbar controls aligned to the right", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "Desktop navbar layout assertion");
+    await page.goto("/app");
+
+    const header = await page.locator(".dapp-header").boundingBox();
+    const actions = await page.locator(".dapp-header-actions").boundingBox();
+    expect(header).not.toBeNull();
+    expect(actions).not.toBeNull();
+    if (!header || !actions) return;
+
+    await expect(page.locator(".dapp-header-actions")).toHaveCSS("justify-self", "end");
+    expect(header.x + header.width - (actions.x + actions.width)).toBeLessThan(50);
+  });
+
   test("keeps the basket route responsive and accessible", async ({ page }) => {
     await page.goto("/app/baskets");
     await expect(page.locator('.dapp-nav-item[href="/app/baskets"]')).toHaveAttribute(

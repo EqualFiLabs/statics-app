@@ -38,7 +38,7 @@ import {
   toHex,
 } from "viem";
 
-import { validateLaunchForkCommand } from "./lib/launch-fork-control.mjs";
+import { LAUNCH_FORK_RPC_PORT, validateLaunchForkCommand } from "./lib/launch-fork-control.mjs";
 import { deployLaunchFork, startRpcRelay } from "./lib/launch-fork.mjs";
 import { readPublicPrivyConfig } from "./lib/local-privy.mjs";
 
@@ -48,7 +48,7 @@ const socketPath = resolve(localRoot, "control.sock");
 const sessionPath = resolve(localRoot, "session.json");
 const ponderData = resolve(localRoot, "ponder");
 const ponderProject = resolve(localRoot, "ponder-project");
-const rpcPort = 8_546;
+const rpcPort = LAUNCH_FORK_RPC_PORT;
 const rpcUrl = `http://127.0.0.1:${rpcPort}`;
 const ponderPort = 42_070;
 const indexerUrl = `http://127.0.0.1:${ponderPort}`;
