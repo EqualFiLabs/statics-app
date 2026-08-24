@@ -24,9 +24,9 @@ import { useWalletState } from "@/providers/wallet-context";
 function describeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/rejected/i.test(message)) return "The wallet request was rejected.";
-  if (message.includes("GenesisNotInVault"))
-    return "That NFT was just acquired. Loading the next one.";
-  if (message.includes("GenesisLocked")) return "Unlink this Genesis NFT before redeeming it.";
+  if (message.includes("GenesisNotInVault")) return "That NFT was just acquired. Loading the next one.";
+  if (message.includes("CreditAlreadyActive")) return "Repay or recover this Genesis credit before redeeming.";
+  if (message.includes("GenesisLocked")) return "This Genesis is currently locked and cannot be redeemed.";
   return message || "The Genesis Vault transaction failed.";
 }
 
@@ -46,11 +46,16 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
       await verifyLaunchDeployment(publicClient, deployment);
-      const [quote, accounting, nextId, ownedIds] = await Promise.all([
+      const [purchaseQuote, redemptionQuote, accounting, nextId, ownedIds] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: staticsGenesisVaultAbi,
           functionName: "quoteGenesisPurchase",
+        }),
+        publicClient.readContract({
+          address: deployment.contracts.vault,
+          abi: staticsGenesisVaultAbi,
+          functionName: "quoteGenesisRedemption",
         }),
         publicClient.readContract({
           address: deployment.contracts.vault,
@@ -60,7 +65,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         discoverNextAvailableGenesisId(publicClient, deployment),
         wallet ? discoverWalletGenesisIds(publicClient, deployment, wallet) : [],
       ]);
-      return { quote, accounting, nextId, ownedIds };
+      return { purchaseQuote, redemptionQuote, accounting, nextId, ownedIds };
     },
   });
 
@@ -94,10 +99,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     request: Omit<Parameters<typeof executeProtocolTransaction>[0], "deploymentId">
   ) => {
     await verifyLaunchDeployment(request.publicClient, deployment);
-    return executeProtocolTransaction({
-      ...request,
-      deploymentId: deployment.descriptor.deploymentId,
-    });
+    return executeProtocolTransaction({ ...request, deploymentId: deployment.descriptor.deploymentId });
   };
 
   const buy = async () => {
@@ -106,7 +108,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     setError(null);
     try {
       const id = vault.data.nextId;
-      const [[price, nativeFee], balance, allowance, stillAvailable] = await Promise.all([
+      const [quote, balance, allowance, stillAvailable] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: staticsGenesisVaultAbi,
@@ -132,8 +134,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         }),
       ]);
       if (!stillAvailable) throw new Error("GenesisNotInVault");
-      if (balance < price) throw new Error("Buy STATICS first, then switch back to NFT.");
-      if (allowance < price) {
+      if (balance < quote.staticsPrice) throw new Error("Buy STATICS first, then switch back to NFT.");
+      if (allowance < quote.staticsPrice) {
         await transact({
           publicClient,
           wallet,
@@ -151,14 +153,14 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           describeError,
         });
       }
-      const purchase = buildBuyGenesisTransaction(id, wallet, nativeFee);
+      const purchase = buildBuyGenesisTransaction(id, wallet, quote.requiredNative);
       await transact({
         publicClient,
         wallet,
         chainId: deployment.descriptor.chainId,
         kind: "buy-genesis",
         label: `Acquire Genesis #${id}`,
-        amount: `${formatEther(price)} STATICS + ${formatEther(nativeFee)} ETH`,
+        amount: `${formatEther(quote.staticsPrice)} STATICS + ${formatEther(quote.requiredNative)} ETH`,
         to: deployment.contracts.vault,
         data: purchase.data,
         value: purchase.value,
@@ -180,6 +182,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     setError(null);
     try {
       const id = BigInt(selectedOwnedId);
+      const redemptionQuote = await publicClient.readContract({
+        address: deployment.contracts.vault,
+        abi: staticsGenesisVaultAbi,
+        functionName: "quoteGenesisRedemption",
+      });
       const approved = await publicClient.readContract({
         address: deployment.contracts.genesis,
         abi: staticsGenesisAbi,
@@ -210,7 +217,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         chainId: deployment.descriptor.chainId,
         kind: "redeem-genesis",
         label: `Redeem Genesis #${id}`,
-        amount: `${formatEther(vault.data?.quote[0] ?? 0n)} STATICS`,
+        amount: `${formatEther(redemptionQuote.staticsPayout)} STATICS + ${formatEther(redemptionQuote.reservePayout)} ETH`,
         to: deployment.contracts.vault,
         data: buildRedeemGenesisCall(id, wallet),
         sendTransaction: walletState.sendEvmTransaction,
@@ -227,97 +234,70 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   };
 
   if (vault.isLoading) return <p className="dapp-loading">Loading the Genesis Vault…</p>;
-  if (vault.error) {
-    return (
-      <EmptyState title="Genesis Vault unavailable" description={describeError(vault.error)} />
-    );
-  }
+  if (vault.error) return <EmptyState title="Genesis Vault unavailable" description={describeError(vault.error)} />;
 
   const nextId = vault.data?.nextId ?? null;
+  const purchaseQuote = vault.data?.purchaseQuote;
+  const redemptionQuote = vault.data?.redemptionQuote;
+  const accounting = vault.data?.accounting;
   return (
     <div className="genesis-vault-swap">
+      <section className="portal-panel" aria-labelledby="genesis-vault-state-title">
+        <p className="dapp-eyebrow">Genesis Vault</p>
+        <h2 id="genesis-vault-state-title">Fully backed Genesis inventory</h2>
+        <dl className="portal-quote-grid">
+          <div><dt>Remaining</dt><dd>{accounting?.vaultInventory.toString() ?? "—"}</dd></div>
+          <div><dt>Circulating</dt><dd>{accounting?.circulatingGenesis.toString() ?? "—"}</dd></div>
+          <div><dt>Native reserve</dt><dd>{formatEther(accounting?.reserveETH ?? 0n)} ETH</dd></div>
+          <div><dt>Reserve / Genesis</dt><dd>{formatEther(accounting?.reserveBackingPerGenesis ?? 0n)} ETH</dd></div>
+          <div><dt>Outstanding credit</dt><dd>{formatEther(accounting?.outstandingGenesisCredit ?? 0n)} STATICS</dd></div>
+          <div><dt>Genesis Epoch</dt><dd>{accounting?.epochActive ? "Active" : "Complete"}</dd></div>
+        </dl>
+      </section>
+
       <section className="portal-panel" aria-labelledby="next-genesis-title">
         <p className="dapp-eyebrow">STATICS → Genesis NFT</p>
-        <h2 id="next-genesis-title">
-          {nextId === null ? "Vault inventory exhausted" : `Genesis #${nextId}`}
-        </h2>
+        <h2 id="next-genesis-title">{nextId === null ? "Vault inventory exhausted" : `Genesis #${nextId}`}</h2>
         {nextId !== null && (
           <NftArtwork
             chainId={deployment.descriptor.chainId}
             expandable
-            nft={{
-              kind: "collection",
-              tokenId: nextId,
-              contract: deployment.contracts.genesis,
-              name: `Genesis #${nextId}`,
-              summary: "Next available Genesis NFT",
-              carries: [],
-              blockedReason: null,
-            }}
+            nft={{ kind: "collection", tokenId: nextId, contract: deployment.contracts.genesis, name: `Genesis #${nextId}`, summary: "Next available Genesis NFT", carries: [], blockedReason: null }}
           />
         )}
         <dl className="portal-quote-grid">
-          <div>
-            <dt>Fixed backing</dt>
-            <dd>{formatEther(vault.data?.quote[0] ?? 0n)} STATICS</dd>
-          </div>
-          <div>
-            <dt>Acquisition fee</dt>
-            <dd>{formatEther(vault.data?.quote[1] ?? 0n)} ETH</dd>
-          </div>
-          <div>
-            <dt>Remaining</dt>
-            <dd>{vault.data?.accounting.vaultInventory.toString() ?? "—"}</dd>
-          </div>
+          <div><dt>STATICS backing</dt><dd>{formatEther(purchaseQuote?.staticsPrice ?? 0n)} STATICS</dd></div>
+          <div><dt>Reserve buy-in</dt><dd>{formatEther(purchaseQuote?.reserveBuyIn ?? 0n)} ETH</dd></div>
+          <div><dt>Acquisition fee</dt><dd>{formatEther(purchaseQuote?.nativeFee ?? 0n)} ETH</dd></div>
+          <div><dt>Total ETH required</dt><dd>{formatEther(purchaseQuote?.requiredNative ?? 0n)} ETH</dd></div>
         </dl>
-        <button
-          className="portal-primary-action"
-          type="button"
-          disabled={busy !== null || nextId === null}
-          onClick={() => void buy()}
-        >
-          {busy === "buy" ? "Confirming…" : "Buy Genesis NFT"}
+        <button className="portal-primary-action" type="button" disabled={busy !== null || nextId === null} onClick={() => void buy()}>
+          {busy === "buy" ? "Confirming…" : "Acquire Genesis NFT"}
         </button>
       </section>
 
       <section className="portal-panel" aria-labelledby="redeem-genesis-title">
-        <p className="dapp-eyebrow">Genesis NFT → STATICS</p>
+        <p className="dapp-eyebrow">Genesis NFT → backing</p>
         <h2 id="redeem-genesis-title">Redeem an owned NFT</h2>
         {wallet && (vault.data?.ownedIds.length ?? 0) > 0 ? (
           <>
             <label className="portal-field">
               <span>Genesis NFT</span>
-              <select
-                value={selectedOwnedId}
-                onChange={(event) => setSelectedOwnedId(event.target.value)}
-              >
+              <select value={selectedOwnedId} onChange={(event) => setSelectedOwnedId(event.target.value)}>
                 <option value="">Choose an NFT</option>
-                {vault.data!.ownedIds.map((id) => (
-                  <option key={id.toString()} value={id.toString()}>
-                    Genesis #{id.toString()}
-                  </option>
-                ))}
+                {vault.data!.ownedIds.map((id) => <option key={id.toString()} value={id.toString()}>Genesis #{id.toString()}</option>)}
               </select>
             </label>
-            <p>Receive {formatEther(vault.data?.quote[0] ?? 0n)} STATICS.</p>
-            <button
-              className="portal-primary-action"
-              type="button"
-              disabled={busy !== null || !selectedOwnedId}
-              onClick={() => void redeem()}
-            >
-              {busy === "redeem" ? "Confirming…" : "Redeem for STATICS"}
+            <p>Receive {formatEther(redemptionQuote?.staticsPayout ?? 0n)} STATICS + {formatEther(redemptionQuote?.reservePayout ?? 0n)} ETH.</p>
+            <button className="portal-primary-action" type="button" disabled={busy !== null || !selectedOwnedId} onClick={() => void redeem()}>
+              {busy === "redeem" ? "Confirming…" : "Redeem Genesis"}
             </button>
           </>
         ) : (
           <p>Connect a wallet holding a Genesis NFT to redeem it.</p>
         )}
       </section>
-      {error && (
-        <p className="portal-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p className="portal-error" role="alert">{error}</p>}
     </div>
   );
 }
