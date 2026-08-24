@@ -12,6 +12,7 @@ import {
 } from "@statics-protocol/sdk";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { GenesisCreditPanel } from "@/components/genesis/GenesisCreditPanel";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
@@ -160,7 +161,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         deploymentId: deployment.descriptor.deploymentId,
         kind: "activate-genesis",
         label: `Activate Genesis #${id} to tier ${targetTier}`,
-        amount: `${formatEther(cost)} STATICS burned`,
+        amount: `${formatEther(cost)} STATICS activation payment`,
         to: deployment.contracts.activationRegistry,
         data: buildActivateGenesisCall(id, targetTier),
         sendTransaction: walletState.sendEvmTransaction,
@@ -179,7 +180,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     return (
       <EmptyState
         title="Connect your wallet"
-        description="Connect to view and activate your Genesis NFTs."
+        description="Connect to view and manage your Genesis NFTs."
       />
     );
   }
@@ -216,7 +217,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   <div>
                     <h2 className="ui-section-title">Genesis #{item.id.toString()}</h2>
                     <span className="ui-pill">
-                      Tier {item.tier} · {(item.multiplierBps / 10_000).toFixed(2)}×
+                      Tier {item.tier} · {(item.multiplierBps / 10_000).toFixed(2)}× reward weight
                     </span>
                   </div>
                   <NftArtwork
@@ -255,7 +256,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                           ))}
                       </select>
                     </label>
-                    <p>Burn cost: {formatEther(cost)} STATICS</p>
+                    <p>Activation cost: {formatEther(cost)} STATICS</p>
                     <button
                       className="ui-button ui-button--primary ui-button--block"
                       type="button"
@@ -264,11 +265,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                     >
                       {busy === item.id ? "Confirming…" : "Activate"}
                     </button>
+                    <p>Activation payments are transferred to the Statics treasury.</p>
                   </div>
                 )}
+                <GenesisCreditPanel deployment={deployment} genesisId={item.id} />
                 <p className="genesis-warning">
                   Transferring this Genesis NFT resets its activation to Tier 0. Rewards earned
-                  before transfer remain claimable by the previous owner.
+                  before transfer remain claimable by the previous owner. Active secured credit
+                  locks transfers until repayment or recovery.
                 </p>
               </article>
             );
@@ -285,6 +289,11 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           address={deployment.contracts.activationRegistry}
           chainId={deployment.descriptor.chainId}
           label="Activation registry"
+        />
+        <AddressDisplay
+          address={deployment.contracts.vault}
+          chainId={deployment.descriptor.chainId}
+          label="Genesis Vault"
         />
       </section>
     </div>
