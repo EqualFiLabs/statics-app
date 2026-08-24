@@ -92,7 +92,7 @@ const routePresentations = {
     status: "Genesis NFT",
     title: "Manage your Genesis NFTs",
     description:
-      "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight.",
+      "Activate a Genesis NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
   },
   genesisRewards: {
     label: "Genesis Rewards",
