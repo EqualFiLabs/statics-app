@@ -9,12 +9,12 @@ import {
   buildRedeemGenesisCall,
   dopplerStaticsTokenAbi,
   staticsGenesisAbi,
-  staticsGenesisVaultAbi,
 } from "@statics-protocol/sdk";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
+import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/genesis/discovery";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -47,21 +47,9 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
       await verifyLaunchDeployment(publicClient, deployment);
       const [purchaseQuote, redemptionQuote, accounting, nextId, ownedIds] = await Promise.all([
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "quoteGenesisPurchase",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "quoteGenesisRedemption",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "vaultAccounting",
-        }),
+        publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "quoteGenesisPurchase" }),
+        publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "quoteGenesisRedemption" }),
+        publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "vaultAccounting" }),
         discoverNextAvailableGenesisId(publicClient, deployment),
         wallet ? discoverWalletGenesisIds(publicClient, deployment, wallet) : [],
       ]);
@@ -74,8 +62,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       predicate: (query) =>
         Array.isArray(query.queryKey) &&
         query.queryKey.includes(deployment.descriptor.deploymentId) &&
-        (String(query.queryKey[0]).startsWith("genesis-vault") ||
-          String(query.queryKey[0]).startsWith("launch-genesis")),
+        (String(query.queryKey[0]).startsWith("genesis-vault") || String(query.queryKey[0]).startsWith("launch-genesis")),
     });
   };
 
@@ -95,9 +82,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     return Boolean(wallet && publicClient);
   };
 
-  const transact = async (
-    request: Omit<Parameters<typeof executeProtocolTransaction>[0], "deploymentId">
-  ) => {
+  const transact = async (request: Omit<Parameters<typeof executeProtocolTransaction>[0], "deploymentId">) => {
     await verifyLaunchDeployment(request.publicClient, deployment);
     return executeProtocolTransaction({ ...request, deploymentId: deployment.descriptor.deploymentId });
   };
@@ -109,29 +94,10 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     try {
       const id = vault.data.nextId;
       const [quote, balance, allowance, stillAvailable] = await Promise.all([
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "quoteGenesisPurchase",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.statics,
-          abi: dopplerStaticsTokenAbi,
-          functionName: "balanceOf",
-          args: [wallet],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.statics,
-          abi: dopplerStaticsTokenAbi,
-          functionName: "allowance",
-          args: [wallet, deployment.contracts.vault],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "isVaultInventory",
-          args: [id],
-        }),
+        publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "quoteGenesisPurchase" }),
+        publicClient.readContract({ address: deployment.contracts.statics, abi: dopplerStaticsTokenAbi, functionName: "balanceOf", args: [wallet] }),
+        publicClient.readContract({ address: deployment.contracts.statics, abi: dopplerStaticsTokenAbi, functionName: "allowance", args: [wallet, deployment.contracts.vault] }),
+        publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "isVaultInventory", args: [id] }),
       ]);
       if (!stillAvailable) throw new Error("GenesisNotInVault");
       if (balance < quote.staticsPrice) throw new Error("Buy STATICS first, then switch back to NFT.");
@@ -144,11 +110,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           label: "Enable Genesis NFT acquisition",
           amount: "Maximum STATICS",
           to: deployment.contracts.statics,
-          data: encodeFunctionData({
-            abi: dopplerStaticsTokenAbi,
-            functionName: "approve",
-            args: [deployment.contracts.vault, MAX_ERC20_ALLOWANCE],
-          }),
+          data: encodeFunctionData({ abi: dopplerStaticsTokenAbi, functionName: "approve", args: [deployment.contracts.vault, MAX_ERC20_ALLOWANCE] }),
           sendTransaction: walletState.sendEvmTransaction,
           describeError,
         });
@@ -182,17 +144,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     setError(null);
     try {
       const id = BigInt(selectedOwnedId);
-      const redemptionQuote = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: staticsGenesisVaultAbi,
-        functionName: "quoteGenesisRedemption",
-      });
-      const approved = await publicClient.readContract({
-        address: deployment.contracts.genesis,
-        abi: staticsGenesisAbi,
-        functionName: "getApproved",
-        args: [id],
-      });
+      const redemptionQuote = await publicClient.readContract({ address: deployment.contracts.vault, abi: currentGenesisVaultAbi, functionName: "quoteGenesisRedemption" });
+      const approved = await publicClient.readContract({ address: deployment.contracts.genesis, abi: staticsGenesisAbi, functionName: "getApproved", args: [id] });
       if (getAddress(approved) !== getAddress(deployment.contracts.vault)) {
         await transact({
           publicClient,
@@ -202,11 +155,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           label: `Approve Genesis #${id} redemption`,
           amount: `Genesis #${id}`,
           to: deployment.contracts.genesis,
-          data: encodeFunctionData({
-            abi: staticsGenesisAbi,
-            functionName: "approve",
-            args: [deployment.contracts.vault, id],
-          }),
+          data: encodeFunctionData({ abi: staticsGenesisAbi, functionName: "approve", args: [deployment.contracts.vault, id] }),
           sendTransaction: walletState.sendEvmTransaction,
           describeError,
         });
@@ -259,11 +208,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         <p className="dapp-eyebrow">STATICS → Genesis NFT</p>
         <h2 id="next-genesis-title">{nextId === null ? "Vault inventory exhausted" : `Genesis #${nextId}`}</h2>
         {nextId !== null && (
-          <NftArtwork
-            chainId={deployment.descriptor.chainId}
-            expandable
-            nft={{ kind: "collection", tokenId: nextId, contract: deployment.contracts.genesis, name: `Genesis #${nextId}`, summary: "Next available Genesis NFT", carries: [], blockedReason: null }}
-          />
+          <NftArtwork chainId={deployment.descriptor.chainId} expandable nft={{ kind: "collection", tokenId: nextId, contract: deployment.contracts.genesis, name: `Genesis #${nextId}`, summary: "Next available Genesis NFT", carries: [], blockedReason: null }} />
         )}
         <dl className="portal-quote-grid">
           <div><dt>STATICS backing</dt><dd>{formatEther(purchaseQuote?.staticsPrice ?? 0n)} STATICS</dd></div>
