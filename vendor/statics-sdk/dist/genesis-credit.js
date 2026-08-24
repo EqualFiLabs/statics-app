@@ -8,6 +8,7 @@ export const staticsGenesisCreditAbi = parseAbi([
     "function extendGenesisCredit(uint256 genesisId) payable",
     "function repayGenesisCredit(uint256 genesisId)",
     "function recoverGenesisCredit(uint256 genesisId)",
+    "function epochActive() view returns (bool)",
     "function creditLimit(uint256 genesisId) view returns (uint256)",
     "function credit(uint256 genesisId) view returns ((address owner, uint256 principal, uint40 maturity, uint40 recoverableAt, bool active) state)",
     "function creditActive(uint256 genesisId) view returns (bool)",
@@ -28,16 +29,10 @@ export const staticsGenesisCreditAbi = parseAbi([
     "event GenesisCreditRecovered(uint256 indexed genesisId, address indexed formerOwner, address indexed caller, uint256 principal, uint256 unusedCredit, uint256 callerIncentive, uint256 genesisDistribution)",
 ]);
 export function buildOpenGenesisCreditTransaction(genesisId, principal, nativeFee) {
-    return {
-        data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "openGenesisCredit", args: [genesisId, principal] }),
-        value: nativeFee,
-    };
+    return { data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "openGenesisCredit", args: [genesisId, principal] }), value: nativeFee };
 }
 export function buildExtendGenesisCreditTransaction(genesisId, nativeFee) {
-    return {
-        data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "extendGenesisCredit", args: [genesisId] }),
-        value: nativeFee,
-    };
+    return { data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "extendGenesisCredit", args: [genesisId] }), value: nativeFee };
 }
 export function buildRepayGenesisCreditCall(genesisId) {
     return encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "repayGenesisCredit", args: [genesisId] });
