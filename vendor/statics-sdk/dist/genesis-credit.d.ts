@@ -1,9 +1,9 @@
-import type { Address, Hex } from "viem";
+import type { Abi, Address, Hex } from "viem";
 export declare const GENESIS_MAX_CREDIT_PRINCIPAL: bigint;
 export declare const GENESIS_RECOVERY_RESIDUAL: bigint;
 export declare const GENESIS_CREDIT_TERM: bigint;
 export declare const GENESIS_CREDIT_RECOVERY_GRACE: bigint;
-export declare const staticsGenesisCreditAbi: readonly unknown[];
+export declare const staticsGenesisCreditAbi: Abi;
 export type GenesisCreditTransaction = Readonly<{
     data: Hex;
     value: bigint;
