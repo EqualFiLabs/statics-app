@@ -12,6 +12,19 @@ export type CanonicalToken = Readonly<{
   kind: "native" | "erc20";
 }>;
 
+export const CANONICAL_SWAP_TTL_SECONDS = 20n * 60n;
+
+export function canonicalSwapDeadline(
+  deployment: LaunchDeployment,
+  blockTimestamp: bigint,
+  wallClockTimestamp = BigInt(Math.floor(Date.now() / 1_000))
+): bigint {
+  const baseline =
+    deployment.source === "development-fixture" && wallClockTimestamp > blockTimestamp
+      ? wallClockTimestamp
+      : blockTimestamp;
+  return baseline + CANONICAL_SWAP_TTL_SECONDS;
+}
 export const tradeDirections: readonly TradeDirection[] = [
   { input: "eth", output: "statics" },
   { input: "weth", output: "statics" },

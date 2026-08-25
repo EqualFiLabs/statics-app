@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   canonicalTradeDirection,
+  CANONICAL_SWAP_TTL_SECONDS,
+  canonicalSwapDeadline,
   settlementForTrade,
   tradeDirections,
   zeroForTrade,
@@ -107,5 +109,16 @@ describe("canonical STATICS market", () => {
       output: "native",
       wrappedNative: weth,
     });
+  });
+
+  it("uses wall-clock time for stale local forks and block time elsewhere", () => {
+    const staleBlock = 1_787_611_468n;
+    const wallClock = 1_787_660_530n;
+    expect(canonicalSwapDeadline(deployment, staleBlock, wallClock)).toBe(
+      wallClock + CANONICAL_SWAP_TTL_SECONDS
+    );
+    expect(
+      canonicalSwapDeadline({ ...deployment, source: "checked-in-manifest" }, staleBlock, wallClock)
+    ).toBe(staleBlock + CANONICAL_SWAP_TTL_SECONDS);
   });
 });
