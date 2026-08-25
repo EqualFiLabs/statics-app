@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { appNavigationGroupsForStage, appTabNavigationForStage } from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -131,7 +131,7 @@ function WalletHeaderControls() {
  * rather than by name, because the context does not carry the name of the
  * chain the wallet actually sits on -- only its id.
  */
-function NetworkIndicator() {
+function NetworkIndicator({ label }: { label?: string } = {}) {
   const wallet = useWalletState();
   const t = useTranslations("shell");
 
@@ -139,7 +139,7 @@ function NetworkIndicator() {
     return (
       <div className="dapp-network">
         <span className="dapp-network-dot" aria-hidden="true" />
-        {wallet.networkName}
+        {label ?? wallet.networkName}
       </div>
     );
   }
@@ -156,7 +156,7 @@ function NetworkIndicator() {
   return (
     <div className="dapp-network is-ready">
       <span className="dapp-network-dot" aria-hidden="true" />
-      {wallet.networkName}
+      {label ?? wallet.networkName}
     </div>
   );
 }
@@ -164,6 +164,9 @@ function NetworkIndicator() {
 function NetworkSelector() {
   const { active, options } = useDeployment();
   const wallet = useWalletState();
+  if (active.descriptor.stage === "launch" && process.env.NEXT_PUBLIC_APP_ENV === "production") {
+    return <NetworkIndicator label={active.descriptor.network} />;
+  }
   if (options.length < 2) return null;
   return (
     <label className="dapp-network-selector">
@@ -224,6 +227,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const { active, options } = useDeployment();
+  const navigationGroups = appNavigationGroupsForStage(active.descriptor.stage);
+  const tabNavigation = appTabNavigationForStage(active.descriptor.stage);
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -235,20 +240,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeId = getDappRouteId(currentPath);
-  let routeCopy = {
-    label: tRoutes(`${routeId}.label`),
-    title: tRoutes(`${routeId}.title`),
-    description: tRoutes(`${routeId}.description`),
+  const useLaunchRouteCopy =
+    active.descriptor.stage === "launch" &&
+    (routeId === "overview" ||
+      routeId === "swap" ||
+      routeId === "genesis" ||
+      routeId === "genesisRewards");
+  const tLaunchRoutes = useTranslations("launchRoutes");
+  const routeCopy = {
+    label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
+    title: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.title`) : tRoutes(`${routeId}.title`),
+    description: useLaunchRouteCopy
+      ? tLaunchRoutes(`${routeId}.description`)
+      : tRoutes(`${routeId}.description`),
   };
-  if (routeId === "overview" && active.descriptor.stage === "launch") {
-    routeCopy = {
-      label: "Overview",
-      title: "Statics Genesis",
-      description: active.descriptor.available
-        ? "Trade STATICS, acquire a fully backed Genesis NFT, activate it, and earn a share of launch fees."
-        : "The standalone Genesis launch will open here after its reviewed Robinhood Chain deployment is published.",
-    };
-  }
   const showOverviewSummary = isDappOverviewPath(currentPath);
   const showApprovalDisclosure = approvalDisclosureRoutes.some(
     (route) => currentPath === route || currentPath.startsWith(`${route}/`)
@@ -326,7 +331,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             {/* One <nav> per group, each labelled, so the grouping is structure
                 rather than styling and assistive tech can jump between them. */}
-            {appNavigationGroups.map((group, groupIndex) => (
+            {navigationGroups.map((group, groupIndex) => (
               <nav
                 key={group.label ?? "home"}
                 className="dapp-nav-group"
@@ -347,7 +352,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       aria-current={currentActive ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
-                      {tItems(item.messageKey)}
+                      {active.descriptor.stage === "launch"
+                        ? tLaunchRoutes(`${item.messageKey}.label`)
+                        : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
@@ -396,7 +403,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="dapp-tabbar" aria-label={tShell("primary")}>
-        {appTabNavigation.map((item) => {
+        {tabNavigation.map((item) => {
           const currentActive =
             item.href === currentPath ||
             (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
@@ -407,7 +414,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={currentActive ? "page" : undefined}
             >
-              {tItems(item.messageKey)}
+              {active.descriptor.stage === "launch"
+                ? tLaunchRoutes(`${item.messageKey}.label`)
+                : tItems(item.messageKey)}
             </Link>
           );
         })}

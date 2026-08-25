@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import {
+  getDappRouteCapability,
+  getDappRoutePresentation,
+  isDappRouteAllowed,
+} from "@/lib/dapp-navigation";
+import {
+  appNavigation,
+  appNavigationGroups,
+  appNavigationGroupsForStage,
+  appTabNavigation,
+  appTabNavigationForStage,
+} from "@/lib/site-config";
 import english from "@/messages/en.json";
 import spanish from "@/messages/es.json";
 import chinese from "@/messages/zh-CN.json";
@@ -73,6 +83,51 @@ describe("dapp route copy", () => {
         180
       );
     }
+  });
+});
+
+describe("stage-aware dapp navigation", () => {
+  const launch = {
+    deploymentId: "launch",
+    label: "Genesis launch",
+    network: "Robinhood Chain",
+    chainId: 4663,
+    stage: "launch" as const,
+    capabilities: [],
+    available: true,
+  };
+
+  it("selects exactly four launch destinations and tabs", () => {
+    const groups = appNavigationGroupsForStage("launch");
+    expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual([
+      "/app",
+      "/app/swap",
+      "/app/genesis",
+      "/app/genesis-rewards",
+    ]);
+    expect(appTabNavigationForStage("launch").map((item) => item.href)).toEqual([
+      "/app",
+      "/app/swap",
+      "/app/genesis",
+      "/app/genesis-rewards",
+    ]);
+    expect(groups.every((group) => group.items.every((item) => item.enabled))).toBe(true);
+  });
+
+  it("allows launch contextual utilities but rejects unsupported known routes", () => {
+    expect(isDappRouteAllowed("/app/genesis-rewards", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/wallet", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/activity", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/tools", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/positions/1042", launch)).toBe(false);
+    expect(isDappRouteAllowed("/app/unknown", launch)).toBe(true);
+    expect(getDappRouteCapability("/app/unknown")).toBeNull();
+    expect(getDappRouteCapability("/app/positions/1042")).toBe("positions");
+  });
+
+  it("leaves the complete catalog unchanged for full protocol", () => {
+    expect(appNavigationGroupsForStage("full-protocol")).toBe(appNavigationGroups);
+    expect(appTabNavigationForStage("full-protocol")).toBe(appTabNavigation);
   });
 });
 

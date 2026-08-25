@@ -31,11 +31,7 @@ Each network target may have a reviewed launch deployment, a full-protocol deplo
 neither. Chain and manifest identity remain part of internal cache and database keys so records
 cannot cross networks. This internal isolation is not exposed as a second product-selection model.
 
-Features that require the future Statics Diamond remain present as normal navigation links. Their
-real pages and complete controls still render. Inputs and value-moving buttons whose required
-contracts are absent are visibly disabled, and an accessible tooltip explains when they will be
-enabled. Pages are never replaced by a protocol-pending or unavailable screen merely because the
-Diamond is absent. The application shell does not remove, disable, or intercept such routes.
+Launch deployments expose only four primary product destinations: Overview, Trade, My Genesis, and Rewards. Wallet, Activity, and Approval Tools remain contextual utilities reachable from product flows; funding Portal access remains contextual through Wallet. Unsupported known full-protocol URLs replace to `/app`, while unknown `/app/*` paths remain Next.js 404s. Full-protocol deployments restore the complete application catalog and its existing route behavior.
 
 The network selector uses stable target identities rather than treating a deployment as a second
 environment selector:
@@ -75,16 +71,7 @@ NFT mode is the Genesis Vault conversion surface:
 
 There is no Genesis inventory catalog and no user-facing pagination over 5,555 NFTs.
 
-### Genesis management and rewards
-
-Manage contains two launch destinations:
-
-1. **Genesis NFT** displays NFTs owned by the connected wallet, their artwork and activation tier,
-   and activation controls.
-2. **Genesis Rewards** contains reward registration, effective weights, permissionless accrual,
-   current-holder claims, and previous-owner pull claims.
-
-Acquisition and redemption belong on Swap, not on the Genesis management or rewards pages.
+Genesis management is the My Genesis destination. It displays owned Genesis NFTs, artwork, activation tier, and post-Epoch secured credit management. After the Epoch it also discovers permissionless recoverable credits through the deployment-scoped Ponder index; every indexed candidate is revalidated onchain before a recovery action. Genesis Rewards contains reward registration, effective weights, permissionless accrual, current-holder claims, and previous-owner pull claims.
 
 ### Event-derived Genesis indexing
 
@@ -127,7 +114,7 @@ create a user-visible deployment mode, replace pages, or disable canonical swaps
 4. NFT acquisition rechecks that the displayed token is still Vault inventory before submitting.
 5. Genesis redemption remains subject to ownership, approval, activation-lock, and backing checks.
 6. Mainnet, testnet, and local-fork indexed records cannot collide.
-7. Future feature pages and their controls remain visible; only unavailable actions are disabled.
+7. Launch primary navigation is Overview, Trade, My Genesis, and Rewards; contextual Wallet, Activity, and Approval Tools remain reachable; unsupported known full-protocol URLs replace to `/app`, unknown paths remain 404s, and full-protocol stage restores the complete catalog.
 8. Local-fork support cannot be enabled outside development or against a non-loopback RPC.
 
 ## Consequences

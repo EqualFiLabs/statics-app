@@ -67,7 +67,7 @@ export const protocolStatus = {
   audit: "Internal review",
 } as const;
 
-import type { DeploymentCapability } from "@/lib/deployments/types";
+import type { DeploymentCapability, DeploymentStage } from "@/lib/deployments/types";
 
 export type AppNavigationItem = Readonly<{
   label: string;
@@ -255,3 +255,29 @@ export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.f
 export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filter(
   (item) => typeof item.tabLabel === "string"
 );
+/** The only product capabilities promoted by a launch deployment. */
+export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [
+  "overview",
+  "canonical-statics-market",
+  "genesis-vault",
+  "genesis-launch-rewards",
+] as const;
+
+/**
+ * Selects the canonical catalog for the selected deployment stage. The full
+ * catalog remains the source of truth; launch only filters and regroups it.
+ */
+export function appNavigationGroupsForStage(stage: DeploymentStage): readonly AppNavigationGroup[] {
+  if (stage === "full-protocol") return appNavigationGroups;
+  return appNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => launchPrimaryCapabilities.includes(item.capability)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNavigationItem[] {
+  if (stage === "full-protocol") return appTabNavigation;
+  return appNavigation.filter((item) => launchPrimaryCapabilities.includes(item.capability));
+}

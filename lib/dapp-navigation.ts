@@ -1,3 +1,41 @@
+import type { DeploymentCapability, DeploymentDescriptor } from "@/lib/deployments/types";
+
+export type DappRouteCapability = DeploymentCapability;
+
+/** Exact runtime route policy; unknown paths intentionally return null. */
+export function getDappRouteCapability(pathname: string): DappRouteCapability | null {
+  if (pathname === "/app" || pathname === "/app/") return "overview";
+  if (pathname === "/app/swap") return "canonical-statics-market";
+  if (pathname === "/app/genesis") return "genesis-vault";
+  if (pathname === "/app/genesis-rewards") return "genesis-launch-rewards";
+  if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
+  if (pathname === "/app/activity") return "activity";
+  if (pathname === "/app/tools") return "approval-tools";
+  if (pathname === "/app/dollar") return "dollar";
+  if (pathname === "/app/baskets" || pathname.startsWith("/app/baskets/")) return "baskets";
+  if (pathname === "/app/create") return "baskets";
+  if (pathname === "/app/positions" || pathname.startsWith("/app/positions/")) return "positions";
+  if (pathname === "/app/loans") return "loans";
+  if (pathname === "/app/rewards") return "protocol-rewards";
+  if (pathname === "/app/liquidity") return "protocol-liquidity";
+  if (pathname === "/app/faucet") return "faucet";
+  return null;
+}
+
+export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescriptor): boolean {
+  const capability = getDappRouteCapability(pathname);
+  if (capability === null) return true;
+  if (descriptor.stage === "full-protocol") return true;
+  return (
+    capability === "overview" ||
+    capability === "canonical-statics-market" ||
+    capability === "genesis-vault" ||
+    capability === "genesis-launch-rewards" ||
+    capability === "wallet" ||
+    capability === "activity" ||
+    capability === "approval-tools"
+  );
+}
 export type DappRoutePresentation = {
   label: string;
   status: string;
