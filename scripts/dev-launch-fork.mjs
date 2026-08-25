@@ -564,6 +564,15 @@ try {
   await publicClient.request({ method: "anvil_setChainId", params: [31_337] });
   // Anvil keeps the fork's finality distance. Finalize deployment blocks before
   // Ponder starts so its historical pass sees constructor and ERC-2309 logs.
+  const currentTimestamp = BigInt(Math.floor(Date.now() / 1_000));
+  const forkTip = await publicClient.getBlock();
+  if (forkTip.timestamp < currentTimestamp) {
+    await publicClient.request({
+      method: "evm_increaseTime",
+      params: [Number(currentTimestamp - forkTip.timestamp)],
+    });
+    await publicClient.request({ method: "evm_mine", params: [] });
+  }
   await publicClient.request({ method: "anvil_mine", params: ["0x60"] });
   indexerRelay = await startRpcRelay(rpcUrl);
 

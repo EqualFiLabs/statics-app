@@ -42,7 +42,6 @@ import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { minimumWithSlippage } from "@/lib/baskets/baskets";
 import {
   canonicalTradeDirection,
-  canonicalSwapDeadline,
   maximumTokenApproval,
   poolKeyForLaunch,
   settlementForTrade,
@@ -479,7 +478,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           zeroForOne: zeroForTrade(launch, directDirection.input),
           amountIn: parsedAmount,
           amountOutMinimum: reviewedMinimum,
-          deadline: canonicalSwapDeadline(launch, block.timestamp),
+          deadline: block.timestamp + PERMIT_TTL,
           settlement: settlementForTrade(launch, directDirection),
         });
         await executeProtocolTransaction({
