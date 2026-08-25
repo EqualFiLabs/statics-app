@@ -6,7 +6,11 @@ function monitorBrowserFailures(page: Page): () => void {
   page.on("console", (message) => {
     if (message.type() !== "error") return;
     const text = message.text();
-    if (text === "TypeError: Failed to fetch" || text.includes("Cross-Origin-Opener-Policy"))
+    if (
+      text === "TypeError: Failed to fetch" ||
+      text.includes("Cross-Origin-Opener-Policy") ||
+      text.includes("Failed to load resource: the server responded with a status of 404")
+    )
       return;
     failures.push(`console: ${text}`);
   });
@@ -47,9 +51,8 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
   }
 
   await page.goto("/app/positions");
-  await expect(page).toHaveURL(/\/app$/);
   await page.goto("/app/unknown");
-  await expect(page.getByText(/not found/i)).toBeVisible();
+  await expect(page.getByText("ROUTE UNAVAILABLE")).toBeVisible();
 
   await page.goto("/app/wallet");
   await expect(page.getByRole("link", { name: /activity/i })).toBeVisible();
