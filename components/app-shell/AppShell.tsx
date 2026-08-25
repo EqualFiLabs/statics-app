@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
-import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
+import { getDappRouteId } from "@/lib/dapp-navigation";
 import { appNavigationGroupsForStage, appTabNavigationForStage } from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
@@ -249,12 +249,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const tLaunchRoutes = useTranslations("launchRoutes");
   const routeCopy = {
     label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
+    status: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.status`) : tRoutes(`${routeId}.status`),
     title: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.title`) : tRoutes(`${routeId}.title`),
     description: useLaunchRouteCopy
       ? tLaunchRoutes(`${routeId}.description`)
       : tRoutes(`${routeId}.description`),
   };
-  const showOverviewSummary = isDappOverviewPath(currentPath);
   const showApprovalDisclosure = approvalDisclosureRoutes.some(
     (route) => currentPath === route || currentPath.startsWith(`${route}/`)
   );
@@ -381,13 +381,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="dapp-content" className="dapp-content">
           <WrongNetworkBar />
 
-          {showOverviewSummary && (
-            <section className="dapp-intro">
-              <p className="dapp-eyebrow">{tShell("application")}</p>
-              <h1>{routeCopy.title}</h1>
-              <p>{routeCopy.description}</p>
-            </section>
-          )}
+          {/* Every route names itself. This used to be gated to /app, which left
+              every other destination -- Genesis included -- with no <h1> at all
+              and no statement of what the page is for. */}
+          <section className="dapp-intro">
+            <p className="dapp-eyebrow">{routeCopy.status}</p>
+            <h1>{routeCopy.title}</h1>
+            <p>{routeCopy.description}</p>
+          </section>
 
           {wallet.error && (
             <p className="dapp-inline-error" role="alert">
