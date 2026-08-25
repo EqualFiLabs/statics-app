@@ -22,4 +22,14 @@ describe("DApp style primitives", () => {
       expect(source).toContain(primitive);
     }
   });
+
+  it("keeps the centred trade card layout scoped away from Wallet", () => {
+    const source = readFileSync("app/(dapp)/app/app.css", "utf8");
+
+    expect(source).toContain(".wallet-surface,\n.portal-workspace {");
+    expect(source).toContain(
+      ".swap-page {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr);"
+    );
+    expect(source).not.toContain(".wallet-surface,\n.portal-workspace,\n.swap-page {");
+  });
 });

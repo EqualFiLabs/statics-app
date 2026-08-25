@@ -1665,7 +1665,13 @@
 }
 
 .wallet-surface,
-.portal-workspace,
+.portal-workspace {
+  margin-top: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+
 .swap-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1687,7 +1693,17 @@
   border-bottom: 1px solid var(--app-border);
 }
 
-.wallet-network-row label,
+.wallet-network-row label {
+  display: grid;
+  gap: 0.55rem;
+  min-width: min(100%, 250px);
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .portal-field {
   display: grid;
   gap: 0.55rem;
@@ -1696,7 +1712,6 @@
 
 /* The label, and only the label. Setting these on the container leaked the
  * casing and tracking into the amount input, which is nothing but digits. */
-.wallet-network-row label > span,
 .portal-field > span,
 /* The Solana and bridge panels nest their label inside the field head, so it is
  * not a direct child of .portal-field. */
@@ -1725,6 +1740,15 @@
   background: var(--app-surface);
   color: var(--app-text);
   font: inherit;
+}
+
+/* Keep the established Wallet controls unchanged. Trade controls share the
+ * base rule above, but their redesign must not leak into the Wallet page. */
+.wallet-network-row select,
+.wallet-network-row button,
+.wallet-quick-actions button {
+  min-height: 44px;
+  border-radius: 0;
 }
 
 .wallet-network-row select,
