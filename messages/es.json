@@ -52,7 +52,6 @@
       "swap": "Intercambiar",
       "earn": "Ganar",
       "genesis": "Genesis NFT",
-      "genesisRewards": "Recompensas Genesis",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
       "create": "Crear cesta",
@@ -91,13 +90,7 @@
       "label": "Mi Genesis",
       "status": "NFT Genesis",
       "title": "Gestiona mi Genesis",
-      "description": "Consulta el arte de Genesis, activa niveles de recompensa y gestiona crédito garantizado después de la Época Genesis."
-    },
-    "genesisRewards": {
-      "label": "Recompensas",
-      "status": "Recompensas Genesis",
-      "title": "Recompensas Genesis",
-      "description": "Registra NFT Genesis, sigue la acumulación y reclama recompensas como titular actual o de periodos de propiedad anteriores."
+      "description": "Consulta el arte de Genesis, activa niveles de recompensa, registra tus NFT para recibir recompensas de lanzamiento y gestiona crédito garantizado después de la Época Genesis."
     }
   },
   "routes": {
@@ -166,12 +159,6 @@
       "status": "Genesis NFT",
       "title": "Gestiona tus Genesis NFTs",
       "description": "Consulta el arte de Genesis, activa niveles de recompensa mediante pagos en STATICS y gestiona las funciones de cada NFT."
-    },
-    "genesisRewards": {
-      "label": "Recompensas Genesis",
-      "status": "Recompensas Genesis",
-      "title": "Tus recompensas Genesis",
-      "description": "Registra NFT Genesis y reclama su parte de las comisiones del mercado STATICS."
     },
     "liquidity": {
       "label": "Liquidez",

@@ -7,7 +7,6 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
   if (pathname === "/app" || pathname === "/app/") return "overview";
   if (pathname === "/app/swap") return "canonical-statics-market";
   if (pathname === "/app/genesis") return "genesis-vault";
-  if (pathname === "/app/genesis-rewards") return "genesis-launch-rewards";
   if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
   if (pathname === "/app/activity") return "activity";
   if (pathname === "/app/tools") return "approval-tools";
@@ -30,7 +29,6 @@ export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescr
     capability === "overview" ||
     capability === "canonical-statics-market" ||
     capability === "genesis-vault" ||
-    capability === "genesis-launch-rewards" ||
     capability === "wallet" ||
     capability === "activity" ||
     capability === "approval-tools"
@@ -132,12 +130,6 @@ const routePresentations = {
     description:
       "Activate a Genesis NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
   },
-  genesisRewards: {
-    label: "Genesis Rewards",
-    status: "Genesis Rewards",
-    title: "Your Genesis rewards",
-    description: "Register Genesis NFTs and claim their share of STATICS market fees.",
-  },
   liquidity: {
     label: "Liquidity",
     status: "Liquidity",
@@ -180,7 +172,6 @@ export function getDappRouteId(pathname: string): DappRouteId {
   if (pathname.startsWith("/app/positions")) return "positions";
   if (pathname.startsWith("/app/loans")) return "loans";
   if (pathname.startsWith("/app/rewards")) return "rewards";
-  if (pathname.startsWith("/app/genesis-rewards")) return "genesisRewards";
   if (pathname.startsWith("/app/genesis")) return "genesis";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";

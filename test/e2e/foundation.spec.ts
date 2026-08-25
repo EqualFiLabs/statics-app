@@ -141,9 +141,8 @@ test.describe("Dollar DApp foundation", () => {
     await navigateDapp(page, "/app/genesis");
     await expect(page).toHaveURL(/\/app\/genesis$/);
 
-    await navigateDapp(page, "/app/genesis-rewards");
-    await expect(page).toHaveURL(/\/app\/genesis-rewards$/);
-    await expect(page.getByRole("heading", { name: "Genesis rewards unavailable" })).toBeVisible();
+    await page.goto("/app/genesis-rewards");
+    await expect(page).toHaveURL(/\/app\/genesis$/);
 
     await navigateDapp(page, "/app/liquidity");
     await expect(page).toHaveURL(/\/app\/liquidity$/);

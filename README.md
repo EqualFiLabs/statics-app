@@ -39,8 +39,7 @@ against that manifest.
 - `/app/dollar?profile=USDG` — pegged Statics Dollar profile.
 - `/app/baskets` — basket discovery, creation, conversion, and protocol swaps.
 - `/app/positions` — PositionNFT custody and collateral management.
-- `/app/genesis` — inspect and activate Genesis NFTs owned by the connected wallet.
-- `/app/genesis-rewards` — register Genesis NFTs and claim their launch-market rewards.
+- `/app/genesis` — inspect and activate Genesis NFTs owned by the connected wallet, register them for launch rewards, and claim accrued rewards.
 - `/app/create` — permissionlessly configure, fund, and launch an index basket.
 - `/app/rewards` — claim Position, Basket, creator, and permissionless partner-distribution rewards.
 - `/app/loans` — proportional self-backed lending.

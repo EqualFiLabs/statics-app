@@ -5,10 +5,15 @@ import { useState } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import {
+  buildAccrueGenesisLaunchRewardsCall,
   buildActivateGenesisCall,
+  buildClaimGenesisLaunchRewardsCall,
+  buildClaimOwnerGenesisLaunchRewardsCall,
+  buildRegisterGenesisCall,
   cumulativeGenesisActivationCost,
   dopplerStaticsTokenAbi,
   genesisActivationRegistryAbi,
+  genesisLaunchDistributorAbi,
 } from "@statics-protocol/sdk";
 import {
   buildRecoverGenesisCreditCall,
@@ -33,6 +38,8 @@ function describeGenesisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/rejected/i.test(message)) return "The wallet request was rejected.";
   if (message.includes("NotGenesisOwner")) return "This wallet no longer owns that Genesis NFT.";
+  if (message.includes("GenesisAlreadyRegistered"))
+    return "That Genesis NFT is already registered for rewards.";
   if (message.includes("CreditNotRecoverable")) return "This credit is not recoverable yet.";
   if (message.includes("CreditNotActive")) return "This Genesis credit is no longer active.";
   return message || "The Genesis transaction failed.";
@@ -47,6 +54,16 @@ type RecoveryCredit = Readonly<{
   unusedCredit: bigint;
   callerIncentive: bigint;
   genesisDistribution: bigint;
+}>;
+
+type OwnedGenesis = Readonly<{
+  id: bigint;
+  tier: number;
+  multiplierBps: number;
+  registered: boolean;
+  rewardWeight: bigint;
+  pendingStatics: bigint;
+  pendingWeth: bigint;
 }>;
 
 function displayTimestamp(timestamp: bigint): string {
@@ -65,6 +82,9 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const [view, setView] = useState<"owned" | "recoveries">("owned");
   const [recoveryBusy, setRecoveryBusy] = useState<bigint | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [rewardsBusy, setRewardsBusy] = useState<string | null>(null);
+  const [rewardsError, setRewardsError] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const epoch = useQuery({
     queryKey: ["genesis-vault-epoch", deployment.descriptor.deploymentId],
@@ -131,43 +151,110 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     queryKey: ["launch-genesis-owned", deployment.descriptor.deploymentId, wallet],
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
-      if (!publicClient || !wallet) return { items: [], tierCosts: [] as readonly bigint[] };
+      if (!publicClient || !wallet)
+        return {
+          items: [] as readonly OwnedGenesis[],
+          tierCosts: [] as readonly bigint[],
+          rewardShareBps: 0n,
+          totalWeight: 0n,
+          ownerStatics: 0n,
+          ownerWeth: 0n,
+        };
       await verifyLaunchDeployment(publicClient, deployment);
-      const [ids, tierCosts] = await Promise.all([
-        discoverWalletGenesisIds(publicClient, deployment, wallet),
-        Promise.all(
-          [1, 2, 3, 4].map((tier) =>
-            publicClient.readContract({
-              address: deployment.contracts.activationRegistry,
-              abi: genesisActivationRegistryAbi,
-              functionName: "tierCost",
-              args: [tier],
-            })
-          )
-        ).then(oneIndexedGenesisTierCosts),
-      ]);
+      const [ids, tierCosts, rewardShareBps, totalWeight, ownerStatics, ownerWeth] =
+        await Promise.all([
+          discoverWalletGenesisIds(publicClient, deployment, wallet),
+          Promise.all(
+            [1, 2, 3, 4].map((tier) =>
+              publicClient.readContract({
+                address: deployment.contracts.activationRegistry,
+                abi: genesisActivationRegistryAbi,
+                functionName: "tierCost",
+                args: [tier],
+              })
+            )
+          ).then(oneIndexedGenesisTierCosts),
+          publicClient.readContract({
+            address: deployment.contracts.launchDistributor,
+            abi: genesisLaunchDistributorAbi,
+            functionName: "genesisRewardShareBps",
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.launchDistributor,
+            abi: genesisLaunchDistributorAbi,
+            functionName: "totalWeight",
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.launchDistributor,
+            abi: genesisLaunchDistributorAbi,
+            functionName: "ownerClaimable",
+            args: [wallet, deployment.contracts.statics],
+          }),
+          publicClient.readContract({
+            address: deployment.contracts.launchDistributor,
+            abi: genesisLaunchDistributorAbi,
+            functionName: "ownerClaimable",
+            args: [wallet, deployment.contracts.weth],
+          }),
+        ]);
       const items = await Promise.all(
-        ids.map(async (id) => {
-          const [tier, multiplierBps] = await Promise.all([
-            publicClient.readContract({
-              address: deployment.contracts.activationRegistry,
-              abi: genesisActivationRegistryAbi,
-              functionName: "tierOf",
-              args: [id],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.activationRegistry,
-              abi: genesisActivationRegistryAbi,
-              functionName: "multiplierBps",
-              args: [id],
-            }),
-          ]);
-          return { id, tier: Number(tier), multiplierBps: Number(multiplierBps) };
+        ids.map(async (id): Promise<OwnedGenesis> => {
+          const [tier, multiplierBps, registered, rewardWeight, pendingStatics, pendingWeth] =
+            await Promise.all([
+              publicClient.readContract({
+                address: deployment.contracts.activationRegistry,
+                abi: genesisActivationRegistryAbi,
+                functionName: "tierOf",
+                args: [id],
+              }),
+              publicClient.readContract({
+                address: deployment.contracts.activationRegistry,
+                abi: genesisActivationRegistryAbi,
+                functionName: "multiplierBps",
+                args: [id],
+              }),
+              publicClient.readContract({
+                address: deployment.contracts.launchDistributor,
+                abi: genesisLaunchDistributorAbi,
+                functionName: "registered",
+                args: [id],
+              }),
+              publicClient.readContract({
+                address: deployment.contracts.launchDistributor,
+                abi: genesisLaunchDistributorAbi,
+                functionName: "effectiveWeight",
+                args: [id],
+              }),
+              publicClient.readContract({
+                address: deployment.contracts.launchDistributor,
+                abi: genesisLaunchDistributorAbi,
+                functionName: "pendingGenesis",
+                args: [id, deployment.contracts.statics],
+              }),
+              publicClient.readContract({
+                address: deployment.contracts.launchDistributor,
+                abi: genesisLaunchDistributorAbi,
+                functionName: "pendingGenesis",
+                args: [id, deployment.contracts.weth],
+              }),
+            ]);
+          return {
+            id,
+            tier: Number(tier),
+            multiplierBps: Number(multiplierBps),
+            registered,
+            rewardWeight,
+            pendingStatics,
+            pendingWeth,
+          };
         })
       );
-      return { items, tierCosts };
+      return { items, tierCosts, rewardShareBps, totalWeight, ownerStatics, ownerWeth };
     },
   });
+
+  const items = owned.data?.items ?? [];
+  const selected = items.find((item) => item.id.toString() === selectedKey) ?? items[0] ?? null;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({
@@ -304,7 +391,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         predicate: (query) =>
           Array.isArray(query.queryKey) &&
           query.queryKey.includes(deployment.descriptor.deploymentId) &&
-          ["launch-genesis-rewards", "genesis-vault"].some((prefix) =>
+          ["launch-genesis", "genesis-vault"].some((prefix) =>
             String(query.queryKey[0]).startsWith(prefix)
           ),
       });
@@ -313,6 +400,37 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       await recoveries.refetch();
     } finally {
       setRecoveryBusy(null);
+    }
+  };
+
+  const sendReward = async (key: string, label: string, data: `0x${string}`, amount: string) => {
+    if (!wallet || !publicClient) return;
+    if (!walletState.isTargetChain) {
+      await walletState.switchNetwork();
+      return;
+    }
+    setRewardsBusy(key);
+    setRewardsError(null);
+    try {
+      await verifyLaunchDeployment(publicClient, deployment);
+      await executeProtocolTransaction({
+        publicClient,
+        wallet,
+        chainId: deployment.descriptor.chainId,
+        deploymentId: deployment.descriptor.deploymentId,
+        kind: key === "accrue" ? "accrue-genesis-rewards" : "claim-rewards",
+        label,
+        amount,
+        to: deployment.contracts.launchDistributor,
+        data,
+        sendTransaction: walletState.sendEvmTransaction,
+        describeError: describeGenesisError,
+      });
+      await refresh();
+    } catch (cause) {
+      setRewardsError(describeGenesisError(cause));
+    } finally {
+      setRewardsBusy(null);
     }
   };
 
@@ -412,106 +530,330 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
               title="Connect your wallet"
               description="Connect to view and manage your Genesis NFTs."
             />
-          ) : !owned.data?.items.length ? (
-            <EmptyState
-              title="No Genesis NFTs found"
-              description="Use Swap → NFT to acquire a fully backed Genesis NFT."
-            />
           ) : (
-            <div className="genesis-grid">
-              {owned.data.items.map((item) => {
-                const target = targetTiers[item.id.toString()] ?? Math.min(4, item.tier + 1);
-                const cost = cumulativeGenesisActivationCost(
-                  owned.data.tierCosts,
-                  item.tier,
-                  target
-                );
-                return (
-                  <article className="ui-card genesis-card" key={item.id.toString()}>
-                    <div className="genesis-card-heading">
-                      <div>
-                        <h2 className="ui-section-title">Genesis #{item.id.toString()}</h2>
-                        <span className="ui-pill">
-                          Tier {item.tier} · {(item.multiplierBps / 10_000).toFixed(2)}× reward
-                          weight
-                        </span>
-                      </div>
-                      <NftArtwork
-                        chainId={deployment.descriptor.chainId}
-                        expandable
-                        nft={{
-                          kind: "collection",
-                          tokenId: item.id,
-                          contract: deployment.contracts.genesis,
-                          name: `Genesis #${item.id}`,
-                          summary: `Tier ${item.tier}`,
-                          carries: [],
-                          blockedReason: null,
-                        }}
-                      />
+            <>
+              <section
+                className="ui-card genesis-rewards-strip"
+                aria-label="Genesis launch rewards"
+              >
+                <div className="genesis-summary">
+                  <div className="ui-stat">
+                    <span className="ui-stat__label">Genesis reward share</span>
+                    <strong className="ui-stat__value">
+                      {Number(owned.data?.rewardShareBps ?? 0n) / 100}%
+                    </strong>
+                  </div>
+                  <div className="ui-stat">
+                    <span className="ui-stat__label">Total registered weight</span>
+                    <strong className="ui-stat__value">
+                      {(owned.data?.totalWeight ?? 0n).toString()}
+                    </strong>
+                  </div>
+                  <div className="ui-stat">
+                    <span className="ui-stat__label">Retained after transfer</span>
+                    <strong className="ui-stat__value">
+                      {formatEther(owned.data?.ownerStatics ?? 0n)} STATICS ·{" "}
+                      {formatEther(owned.data?.ownerWeth ?? 0n)} WETH
+                    </strong>
+                  </div>
+                </div>
+                <div className="ui-inline-actions">
+                  <button
+                    className="ui-button ui-button--primary"
+                    type="button"
+                    disabled={rewardsBusy !== null}
+                    onClick={() =>
+                      void sendReward(
+                        "accrue",
+                        "Update Genesis launch rewards",
+                        buildAccrueGenesisLaunchRewardsCall(),
+                        "Current market fees"
+                      )
+                    }
+                  >
+                    {rewardsBusy === "accrue" ? "Updating…" : "Update rewards"}
+                  </button>
+                  {(
+                    [
+                      [deployment.contracts.statics, "STATICS", owned.data?.ownerStatics ?? 0n],
+                      [deployment.contracts.weth, "WETH", owned.data?.ownerWeth ?? 0n],
+                    ] as const
+                  ).map(([asset, symbol, amount]) => (
+                    <button
+                      key={asset}
+                      className="ui-button ui-button--secondary"
+                      type="button"
+                      disabled={rewardsBusy !== null || amount === 0n}
+                      onClick={() =>
+                        void sendReward(
+                          `owner-${symbol}`,
+                          `Claim previous-owner ${symbol} rewards`,
+                          buildClaimOwnerGenesisLaunchRewardsCall(asset, wallet),
+                          symbol
+                        )
+                      }
+                    >
+                      {rewardsBusy === `owner-${symbol}`
+                        ? "Claiming…"
+                        : `Claim ${symbol} from past ownership`}
+                    </button>
+                  ))}
+                </div>
+                <p className="genesis-rewards-note">
+                  Updating rewards is permissionless: it harvests current market fees into the
+                  Genesis reward indexes. Rewards accrued before a Genesis is registered, or before
+                  an NFT changed hands, are not included.
+                </p>
+                {rewardsError && (
+                  <p className="dapp-inline-error" role="alert">
+                    {rewardsError}
+                  </p>
+                )}
+              </section>
+              {!items.length ? (
+                <EmptyState
+                  title="No Genesis NFTs found"
+                  description="Use Swap → NFT to acquire a fully backed Genesis NFT."
+                />
+              ) : (
+                <>
+                  {items.length > 1 && (
+                    <div className="genesis-selector" role="tablist" aria-label="Your Genesis NFTs">
+                      {items.map((item) => {
+                        const isSelected = selected?.id === item.id;
+                        const hasPending = item.pendingStatics > 0n || item.pendingWeth > 0n;
+                        return (
+                          <button
+                            key={item.id.toString()}
+                            type="button"
+                            role="tab"
+                            aria-selected={isSelected}
+                            className="genesis-selector-chip"
+                            onClick={() => setSelectedKey(item.id.toString())}
+                          >
+                            <NftArtwork
+                              chainId={deployment.descriptor.chainId}
+                              nft={{
+                                kind: "collection",
+                                tokenId: item.id,
+                                contract: deployment.contracts.genesis,
+                                name: `Genesis #${item.id}`,
+                                summary: `Tier ${item.tier}`,
+                                carries: [],
+                                blockedReason: null,
+                              }}
+                            />
+                            <span>#{item.id.toString()}</span>
+                            <span className="genesis-selector-badges">
+                              {!item.registered && (
+                                <span className="ui-pill genesis-selector-badge">
+                                  Not registered
+                                </span>
+                              )}
+                              {hasPending && (
+                                <span className="ui-pill genesis-selector-badge">
+                                  Rewards pending
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                    {item.tier < 4 && (
-                      <div className="genesis-action">
-                        <label className="ui-field">
-                          Activate through tier
-                          <select
-                            value={target}
-                            onChange={(event) =>
-                              setTargetTiers((current) => ({
-                                ...current,
-                                [item.id.toString()]: Number(event.target.value),
-                              }))
+                  )}
+                  {selected && (
+                    <article className="ui-card genesis-card">
+                      <div className="genesis-card-heading">
+                        <div>
+                          <h2 className="ui-section-title">Genesis #{selected.id.toString()}</h2>
+                          <span className="ui-pill">
+                            Tier {selected.tier} · {(selected.multiplierBps / 10_000).toFixed(2)}×
+                            reward weight
+                          </span>
+                        </div>
+                        <NftArtwork
+                          chainId={deployment.descriptor.chainId}
+                          expandable
+                          nft={{
+                            kind: "collection",
+                            tokenId: selected.id,
+                            contract: deployment.contracts.genesis,
+                            name: `Genesis #${selected.id}`,
+                            summary: `Tier ${selected.tier}`,
+                            carries: [],
+                            blockedReason: null,
+                          }}
+                        />
+                      </div>
+                      {selected.tier < 4 && (
+                        <div className="genesis-action">
+                          <label className="ui-field">
+                            Activate through tier
+                            <select
+                              value={
+                                targetTiers[selected.id.toString()] ??
+                                Math.min(4, selected.tier + 1)
+                              }
+                              onChange={(event) =>
+                                setTargetTiers((current) => ({
+                                  ...current,
+                                  [selected.id.toString()]: Number(event.target.value),
+                                }))
+                              }
+                            >
+                              {[1, 2, 3, 4]
+                                .filter((tier) => tier > selected.tier)
+                                .map((tier) => (
+                                  <option key={tier} value={tier}>
+                                    Tier {tier}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <p>
+                            Activation cost:{" "}
+                            {formatEther(
+                              cumulativeGenesisActivationCost(
+                                owned.data?.tierCosts ?? [],
+                                selected.tier,
+                                targetTiers[selected.id.toString()] ??
+                                  Math.min(4, selected.tier + 1)
+                              )
+                            )}{" "}
+                            STATICS
+                          </p>
+                          <button
+                            className="ui-button ui-button--primary ui-button--block"
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() =>
+                              void activate(
+                                selected.id,
+                                selected.tier,
+                                targetTiers[selected.id.toString()] ??
+                                  Math.min(4, selected.tier + 1)
+                              )
                             }
                           >
-                            {[1, 2, 3, 4]
-                              .filter((tier) => tier > item.tier)
-                              .map((tier) => (
-                                <option key={tier} value={tier}>
-                                  Tier {tier}
-                                </option>
+                            {busy === selected.id ? "Confirming…" : "Activate"}
+                          </button>
+                          <p>Activation payments are transferred to the Statics treasury.</p>
+                        </div>
+                      )}
+                      <section
+                        className="genesis-rewards-block"
+                        aria-label="Genesis launch rewards"
+                      >
+                        <p className="dapp-eyebrow">Launch rewards</p>
+                        {!selected.registered ? (
+                          <>
+                            <button
+                              className="ui-button ui-button--secondary ui-button--block"
+                              type="button"
+                              disabled={rewardsBusy !== null}
+                              onClick={() =>
+                                void sendReward(
+                                  `register-${selected.id.toString()}`,
+                                  `Register Genesis #${selected.id}`,
+                                  buildRegisterGenesisCall(selected.id),
+                                  `Genesis #${selected.id}`
+                                )
+                              }
+                            >
+                              {rewardsBusy === `register-${selected.id.toString()}`
+                                ? "Registering…"
+                                : "Register for rewards"}
+                            </button>
+                            <p>
+                              Registration starts accruing from the current reward index with this
+                              NFT&apos;s activation weight. Fees earned before registration are not
+                              included.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p>Effective reward weight: {selected.rewardWeight.toString()}</p>
+                            <p>
+                              Pending: {formatEther(selected.pendingStatics)} STATICS ·{" "}
+                              {formatEther(selected.pendingWeth)} WETH
+                            </p>
+                            <div className="ui-inline-actions">
+                              {(
+                                [
+                                  [
+                                    deployment.contracts.statics,
+                                    "STATICS",
+                                    selected.pendingStatics,
+                                  ],
+                                  [deployment.contracts.weth, "WETH", selected.pendingWeth],
+                                ] as const
+                              ).map(([asset, symbol, amount]) => (
+                                <button
+                                  key={asset}
+                                  className="ui-button ui-button--secondary"
+                                  type="button"
+                                  disabled={rewardsBusy !== null || amount === 0n}
+                                  onClick={() =>
+                                    void sendReward(
+                                      `claim-${selected.id.toString()}-${symbol}`,
+                                      `Claim Genesis #${selected.id} ${symbol} rewards`,
+                                      buildClaimGenesisLaunchRewardsCall(
+                                        selected.id,
+                                        asset,
+                                        wallet
+                                      ),
+                                      symbol
+                                    )
+                                  }
+                                >
+                                  {rewardsBusy === `claim-${selected.id.toString()}-${symbol}`
+                                    ? "Claiming…"
+                                    : `Claim ${symbol}`}
+                                </button>
                               ))}
-                          </select>
-                        </label>
-                        <p>Activation cost: {formatEther(cost)} STATICS</p>
-                        <button
-                          className="ui-button ui-button--primary ui-button--block"
-                          type="button"
-                          disabled={busy !== null}
-                          onClick={() => void activate(item.id, item.tier, target)}
-                        >
-                          {busy === item.id ? "Confirming…" : "Activate"}
-                        </button>
-                        <p>Activation payments are transferred to the Statics treasury.</p>
-                      </div>
-                    )}
-                    <GenesisCreditPanel deployment={deployment} genesisId={item.id} />
-                    <p className="genesis-warning">
-                      Transferring this Genesis NFT resets its activation to Tier 0. Rewards earned
-                      before transfer remain claimable by the previous owner. Active secured credit
-                      locks transfers until repayment or recovery.
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
+                            </div>
+                          </>
+                        )}
+                      </section>
+                      <GenesisCreditPanel deployment={deployment} genesisId={selected.id} />
+                      <p className="genesis-warning">
+                        Transferring this Genesis NFT resets its activation to Tier 0. Rewards
+                        earned before transfer remain claimable by the previous owner. Active
+                        secured credit locks transfers until repayment or recovery.
+                      </p>
+                      {error && (
+                        <p className="dapp-inline-error" role="alert">
+                          {error}
+                        </p>
+                      )}
+                    </article>
+                  )}
+                </>
+              )}
+              <section className="genesis-contracts ui-card">
+                <AddressDisplay
+                  address={deployment.contracts.genesis}
+                  chainId={deployment.descriptor.chainId}
+                  label="Genesis NFT"
+                />
+                <AddressDisplay
+                  address={deployment.contracts.launchDistributor}
+                  chainId={deployment.descriptor.chainId}
+                  label="Rewards distributor"
+                />
+                <AddressDisplay
+                  address={deployment.contracts.activationRegistry}
+                  chainId={deployment.descriptor.chainId}
+                  label="Activation registry"
+                />
+                <AddressDisplay
+                  address={deployment.contracts.vault}
+                  chainId={deployment.descriptor.chainId}
+                  label="Genesis Vault"
+                />
+              </section>
+            </>
           )}
-          <section className="genesis-contracts ui-card">
-            <AddressDisplay
-              address={deployment.contracts.genesis}
-              chainId={deployment.descriptor.chainId}
-              label="Genesis NFT"
-            />
-            <AddressDisplay
-              address={deployment.contracts.activationRegistry}
-              chainId={deployment.descriptor.chainId}
-              label="Activation registry"
-            />
-            <AddressDisplay
-              address={deployment.contracts.vault}
-              chainId={deployment.descriptor.chainId}
-              label="Genesis Vault"
-            />
-          </section>
         </>
       )}
     </div>

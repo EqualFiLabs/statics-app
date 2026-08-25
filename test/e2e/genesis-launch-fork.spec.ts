@@ -33,13 +33,11 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
     "Overview",
     "Trade",
     "My Genesis",
-    "Rewards",
     "Wallet",
   ]);
   await expect(page.locator(".dapp-tabbar .dapp-tab:not(.dapp-nav-toggle)")).toHaveText([
     "Trade",
     "My Genesis",
-    "Rewards",
     "Wallet",
   ]);
   await expect(page.getByRole("link", { name: "Add funds" })).toHaveAttribute(
@@ -50,10 +48,12 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
   await expect(page.getByText("Baskets", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Position NFT", { exact: true })).toHaveCount(0);
 
-  for (const href of ["/app", "/app/swap", "/app/genesis", "/app/genesis-rewards"]) {
+  for (const href of ["/app", "/app/swap", "/app/genesis"]) {
     await page.goto(href);
     await expect(page).toHaveURL(new RegExp(`${href.replace("?", "\\?")}$`));
   }
+  await page.goto("/app/genesis-rewards");
+  await expect(page).toHaveURL(/\/app\/genesis$/);
 
   await page.goto("/app/positions");
   await page.goto("/app/unknown");

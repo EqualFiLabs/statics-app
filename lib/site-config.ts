@@ -194,13 +194,6 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         capability: "genesis-vault",
       },
       {
-        label: "Genesis Rewards",
-        messageKey: "genesisRewards",
-        enabled: true,
-        href: "/app/genesis-rewards",
-        capability: "genesis-launch-rewards",
-      },
-      {
         label: "Loans",
         messageKey: "loans",
         enabled: true,
@@ -260,7 +253,6 @@ export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [
   "overview",
   "canonical-statics-market",
   "genesis-vault",
-  "genesis-launch-rewards",
 ] as const;
 
 /**
@@ -286,7 +278,6 @@ export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNa
   const launchTabCapabilities: readonly DeploymentCapability[] = [
     "canonical-statics-market",
     "genesis-vault",
-    "genesis-launch-rewards",
     "wallet",
   ];
   return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));

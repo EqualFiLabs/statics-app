@@ -52,7 +52,6 @@
       "swap": "兑换",
       "earn": "赚取",
       "genesis": "Genesis NFT",
-      "genesisRewards": "Genesis 奖励",
       "liquidity": "流动性",
       "baskets": "篮子",
       "create": "创建篮子",
@@ -91,13 +90,7 @@
       "label": "我的 Genesis",
       "status": "Genesis NFT",
       "title": "管理我的 Genesis",
-      "description": "查看 Genesis 艺术作品、激活奖励等级，并在 Genesis 纪元结束后管理担保信贷。"
-    },
-    "genesisRewards": {
-      "label": "奖励",
-      "status": "Genesis 奖励",
-      "title": "Genesis 奖励",
-      "description": "注册 Genesis NFT、跟踪奖励累积，并以当前持有者身份或针对之前的持有期领取奖励。"
+      "description": "查看 Genesis 艺术作品、激活奖励等级、注册以获取启动奖励，并在 Genesis 纪元结束后管理担保信贷。"
     }
   },
   "routes": {
@@ -166,12 +159,6 @@
       "status": "Genesis NFT",
       "title": "管理你的 Genesis NFTs",
       "description": "查看 Genesis 艺术作品，通过支付 STATICS 激活奖励等级，并管理每个 NFT 的协议功能。"
-    },
-    "genesisRewards": {
-      "label": "Genesis 奖励",
-      "status": "Genesis 奖励",
-      "title": "你的 Genesis 奖励",
-      "description": "注册 Genesis NFT 并领取其 STATICS 市场费用份额。"
     },
     "liquidity": {
       "label": "流动性",

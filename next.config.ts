@@ -30,6 +30,15 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: process.env.STATICS_NEXT_TSCONFIG || "tsconfig.json",
   },
+  async redirects() {
+    return [
+      {
+        source: "/app/genesis-rewards",
+        destination: "/app/genesis",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

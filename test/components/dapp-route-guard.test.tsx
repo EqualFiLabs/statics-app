@@ -65,7 +65,7 @@ describe("DappRouteGuard", () => {
     }
   );
 
-  it.each(["/app/genesis-rewards", "/app/wallet", "/app/activity", "/app/tools"])(
+  it.each(["/app/wallet", "/app/activity", "/app/tools"])(
     "keeps allowed launch route %s",
     (route) => {
       pathname = route;

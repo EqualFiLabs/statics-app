@@ -52,7 +52,6 @@
       "swap": "Swap",
       "earn": "Earn",
       "genesis": "Genesis NFT",
-      "genesisRewards": "Genesis Rewards",
       "liquidity": "Liquidity",
       "baskets": "Baskets",
       "create": "Create basket",
@@ -91,13 +90,7 @@
       "label": "My Genesis",
       "status": "Genesis NFTs",
       "title": "Manage my Genesis",
-      "description": "View Genesis artwork, activate reward tiers, and manage secured credit after the Genesis Epoch."
-    },
-    "genesisRewards": {
-      "label": "Rewards",
-      "status": "Genesis rewards",
-      "title": "Genesis rewards",
-      "description": "Register Genesis NFTs, follow reward accrual, and claim rewards as the current holder or from your previous ownership."
+      "description": "View Genesis artwork, activate reward tiers, register for launch rewards, and manage secured credit after the Genesis Epoch."
     }
   },
   "routes": {
@@ -166,12 +159,6 @@
       "status": "Genesis NFT",
       "title": "Manage your Genesis NFTs",
       "description": "View Genesis artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
-    },
-    "genesisRewards": {
-      "label": "Genesis Rewards",
-      "status": "Genesis Rewards",
-      "title": "Your Genesis rewards",
-      "description": "Register Genesis NFTs and claim their share of STATICS market fees."
     },
     "liquidity": {
       "label": "Liquidity",

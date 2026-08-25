@@ -97,26 +97,24 @@ describe("stage-aware dapp navigation", () => {
     available: true,
   };
 
-  it("selects the launch product plus Wallet in the sidebar and four product tabs", () => {
+  it("selects the launch product plus Wallet in the sidebar and three product tabs", () => {
     const groups = appNavigationGroupsForStage("launch");
     expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual([
       "/app",
       "/app/swap",
       "/app/genesis",
-      "/app/genesis-rewards",
       "/app/wallet",
     ]);
     expect(appTabNavigationForStage("launch").map((item) => item.href)).toEqual([
       "/app/swap",
       "/app/genesis",
-      "/app/genesis-rewards",
       "/app/wallet",
     ]);
     expect(groups.every((group) => group.items.every((item) => item.enabled))).toBe(true);
   });
 
   it("allows launch contextual utilities but rejects unsupported known routes", () => {
-    expect(isDappRouteAllowed("/app/genesis-rewards", launch)).toBe(true);
+    expect(getDappRouteCapability("/app/genesis-rewards")).toBeNull();
     expect(isDappRouteAllowed("/app/wallet", launch)).toBe(true);
     expect(isDappRouteAllowed("/app/activity", launch)).toBe(true);
     expect(isDappRouteAllowed("/app/tools", launch)).toBe(true);
@@ -151,7 +149,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(15);
+    expect(hrefs).toHaveLength(14);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -183,7 +181,6 @@ describe("sidebar completeness", () => {
       "Dollar",
       "Position NFT",
       "Genesis NFT",
-      "Genesis Rewards",
       "Loans",
       "Wallet",
       "Faucet",
@@ -197,7 +194,6 @@ describe("sidebar completeness", () => {
     expect(manage?.items.map((item) => item.href)).toEqual([
       "/app/positions",
       "/app/genesis",
-      "/app/genesis-rewards",
       "/app/loans",
     ]);
   });

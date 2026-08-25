@@ -25,7 +25,6 @@ const approvalDisclosureRoutes = [
   "/app/loans",
   "/app/rewards",
   "/app/genesis",
-  "/app/genesis-rewards",
   "/app/liquidity",
 ] as const;
 
@@ -246,10 +245,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const routeId = getDappRouteId(currentPath);
   const useLaunchRouteCopy =
     active.descriptor.stage === "launch" &&
-    (routeId === "overview" ||
-      routeId === "swap" ||
-      routeId === "genesis" ||
-      routeId === "genesisRewards");
+    (routeId === "overview" || routeId === "swap" || routeId === "genesis");
   const tLaunchRoutes = useTranslations("launchRoutes");
   const routeCopy = {
     label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
