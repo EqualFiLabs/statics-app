@@ -15,6 +15,23 @@ export const activeLoan = onchainTable(
   (table) => ({ recoverable: index().on(table.deploymentId, table.recoverableAt, table.id) })
 );
 
+export const activeGenesisCredit = onchainTable(
+  "active_genesis_credit",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    genesisId: table.bigint().notNull(),
+    owner: table.hex().notNull(),
+    principal: table.bigint().notNull(),
+    maturity: table.bigint().notNull(),
+    recoverableAt: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({
+    recoverable: index().on(table.deploymentId, table.recoverableAt, table.genesisId),
+  })
+);
+
 export const v4Position = onchainTable(
   "v4_position",
   (table) => ({

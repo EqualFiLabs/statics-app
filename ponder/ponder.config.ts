@@ -7,9 +7,10 @@ import {
   staticsAbi,
   staticsFeeReceiverAbi,
   staticsGenesisAbi,
-  staticsGenesisVaultAbi,
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
+
+import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -81,7 +82,7 @@ export default createConfig({
     },
     GenesisVault: {
       chain: "active",
-      abi: staticsGenesisVaultAbi,
+      abi: staticsGenesisCreditAbi,
       address: optionalAddress("PONDER_GENESIS_VAULT_ADDRESS"),
       startBlock: optionalStartBlock("PONDER_GENESIS_VAULT_START_BLOCK", deploymentStartBlock),
     },

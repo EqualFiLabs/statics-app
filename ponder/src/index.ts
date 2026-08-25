@@ -1,8 +1,11 @@
 import { ponder } from "ponder:registry";
 import { genesisActivationRegistryAbi, staticsAbi } from "@statics-protocol/sdk";
+import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 import { getAddress, zeroAddress } from "viem";
+import { activeGenesisCreditMutation } from "./genesis-credit";
 
 import {
+  activeGenesisCredit,
   activeLoan,
   genesisNft,
   genesisRewardClaim,
@@ -60,6 +63,68 @@ ponder.on("Statics:LoanRepaid", async ({ event, context }) => {
 
 ponder.on("Statics:LoanRecovered", async ({ event, context }) => {
   await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
+});
+
+ponder.on("GenesisVault:GenesisCreditOpened", async ({ event, context }) => {
+  const recoverableAt = await context.client.readContract({
+    address: event.log.address,
+    abi: staticsGenesisCreditAbi,
+    functionName: "creditRecoverableAt",
+    args: [event.args.genesisId],
+    blockNumber: event.block.number,
+  });
+  const mutation = activeGenesisCreditMutation({
+    type: "opened",
+    deploymentId,
+    genesisId: event.args.genesisId,
+    owner: event.args.owner,
+    principal: event.args.principal,
+    maturity: BigInt(event.args.maturity),
+    recoverableAt: BigInt(recoverableAt),
+    blockNumber: event.block.number,
+  });
+  if (mutation.type === "insert") await context.db.insert(activeGenesisCredit).values(mutation.row);
+});
+
+ponder.on("GenesisVault:GenesisCreditExtended", async ({ event, context }) => {
+  const recoverableAt = await context.client.readContract({
+    address: event.log.address,
+    abi: staticsGenesisCreditAbi,
+    functionName: "creditRecoverableAt",
+    args: [event.args.genesisId],
+    blockNumber: event.block.number,
+  });
+  const mutation = activeGenesisCreditMutation({
+    type: "extended",
+    deploymentId,
+    genesisId: event.args.genesisId,
+    maturity: BigInt(event.args.newMaturity),
+    recoverableAt: BigInt(recoverableAt),
+    blockNumber: event.block.number,
+  });
+  if (mutation.type === "update") {
+    await context.db.update(activeGenesisCredit, { key: mutation.key }).set(mutation.values);
+  }
+});
+
+ponder.on("GenesisVault:GenesisCreditRepaid", async ({ event, context }) => {
+  const mutation = activeGenesisCreditMutation({
+    type: "repaid",
+    deploymentId,
+    genesisId: event.args.genesisId,
+  });
+  if (mutation.type === "delete")
+    await context.db.delete(activeGenesisCredit, { key: mutation.key });
+});
+
+ponder.on("GenesisVault:GenesisCreditRecovered", async ({ event, context }) => {
+  const mutation = activeGenesisCreditMutation({
+    type: "recovered",
+    deploymentId,
+    genesisId: event.args.genesisId,
+  });
+  if (mutation.type === "delete")
+    await context.db.delete(activeGenesisCredit, { key: mutation.key });
 });
 
 ponder.on("PositionManager:Transfer", async ({ event, context }) => {

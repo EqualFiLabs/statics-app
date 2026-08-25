@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { getAddress, isAddress } from "viem";
 
 import {
+  activeGenesisCredit,
   activeLoan,
   genesisNft,
   genesisRewardClaim,
@@ -13,6 +14,7 @@ import {
   v4Position,
 } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
+import { recoverableGenesisCreditPage } from "./genesis-credits";
 import { nextAvailableGenesisId } from "../genesis";
 
 const app = new Hono();
@@ -46,6 +48,52 @@ app.get("/loans/recoverable", async (context) => {
     deploymentId,
     items: page.map((row) => ({ id: row.id.toString() })),
     nextCursor: rows.length > limit && page.length ? encodeCursor(page.at(-1)!.id) : null,
+  });
+});
+
+app.get("/genesis/credits/recoverable", async (context) => {
+  const asOfValue = context.req.query("asOf");
+  const limit = readLimit(context.req.query("limit"));
+  const cursor = decodeCursor(context.req.query("cursor"));
+  if (!asOfValue || !/^\d+$/.test(asOfValue) || limit === 0) {
+    return context.json({ error: "Invalid asOf or limit." }, 400);
+  }
+  if (context.req.query("cursor") !== undefined && cursor === null) {
+    return context.json({ error: "Invalid cursor." }, 400);
+  }
+  const rows = await db
+    .select({
+      genesisId: activeGenesisCredit.genesisId,
+      deploymentId: activeGenesisCredit.deploymentId,
+      owner: activeGenesisCredit.owner,
+      principal: activeGenesisCredit.principal,
+      maturity: activeGenesisCredit.maturity,
+      recoverableAt: activeGenesisCredit.recoverableAt,
+    })
+    .from(activeGenesisCredit)
+    .where(
+      and(
+        eq(activeGenesisCredit.deploymentId, deploymentId),
+        lt(activeGenesisCredit.recoverableAt, BigInt(asOfValue)),
+        cursor === null ? undefined : gt(activeGenesisCredit.genesisId, cursor)
+      )
+    )
+    .orderBy(asc(activeGenesisCredit.genesisId))
+    .limit(limit + 1);
+  const result = recoverableGenesisCreditPage(rows, deploymentId, BigInt(asOfValue), limit);
+  return context.json({
+    deploymentId,
+    items: result.items.map((row) => ({
+      genesisId: row.genesisId.toString(),
+      owner: row.owner,
+      principal: row.principal.toString(),
+      maturity: row.maturity.toString(),
+      recoverableAt: row.recoverableAt.toString(),
+    })),
+    nextCursor:
+      result.hasNextPage && result.items.length
+        ? encodeCursor(result.items.at(-1)!.genesisId)
+        : null,
   });
 });
 

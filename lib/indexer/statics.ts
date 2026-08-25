@@ -15,6 +15,14 @@ export type IndexedGenesis = Readonly<{
   linkedPositionId: bigint;
 }>;
 
+export type IndexedRecoverableGenesisCredit = Readonly<{
+  genesisId: bigint;
+  owner: Address;
+  principal: bigint;
+  maturity: bigint;
+  recoverableAt: bigint;
+}>;
+
 function configuredIndexerUrl(): string | null {
   const value = process.env.NEXT_PUBLIC_STATICS_INDEXER_URL?.trim();
   if (!value) return null;
@@ -157,6 +165,80 @@ export async function loadWalletV4PositionIds(
     `/wallets/${getAddress(owner)}/v4-positions`,
     indexerUrl === undefined ? configuredIndexerUrl() : indexerUrl
   );
+}
+
+export async function loadRecoverableGenesisCredits(
+  asOf: bigint,
+  deploymentId: string,
+  indexerUrl?: string | null
+): Promise<readonly IndexedRecoverableGenesisCredit[]> {
+  const base =
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
+  if (!base) throw new Error("No indexer is configured for this deployment.");
+  const values: IndexedRecoverableGenesisCredit[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const url = new URL(`${base}/genesis/credits/recoverable`);
+    url.searchParams.set("asOf", asOf.toString());
+    url.searchParams.set("limit", String(DEFAULT_PAGE_SIZE));
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
+    const body = (await response.json()) as {
+      deploymentId?: string;
+      items?: readonly {
+        genesisId?: string;
+        owner?: string;
+        principal?: string;
+        maturity?: string;
+        recoverableAt?: string;
+      }[];
+      nextCursor?: string | null;
+    };
+    if (body.deploymentId !== deploymentId) {
+      throw new Error("The Statics indexer returned data for a different deployment.");
+    }
+    if (
+      !Array.isArray(body.items) ||
+      !(body.nextCursor === null || typeof body.nextCursor === "string")
+    ) {
+      throw new Error("The Statics indexer returned an invalid page.");
+    }
+    values.push(
+      ...body.items.map((item) => {
+        if (typeof item.owner !== "string") {
+          throw new Error("The Statics indexer returned an invalid Genesis credit owner.");
+        }
+        let owner: Address;
+        try {
+          owner = getAddress(item.owner);
+        } catch {
+          throw new Error("The Statics indexer returned an invalid Genesis credit owner.");
+        }
+        if (
+          typeof item.genesisId !== "string" ||
+          typeof item.principal !== "string" ||
+          typeof item.maturity !== "string" ||
+          typeof item.recoverableAt !== "string"
+        ) {
+          throw new Error("The Statics indexer returned an invalid Genesis credit.");
+        }
+        return {
+          genesisId: parseId(item.genesisId),
+          owner,
+          principal: parseId(item.principal),
+          maturity: parseId(item.maturity),
+          recoverableAt: parseId(item.recoverableAt),
+        };
+      })
+    );
+    if (!body.nextCursor) return values;
+    if (body.nextCursor === cursor) {
+      throw new Error("The Statics indexer returned a stalled cursor.");
+    }
+    cursor = body.nextCursor;
+  }
+  throw new Error("The Statics indexer exceeded its pagination limit.");
 }
 
 export async function loadWalletGenesis(
