@@ -93,22 +93,45 @@ const option = {
 } satisfies DeploymentOption;
 
 function vaultAccounting(epochActive: boolean) {
+  // 655 circulating + 4,900 in the Vault = the fixed 5,555, and backing that
+  // equals circulating x vaultPrice, so the solvency invariants actually hold.
+  const backing = parseEther("117900000"); // 655 x 180,000
   return {
     vaultPrice: parseEther("180000"),
     maximumSupply: 5_555n,
     mintedSupply: 5_555n,
-    vaultInventory: 5_500n,
-    circulatingGenesis: 55n,
-    tokenBacking: parseEther("9900000"),
-    grossBacking: parseEther("9900000"),
+    vaultInventory: 4_900n,
+    circulatingGenesis: 655n,
+    tokenBacking: backing,
+    grossBacking: backing,
     outstandingGenesisCredit: 0n,
-    requiredBacking: parseEther("9900000"),
-    tokenCustody: parseEther("9900000"),
+    requiredBacking: backing,
+    tokenCustody: backing,
     reserveETH: parseEther("5"),
     nativeCustody: parseEther("5"),
     genesisEpochEnd: 2_000_000_000n,
     epochActive,
-    reserveBackingPerGenesis: parseEther("0.001"),
+    reserveBackingPerGenesis: parseEther("5") / 5_555n,
+  };
+}
+
+function purchaseQuote(epochActive: boolean) {
+  const reserveBuyIn = epochActive ? 0n : (parseEther("5") + 5_553n) / 5_554n;
+  const nativeFee = parseEther("0.003");
+  return {
+    staticsPrice: parseEther("180000"),
+    reserveBuyIn,
+    nativeFee,
+    requiredNative: reserveBuyIn + nativeFee,
+    epochActive,
+  };
+}
+
+function redemptionQuote(epochActive: boolean) {
+  return {
+    staticsPayout: parseEther("180000"),
+    reservePayout: epochActive ? 0n : parseEther("5") / 5_555n,
+    epochActive,
   };
 }
 
@@ -144,29 +167,101 @@ beforeEach(() => {
 });
 
 describe("launch overview", () => {
-  it("shows only launch metrics and the three launch actions", async () => {
+  function overviewReads(epochActive: boolean) {
+    discoverWalletGenesisIds.mockResolvedValue([]);
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
-      if (functionName === "vaultAccounting") return vaultAccounting(true);
+      if (functionName === "vaultAccounting") return vaultAccounting(epochActive);
+      if (functionName === "quoteGenesisPurchase") return purchaseQuote(epochActive);
+      if (functionName === "quoteGenesisRedemption") return redemptionQuote(epochActive);
       if (functionName === "getSlot0") return [1n << 96n, 0, 0, 0];
       if (functionName === "getLiquidity") return 1n;
       if (functionName === "balanceOf") return parseEther("42");
+      if (functionName === "genesisRewardShareBps") return 1_000;
+      if (functionName === "totalWeight") return 25_000n;
+      if (functionName === "ownerClaimable") return 0n;
       throw new Error(`Unexpected read ${functionName}`);
     });
+  }
 
+  it("leads with the Epoch and prices the acquisition inline", async () => {
+    overviewReads(true);
     renderWithProviders(<DeploymentOverview />);
 
-    expect(await screen.findByText(/Active until/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Buy STATICS" })).toHaveAttribute("href", "/app/swap");
-    expect(screen.getByRole("link", { name: "Acquire Genesis" })).toHaveAttribute(
+    expect(await screen.findByText("The Epoch ends in")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Acquire Genesis/ })).toHaveAttribute(
       "href",
       "/app/swap?mode=nft"
     );
-    expect(screen.getByRole("link", { name: "Manage my Genesis" })).toHaveAttribute(
-      "href",
-      "/app/genesis"
-    );
+    expect(screen.getByRole("link", { name: "Buy STATICS" })).toHaveAttribute("href", "/app/swap");
     expect(screen.queryByText("Registered reward weight")).not.toBeInTheDocument();
-    expect(screen.queryByText("Fees harvested")).not.toBeInTheDocument();
+  });
+
+  it("states what the deadline changes, in both directions", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />);
+
+    // Await a figure rather than a static label, so the quotes have landed.
+    expect(await screen.findByText("180,000 STATICS, no ETH")).toBeInTheDocument();
+    expect(screen.getByText("Acquiring a Genesis")).toBeInTheDocument();
+    expect(screen.getByText("Redeeming a Genesis")).toBeInTheDocument();
+    expect(screen.getByText("Secured credit")).toBeInTheDocument();
+    expect(screen.getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByText("Up to 171,000 STATICS")).toBeInTheDocument();
+  });
+
+  it("projects the buy-in from today's reserve rather than quoting zero", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />);
+
+    // Charged buy-in is zero during the Epoch, but ceil(5 ETH / 5,554) is what
+    // the next buyer owes the moment it ends -- and it climbs on every fee.
+    // Await a quoted figure so the reads have landed, then scope: the reserve
+    // share (R / 5,555) and the buy-in (R / 5,554) round to the same string at
+    // this precision, which is the asymmetry working as designed.
+    await screen.findByText("180,000 STATICS, no ETH");
+    const row = screen.getByText("Buy-in if the Epoch ended now").closest("div");
+    expect(row).toHaveTextContent("0.0009 ETH");
+    expect(screen.getByText(/already accruing/)).toBeInTheDocument();
+  });
+
+  it("charges the buy-in once the Epoch is complete", async () => {
+    overviewReads(false);
+    renderWithProviders(<DeploymentOverview />);
+
+    expect(await screen.findByText("The Epoch has ended")).toBeInTheDocument();
+    expect(screen.getByText("Buy-in charged today")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Recover matured credit/ })).toHaveAttribute(
+      "href",
+      "/app/genesis/recoveries"
+    );
+  });
+
+  it("verifies the three solvency invariants the Vault enforces", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />);
+
+    expect(await screen.findByText("All three hold")).toBeInTheDocument();
+    expect(screen.getByText("Backing covers every circulating Genesis")).toBeInTheDocument();
+    expect(screen.getByText("The Vault holds that STATICS")).toBeInTheDocument();
+    expect(screen.getByText("The Vault holds the ETH reserve")).toBeInTheDocument();
+    expect(screen.getByText("655 circulating × 180,000")).toBeInTheDocument();
+  });
+
+  it("reports the supply as one fixed collection", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />);
+
+    expect(await screen.findByText("Fixed at 5,555")).toBeInTheDocument();
+    expect(screen.getByText("Treasury at genesis")).toBeInTheDocument();
+    expect(screen.getByText("Vault inventory")).toBeInTheDocument();
+  });
+
+  it("prompts a signed-out visitor instead of showing dashes", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />, false);
+
+    expect(await screen.findByText("Connect to see where you stand")).toBeInTheDocument();
+    expect(screen.queryByText("Your Genesis")).not.toBeInTheDocument();
   });
 
   it("formats either canonical token ordering without floating-point input", () => {

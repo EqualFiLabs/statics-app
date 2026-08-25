@@ -626,18 +626,537 @@
   font-size: var(--text-caption);
 }
 
-.launch-overview,
-.launch-overview-hero,
+.launch-overview {
+  display: grid;
+  gap: 1.5rem;
+}
+
 .launch-overview-actions {
   display: grid;
   gap: 1rem;
 }
 
-.launch-overview-hero h2,
-.launch-overview-hero p,
 .launch-overview-actions h2,
 .launch-overview-actions p {
   margin: 0;
+}
+
+/* ---- Epoch banner ---------------------------------------------------
+ * The deadline is the launch's one time-critical fact, so it leads the
+ * page rather than sitting as one tile among nine. */
+
+.epoch-banner {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 140% at 12% 0%, var(--accent-wash), transparent 62%),
+    linear-gradient(180deg, var(--app-raised), var(--app-surface));
+}
+
+.epoch-banner.is-complete {
+  background: linear-gradient(180deg, var(--app-raised), var(--app-surface));
+}
+
+.epoch-banner-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 2rem;
+}
+
+.epoch-banner-label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.epoch-banner-label h2 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+}
+
+.epoch-banner-label > p:last-child {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.epoch-countdown {
+  margin-left: auto;
+  text-align: right;
+}
+
+.epoch-countdown-figure {
+  display: flex;
+  gap: 0.875rem;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.epoch-countdown-figure > div {
+  display: grid;
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.epoch-countdown-figure b {
+  color: var(--accent);
+  font-size: var(--text-4xl);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.epoch-banner.is-complete .epoch-countdown-figure b {
+  color: var(--app-text-muted);
+}
+
+.epoch-countdown-figure span {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.epoch-countdown-when {
+  margin: 0.4rem 0 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+
+.epoch-changes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.epoch-change {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+
+.epoch-change-primary,
+.epoch-change-secondary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.epoch-change-primary {
+  font-weight: 600;
+}
+
+.epoch-banner.is-complete .epoch-change-secondary b.is-past {
+  color: var(--app-text-muted);
+  text-decoration: line-through;
+}
+
+.epoch-change-secondary span {
+  color: var(--app-text-muted);
+}
+
+.epoch-change-secondary b.is-next {
+  color: var(--accent);
+}
+
+.epoch-change-caveat {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-snug);
+}
+
+/* ---- Launch actions and position ------------------------------------- */
+
+.launch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.launch-actions .ui-button {
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 3.25rem;
+}
+
+.launch-actions .ui-button small {
+  font-weight: 400;
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.launch-position {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.launch-position.is-signed-out {
+  grid-template-columns: 1fr auto;
+}
+
+.launch-position.is-signed-out strong {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 620;
+}
+
+.launch-position.is-signed-out p {
+  margin: 0.2rem 0 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.launch-position .ui-stat {
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.launch-position .ui-stat__value {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.launch-position .ui-stat__value.is-accent {
+  color: var(--accent);
+}
+
+.launch-position .ui-stat small {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Supply and market ------------------------------------------------ */
+
+.launch-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.overview-panel {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.overview-panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.overview-panel-head h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 640;
+}
+
+.overview-panel-head span {
+  margin-left: auto;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-panel-head span.is-accent {
+  color: var(--accent);
+}
+
+.overview-panel-head span.is-negative {
+  color: var(--negative);
+}
+
+.overview-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-figure b {
+  font-size: var(--text-3xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.overview-figure span {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.supply-bar {
+  display: flex;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--app-sunken);
+  overflow: hidden;
+}
+
+.supply-bar i {
+  display: block;
+  height: 100%;
+}
+
+.supply-bar i.is-treasury,
+.supply-key i.is-treasury {
+  background: var(--app-border-strong);
+}
+
+.supply-bar i.is-circulating,
+.supply-key i.is-circulating {
+  background: var(--accent);
+}
+
+.supply-bar i.is-inventory,
+.supply-key i.is-inventory {
+  background: var(--app-overlay);
+}
+
+.supply-key {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.supply-key > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.supply-key dt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--app-text-secondary);
+}
+
+.supply-key i {
+  display: block;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: var(--radius-sm);
+}
+
+.supply-key dd {
+  margin: 0 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-rows {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.overview-rows > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--app-sunken);
+  font-size: var(--text-sm);
+}
+
+.overview-rows dt {
+  color: var(--app-text-secondary);
+}
+
+.overview-rows dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-rows > div.is-total {
+  background: var(--app-raised);
+}
+
+.overview-rows > div.is-total dd {
+  color: var(--accent);
+  font-size: var(--text-base);
+}
+
+.overview-note {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.overview-note b {
+  color: var(--app-text);
+}
+
+/* ---- Solvency ---------------------------------------------------------- */
+
+.solvency-checks {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.solvency-checks li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.875rem;
+  align-items: center;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+
+.solvency-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.solvency-checks li.is-failing .solvency-mark {
+  background: var(--negative-wash);
+  color: var(--negative);
+}
+
+.solvency-body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.solvency-body strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.solvency-body > span {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.solvency-surplus {
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.solvency-checks li.is-failing .solvency-surplus {
+  color: var(--negative);
+}
+
+.solvency-reconcile {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+
+.solvency-reconcile > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.solvency-reconcile dt {
+  color: var(--app-text-secondary);
+}
+
+.solvency-reconcile dd {
+  margin: 0;
+}
+
+.solvency-reconcile > div.is-total {
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.solvency-reconcile > div.is-total dd {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .launch-duo,
+  .epoch-changes {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-position {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .launch-position > .ui-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .launch-position,
+  .launch-position.is-signed-out {
+    grid-template-columns: 1fr;
+  }
+
+  .epoch-countdown {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .epoch-countdown-figure {
+    justify-content: flex-start;
+  }
+
+  .solvency-checks li {
+    grid-template-columns: auto 1fr;
+  }
+
+  .solvency-surplus {
+    grid-column: 2;
+    text-align: left;
+  }
 }
 
 .locale-switcher--dapp-mobile {

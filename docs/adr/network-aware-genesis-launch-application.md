@@ -31,6 +31,8 @@ Each network target may have a reviewed launch deployment, a full-protocol deplo
 neither. Chain and manifest identity remain part of internal cache and database keys so records
 cannot cross networks. This internal isolation is not exposed as a second product-selection model.
 
+The Overview is organised around the Genesis Epoch. `genesisEpochEnd` is immutable and changes three economics the moment it passes — acquisition gains a reserve buy-in, redemption begins paying a reserve share, and secured credit opens — so it leads the page as a live countdown stating what changes, rather than as one metric tile among many. Because the reserve accrues acquisition fees during the Epoch, the buy-in owed at the boundary is always quoted from the current reserve and labelled as rising, never as a settled future price. Below it the page reports the wallet's own position, the fixed 5,555 supply as one division, the market price with the Genesis backing valued against it, and the three solvency invariants the Vault enforces — verified client-side from the custody figures `vaultAccounting` already returns.
+
 Launch deployments expose only three primary product destinations: Overview, Trade, and My Genesis. Wallet, Activity, and Approval Tools remain contextual utilities reachable from product flows; funding Portal access remains contextual through Wallet. Unsupported known full-protocol URLs replace to `/app`, while unknown `/app/*` paths remain Next.js 404s. Full-protocol deployments restore the complete application catalog and its existing route behavior.
 
 The network selector uses stable target identities rather than treating a deployment as a second

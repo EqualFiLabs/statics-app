@@ -14,9 +14,7 @@ import {
   cumulativeGenesisActivationCost,
   dopplerStaticsTokenAbi,
   genesisActivationRegistryAbi,
-  genesisLaunchDistributorAbi,
 } from "@statics-protocol/sdk";
-import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisCarousel } from "@/components/genesis/GenesisCarousel";
@@ -32,7 +30,13 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
-import { discoverWalletGenesisIds } from "@/lib/genesis/discovery";
+import {
+  EMPTY_GENESIS_PORTFOLIO,
+  loadOwnedGenesis,
+  ownedGenesisQueryKey,
+  summariseGenesisRewards,
+  type OwnedGenesis,
+} from "@/lib/genesis/owned";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
@@ -47,19 +51,6 @@ function describeGenesisError(error: unknown): string {
   if (message.includes("NoRewards")) return "There is nothing to claim for that asset yet.";
   return message || "The Genesis transaction failed.";
 }
-
-type OwnedGenesis = Readonly<{
-  id: bigint;
-  tier: number;
-  multiplierBps: number;
-  registered: boolean;
-  rewardWeight: bigint;
-  pendingStatics: bigint;
-  pendingWeth: bigint;
-  creditActive: boolean;
-  creditPrincipal: bigint;
-  creditMaturity: number;
-}>;
 
 type ActionTab = "activate" | "rewards" | "credit";
 
@@ -97,129 +88,13 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     },
   });
 
+  // Shared with the Overview: same key, same fetcher, one walk of the wallet.
   const owned = useQuery({
-    queryKey: ["launch-genesis-owned", deployment.descriptor.deploymentId, wallet],
+    queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
-      if (!publicClient || !wallet) {
-        return {
-          items: [] as readonly OwnedGenesis[],
-          tierCosts: [] as readonly bigint[],
-          rewardShareBps: 0n,
-          totalWeight: 0n,
-          ownerStatics: 0n,
-          ownerWeth: 0n,
-        };
-      }
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [ids, tierCosts, rewardShareBps, totalWeight, ownerStatics, ownerWeth] =
-        await Promise.all([
-          discoverWalletGenesisIds(publicClient, deployment, wallet),
-          Promise.all(
-            [1, 2, 3, 4].map((tier) =>
-              publicClient.readContract({
-                address: deployment.contracts.activationRegistry,
-                abi: genesisActivationRegistryAbi,
-                functionName: "tierCost",
-                args: [tier],
-              })
-            )
-          ).then(oneIndexedGenesisTierCosts),
-          publicClient.readContract({
-            address: deployment.contracts.launchDistributor,
-            abi: genesisLaunchDistributorAbi,
-            functionName: "genesisRewardShareBps",
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.launchDistributor,
-            abi: genesisLaunchDistributorAbi,
-            functionName: "totalWeight",
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.launchDistributor,
-            abi: genesisLaunchDistributorAbi,
-            functionName: "ownerClaimable",
-            args: [wallet, deployment.contracts.statics],
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.launchDistributor,
-            abi: genesisLaunchDistributorAbi,
-            functionName: "ownerClaimable",
-            args: [wallet, deployment.contracts.weth],
-          }),
-        ]);
-      const items = await Promise.all(
-        ids.map(async (id): Promise<OwnedGenesis> => {
-          const [
-            tier,
-            multiplierBps,
-            registered,
-            rewardWeight,
-            pendingStatics,
-            pendingWeth,
-            credit,
-          ] = await Promise.all([
-            publicClient.readContract({
-              address: deployment.contracts.activationRegistry,
-              abi: genesisActivationRegistryAbi,
-              functionName: "tierOf",
-              args: [id],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.activationRegistry,
-              abi: genesisActivationRegistryAbi,
-              functionName: "multiplierBps",
-              args: [id],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.launchDistributor,
-              abi: genesisLaunchDistributorAbi,
-              functionName: "registered",
-              args: [id],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.launchDistributor,
-              abi: genesisLaunchDistributorAbi,
-              functionName: "effectiveWeight",
-              args: [id],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.launchDistributor,
-              abi: genesisLaunchDistributorAbi,
-              functionName: "pendingGenesis",
-              args: [id, deployment.contracts.statics],
-            }),
-            publicClient.readContract({
-              address: deployment.contracts.launchDistributor,
-              abi: genesisLaunchDistributorAbi,
-              functionName: "pendingGenesis",
-              args: [id, deployment.contracts.weth],
-            }),
-            // Credit state travels with the list so the carousel can flag a
-            // transfer lock and the summary can total what is owed, without a
-            // per-card query fanning out behind the scenes.
-            publicClient.readContract({
-              address: deployment.contracts.vault,
-              abi: staticsGenesisCreditAbi,
-              functionName: "credit",
-              args: [id],
-            }),
-          ]);
-          return {
-            id,
-            tier: Number(tier),
-            multiplierBps: Number(multiplierBps),
-            registered,
-            rewardWeight,
-            pendingStatics,
-            pendingWeth,
-            creditActive: credit.active,
-            creditPrincipal: credit.principal,
-            creditMaturity: Number(credit.maturity),
-          };
-        })
-      );
-      return { items, tierCosts, rewardShareBps, totalWeight, ownerStatics, ownerWeth };
+      if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
+      return loadOwnedGenesis(publicClient, deployment, wallet);
     },
   });
 
@@ -230,10 +105,10 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   );
 
   const summary = useMemo(() => {
-    const pendingStatics = items.reduce((total, item) => total + item.pendingStatics, 0n);
-    const pendingWeth = items.reduce((total, item) => total + item.pendingWeth, 0n);
-    const ownerStatics = owned.data?.ownerStatics ?? 0n;
-    const ownerWeth = owned.data?.ownerWeth ?? 0n;
+    const portfolio = owned.data ?? EMPTY_GENESIS_PORTFOLIO;
+    // Reward totals and the claim signature count are shared with the Overview,
+    // so both surfaces quote the same figures.
+    const rewards = summariseGenesisRewards(portfolio);
     const credits = items.filter((item) => item.creditActive);
     const owed = credits.reduce((total, item) => total + item.creditPrincipal, 0n);
     const soonest = credits.reduce<OwnedGenesis | null>(
@@ -241,25 +116,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         !earliest || item.creditMaturity < earliest.creditMaturity ? item : earliest,
       null
     );
-    // One claim call per NFT and asset, and the distributor exposes no batch
-    // entry point, so the button says up front how many signatures it wants.
-    const claimCount =
-      items.reduce(
-        (total, item) =>
-          total + (item.pendingStatics > 0n ? 1 : 0) + (item.pendingWeth > 0n ? 1 : 0),
-        0
-      ) +
-      (ownerStatics > 0n ? 1 : 0) +
-      (ownerWeth > 0n ? 1 : 0);
     return {
-      claimableStatics: pendingStatics + ownerStatics,
-      claimableWeth: pendingWeth + ownerWeth,
-      ownerStatics,
-      ownerWeth,
+      ...rewards,
+      claimCount: rewards.claimTransactionCount,
       owed,
       creditCount: credits.length,
       soonest,
-      claimCount,
       activated: items.filter((item) => item.tier > 0).length,
       unregistered: items.filter((item) => !item.registered).length,
     };
@@ -759,7 +621,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 <div className="genesis-panel-head">
                   <h3>Launch rewards</h3>
                   <p>
-                    Registered Genesis NFTs split {Number(owned.data?.rewardShareBps ?? 0n) / 100}%
+                    Registered Genesis NFTs split {Number(owned.data?.rewardShareBps ?? 0) / 100}%
                     of market fees, weighted by activation tier.
                   </p>
                 </div>
