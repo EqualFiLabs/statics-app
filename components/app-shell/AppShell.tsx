@@ -307,6 +307,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="dapp-header-actions">
           <NetworkSelector />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
+          {active.descriptor.stage === "launch" && (
+            <Link className="dapp-return dapp-add-funds" href="/app/portal">
+              {tItems("portal")}
+            </Link>
+          )}
           <Link className="dapp-return" href="/">
             {tNavigation("site")} <span aria-hidden="true">↗</span>
           </Link>
@@ -352,7 +357,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       aria-current={currentActive ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
-                      {active.descriptor.stage === "launch"
+                      {active.descriptor.stage === "launch" && item.capability !== "wallet"
                         ? tLaunchRoutes(`${item.messageKey}.label`)
                         : tItems(item.messageKey)}
                     </Link>

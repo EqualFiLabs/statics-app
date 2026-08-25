@@ -3,6 +3,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/app-shell/AppShell";
+import type { DeploymentOption } from "@/lib/deployments/types";
+import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
 import english from "@/messages/en.json";
 
@@ -41,6 +43,33 @@ describe("DApp wallet shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close ×" }));
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveFocus();
+  });
+  it("places Wallet in launch navigation and Add funds in the navbar", () => {
+    const descriptor = {
+      deploymentId: "launch-fixture",
+      label: "Genesis launch",
+      network: "Robinhood Chain",
+      chainId: 4_663,
+      stage: "launch",
+      capabilities: [],
+      available: true,
+    } as const;
+    const active = {
+      networkId: "robinhood",
+      descriptor,
+      launch: null,
+      protocol: null,
+    } satisfies DeploymentOption;
+    renderWithWallet(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <AppShell>Overview</AppShell>
+      </DeploymentContext.Provider>
+    );
+
+    expect(screen.getByLabelText("DApp navigation")).toContainElement(
+      screen.getByRole("link", { name: "Wallet" })
+    );
+    expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
   });
 
   it("offers independent Privy sign-in and external wallet connection", () => {

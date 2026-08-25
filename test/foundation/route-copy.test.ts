@@ -97,13 +97,14 @@ describe("stage-aware dapp navigation", () => {
     available: true,
   };
 
-  it("selects exactly four launch destinations and tabs", () => {
+  it("selects the launch product plus Wallet in the sidebar and four product tabs", () => {
     const groups = appNavigationGroupsForStage("launch");
     expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual([
       "/app",
       "/app/swap",
       "/app/genesis",
       "/app/genesis-rewards",
+      "/app/wallet",
     ]);
     expect(appTabNavigationForStage("launch").map((item) => item.href)).toEqual([
       "/app",

@@ -269,10 +269,14 @@ export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [
  */
 export function appNavigationGroupsForStage(stage: DeploymentStage): readonly AppNavigationGroup[] {
   if (stage === "full-protocol") return appNavigationGroups;
+  const launchNavigationCapabilities: readonly DeploymentCapability[] = [
+    ...launchPrimaryCapabilities,
+    "wallet",
+  ];
   return appNavigationGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => launchPrimaryCapabilities.includes(item.capability)),
+      items: group.items.filter((item) => launchNavigationCapabilities.includes(item.capability)),
     }))
     .filter((group) => group.items.length > 0);
 }

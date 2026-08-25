@@ -34,6 +34,7 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
     "Trade",
     "My Genesis",
     "Rewards",
+    "Wallet",
   ]);
   await expect(page.locator(".dapp-tabbar .dapp-tab:not(.dapp-nav-toggle)")).toHaveText([
     "Overview",
@@ -41,6 +42,10 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
     "My Genesis",
     "Rewards",
   ]);
+  await expect(page.getByRole("link", { name: "Add funds" })).toHaveAttribute(
+    "href",
+    "/app/portal"
+  );
   await expect(page.getByText("Dollar", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Baskets", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Position NFT", { exact: true })).toHaveCount(0);
@@ -53,9 +58,14 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
   await page.goto("/app/positions");
   await page.goto("/app/unknown");
   await expect(page.getByText("ROUTE UNAVAILABLE")).toBeVisible();
+  await page.goto("/app");
 
-  await page.goto("/app/wallet");
+  await page.locator('.dapp-nav-item[href="/app/wallet"]').click();
+  await expect(page).toHaveURL(/\/app\/wallet$/);
   await expect(page.getByRole("link", { name: /activity/i })).toBeVisible();
+  await page.goto("/app/portal");
+  await expect(page).toHaveURL(/\/app\/wallet\?modal=portal$/);
+  await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
   await page.goto("/app/tools");
   await expect(page).toHaveURL(/\/app\/tools$/);
   expectNoBrowserFailures();

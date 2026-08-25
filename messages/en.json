@@ -62,7 +62,8 @@
       "wallet": "Wallet",
       "faucet": "Faucet",
       "activity": "Activity",
-      "tools": "Tools"
+      "tools": "Tools",
+      "portal": "Add funds"
     },
     "marketing": {
       "protocol": "Protocol",
