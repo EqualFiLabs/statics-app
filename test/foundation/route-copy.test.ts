@@ -107,10 +107,10 @@ describe("stage-aware dapp navigation", () => {
       "/app/wallet",
     ]);
     expect(appTabNavigationForStage("launch").map((item) => item.href)).toEqual([
-      "/app",
       "/app/swap",
       "/app/genesis",
       "/app/genesis-rewards",
+      "/app/wallet",
     ]);
     expect(groups.every((group) => group.items.every((item) => item.enabled))).toBe(true);
   });

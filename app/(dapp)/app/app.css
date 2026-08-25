@@ -525,6 +525,9 @@
   grid-column: -2 / -1;
   justify-self: end;
 }
+.dapp-network-selector--mobile {
+  display: none;
+}
 
 .dapp-network-selector select {
   max-width: 15rem;
@@ -5187,11 +5190,26 @@
     grid-template-columns: 1fr auto;
   }
 
-  /* The header drops to two columns here, so the indicator would have nowhere
-   * to sit. Losing it costs nothing: the wrong-network bar is in the content
-   * column and stays visible at every width. */
-  .dapp-network {
+  .dapp-network-selector--header,
+  .dapp-header > .dapp-network {
     display: none;
+  }
+
+  .dapp-network-selector--mobile {
+    display: block;
+    margin-top: auto;
+    padding: 1rem;
+    border-top: 1px solid var(--app-border);
+  }
+
+  .dapp-network-selector--mobile select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .dapp-network-selector--mobile .dapp-network {
+    display: inline-flex;
+    width: 100%;
   }
 
   .dapp-layout {
@@ -5211,8 +5229,8 @@
 
   .dapp-nav-panel {
     position: fixed;
-    z-index: 50;
-    inset: 72px 0 0;
+    z-index: 70;
+    inset: 0;
     display: none;
     padding: 1rem clamp(1rem, 3vw, 2.5rem) var(--tabbar-clearance);
     overflow-y: auto;
@@ -5273,11 +5291,8 @@
     margin-top: 1rem;
   }
 
-  /* The mobile header cannot hold these, and this panel is a full-height
-   * sheet, so the sidebar is where they belong at this width. */
-
-  /* The panel already lists these at this width, and the mobile header has to
-   * hold the brand, the network state and the wallet control. */
+  /* Network selection moves into the full-screen menu at this width. The
+   * mobile navbar keeps Add funds and the connected address visible. */
 
   .dapp-tabbar {
     position: fixed;
@@ -5360,8 +5375,15 @@
     width: min(132px, 100%);
   }
 
-  .dapp-return {
+  .dapp-return:not(.dapp-add-funds) {
     display: none;
+  }
+
+  .dapp-add-funds {
+    min-height: var(--control-height-sm);
+    padding: 0 0.65rem;
+    border: 1px solid var(--app-border-strong);
+    white-space: nowrap;
   }
 
   .locale-switcher--dapp {
@@ -5398,7 +5420,7 @@
   }
 
   .dapp-nav-panel {
-    inset: 64px 0 0;
+    inset: 0;
   }
 
   .dapp-content {

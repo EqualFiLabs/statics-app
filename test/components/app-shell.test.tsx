@@ -66,9 +66,9 @@ describe("DApp wallet shell", () => {
       </DeploymentContext.Provider>
     );
 
-    expect(screen.getByLabelText("DApp navigation")).toContainElement(
-      screen.getByRole("link", { name: "Wallet" })
-    );
+    expect(
+      within(screen.getByLabelText("DApp navigation")).getByRole("link", { name: "Wallet" })
+    ).toHaveAttribute("href", "/app/wallet");
     expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
   });
 
@@ -221,7 +221,7 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText(/wrong network/i)).toBeInTheDocument();
     expect(screen.getByText(/switch to Anvil/i)).toBeInTheDocument();
     expect(screen.getByText(/chain 31337/i)).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveValue(
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveValue(
       "robinhood-testnet"
     );
   });
@@ -237,7 +237,7 @@ describe("DApp wallet shell", () => {
       isTargetChain: true,
     });
 
-    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveDisplayValue(
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveDisplayValue(
       "Robinhood Chain Testnet"
     );
     expect(screen.queryByRole("button", { name: "Switch network" })).not.toBeInTheDocument();
@@ -251,7 +251,7 @@ describe("DApp wallet shell", () => {
       targetChainId: 31_337,
     });
 
-    expect(screen.getByRole("combobox", { name: "Statics network" })).toHaveDisplayValue(
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveDisplayValue(
       "Robinhood Chain Testnet"
     );
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
@@ -261,7 +261,7 @@ describe("DApp wallet shell", () => {
     const selectNetwork = vi.fn().mockResolvedValue(undefined);
     renderWithWallet(<AppShell>Overview</AppShell>, { selectNetwork });
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Statics network" }), {
+    fireEvent.change(screen.getAllByRole("combobox", { name: "Statics network" })[0], {
       target: { value: "robinhood" },
     });
     expect(selectNetwork).toHaveBeenCalledWith("robinhood");

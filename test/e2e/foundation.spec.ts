@@ -173,6 +173,19 @@ test.describe("Dollar DApp foundation", () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#dapp-navigation-panel")).toBeVisible();
+    const panelBox = await page.locator("#dapp-navigation-panel").boundingBox();
+    const viewport = page.viewportSize();
+    expect(panelBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (panelBox && viewport) {
+      expect(panelBox.x).toBeLessThanOrEqual(1);
+      expect(panelBox.y).toBeLessThanOrEqual(1);
+      expect(panelBox.width).toBeGreaterThanOrEqual(viewport.width - 1);
+      expect(panelBox.height).toBeGreaterThanOrEqual(viewport.height - 1);
+    }
+    await expect(
+      page.locator("#dapp-navigation-panel").getByRole("combobox", { name: "Statics network" })
+    ).toBeVisible();
     await expect(page.locator('.dapp-nav-item[href="/app"]')).toBeFocused();
 
     await page.keyboard.press("Escape");

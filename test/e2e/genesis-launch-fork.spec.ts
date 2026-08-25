@@ -37,10 +37,10 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
     "Wallet",
   ]);
   await expect(page.locator(".dapp-tabbar .dapp-tab:not(.dapp-nav-toggle)")).toHaveText([
-    "Overview",
     "Trade",
     "My Genesis",
     "Rewards",
+    "Wallet",
   ]);
   await expect(page.getByRole("link", { name: "Add funds" })).toHaveAttribute(
     "href",

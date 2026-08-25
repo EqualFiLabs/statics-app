@@ -161,15 +161,19 @@ function NetworkIndicator({ label }: { label?: string } = {}) {
   );
 }
 
-function NetworkSelector() {
+function NetworkSelector({ className = "" }: { className?: string }) {
   const { active, options } = useDeployment();
   const wallet = useWalletState();
   if (active.descriptor.stage === "launch" && process.env.NEXT_PUBLIC_APP_ENV === "production") {
-    return <NetworkIndicator label={active.descriptor.network} />;
+    return (
+      <div className={className}>
+        <NetworkIndicator label={active.descriptor.network} />
+      </div>
+    );
   }
   if (options.length < 2) return null;
   return (
-    <label className="dapp-network-selector">
+    <label className={`dapp-network-selector ${className}`.trim()}>
       <span className="sr-only">Statics network</span>
       <select
         aria-label="Statics network"
@@ -305,7 +309,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         {options.length < 2 ? <NetworkIndicator /> : null}
         <div className="dapp-header-actions">
-          <NetworkSelector />
+          <NetworkSelector className="dapp-network-selector--header" />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
           {active.descriptor.stage === "launch" && (
             <Link className="dapp-return dapp-add-funds" href="/app/portal">
@@ -373,6 +377,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
               {tNavigation("returnSite")} <span aria-hidden="true">↗</span>
             </Link>
+            <NetworkSelector className="dapp-network-selector--mobile" />
             <LocaleSwitcher className="locale-switcher locale-switcher--dapp-mobile" />
           </div>
         </aside>
@@ -419,7 +424,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={currentActive ? "page" : undefined}
             >
-              {active.descriptor.stage === "launch"
+              {active.descriptor.stage === "launch" && item.capability !== "wallet"
                 ? tLaunchRoutes(`${item.messageKey}.label`)
                 : tItems(item.messageKey)}
             </Link>

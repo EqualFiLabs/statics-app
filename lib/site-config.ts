@@ -283,5 +283,11 @@ export function appNavigationGroupsForStage(stage: DeploymentStage): readonly Ap
 
 export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNavigationItem[] {
   if (stage === "full-protocol") return appTabNavigation;
-  return appNavigation.filter((item) => launchPrimaryCapabilities.includes(item.capability));
+  const launchTabCapabilities: readonly DeploymentCapability[] = [
+    "canonical-statics-market",
+    "genesis-vault",
+    "genesis-launch-rewards",
+    "wallet",
+  ];
+  return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));
 }
