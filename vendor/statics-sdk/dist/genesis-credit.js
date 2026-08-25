@@ -1,6 +1,6 @@
 import { encodeFunctionData, parseAbi } from "viem";
-export const GENESIS_MAX_CREDIT_PRINCIPAL = 171_000n * 10n ** 18n;
-export const GENESIS_RECOVERY_RESIDUAL = 9_000n * 10n ** 18n;
+export const GENESIS_MAX_CREDIT_PRINCIPAL = 171000n * 10n ** 18n;
+export const GENESIS_RECOVERY_RESIDUAL = 9000n * 10n ** 18n;
 export const GENESIS_CREDIT_TERM = 30n * 24n * 60n * 60n;
 export const GENESIS_CREDIT_RECOVERY_GRACE = 60n * 60n;
 export const staticsGenesisCreditAbi = parseAbi([
@@ -29,14 +29,36 @@ export const staticsGenesisCreditAbi = parseAbi([
     "event GenesisCreditRecovered(uint256 indexed genesisId, address indexed formerOwner, address indexed caller, uint256 principal, uint256 unusedCredit, uint256 callerIncentive, uint256 genesisDistribution)",
 ]);
 export function buildOpenGenesisCreditTransaction(genesisId, principal, nativeFee) {
-    return { data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "openGenesisCredit", args: [genesisId, principal] }), value: nativeFee };
+    return {
+        data: encodeFunctionData({
+            abi: staticsGenesisCreditAbi,
+            functionName: "openGenesisCredit",
+            args: [genesisId, principal],
+        }),
+        value: nativeFee,
+    };
 }
 export function buildExtendGenesisCreditTransaction(genesisId, nativeFee) {
-    return { data: encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "extendGenesisCredit", args: [genesisId] }), value: nativeFee };
+    return {
+        data: encodeFunctionData({
+            abi: staticsGenesisCreditAbi,
+            functionName: "extendGenesisCredit",
+            args: [genesisId],
+        }),
+        value: nativeFee,
+    };
 }
 export function buildRepayGenesisCreditCall(genesisId) {
-    return encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "repayGenesisCredit", args: [genesisId] });
+    return encodeFunctionData({
+        abi: staticsGenesisCreditAbi,
+        functionName: "repayGenesisCredit",
+        args: [genesisId],
+    });
 }
 export function buildRecoverGenesisCreditCall(genesisId) {
-    return encodeFunctionData({ abi: staticsGenesisCreditAbi, functionName: "recoverGenesisCredit", args: [genesisId] });
+    return encodeFunctionData({
+        abi: staticsGenesisCreditAbi,
+        functionName: "recoverGenesisCredit",
+        args: [genesisId],
+    });
 }

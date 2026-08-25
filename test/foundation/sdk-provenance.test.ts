@@ -12,12 +12,19 @@ describe("vendored Statics SDK", () => {
     ) as {
       protocolCommit: string;
       source: { repository: string; path: string; commit: string };
+      extensionSource?: { repository: string; path: string; commit: string };
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
+      extensionSourceChecksums?: Record<string, string>;
       checksums: Record<string, string>;
     };
     expect(provenance.protocolCommit).toMatch(/^[a-f0-9]{40}$/);
     expect(provenance.source).toEqual({
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: expect.stringMatching(/^[a-f0-9]{40}$/),
+    });
+    expect(provenance.extensionSource).toEqual({
       repository: "https://github.com/EqualFiLabs/statics-sdk",
       path: ".",
       commit: expect.stringMatching(/^[a-f0-9]{40}$/),
@@ -27,7 +34,14 @@ describe("vendored Statics SDK", () => {
       "package.json",
       "src/index.ts",
     ]);
+    expect(Object.keys(provenance.extensionSourceChecksums ?? {}).sort()).toEqual([
+      "package.json",
+      "src/genesis-credit.ts",
+    ]);
     for (const expected of Object.values(provenance.sourceChecksums)) {
+      expect(expected).toMatch(/^[a-f0-9]{64}$/);
+    }
+    for (const expected of Object.values(provenance.extensionSourceChecksums ?? {})) {
       expect(expected).toMatch(/^[a-f0-9]{64}$/);
     }
     for (const [file, expected] of Object.entries(provenance.checksums)) {
