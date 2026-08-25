@@ -73,6 +73,32 @@
       "dev": "Dev"
     }
   },
+  "launchRoutes": {
+    "overview": {
+      "label": "Overview",
+      "status": "Genesis launch",
+      "title": "Statics Genesis launch",
+      "description": "Trade STATICS, acquire fully backed Genesis NFTs, and follow the Genesis Epoch on Robinhood Chain."
+    },
+    "swap": {
+      "label": "Trade",
+      "status": "STATICS market",
+      "title": "Trade STATICS and Genesis NFTs",
+      "description": "Buy or sell STATICS through its canonical market, or acquire a fully backed Genesis NFT through the Vault."
+    },
+    "genesis": {
+      "label": "My Genesis",
+      "status": "Genesis NFTs",
+      "title": "Manage my Genesis",
+      "description": "View Genesis artwork, activate reward tiers, and manage secured credit after the Genesis Epoch."
+    },
+    "genesisRewards": {
+      "label": "Rewards",
+      "status": "Genesis rewards",
+      "title": "Genesis rewards",
+      "description": "Register Genesis NFTs, follow reward accrual, and claim rewards as the current holder or from your previous ownership."
+    }
+  },
   "routes": {
     "overview": {
       "label": "Overview",
@@ -138,7 +164,7 @@
       "label": "Genesis NFT",
       "status": "Genesis NFT",
       "title": "Manage your Genesis NFTs",
-      "description": "Activate a Genesis NFT by burning STATICS, then link it to one Position to increase that Position's reward weight."
+      "description": "View Genesis artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
     },
     "genesisRewards": {
       "label": "Genesis Rewards",
@@ -815,7 +841,8 @@
     "exportWarning": "Exporting reveals recovery material that controls this wallet and every asset it holds. Never share it or paste it into a website, chat, or cloud note.",
     "openingExport": "Opening secure export…",
     "reviewExport": "Review secure export",
-    "disconnectWallet": "Disconnect wallet"
+    "disconnectWallet": "Disconnect wallet",
+    "walletLink": "Wallet"
   },
   "landing": {
     "eyebrow": "The anchor is fixed. The market is not.",

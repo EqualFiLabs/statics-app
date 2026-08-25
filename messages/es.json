@@ -73,6 +73,32 @@
       "dev": "Desarrollo"
     }
   },
+  "launchRoutes": {
+    "overview": {
+      "label": "Resumen",
+      "status": "Lanzamiento Genesis",
+      "title": "Lanzamiento de Statics Genesis",
+      "description": "Intercambia STATICS, adquiere NFT Genesis con respaldo total y sigue la Época Genesis en Robinhood Chain."
+    },
+    "swap": {
+      "label": "Intercambiar",
+      "status": "Mercado STATICS",
+      "title": "Intercambia STATICS y NFT Genesis",
+      "description": "Compra o vende STATICS en su mercado canónico, o adquiere un NFT Genesis con respaldo total mediante la Bóveda."
+    },
+    "genesis": {
+      "label": "Mi Genesis",
+      "status": "NFT Genesis",
+      "title": "Gestiona mi Genesis",
+      "description": "Consulta el arte de Genesis, activa niveles de recompensa y gestiona crédito garantizado después de la Época Genesis."
+    },
+    "genesisRewards": {
+      "label": "Recompensas",
+      "status": "Recompensas Genesis",
+      "title": "Recompensas Genesis",
+      "description": "Registra NFT Genesis, sigue la acumulación y reclama recompensas como titular actual o de periodos de propiedad anteriores."
+    }
+  },
   "routes": {
     "overview": {
       "label": "Resumen",
@@ -138,7 +164,7 @@
       "label": "Genesis NFT",
       "status": "Genesis NFT",
       "title": "Gestiona tus Genesis NFTs",
-      "description": "Activa un NFT Genesis quemando STATICS y enlázalo a una Posición para aumentar su peso de recompensas."
+      "description": "Consulta el arte de Genesis, activa niveles de recompensa mediante pagos en STATICS y gestiona las funciones de cada NFT."
     },
     "genesisRewards": {
       "label": "Recompensas Genesis",
@@ -815,7 +841,8 @@
     "exportWarning": "La exportación revela el material de recuperación que controla esta billetera y todos sus activos. Nunca lo compartas ni lo pegues en un sitio web, chat o nota en la nube.",
     "openingExport": "Abriendo exportación segura…",
     "reviewExport": "Revisar exportación segura",
-    "disconnectWallet": "Desconectar billetera"
+    "disconnectWallet": "Desconectar billetera",
+    "walletLink": "Billetera"
   },
   "landing": {
     "eyebrow": "El ancla es fija. El mercado no.",

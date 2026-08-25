@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from "@/test/render";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
+const searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => searchParams,
+}));
 import { SwapPage } from "@/components/swap/SwapPage";
 import type { DeploymentOption, LaunchDeployment } from "@/lib/deployments/types";
 import { DeploymentContext } from "@/providers/deployment-context";
@@ -79,5 +83,20 @@ describe("Swap page", () => {
     fireEvent.click(screen.getByRole("tab", { name: "NFT" }));
     expect(screen.getByText("Next available Genesis NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
+  });
+
+  it("starts in NFT mode for the explicit mode query", () => {
+    searchParams.set("mode", "nft");
+    render(
+      <DeploymentContext.Provider
+        value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+      >
+        <SwapPage />
+      </DeploymentContext.Provider>
+    );
+
+    expect(screen.getByText("Next available Genesis NFT")).toBeInTheDocument();
+    expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
+    searchParams.delete("mode");
   });
 });

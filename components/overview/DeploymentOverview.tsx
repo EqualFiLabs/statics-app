@@ -2,23 +2,42 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { formatEther, getAddress } from "viem";
+import { useLocale } from "next-intl";
+import { formatEther, getAddress, type Address } from "viem";
 import { usePublicClient } from "wagmi";
 
-import {
-  dopplerStaticsTokenAbi,
-  genesisLaunchDistributorAbi,
-  staticsFeeReceiverAbi,
-  staticsGenesisVaultAbi,
-  v4StateViewReadAbi,
-} from "@statics-protocol/sdk";
+import { dopplerStaticsTokenAbi, v4StateViewReadAbi } from "@statics-protocol/sdk";
 
-import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useDeployment } from "@/providers/deployment-context";
+import { DollarOverview } from "@/components/dollar/DollarPage";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
+import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
+
+const Q192 = 1n << 192n;
+const PRICE_DECIMALS = 8;
+
+function decimalFromScaled(value: bigint, decimals: number): string {
+  const base = 10n ** BigInt(decimals);
+  const whole = value / base;
+  const fraction = (value % base).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole.toString();
+}
+
+export function formatCanonicalMarketPrice(
+  sqrtPriceX96: bigint,
+  currency0: Address,
+  statics: Address
+): { value: string; unit: "WETH per STATICS" | "STATICS per WETH" } {
+  const scaledPrice = (sqrtPriceX96 * sqrtPriceX96 * 10n ** BigInt(PRICE_DECIMALS)) / Q192;
+  return {
+    value: decimalFromScaled(scaledPrice, PRICE_DECIMALS),
+    unit:
+      currency0.toLowerCase() === statics.toLowerCase() ? "WETH per STATICS" : "STATICS per WETH",
+  };
+}
 
 export function DeploymentOverview() {
   const { active } = useDeployment();
@@ -48,6 +67,7 @@ export function DeploymentOverview() {
 
 function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
+  const locale = useLocale();
   const walletState = useWalletState();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
@@ -57,46 +77,34 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
       await verifyLaunchDeployment(publicClient, deployment);
-      const [vault, totalWeight, harvestedStatics, harvestedWeth, liquidity, staticsBalance] =
-        await Promise.all([
-          publicClient.readContract({
-            address: deployment.contracts.vault,
-            abi: staticsGenesisVaultAbi,
-            functionName: "vaultAccounting",
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.launchDistributor,
-            abi: genesisLaunchDistributorAbi,
-            functionName: "totalWeight",
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.feeReceiver,
-            abi: staticsFeeReceiverAbi,
-            functionName: "cumulativeHarvested",
-            args: [deployment.contracts.statics],
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.feeReceiver,
-            abi: staticsFeeReceiverAbi,
-            functionName: "cumulativeHarvested",
-            args: [deployment.contracts.weth],
-          }),
-          publicClient.readContract({
-            address: deployment.contracts.stateView,
-            abi: v4StateViewReadAbi,
-            functionName: "getLiquidity",
-            args: [deployment.market.poolId],
-          }),
-          wallet
-            ? publicClient.readContract({
-                address: deployment.contracts.statics,
-                abi: dopplerStaticsTokenAbi,
-                functionName: "balanceOf",
-                args: [wallet],
-              })
-            : 0n,
-        ]);
-      return { vault, totalWeight, harvestedStatics, harvestedWeth, liquidity, staticsBalance };
+      const [vault, slot0, liquidity, staticsBalance] = await Promise.all([
+        publicClient.readContract({
+          address: deployment.contracts.vault,
+          abi: currentGenesisVaultAbi,
+          functionName: "vaultAccounting",
+        }),
+        publicClient.readContract({
+          address: deployment.contracts.stateView,
+          abi: v4StateViewReadAbi,
+          functionName: "getSlot0",
+          args: [deployment.market.poolId],
+        }),
+        publicClient.readContract({
+          address: deployment.contracts.stateView,
+          abi: v4StateViewReadAbi,
+          functionName: "getLiquidity",
+          args: [deployment.market.poolId],
+        }),
+        wallet
+          ? publicClient.readContract({
+              address: deployment.contracts.statics,
+              abi: dopplerStaticsTokenAbi,
+              functionName: "balanceOf",
+              args: [wallet],
+            })
+          : 0n,
+      ]);
+      return { vault, sqrtPriceX96: slot0[0], liquidity, staticsBalance };
     },
   });
   return (
@@ -112,23 +120,25 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           <Link className="ui-button ui-button--primary" href="/app/swap">
             Buy STATICS
           </Link>
+          <Link className="ui-button ui-button--secondary" href="/app/swap?mode=nft">
+            Acquire Genesis
+          </Link>
           <Link className="ui-button ui-button--secondary" href="/app/genesis">
-            Explore Genesis
+            Manage my Genesis
           </Link>
         </div>
       </section>
       <section className="genesis-summary ui-card">
         <div className="ui-stat">
-          <span className="ui-stat__label">Your STATICS</span>
-          <strong className="ui-stat__value">
-            {wallet && metrics.data ? formatEther(metrics.data.staticsBalance) : "—"}
-          </strong>
-        </div>
-        <div className="ui-stat">
-          <span className="ui-stat__label">Vault backing</span>
+          <span className="ui-stat__label">Genesis Epoch</span>
           <strong className="ui-stat__value">
             {metrics.data
-              ? `${formatEther(metrics.data.vault.tokenBacking)} / ${formatEther(metrics.data.vault.requiredBacking)} STATICS`
+              ? metrics.data.vault.epochActive
+                ? `Active until ${new Intl.DateTimeFormat(locale, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(Number(metrics.data.vault.genesisEpochEnd) * 1_000))}`
+                : "Complete"
               : "—"}
           </strong>
         </div>
@@ -145,19 +155,47 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           </strong>
         </div>
         <div className="ui-stat">
-          <span className="ui-stat__label">Registered reward weight</span>
-          <strong className="ui-stat__value">{metrics.data?.totalWeight.toString() ?? "—"}</strong>
-        </div>
-        <div className="ui-stat">
-          <span className="ui-stat__label">Market liquidity</span>
-          <strong className="ui-stat__value">{metrics.data?.liquidity ? "Active" : "—"}</strong>
-        </div>
-        <div className="ui-stat">
-          <span className="ui-stat__label">Fees harvested</span>
+          <span className="ui-stat__label">STATICS backing</span>
           <strong className="ui-stat__value">
             {metrics.data
-              ? `${formatEther(metrics.data.harvestedStatics)} STATICS · ${formatEther(metrics.data.harvestedWeth)} WETH`
+              ? `${formatEther(metrics.data.vault.tokenBacking)} / ${formatEther(metrics.data.vault.requiredBacking)} STATICS`
               : "—"}
+          </strong>
+        </div>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Native reserve</span>
+          <strong className="ui-stat__value">
+            {metrics.data ? `${formatEther(metrics.data.vault.reserveETH)} ETH` : "—"}
+          </strong>
+        </div>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Reserve backing per Genesis</span>
+          <strong className="ui-stat__value">
+            {metrics.data ? `${formatEther(metrics.data.vault.reserveBackingPerGenesis)} ETH` : "—"}
+          </strong>
+        </div>
+        <div className="ui-stat">
+          <span className="ui-stat__label">STATICS/WETH market price</span>
+          <strong className="ui-stat__value">
+            {metrics.data
+              ? (() => {
+                  const price = formatCanonicalMarketPrice(
+                    metrics.data.sqrtPriceX96,
+                    deployment.market.poolKey.currency0,
+                    deployment.contracts.statics
+                  );
+                  return `${price.value} ${price.unit}`;
+                })()
+              : "—"}
+          </strong>
+          <span>
+            {metrics.data?.liquidity ? "Canonical liquidity active" : "No active liquidity"}
+          </span>
+        </div>
+        <div className="ui-stat">
+          <span className="ui-stat__label">Your STATICS</span>
+          <strong className="ui-stat__value">
+            {wallet && metrics.data ? formatEther(metrics.data.staticsBalance) : "—"}
           </strong>
         </div>
       </section>

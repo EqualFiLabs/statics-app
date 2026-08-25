@@ -1,4 +1,5 @@
 "use client";
+import { useSearchParams } from "next/navigation";
 
 import { useState } from "react";
 
@@ -11,7 +12,10 @@ type SwapMode = "token" | "nft";
 
 export function SwapPage() {
   const { active } = useDeployment();
-  const [mode, setMode] = useState<SwapMode>("token");
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<SwapMode>(() =>
+    searchParams?.get("mode") === "nft" ? "nft" : "token"
+  );
   if (!active.launch) {
     return (
       <EmptyState

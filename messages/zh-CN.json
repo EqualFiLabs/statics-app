@@ -73,6 +73,32 @@
       "dev": "开发"
     }
   },
+  "launchRoutes": {
+    "overview": {
+      "label": "概览",
+      "status": "Genesis 启动",
+      "title": "Statics Genesis 启动",
+      "description": "在 Robinhood Chain 上交易 STATICS、获取有完全储备支持的 Genesis NFT，并关注 Genesis 纪元。"
+    },
+    "swap": {
+      "label": "交易",
+      "status": "STATICS 市场",
+      "title": "交易 STATICS 和 Genesis NFT",
+      "description": "通过规范市场买卖 STATICS，或通过金库获取有完全储备支持的 Genesis NFT。"
+    },
+    "genesis": {
+      "label": "我的 Genesis",
+      "status": "Genesis NFT",
+      "title": "管理我的 Genesis",
+      "description": "查看 Genesis 艺术作品、激活奖励等级，并在 Genesis 纪元结束后管理担保信贷。"
+    },
+    "genesisRewards": {
+      "label": "奖励",
+      "status": "Genesis 奖励",
+      "title": "Genesis 奖励",
+      "description": "注册 Genesis NFT、跟踪奖励累积，并以当前持有者身份或针对之前的持有期领取奖励。"
+    }
+  },
   "routes": {
     "overview": {
       "label": "概览",
@@ -138,7 +164,7 @@
       "label": "Genesis NFT",
       "status": "Genesis NFT",
       "title": "管理你的 Genesis NFTs",
-      "description": "燃烧 STATICS 激活 Genesis NFT，再将其绑定到一个 Position，以提高该 Position 的奖励权重。"
+      "description": "查看 Genesis 艺术作品，通过支付 STATICS 激活奖励等级，并管理每个 NFT 的协议功能。"
     },
     "genesisRewards": {
       "label": "Genesis 奖励",
@@ -815,7 +841,8 @@
     "exportWarning": "导出会显示控制此钱包及其中全部资产的恢复材料。切勿分享，也不要粘贴到网站、聊天或云笔记中。",
     "openingExport": "正在打开安全导出…",
     "reviewExport": "查看安全导出",
-    "disconnectWallet": "断开钱包连接"
+    "disconnectWallet": "断开钱包连接",
+    "walletLink": "钱包"
   },
   "landing": {
     "eyebrow": "锚点固定，市场不固定。",
@@ -913,7 +940,11 @@
       "plural": "头寸",
       "plain": "你在 Statics 中持有的一切，汇集在一个可转移项目中。"
     },
-    "basket": { "label": "篮子", "plural": "篮子", "plain": "一组固定资产，可作为一个整体买卖。" },
+    "basket": {
+      "label": "篮子",
+      "plural": "篮子",
+      "plain": "一组固定资产，可作为一个整体买卖。"
+    },
     "underlying": {
       "label": "底层资产",
       "plural": "底层资产",
@@ -974,7 +1005,11 @@
       "plural": "健康度",
       "plain": "你的头寸获得保障的程度。数值越高越安全。"
     },
-    "rewards": { "label": "奖励", "plural": "奖励", "plain": "你已赚取并可领取的费用。" },
+    "rewards": {
+      "label": "奖励",
+      "plural": "奖励",
+      "plain": "你已赚取并可领取的费用。"
+    },
     "staking": {
       "label": "质押",
       "plural": "质押",

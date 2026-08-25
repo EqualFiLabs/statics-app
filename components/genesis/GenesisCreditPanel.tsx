@@ -9,11 +9,11 @@ import {
   GENESIS_MAX_CREDIT_PRINCIPAL,
   buildExtendGenesisCreditTransaction,
   buildOpenGenesisCreditTransaction,
-  buildRecoverGenesisCreditCall,
   buildRepayGenesisCreditCall,
   staticsGenesisCreditAbi,
 } from "@statics-protocol/sdk/genesis-credit";
 
+import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -53,13 +53,6 @@ type GenesisCreditQuote = {
   treasuryPortion: bigint;
 };
 
-type GenesisCreditRecoveryQuote = {
-  unusedCredit: bigint;
-  recoveryResidual: bigint;
-  callerIncentive: bigint;
-  genesisDistribution: bigint;
-  recoverableAt: number;
-};
 export function GenesisCreditPanel({
   deployment,
   genesisId,
@@ -75,26 +68,31 @@ export function GenesisCreditPanel({
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setNow(Math.floor(Date.now() / 1000));
+      setNow(Math.floor(Date.now() / 1_000));
     }, 1_000);
     return () => window.clearInterval(timer);
   }, []);
 
   const state = useQuery({
-    queryKey: ["launch-genesis-credit", deployment.descriptor.deploymentId, genesisId, wallet],
+    queryKey: [
+      "launch-genesis-credit",
+      deployment.descriptor.deploymentId,
+      genesisId.toString(),
+      wallet,
+    ],
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error("Connect a wallet first.");
       await verifyLaunchDeployment(publicClient, deployment);
-      const [epochActive, originationsPaused, credit, limit] = await Promise.all([
+      const [vault, originationsPaused, credit, limit] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
-          abi: staticsGenesisCreditAbi,
-          functionName: "epochActive",
-        }) as Promise<boolean>,
+          abi: currentGenesisVaultAbi,
+          functionName: "vaultAccounting",
+        }),
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: staticsGenesisCreditAbi,
@@ -113,7 +111,13 @@ export function GenesisCreditPanel({
           args: [genesisId],
         }) as Promise<bigint>,
       ]);
-      return { epochActive, originationsPaused, credit, limit };
+      return {
+        epochActive: vault.epochActive,
+        genesisEpochEnd: Number(vault.genesisEpochEnd),
+        originationsPaused,
+        credit,
+        limit,
+      };
     },
   });
 
@@ -129,11 +133,7 @@ export function GenesisCreditPanel({
   };
 
   const send = async (
-    key:
-      | "open-genesis-credit"
-      | "extend-genesis-credit"
-      | "repay-genesis-credit"
-      | "recover-genesis-credit",
+    key: "open-genesis-credit" | "extend-genesis-credit" | "repay-genesis-credit",
     label: string,
     data: `0x${string}`,
     reviewedAmount: string,
@@ -182,18 +182,19 @@ export function GenesisCreditPanel({
   }
 
   const credit = state.data.credit;
-  const recoverable = credit.active && credit.recoverableAt !== 0 && now > credit.recoverableAt;
 
   if (!credit.active) {
-    const unavailable = state.data.epochActive || state.data.originationsPaused;
     return (
       <section className="genesis-action" aria-label={`Genesis #${genesisId} secured credit`}>
         <h3>Secured credit</h3>
         {state.data.epochActive ? (
           <p>
-            Available after the Genesis Epoch. Borrow up to 171,000 STATICS without redeeming the
-            NFT.
+            Genesis credit opens after the Epoch ends at{" "}
+            {formatTimestamp(state.data.genesisEpochEnd)}. The maximum principal is{" "}
+            {formatEther(GENESIS_MAX_CREDIT_PRINCIPAL)} STATICS.
           </p>
+        ) : state.data.originationsPaused ? (
+          <p>New Genesis credit is temporarily paused.</p>
         ) : (
           <>
             <p>
@@ -207,13 +208,13 @@ export function GenesisCreditPanel({
                 value={amount}
                 placeholder="0"
                 onChange={(event) => setAmount(event.target.value)}
-                disabled={unavailable || busy !== null}
+                disabled={busy !== null}
               />
             </label>
             <button
               className="ui-button ui-button--primary ui-button--block"
               type="button"
-              disabled={unavailable || busy !== null || !amount}
+              disabled={busy !== null || !amount}
               onClick={() =>
                 void act("open", async () => {
                   if (!publicClient) return;
@@ -247,9 +248,7 @@ export function GenesisCreditPanel({
             </button>
           </>
         )}
-        {state.data.originationsPaused && !state.data.epochActive && (
-          <p>New Genesis credit is temporarily paused.</p>
-        )}
+
         {error && <p className="dapp-inline-error">{error}</p>}
       </section>
     );
@@ -289,7 +288,7 @@ export function GenesisCreditPanel({
             })
           }
         >
-          {busy === "extend" ? "Extending…" : "Extend 30 days"}
+          {busy === "extend" ? "Extending…" : "Extend until maturity"}
         </button>
         <button
           className="ui-button ui-button--primary"
@@ -334,32 +333,6 @@ export function GenesisCreditPanel({
         >
           {busy === "repay" ? "Repaying…" : "Repay"}
         </button>
-        {recoverable && (
-          <button
-            className="ui-button ui-button--secondary"
-            type="button"
-            disabled={busy !== null}
-            onClick={() =>
-              void act("recover", async () => {
-                if (!publicClient) return;
-                const quote = (await publicClient.readContract({
-                  address: deployment.contracts.vault,
-                  abi: staticsGenesisCreditAbi,
-                  functionName: "quoteGenesisCreditRecovery",
-                  args: [genesisId],
-                })) as GenesisCreditRecoveryQuote;
-                await send(
-                  "recover-genesis-credit",
-                  `Recover expired Genesis #${genesisId} credit`,
-                  buildRecoverGenesisCreditCall(genesisId),
-                  `${formatEther(quote.callerIncentive)} STATICS caller incentive`
-                );
-              })
-            }
-          >
-            {busy === "recover" ? "Recovering…" : "Recover expired credit"}
-          </button>
-        )}
       </div>
       <p>This Genesis is transfer-locked while secured credit is active.</p>
       {error && <p className="dapp-inline-error">{error}</p>}
