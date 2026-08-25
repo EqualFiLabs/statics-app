@@ -80,7 +80,7 @@ describe("Swap page", () => {
     );
 
     expect(screen.getByText("Token swap canonical")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "NFT" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Genesis NFT" }));
     expect(screen.getByText("Next available Genesis NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
   });

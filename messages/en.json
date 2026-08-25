@@ -450,6 +450,7 @@
     "confirmSwap": "Confirm swap",
     "selectAsset": "Select asset",
     "balance": "Balance {balance}",
+    "max": "MAX",
     "createSolanaWallet": "Create Solana wallet",
     "submitting": "Submitting…",
     "connectWallet": "Connect wallet",

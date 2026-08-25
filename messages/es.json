@@ -450,6 +450,7 @@
     "confirmSwap": "Confirmar intercambio",
     "selectAsset": "Seleccionar activo",
     "balance": "Saldo {balance}",
+    "max": "MÁX",
     "createSolanaWallet": "Crear cartera de Solana",
     "submitting": "Enviando…",
     "connectWallet": "Conectar cartera",

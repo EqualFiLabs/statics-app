@@ -17,17 +17,6 @@ function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-const approvalDisclosureRoutes = [
-  "/app/swap",
-  "/app/dollar",
-  "/app/baskets",
-  "/app/positions",
-  "/app/loans",
-  "/app/rewards",
-  "/app/genesis",
-  "/app/liquidity",
-] as const;
-
 function WalletHeaderControls() {
   const wallet = useWalletState();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -255,9 +244,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? tLaunchRoutes(`${routeId}.description`)
       : tRoutes(`${routeId}.description`),
   };
-  const showApprovalDisclosure = approvalDisclosureRoutes.some(
-    (route) => currentPath === route || currentPath.startsWith(`${route}/`)
-  );
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
     if (restoreFocus) {
@@ -394,15 +380,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="dapp-inline-error" role="alert">
               {wallet.error}
             </p>
-          )}
-
-          {showApprovalDisclosure && (
-            <aside className="dapp-approval-disclosure" aria-label={tShell("approvalsTitle")}>
-              <p>
-                <strong>{tShell("approvalsTitle")}</strong> {tShell("approvalsBody")}
-              </p>
-              <Link href="/app/tools">{tShell("manageApprovals")} →</Link>
-            </aside>
           )}
 
           {children}

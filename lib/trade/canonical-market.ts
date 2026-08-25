@@ -93,3 +93,32 @@ export function maximumTokenApproval(spender: Address): Hex {
     args: [getAddress(spender), MAX_ERC20_ALLOWANCE],
   });
 }
+
+/**
+ * The timestamp a swap deadline should be measured from.
+ *
+ * A deadline has to outlive the block the transaction actually lands in, not
+ * the last one that happened to be mined. Three clocks can disagree, and each
+ * is the right answer in some situation:
+ *
+ *   - `latest` leads on a fork whose time has been advanced past wall clock,
+ *     which is how the Genesis Epoch gets tested.
+ *   - `pending` leads where the node exposes the block being assembled.
+ *   - wall clock leads on a fork sitting idle: Anvil mines only on activity, so
+ *     the latest block can be arbitrarily stale while the next one jumps to
+ *     real time. Anchoring to `latest` alone made every swap after a quiet
+ *     period longer than the TTL revert with TransactionDeadlinePassed.
+ *
+ * Taking the greatest is correct in all three: a deadline that is further out
+ * than necessary costs nothing, while one that is short reverts.
+ */
+export function swapDeadlineBase(
+  latestTimestamp: bigint,
+  pendingTimestamp: bigint | null,
+  wallClockSeconds: bigint
+): bigint {
+  let base = latestTimestamp;
+  if (pendingTimestamp !== null && pendingTimestamp > base) base = pendingTimestamp;
+  if (wallClockSeconds > base) base = wallClockSeconds;
+  return base;
+}

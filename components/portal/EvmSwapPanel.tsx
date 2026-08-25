@@ -45,6 +45,7 @@ import {
   maximumTokenApproval,
   poolKeyForLaunch,
   settlementForTrade,
+  swapDeadlineBase,
   tokenAddress,
   zeroForTrade,
 } from "@/lib/trade/canonical-market";
@@ -407,7 +408,16 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           transport: custom(provider),
         });
         await verifyLaunchDeployment(publicClient, launch);
-        const block = await publicClient.getBlock();
+        const [block, pendingBlock] = await Promise.all([
+          publicClient.getBlock(),
+          // Not every node serves a pending block; the fallbacks cover it.
+          publicClient.getBlock({ blockTag: "pending" }).catch(() => null),
+        ]);
+        const deadlineBase = swapDeadlineBase(
+          block.timestamp,
+          pendingBlock?.timestamp ?? null,
+          BigInt(Math.floor(Date.now() / 1_000))
+        );
         const inputToken = tokenAddress(launch, directDirection.input);
         if (directDirection.input !== "eth") {
           const tokenAllowance = await publicClient.readContract({
@@ -443,7 +453,9 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
               permit2[0],
               permit2[1],
               parsedAmount,
-              Number(block.timestamp)
+              // Execution time, not last-block time: a stale latest block makes
+              // an expired Permit2 allowance look usable.
+              Number(deadlineBase)
             )
           ) {
             await executeProtocolTransaction({
@@ -478,7 +490,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           zeroForOne: zeroForTrade(launch, directDirection.input),
           amountIn: parsedAmount,
           amountOutMinimum: reviewedMinimum,
-          deadline: block.timestamp + PERMIT_TTL,
+          deadline: deadlineBase + PERMIT_TTL,
           settlement: settlementForTrade(launch, directDirection),
         });
         await executeProtocolTransaction({
@@ -620,6 +632,16 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
         excluded={destination?.address}
         amount={amount}
         balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
+        onMax={
+          balance === null || balance === 0n || !source
+            ? undefined
+            : () => {
+                setAmount(displayAmount(balance.toString(), source));
+                setQuote(null);
+                setReviewing(false);
+                setError(null);
+              }
+        }
         onAmount={(value) => {
           setAmount(value);
           setQuote(null);
@@ -663,28 +685,31 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           setError(null);
         }}
       />
-      <dl className="portal-quote-grid">
-        <QuoteDatum
-          label={t("minimumReceived")}
-          value={
-            minimumRaw && destination
-              ? `${displayAmount(minimumRaw, destination)} ${destination.symbol}`
-              : "--"
-          }
-        />
-        <QuoteDatum
-          label={t("priceImpact")}
-          value={
-            quote?.quote?.priceImpact === undefined
-              ? "--"
-              : `${quote.quote.priceImpact.toFixed(2)}%`
-          }
-        />
-        <QuoteDatum
-          label={t("networkCost")}
-          value={quote?.quote?.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
-        />
-      </dl>
+      {quote?.quote && (
+        <dl className="portal-quote-grid">
+          <QuoteDatum
+            label={t("minimumReceived")}
+            value={
+              minimumRaw && destination
+                ? `${displayAmount(minimumRaw, destination)} ${destination.symbol}`
+                : "--"
+            }
+          />
+          <QuoteDatum
+            label={t("priceImpact")}
+            value={
+              quote.quote.priceImpact === undefined
+                ? "--"
+                : `${quote.quote.priceImpact.toFixed(2)}%`
+            }
+            tone={priceImpactTone(quote.quote.priceImpact)}
+          />
+          <QuoteDatum
+            label={t("networkCost")}
+            value={quote.quote.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
+          />
+        </dl>
+      )}
       {error && (
         <p className="portal-error" role="alert">
           {error}
@@ -738,6 +763,7 @@ function SwapAssetField({
   readOnly = false,
   onAmount,
   onToken,
+  onMax,
   slippage,
   onEditSlippage,
 }: {
@@ -750,6 +776,7 @@ function SwapAssetField({
   readOnly?: boolean;
   onAmount?: (value: string) => void;
   onToken: (address: string) => void;
+  onMax?: () => void;
   slippage?: number;
   onEditSlippage?: () => void;
 }) {
@@ -759,7 +786,7 @@ function SwapAssetField({
     // card and a button inside a label would also activate the amount input.
     <div className="portal-field portal-asset-field">
       <div className="portal-asset-field-head">
-        <span>{label}</span>
+        <span className="portal-field-label">{label}</span>
         {slippage !== undefined && onEditSlippage && (
           <SlippageInlineControl value={slippage} onEdit={onEditSlippage} />
         )}
@@ -788,16 +815,44 @@ function SwapAssetField({
             ))}
         </select>
       </div>
-      <small>{readOnly ? "--" : t("balance", { balance })}</small>
+      <div className="portal-asset-field-foot">
+        <small>{readOnly ? "--" : t("balance", { balance })}</small>
+        {onMax && (
+          <button className="portal-asset-max" type="button" onClick={onMax}>
+            {t("max")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function QuoteDatum({ label, value }: { label: string; value: string }) {
+/**
+ * Price impact is the one figure here that carries a warning, so it is the one
+ * that earns colour. Semantic, and separate from the accent.
+ */
+function priceImpactTone(impact: number | undefined): QuoteTone {
+  if (impact === undefined) return "neutral";
+  if (impact >= 5) return "negative";
+  if (impact >= 1) return "warning";
+  return "positive";
+}
+
+type QuoteTone = "neutral" | "positive" | "warning" | "negative";
+
+function QuoteDatum({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: QuoteTone;
+}) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd className={tone === "neutral" ? undefined : `is-${tone}`}>{value}</dd>
     </div>
   );
 }

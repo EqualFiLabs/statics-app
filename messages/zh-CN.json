@@ -450,6 +450,7 @@
     "confirmSwap": "确认兑换",
     "selectAsset": "选择资产",
     "balance": "余额 {balance}",
+    "max": "最大",
     "createSolanaWallet": "创建 Solana 钱包",
     "submitting": "正在提交…",
     "connectWallet": "连接钱包",

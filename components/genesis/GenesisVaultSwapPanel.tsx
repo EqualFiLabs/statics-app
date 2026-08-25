@@ -11,6 +11,9 @@ import {
   staticsGenesisAbi,
 } from "@statics-protocol/sdk";
 
+import Link from "next/link";
+import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
+
 import { EmptyState } from "@/components/common/EmptyState";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
@@ -18,8 +21,14 @@ import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/genesis/discovery";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { useWalletState } from "@/providers/wallet-context";
+
+type VaultDirection = "acquire" | "redeem";
+
+/** One owned Genesis, with the credit state that decides whether it can go back. */
+type RedeemableGenesis = Readonly<{ id: bigint; creditActive: boolean }>;
 
 function describeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -40,6 +49,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [selectedOwnedId, setSelectedOwnedId] = useState<string>("");
+  const [direction, setDirection] = useState<VaultDirection>("acquire");
   const [busy, setBusy] = useState<"buy" | "redeem" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +59,15 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
       await verifyLaunchDeployment(publicClient, deployment);
-      const [purchaseQuote, redemptionQuote, accounting, nextId, ownedIds] = await Promise.all([
+      const [
+        purchaseQuote,
+        redemptionQuote,
+        accounting,
+        nextId,
+        ownedIds,
+        staticsBalance,
+        nativeBalance,
+      ] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -67,8 +85,39 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         }),
         discoverNextAvailableGenesisId(publicClient, deployment),
         wallet ? discoverWalletGenesisIds(publicClient, deployment, wallet) : [],
+        wallet
+          ? publicClient.readContract({
+              address: deployment.contracts.statics,
+              abi: dopplerStaticsTokenAbi,
+              functionName: "balanceOf",
+              args: [wallet],
+            })
+          : 0n,
+        wallet ? publicClient.getBalance({ address: wallet }) : 0n,
       ]);
-      return { purchaseQuote, redemptionQuote, accounting, nextId, ownedIds };
+      // Credit locks a Genesis against redemption, and the old panel only found
+      // out by reverting. Resolve it with the list so a locked NFT is marked
+      // before anyone selects it.
+      const owned = await Promise.all(
+        ownedIds.map(async (id): Promise<RedeemableGenesis> => {
+          const credit = await publicClient.readContract({
+            address: deployment.contracts.vault,
+            abi: staticsGenesisCreditAbi,
+            functionName: "credit",
+            args: [id],
+          });
+          return { id, creditActive: credit.active };
+        })
+      );
+      return {
+        purchaseQuote,
+        redemptionQuote,
+        accounting,
+        nextId,
+        owned,
+        staticsBalance,
+        nativeBalance,
+      };
     },
   });
 
@@ -250,128 +299,225 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const purchaseQuote = vault.data?.purchaseQuote;
   const redemptionQuote = vault.data?.redemptionQuote;
   const accounting = vault.data?.accounting;
+  const owned = vault.data?.owned ?? [];
+
+  const statics = (value: bigint | undefined, digits = 0) =>
+    `${formatTokenAmountGrouped(value ?? 0n, 18, digits)} STATICS`;
+  const eth = (value: bigint | undefined, digits = 5) =>
+    `${formatTokenAmountGrouped(value ?? 0n, 18, digits)} ETH`;
+
+  // Both legs, checked here rather than inside the click handler. The old panel
+  // enabled the button regardless and reported the shortfall as a thrown error.
+  const staticsNeeded = purchaseQuote?.staticsPrice ?? 0n;
+  const nativeNeeded = purchaseQuote?.requiredNative ?? 0n;
+  const staticsHeld = vault.data?.staticsBalance ?? 0n;
+  const nativeHeld = vault.data?.nativeBalance ?? 0n;
+  const staticsShort = wallet && staticsHeld < staticsNeeded ? staticsNeeded - staticsHeld : 0n;
+  const nativeShort = wallet && nativeHeld < nativeNeeded ? nativeNeeded - nativeHeld : 0n;
+  const cannotAfford = staticsShort > 0n || nativeShort > 0n;
+
+  const selected = owned.find((item) => item.id.toString() === selectedOwnedId) ?? owned[0] ?? null;
+  const selectedLocked = selected?.creditActive ?? false;
+
   return (
     <div className="genesis-vault-swap">
-      <section className="portal-panel" aria-labelledby="genesis-vault-state-title">
-        <p className="dapp-eyebrow">Genesis Vault</p>
-        <h2 id="genesis-vault-state-title">Fully backed Genesis inventory</h2>
-        <dl className="portal-quote-grid">
-          <div>
-            <dt>Remaining</dt>
-            <dd>{accounting?.vaultInventory.toString() ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Circulating</dt>
-            <dd>{accounting?.circulatingGenesis.toString() ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Native reserve</dt>
-            <dd>{formatEther(accounting?.reserveETH ?? 0n)} ETH</dd>
-          </div>
-          <div>
-            <dt>Reserve / Genesis</dt>
-            <dd>{formatEther(accounting?.reserveBackingPerGenesis ?? 0n)} ETH</dd>
-          </div>
-          <div>
-            <dt>Outstanding credit</dt>
-            <dd>{formatEther(accounting?.outstandingGenesisCredit ?? 0n)} STATICS</dd>
-          </div>
-          <div>
-            <dt>Genesis Epoch</dt>
-            <dd>{accounting?.epochActive ? "Active" : "Complete"}</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="portal-panel" aria-labelledby="next-genesis-title">
-        <p className="dapp-eyebrow">STATICS → Genesis NFT</p>
-        <h2 id="next-genesis-title">
-          {nextId === null ? "Vault inventory exhausted" : `Genesis #${nextId}`}
-        </h2>
-        {nextId !== null && (
-          <NftArtwork
-            chainId={deployment.descriptor.chainId}
-            expandable
-            nft={{
-              kind: "collection",
-              tokenId: nextId,
-              contract: deployment.contracts.genesis,
-              name: `Genesis #${nextId}`,
-              summary: "Next available Genesis NFT",
-              carries: [],
-              blockedReason: null,
-            }}
-          />
-        )}
-        <dl className="portal-quote-grid">
-          <div>
-            <dt>STATICS backing</dt>
-            <dd>{formatEther(purchaseQuote?.staticsPrice ?? 0n)} STATICS</dd>
-          </div>
-          <div>
-            <dt>Reserve buy-in</dt>
-            <dd>{formatEther(purchaseQuote?.reserveBuyIn ?? 0n)} ETH</dd>
-          </div>
-          <div>
-            <dt>Acquisition fee</dt>
-            <dd>{formatEther(purchaseQuote?.nativeFee ?? 0n)} ETH</dd>
-          </div>
-          <div>
-            <dt>Total ETH required</dt>
-            <dd>{formatEther(purchaseQuote?.requiredNative ?? 0n)} ETH</dd>
-          </div>
-        </dl>
-        <button
-          className="portal-primary-action"
-          type="button"
-          disabled={busy !== null || nextId === null}
-          onClick={() => void buy()}
-        >
-          {busy === "buy" ? "Confirming…" : "Acquire Genesis NFT"}
-        </button>
-      </section>
-
-      <section className="portal-panel" aria-labelledby="redeem-genesis-title">
-        <p className="dapp-eyebrow">Genesis NFT → backing</p>
-        <h2 id="redeem-genesis-title">Redeem an owned NFT</h2>
-        {wallet && (vault.data?.ownedIds.length ?? 0) > 0 ? (
-          <>
-            <label className="portal-field">
-              <span>Genesis NFT</span>
-              <select
-                value={selectedOwnedId}
-                onChange={(event) => setSelectedOwnedId(event.target.value)}
-              >
-                <option value="">Choose an NFT</option>
-                {vault.data!.ownedIds.map((id) => (
-                  <option key={id.toString()} value={id.toString()}>
-                    Genesis #{id.toString()}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              Receive {formatEther(redemptionQuote?.staticsPayout ?? 0n)} STATICS +{" "}
-              {formatEther(redemptionQuote?.reservePayout ?? 0n)} ETH.
-            </p>
+      <section className="portal-panel" aria-label="Genesis Vault">
+        <div className="portal-direction-tabs" role="tablist" aria-label="Vault direction">
+          {(["acquire", "redeem"] as const).map((item) => (
             <button
-              className="portal-primary-action"
+              key={item}
               type="button"
-              disabled={busy !== null || !selectedOwnedId}
-              onClick={() => void redeem()}
+              role="tab"
+              aria-selected={direction === item}
+              onClick={() => {
+                setDirection(item);
+                setError(null);
+              }}
             >
-              {busy === "redeem" ? "Confirming…" : "Redeem Genesis"}
+              {item === "acquire" ? "Acquire" : "Redeem"}
             </button>
-          </>
+          ))}
+        </div>
+
+        {direction === "acquire" ? (
+          nextId === null ? (
+            <EmptyState
+              title="Vault inventory is exhausted"
+              description="Every Genesis NFT has been acquired. They can still be bought from holders, and redeemed back into the Vault at any time."
+            />
+          ) : (
+            <>
+              <div className="vault-hero">
+                <NftArtwork
+                  chainId={deployment.descriptor.chainId}
+                  expandable
+                  size="lg"
+                  nft={{
+                    kind: "collection",
+                    tokenId: nextId,
+                    contract: deployment.contracts.genesis,
+                    name: `Genesis #${nextId}`,
+                    summary: "Next available Genesis NFT",
+                    carries: [],
+                    blockedReason: null,
+                  }}
+                />
+                <div className="vault-hero-copy">
+                  <h3>Genesis #{nextId.toString()}</h3>
+                  <p>Next from the Vault. Redeemable for its full backing at any time.</p>
+                  <span className="ui-pill is-ready">Fully backed</span>
+                </div>
+              </div>
+
+              <ul className="vault-legs">
+                <li className={staticsShort > 0n ? "is-short" : undefined}>
+                  <span>STATICS backing</span>
+                  <strong>{statics(staticsNeeded)}</strong>
+                  <small>
+                    {wallet
+                      ? `You hold ${formatTokenAmountGrouped(staticsHeld, 18, 2)}${staticsShort > 0n ? ` · short ${formatTokenAmountGrouped(staticsShort, 18, 2)}` : ""}`
+                      : "Connect a wallet to check your balance"}
+                  </small>
+                </li>
+                <li className={nativeShort > 0n ? "is-short" : undefined}>
+                  <span>Acquisition fee + reserve buy-in</span>
+                  <strong>{eth(nativeNeeded)}</strong>
+                  <small>
+                    {wallet
+                      ? `You hold ${formatTokenAmountGrouped(nativeHeld, 18, 4)} ETH${nativeShort > 0n ? ` · short ${formatTokenAmountGrouped(nativeShort, 18, 5)}` : ""}`
+                      : "Paid in the chain's native asset"}
+                  </small>
+                </li>
+              </ul>
+
+              {staticsShort > 0n && (
+                <p className="vault-notice is-error">
+                  <b>You need {formatTokenAmountGrouped(staticsShort, 18, 2)} more STATICS.</b>{" "}
+                  <Link href="/app/swap">Buy STATICS on the Token tab</Link>, then come back.
+                </p>
+              )}
+              {nativeShort > 0n && (
+                <p className="vault-notice is-error">
+                  <b>You need {formatTokenAmountGrouped(nativeShort, 18, 5)} more ETH</b> for the
+                  acquisition fee and reserve buy-in.
+                </p>
+              )}
+
+              <button
+                className="portal-primary-action"
+                type="button"
+                disabled={busy !== null || (Boolean(wallet) && cannotAfford)}
+                onClick={() => void buy()}
+              >
+                {busy === "buy"
+                  ? "Confirming…"
+                  : wallet && cannotAfford
+                    ? "Not enough to acquire"
+                    : `Acquire Genesis #${nextId}`}
+              </button>
+            </>
+          )
         ) : (
-          <p>Connect a wallet holding a Genesis NFT to redeem it.</p>
+          <>
+            {!wallet || owned.length === 0 ? (
+              <EmptyState
+                title="No Genesis NFTs to redeem"
+                description="Redeeming returns a Genesis to the Vault in exchange for its full backing. Connect a wallet holding one to continue."
+              />
+            ) : (
+              <>
+                <p className="portal-field-label">Choose a Genesis to redeem</p>
+                <div className="vault-owned" role="radiogroup" aria-label="Your Genesis NFTs">
+                  {owned.map((item) => {
+                    const isSelected = selected?.id === item.id;
+                    return (
+                      <button
+                        key={item.id.toString()}
+                        className="vault-owned-card"
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        disabled={item.creditActive}
+                        onClick={() => {
+                          setSelectedOwnedId(item.id.toString());
+                          setError(null);
+                        }}
+                      >
+                        <NftArtwork
+                          chainId={deployment.descriptor.chainId}
+                          size="lg"
+                          nft={{
+                            kind: "collection",
+                            tokenId: item.id,
+                            contract: deployment.contracts.genesis,
+                            name: `Genesis #${item.id}`,
+                            summary: "Owned Genesis NFT",
+                            carries: [],
+                            blockedReason: item.creditActive
+                              ? "Repay secured credit before redeeming."
+                              : null,
+                          }}
+                        />
+                        <span>#{item.id.toString()}</span>
+                        <small>{item.creditActive ? "Credit active" : "Redeemable"}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedLocked ? (
+                  <p className="vault-notice is-error">
+                    <b>Genesis #{selected?.id.toString()} has active secured credit.</b> Repay it in{" "}
+                    <Link href="/app/genesis">My Genesis</Link> before this NFT can be redeemed.
+                  </p>
+                ) : (
+                  <ul className="vault-legs">
+                    <li>
+                      <span>You receive</span>
+                      <strong>{statics(redemptionQuote?.staticsPayout)}</strong>
+                      <small>The full fixed backing</small>
+                    </li>
+                    <li>
+                      <span>Reserve share</span>
+                      <strong>{eth(redemptionQuote?.reservePayout)}</strong>
+                      <small>
+                        {accounting?.epochActive
+                          ? "No reserve share is paid until the Genesis Epoch ends"
+                          : `1 / ${accounting?.maximumSupply.toString() ?? "5,555"} of the native reserve`}
+                      </small>
+                    </li>
+                  </ul>
+                )}
+
+                <button
+                  className="portal-primary-action"
+                  type="button"
+                  disabled={busy !== null || !selected || selectedLocked}
+                  onClick={() => void redeem()}
+                >
+                  {busy === "redeem"
+                    ? "Confirming…"
+                    : selectedLocked
+                      ? "Repay credit first"
+                      : `Redeem Genesis #${selected?.id ?? ""}`}
+                </button>
+              </>
+            )}
+          </>
+        )}
+
+        {error && (
+          <p className="portal-error" role="alert">
+            {error}
+          </p>
         )}
       </section>
-      {error && (
-        <p className="portal-error" role="alert">
-          {error}
-        </p>
-      )}
+
+      <p className="vault-strip">
+        <b>{accounting?.vaultInventory.toString() ?? "—"}</b> of{" "}
+        {accounting?.maximumSupply.toString() ?? "—"} left in the Vault
+        <Link href="/app">Vault detail →</Link>
+      </p>
     </div>
   );
 }
