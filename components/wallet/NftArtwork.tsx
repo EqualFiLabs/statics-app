@@ -22,10 +22,13 @@ export function NftArtwork({
   nft,
   chainId,
   expandable = false,
+  size = "sm",
 }: {
   nft: WalletNft;
   chainId: number;
   expandable?: boolean;
+  /** "sm" is the 48px corner thumbnail; "lg" fills its container. */
+  size?: "sm" | "lg";
 }) {
   const publicClient = usePublicClient({ chainId });
   const t = useTranslations("nftArtwork");
@@ -43,6 +46,8 @@ export function NftArtwork({
     },
   });
 
+  const sizeClass = size === "lg" ? " is-lg" : "";
+
   if (image.data && !failed) {
     const artwork = (
       /* eslint-disable-next-line @next/next/no-img-element --
@@ -50,7 +55,7 @@ export function NftArtwork({
          domain allow-listed up front, which is impossible for user-added
          contracts. */
       <img
-        className="wallet-nft-art"
+        className={`wallet-nft-art${sizeClass}`}
         src={image.data}
         alt=""
         loading="lazy"
@@ -61,7 +66,7 @@ export function NftArtwork({
     return (
       <>
         <button
-          className="wallet-nft-art-trigger"
+          className={`wallet-nft-art-trigger${sizeClass}`}
           type="button"
           aria-label={t("viewFullSize", { name: nft.name })}
           onClick={() => setViewerOpen(true)}
@@ -79,8 +84,8 @@ export function NftArtwork({
     nft.kind === "position" ? Boxes : nft.kind === "liquidity" ? Droplets : ImageIcon;
 
   return (
-    <span className="wallet-nft-art is-placeholder" aria-hidden="true">
-      <Placeholder size={20} />
+    <span className={`wallet-nft-art is-placeholder${sizeClass}`} aria-hidden="true">
+      <Placeholder size={size === "lg" ? 40 : 20} />
     </span>
   );
 }

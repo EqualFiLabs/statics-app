@@ -71,7 +71,11 @@ NFT mode is the Genesis Vault conversion surface:
 
 There is no Genesis inventory catalog and no user-facing pagination over 5,555 NFTs.
 
-Genesis management is the My Genesis destination, and it consolidates ownership, activation, credit, and launch rewards into one surface. A wallet-scoped strip carries permissionless reward accrual, previous-owner pull claims, and collection-wide reward totals. Each owned Genesis NFT is managed through a single dashboard card: artwork, activation tier and upgrade, reward registration, effective weight, pending current-holder claims, and post-Epoch secured credit. When a wallet owns several NFTs, a chip selector labeled with each token's registration and pending-reward state switches the dashboard between them; a single-NFT wallet needs no selector. After the Epoch the same destination also discovers permissionless recoverable credits through the deployment-scoped Ponder index; every indexed candidate is revalidated onchain before a recovery action. The former `/app/genesis-rewards` route redirects to `/app/genesis`.
+Genesis management is the My Genesis destination, and it consolidates ownership, activation, credit, and launch rewards into one surface. The destination opens with a wallet summary — holdings, aggregate backing, everything claimable, and any credit outstanding with its nearest maturity — before any single NFT. Owned NFTs are then a single-row carousel that pages horizontally rather than wrapping, each card carrying its artwork and a status flag for registration, pending rewards, and an active credit lock; past twelve NFTs a filterable grid replaces the carousel. The selected NFT splits into its identity — artwork at full size, derived traits read from the token metadata document, backing, and reward weight — and one action panel at a time behind an Activate / Rewards / Credit control, so each of the three decisions is presented on its own.
+
+Activation presents the whole tier ladder rather than a tier picker, because the multiplier curve flattens after the first tier and the trade-off is only legible when every rung is visible. Secured credit presents the term, the grace period, and the recoverable window as one timeline with a live position marker, and states the recovery consequence before the borrow control rather than after it.
+
+Permissionless recovery moved to `/app/genesis/recoveries`, its own destination: it is keeper work rather than Genesis ownership, and it remains reachable without owning a Genesis or connecting a wallet. Every indexed candidate is revalidated onchain before a recovery action. The former `/app/genesis-rewards` route redirects to `/app/genesis`.
 
 ### Event-derived Genesis indexing
 
@@ -114,8 +118,9 @@ create a user-visible deployment mode, replace pages, or disable canonical swaps
 4. NFT acquisition rechecks that the displayed token is still Vault inventory before submitting.
 5. Genesis redemption remains subject to ownership, approval, activation-lock, and backing checks.
 6. Mainnet, testnet, and local-fork indexed records cannot collide.
-7. Launch primary navigation is Overview, Trade, and My Genesis; contextual Wallet, Activity, and Approval Tools remain reachable; unsupported known full-protocol URLs replace to `/app`, unknown paths remain 404s, and full-protocol stage restores the complete catalog.
-8. Local-fork support cannot be enabled outside development or against a non-loopback RPC.
+7. Launch primary navigation is Overview, Trade, and My Genesis; contextual Wallet, Activity, Approval Tools, and Genesis recoveries remain reachable; unsupported known full-protocol URLs replace to `/app`, unknown paths remain 404s, and full-protocol stage restores the complete catalog.
+8. Every dapp route states its own name and purpose; the route header is not reserved for the overview.
+9. Local-fork support cannot be enabled outside development or against a non-loopback RPC.
 
 ## Consequences
 

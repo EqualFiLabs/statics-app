@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { getAddress, parseEther, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,13 @@ vi.mock("@/lib/genesis/discovery", () => ({
 }));
 vi.mock("@/lib/wallet/nft-image", () => ({
   resolveNftImage: vi.fn().mockResolvedValue("data:image/svg+xml,%3Csvg/%3E"),
+  resolveNftMetadata: vi.fn().mockResolvedValue({
+    image: "data:image/svg+xml,%3Csvg/%3E",
+    traits: [
+      { label: "Field", value: "Quiescent", max: null },
+      { label: "Activation Tier", value: "2", max: 4 },
+    ],
+  }),
 }));
 const discoverWalletGenesisIds = vi.fn();
 
@@ -187,32 +194,51 @@ describe("Genesis credit presentation", () => {
     });
   }
 
-  it("shows the exact Epoch end and no borrow controls during the Epoch", async () => {
+  it("shows when the Epoch ends and no borrow controls during the Epoch", async () => {
     creditReads(true, false);
     renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
 
-    expect(await screen.findByText(/maximum principal is 171000 STATICS/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Borrow STATICS" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Borrow STATICS")).not.toBeInTheDocument();
+    expect(await screen.findByText(/borrow up to 171,000 STATICS/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Borrow/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount to borrow")).not.toBeInTheDocument();
   });
 
   it("shows post-Epoch borrow controls when originations are open", async () => {
     creditReads(false, false);
     renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
 
-    expect(await screen.findByRole("button", { name: "Borrow STATICS" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Borrow STATICS")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Borrow/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Amount to borrow")).toBeInTheDocument();
+  });
+
+  it("states the recovery consequence before any borrow is confirmed", async () => {
+    creditReads(false, false);
+    renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
+
+    expect(await screen.findByText(/Miss the deadline and you lose the NFT/i)).toBeInTheDocument();
+    expect(screen.getByText("Recoverable")).toBeInTheDocument();
+    expect(screen.getByText("1h grace")).toBeInTheDocument();
+  });
+
+  it("caps the borrow amount at this Genesis credit limit", async () => {
+    creditReads(false, false);
+    renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
+
+    const exact = await screen.findByLabelText("Or enter an exact amount");
+    fireEvent.change(exact, { target: { value: "900000" } });
+
+    expect(
+      await screen.findByRole("button", { name: "Borrow 171,000 STATICS" })
+    ).toBeInTheDocument();
   });
 
   it("shows only pause status when post-Epoch originations are paused", async () => {
     creditReads(false, true);
     renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
 
-    expect(
-      await screen.findByText("New Genesis credit is temporarily paused.")
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Borrow STATICS" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Borrow STATICS")).not.toBeInTheDocument();
+    expect(await screen.findByText(/New Genesis credit is temporarily paused/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Borrow/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount to borrow")).not.toBeInTheDocument();
   });
 });
 
@@ -222,7 +248,7 @@ describe("Genesis recovery navigation", () => {
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />, false);
 
     await waitFor(() => expect(readContract).toHaveBeenCalled());
-    expect(screen.queryByRole("tab", { name: "Recoveries" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Recover matured/ })).not.toBeInTheDocument();
   });
 
   it("exposes Recoveries after the Genesis Epoch without requiring an owned NFT", async () => {
@@ -231,7 +257,10 @@ describe("Genesis recovery navigation", () => {
     loadRecoverableGenesisCredits.mockResolvedValue([]);
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />, false);
 
-    expect(await screen.findByRole("tab", { name: "Recoveries" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Recover matured/ })).toHaveAttribute(
+      "href",
+      "/app/genesis/recoveries"
+    );
   });
 });
 
@@ -270,32 +299,69 @@ describe("consolidated Genesis rewards surface", () => {
     );
   }
 
-  it("shows the wallet-global reward strip and manages the selected NFT", async () => {
+  it("summarises the whole wallet before any single NFT", async () => {
     rewardsReads();
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    expect(await screen.findByText("Genesis reward share")).toBeInTheDocument();
-    expect(screen.getByText("10%")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Update rewards" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Claim STATICS from past ownership" })
-    ).toHaveProperty("disabled", false);
-
-    expect(await screen.findByText("Effective reward weight: 12500")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Claim STATICS" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: /#2/ }));
-    expect(await screen.findByRole("button", { name: "Register for rewards" })).toBeInTheDocument();
-    expect(screen.queryByText("Effective reward weight: 12500")).not.toBeInTheDocument();
+    expect(await screen.findByText("Genesis held")).toBeInTheDocument();
+    // Two NFTs at 2 STATICS each, plus 5 STATICS retained from past ownership.
+    expect(screen.getByText("Claimable now").closest(".ui-stat")).toHaveTextContent("9 STATICS");
+    expect(screen.getByText("Credit outstanding").closest(".ui-stat")).toHaveTextContent(
+      "Nothing to repay"
+    );
   });
 
-  it("keeps the permissionless strip usable with no owned NFTs", async () => {
+  it("states the claim transaction count rather than hiding it", async () => {
+    rewardsReads();
+    renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
+
+    // Two assets on each of two NFTs, plus both past-ownership assets.
+    expect(
+      await screen.findByRole("button", { name: "Claim all · 6 transactions" })
+    ).toBeInTheDocument();
+  });
+
+  it("manages the selected NFT and switches between them", async () => {
+    rewardsReads();
+    renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: /^Rewards/ }));
+    expect(await screen.findByText("Your weight")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Claim" }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Genesis #2/ }));
+    expect(
+      await screen.findByRole("button", { name: "Register Genesis #2 for rewards" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows the activation ladder in full rather than a bare tier picker", async () => {
+    rewardsReads();
+    renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
+
+    const ladder = await screen.findByRole("list", { name: "Activation tiers" });
+    expect(within(ladder).getByText("Tier 0")).toBeInTheDocument();
+    expect(within(ladder).getByText("Tier 4")).toBeInTheDocument();
+    expect(within(ladder).getByText("You are here")).toBeInTheDocument();
+    expect(within(ladder).getByText("1.25× reward weight")).toBeInTheDocument();
+  });
+
+  it("never describes activation as burning STATICS", async () => {
+    rewardsReads();
+    renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
+
+    expect(await screen.findByText(/Paid to the Statics treasury/)).toBeInTheDocument();
+    expect(screen.queryByText(/burn cost/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps past-ownership rewards claimable when the wallet owns no Genesis", async () => {
     rewardsReads();
     discoverWalletGenesisIds.mockResolvedValue([]);
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    expect(await screen.findByText("No Genesis NFTs found")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Update rewards" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /#1/ })).not.toBeInTheDocument();
+    expect(await screen.findByText("No Genesis NFTs yet")).toBeInTheDocument();
+    expect(screen.getByText("Rewards from past ownership")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Claim" })).toHaveLength(2);
+    expect(screen.queryByRole("tab", { name: /Genesis #1/ })).not.toBeInTheDocument();
   });
 });

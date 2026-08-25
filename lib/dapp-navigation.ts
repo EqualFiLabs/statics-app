@@ -6,7 +6,7 @@ export type DappRouteCapability = DeploymentCapability;
 export function getDappRouteCapability(pathname: string): DappRouteCapability | null {
   if (pathname === "/app" || pathname === "/app/") return "overview";
   if (pathname === "/app/swap") return "canonical-statics-market";
-  if (pathname === "/app/genesis") return "genesis-vault";
+  if (pathname === "/app/genesis" || pathname === "/app/genesis/recoveries") return "genesis-vault";
   if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
   if (pathname === "/app/activity") return "activity";
   if (pathname === "/app/tools") return "approval-tools";
@@ -130,6 +130,13 @@ const routePresentations = {
     description:
       "Activate a Genesis NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
   },
+  genesisRecoveries: {
+    label: "Recoveries",
+    status: "Genesis recoveries",
+    title: "Recover matured Genesis credit",
+    description:
+      "Find Genesis NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
+  },
   liquidity: {
     label: "Liquidity",
     status: "Liquidity",
@@ -172,6 +179,8 @@ export function getDappRouteId(pathname: string): DappRouteId {
   if (pathname.startsWith("/app/positions")) return "positions";
   if (pathname.startsWith("/app/loans")) return "loans";
   if (pathname.startsWith("/app/rewards")) return "rewards";
+  // Ordered before the /app/genesis prefix, which would otherwise swallow it.
+  if (pathname.startsWith("/app/genesis/recoveries")) return "genesisRecoveries";
   if (pathname.startsWith("/app/genesis")) return "genesis";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";

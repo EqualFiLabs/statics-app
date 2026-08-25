@@ -49,6 +49,103 @@ function imageFromMetadata(metadata: unknown): string | null {
   return typeof candidate === "string" && candidate.trim() ? resolveUri(candidate) : null;
 }
 
+/** One entry of an ERC-721 metadata `attributes` array. */
+export type NftTrait = Readonly<{
+  label: string;
+  value: string;
+  /** Set when the trait declares `display_type: "number"`, as tiers do. */
+  max: number | null;
+}>;
+
+export type NftMetadata = Readonly<{
+  image: string | null;
+  traits: readonly NftTrait[];
+}>;
+
+const EMPTY_METADATA: NftMetadata = { image: null, traits: [] };
+
+/**
+ * Reads the `attributes` array, tolerating every shape a collection might use.
+ *
+ * Statics Genesis returns eight string traits plus a numeric Activation Tier
+ * carrying a `max_value`. Arbitrary collections return anything at all, so a
+ * malformed entry is skipped rather than failing the whole list -- artwork must
+ * still render when the traits beside it are unusable.
+ */
+function traitsFromMetadata(metadata: unknown): readonly NftTrait[] {
+  if (typeof metadata !== "object" || metadata === null) return [];
+  const attributes = (metadata as { attributes?: unknown }).attributes;
+  if (!Array.isArray(attributes)) return [];
+
+  const traits: NftTrait[] = [];
+  for (const entry of attributes) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const label = typeof record.trait_type === "string" ? record.trait_type.trim() : "";
+    const rawValue = record.value;
+    if (!label) continue;
+    if (typeof rawValue !== "string" && typeof rawValue !== "number") continue;
+    const value = String(rawValue).trim();
+    if (!value) continue;
+    const rawMax = record.max_value;
+    traits.push({
+      label,
+      value,
+      max: typeof rawMax === "number" && Number.isFinite(rawMax) ? rawMax : null,
+    });
+  }
+  return traits;
+}
+
+/**
+ * Reads a token's metadata once and returns both its artwork and its traits.
+ *
+ * The traits come free with the image: the metadata document is already
+ * decoded to find `image`, so surfacing `attributes` costs no extra RPC and no
+ * extra fetch. Never throws, for the same reason `resolveNftImage` does not.
+ */
+export async function resolveNftMetadata(
+  publicClient: PublicClient,
+  contract: Address,
+  tokenId: bigint,
+  signal?: AbortSignal
+): Promise<NftMetadata> {
+  let uri: string;
+  try {
+    uri = await publicClient.readContract({
+      address: contract,
+      abi: tokenUriAbi,
+      functionName: "tokenURI",
+      args: [tokenId],
+    });
+  } catch {
+    return EMPTY_METADATA;
+  }
+
+  // Missing metadata is valid for arbitrary user-added collections.
+  if (!uri || !uri.trim()) return EMPTY_METADATA;
+
+  if (uri.startsWith("data:")) {
+    const metadata = decodeDataUri(uri);
+    return { image: imageFromMetadata(metadata), traits: traitsFromMetadata(metadata) };
+  }
+
+  const resolved = resolveUri(uri);
+  if (!/^https?:\/\//i.test(resolved)) return EMPTY_METADATA;
+
+  try {
+    const response = await fetch(resolved, { signal });
+    if (!response.ok) return EMPTY_METADATA;
+    const contentType = response.headers.get("content-type") ?? "";
+    // Some collections point tokenURI straight at an image rather than JSON.
+    if (contentType.startsWith("image/")) return { image: resolved, traits: [] };
+    const metadata: unknown = await response.json();
+    return { image: imageFromMetadata(metadata), traits: traitsFromMetadata(metadata) };
+  } catch {
+    return EMPTY_METADATA;
+  }
+}
+
 /**
  * Reads a token's metadata and returns its image URL, or null.
  *
@@ -62,34 +159,6 @@ export async function resolveNftImage(
   tokenId: bigint,
   signal?: AbortSignal
 ): Promise<string | null> {
-  let uri: string;
-  try {
-    uri = await publicClient.readContract({
-      address: contract,
-      abi: tokenUriAbi,
-      functionName: "tokenURI",
-      args: [tokenId],
-    });
-  } catch {
-    return null;
-  }
-
-  // Missing metadata is valid for arbitrary user-added collections.
-  if (!uri || !uri.trim()) return null;
-
-  if (uri.startsWith("data:")) return imageFromMetadata(decodeDataUri(uri));
-
-  const resolved = resolveUri(uri);
-  if (!/^https?:\/\//i.test(resolved)) return null;
-
-  try {
-    const response = await fetch(resolved, { signal });
-    if (!response.ok) return null;
-    const contentType = response.headers.get("content-type") ?? "";
-    // Some collections point tokenURI straight at an image rather than JSON.
-    if (contentType.startsWith("image/")) return resolved;
-    return imageFromMetadata(await response.json());
-  } catch {
-    return null;
-  }
+  const metadata = await resolveNftMetadata(publicClient, contract, tokenId, signal);
+  return metadata.image;
 }

@@ -160,6 +160,12 @@
       "title": "Gestiona tus Genesis NFTs",
       "description": "Consulta el arte de Genesis, activa niveles de recompensa mediante pagos en STATICS y gestiona las funciones de cada NFT."
     },
+    "genesisRecoveries": {
+      "label": "Recuperaciones",
+      "status": "Recuperaciones de Genesis",
+      "title": "Recupera crédito Genesis vencido",
+      "description": "Encuentra NFT Genesis cuyo crédito garantizado superó su plazo y recupera uno para ganar el incentivo de quien lo ejecuta."
+    },
     "liquidity": {
       "label": "Liquidez",
       "status": "Liquidez",

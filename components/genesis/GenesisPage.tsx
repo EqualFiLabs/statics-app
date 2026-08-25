@@ -238,7 +238,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
         </div>
         <div className="ui-stat">
           <span className="ui-stat__label">Activation</span>
-          <strong className="ui-stat__value">Burned STATICS; resets on transfer</strong>
+          <strong className="ui-stat__value">Paid to the treasury; resets on transfer</strong>
         </div>
       </div>
       {error && (
@@ -307,7 +307,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                         ))}
                     </select>
                   </label>
-                  <p>Burn cost: {formatEther(cost)} STATICS</p>
+                  <p>Activation cost: {formatEther(cost)} STATICS</p>
                   {needsApproval ? (
                     <button
                       className="ui-button ui-button--primary ui-button--block"
@@ -346,7 +346,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                             "activate-genesis",
                             `Activate Genesis #${actionKey} to tier ${target}`,
                             buildActivateGenesisCall(id, target, cost),
-                            `${formatEther(cost)} STATICS burned`
+                            `${formatEther(cost)} STATICS activation payment`
                           );
                         })
                       }

@@ -160,6 +160,12 @@
       "title": "管理你的 Genesis NFTs",
       "description": "查看 Genesis 艺术作品，通过支付 STATICS 激活奖励等级，并管理每个 NFT 的协议功能。"
     },
+    "genesisRecoveries": {
+      "label": "回收",
+      "status": "Genesis 回收",
+      "title": "回收已到期的 Genesis 信贷",
+      "description": "查找担保信贷已超过期限的 Genesis NFT，回收其中一个即可获得执行者奖励。"
+    },
     "liquidity": {
       "label": "流动性",
       "status": "流动性",

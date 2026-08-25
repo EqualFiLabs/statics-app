@@ -160,6 +160,12 @@
       "title": "Manage your Genesis NFTs",
       "description": "View Genesis artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
     },
+    "genesisRecoveries": {
+      "label": "Recoveries",
+      "status": "Genesis recoveries",
+      "title": "Recover matured Genesis credit",
+      "description": "Find Genesis NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive."
+    },
     "liquidity": {
       "label": "Liquidity",
       "status": "Liquidity",

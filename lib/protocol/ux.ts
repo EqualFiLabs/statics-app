@@ -27,6 +27,24 @@ export function parseRecipientAddress(input: string, rejectZero = true): Address
   return rejectZero && address === zeroAddress ? null : address;
 }
 
+/**
+ * `formatTokenAmount` with thousands separators.
+ *
+ * Genesis figures are five and six digits wide -- 180,000 backing, 171,000
+ * credit, 100,000 to reach the top tier -- and are read as quantities rather
+ * than parsed character by character, so they group. Machine data (addresses,
+ * hashes, calldata) keeps the ungrouped form.
+ */
+export function formatTokenAmountGrouped(
+  value: bigint,
+  decimals: number,
+  fractionDigits = 2
+): string {
+  const [whole, fraction] = formatTokenAmount(value, decimals, fractionDigits).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return fraction ? `${grouped}.${fraction}` : grouped;
+}
+
 export function formatTokenAmount(value: bigint, decimals: number, fractionDigits = 6): string {
   const negative = value < 0n;
   const absolute = negative ? -value : value;
