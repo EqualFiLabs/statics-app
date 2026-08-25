@@ -3,6 +3,7 @@ import { getAddress } from "viem";
 export const LAUNCH_FORK_RPC_PORT = 8_545;
 
 const maximumFunding = { eth: 1_000_000, weth: 1_000_000, statics: 10_000_000 };
+const maximumAdvanceSeconds = 365 * 24 * 60 * 60;
 
 function readOption(arguments_, name) {
   const index = arguments_.indexOf(name);
@@ -25,6 +26,18 @@ export function parseLaunchForkControl(action, arguments_) {
   if (action === "status") {
     if (arguments_.length !== 0) throw new Error("launch-fork:status does not accept arguments.");
     return { action };
+  }
+  if (action === "advance-time") {
+    if (arguments_.length !== 1) {
+      throw new Error("advance-time requires exactly one seconds argument.");
+    }
+    const secondsRaw = arguments_[0];
+    if (!/^[1-9]\d*$/u.test(secondsRaw) || Number(secondsRaw) > maximumAdvanceSeconds) {
+      throw new Error(
+        `advance-time seconds must be an integer from 1 through ${maximumAdvanceSeconds}.`
+      );
+    }
+    return { action, seconds: Number(secondsRaw) };
   }
   if (action === "fund-wallet") {
     const wallet = arguments_[0];
@@ -80,11 +93,26 @@ export function parseLaunchForkControl(action, arguments_) {
 }
 
 export function validateLaunchForkCommand(command) {
-  if (!command || typeof command !== "object" || typeof command.action !== "string") {
+  if (!command || typeof command !== "object" || Array.isArray(command)) {
     throw new Error("Invalid launch fork command.");
   }
-  if (command.action === "status") return parseLaunchForkControl("status", []);
+  const keys = Object.keys(command);
+  if (typeof command.action !== "string") throw new Error("Invalid launch fork command.");
+  const requireKeys = (expected) => {
+    if (keys.length !== expected.length || keys.some((key) => !expected.includes(key))) {
+      throw new Error(`Invalid ${command.action} command fields.`);
+    }
+  };
+  if (command.action === "status") {
+    requireKeys(["action"]);
+    return parseLaunchForkControl("status", []);
+  }
+  if (command.action === "advance-time") {
+    requireKeys(["action", "seconds"]);
+    return parseLaunchForkControl("advance-time", [String(command.seconds)]);
+  }
   if (command.action === "fund-wallet") {
+    requireKeys(["action", "wallet", "eth", "weth", "statics"]);
     return parseLaunchForkControl("fund-wallet", [
       command.wallet,
       "--eth",
@@ -96,6 +124,7 @@ export function validateLaunchForkCommand(command) {
     ]);
   }
   if (command.action === "generate-volume") {
+    requireKeys(["action", "eth", "cycles"]);
     return parseLaunchForkControl("generate-volume", [
       "--eth",
       command.eth,

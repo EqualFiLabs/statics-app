@@ -25,6 +25,9 @@ const dependencyNames = [
   "permit2",
 ];
 const execFileAsync = promisify(execFile);
+export const LAUNCH_FORK_DEFAULT_BLOCK = 14_498_238;
+export const LAUNCH_FORK_DEFAULT_BLOCK_HASH =
+  "0x6aa5df55371aa944352e06703b7905fb0ddf3a58c495833ee7595ef08aa46417";
 
 function requiredAddress(output, label) {
   const match = output.match(new RegExp(`${label}\\s+(0x[a-fA-F0-9]{40})`));
@@ -47,19 +50,32 @@ async function contract(address, publicClient) {
 export function readRobinhoodDependencies(protocolRoot) {
   const path = resolve(protocolRoot, "deployments/robinhood-chain-4663.json");
   const manifest = JSON.parse(readFileSync(path, "utf8"));
-  if (manifest.chainId !== 4_663)
+  if (manifest.chainId !== 4_663) {
     throw new Error("The protocol dependency manifest is not Robinhood mainnet.");
-  return Object.fromEntries(
+  }
+  if (!Number.isSafeInteger(manifest.forkBlock) || manifest.forkBlock <= 0) {
+    throw new Error("The Robinhood dependency manifest is missing a pinned fork block.");
+  }
+  if (!/^0x[a-fA-F0-9]{64}$/u.test(manifest.forkBlockHash)) {
+    throw new Error("The Robinhood dependency manifest is missing a pinned fork block hash.");
+  }
+  const contracts = Object.fromEntries(
     dependencyNames.map((name) => {
       const address = manifest.contracts?.[name]?.address;
       if (!address) throw new Error(`The Robinhood dependency manifest is missing ${name}.`);
       return [name, getAddress(address)];
     })
   );
+  return {
+    contracts,
+    forkBlock: manifest.forkBlock,
+    forkBlockHash: manifest.forkBlockHash.toLowerCase(),
+  };
 }
 
 export async function deployLaunchFork({ protocolRoot, rpcUrl, privateKey, publicClient, salt }) {
-  const dependencies = readRobinhoodDependencies(protocolRoot);
+  const dependencyManifest = readRobinhoodDependencies(protocolRoot);
+  const dependencies = dependencyManifest.contracts;
   const deploymentStartBlock = (await publicClient.getBlockNumber()) + 1n;
   const fee = 30_000;
   const { stdout: output } = await execFileAsync(
@@ -121,6 +137,15 @@ export async function deployLaunchFork({ protocolRoot, rpcUrl, privateKey, publi
       chainId: 31_337,
       deploymentStartBlock: deploymentStartBlock.toString(),
       protocolCommit,
+      sourceRepository: "https://github.com/EqualFiLabs/statics",
+      dependencyManifest: {
+        forkBlock: dependencyManifest.forkBlock.toString(),
+        forkBlockHash: dependencyManifest.forkBlockHash,
+      },
+      reproducibleFork: {
+        block: LAUNCH_FORK_DEFAULT_BLOCK.toString(),
+        blockHash: LAUNCH_FORK_DEFAULT_BLOCK_HASH,
+      },
       contracts,
       market: { poolId, poolKey },
     },

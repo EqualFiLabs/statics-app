@@ -35,11 +35,17 @@ import {
   http,
   keccak256,
   parseEther,
+  parseAbi,
   toHex,
 } from "viem";
-
 import { LAUNCH_FORK_RPC_PORT, validateLaunchForkCommand } from "./lib/launch-fork-control.mjs";
-import { deployLaunchFork, startRpcRelay } from "./lib/launch-fork.mjs";
+
+import {
+  LAUNCH_FORK_DEFAULT_BLOCK,
+  deployLaunchFork,
+  readRobinhoodDependencies,
+  startRpcRelay,
+} from "./lib/launch-fork.mjs";
 import { readPublicPrivyConfig } from "./lib/local-privy.mjs";
 
 const siteRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -54,7 +60,10 @@ const ponderPort = 42_070;
 const indexerUrl = `http://127.0.0.1:${ponderPort}`;
 const protocolRoot = process.env.STATICS_PROTOCOL_REPOSITORY?.trim();
 const upstreamRpc = process.env.ROBINHOOD_MAINNET?.trim();
-const forkBlock = process.env.ROBINHOOD_FORK_BLOCK?.trim();
+const dependencyManifest = protocolRoot ? readRobinhoodDependencies(protocolRoot) : null;
+const forkBlock =
+  process.env.ROBINHOOD_FORK_BLOCK?.trim() ||
+  String(dependencyManifest?.forkBlock ?? LAUNCH_FORK_DEFAULT_BLOCK);
 const mnemonic = generateMnemonic(wordlist);
 const account = mnemonicToAccount(mnemonic);
 const derivedPrivateKey = account.getHdKey().privateKey;
@@ -64,6 +73,9 @@ const privateKey = toHex(derivedPrivateKey);
 function wait(milliseconds) {
   return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
 }
+const launchForkVaultStatusAbi = parseAbi([
+  "function vaultAccounting() view returns ((uint256 vaultPrice, uint256 maximumSupply, uint256 mintedSupply, uint256 vaultInventory, uint256 circulatingGenesis, uint256 tokenBacking, uint256 grossBacking, uint256 outstandingGenesisCredit, uint256 requiredBacking, uint256 tokenCustody, uint256 reserveETH, uint256 nativeCustody, uint256 genesisEpochEnd, bool epochActive, uint256 reserveBackingPerGenesis) accounting)",
+]);
 
 async function requirePort(port, label) {
   const server = createNetServer();
@@ -332,30 +344,77 @@ async function fundWallet(command, context) {
     statics: command.statics,
   };
 }
+async function advanceTime(command, context) {
+  const before = await context.publicClient.getBlock();
+  await context.publicClient.request({ method: "evm_increaseTime", params: [command.seconds] });
+  await context.publicClient.request({ method: "evm_mine", params: [] });
+  const after = await context.publicClient.getBlock();
+  if (after.timestamp <= before.timestamp)
+    throw new Error("The local fork timestamp did not advance.");
+  return {
+    ok: true,
+    action: command.action,
+    seconds: command.seconds,
+    beforeTimestamp: before.timestamp.toString(),
+    afterTimestamp: after.timestamp.toString(),
+  };
+}
 
 async function verifiedStatus(context) {
   const { manifest, publicClient, appUrl } = context;
-  if ((await publicClient.getChainId()) !== 31_337)
-    throw new Error("The local fork no longer reports Anvil chain 31337.");
+  const chainId = await publicClient.getChainId();
+  if (chainId !== 31_337) throw new Error("The local fork no longer reports Anvil chain 31337.");
+  const codeHashes = {};
   for (const [name, contract] of Object.entries(manifest.contracts)) {
     const code = await publicClient.getCode({ address: contract.address });
-    if (
-      !code ||
-      code === "0x" ||
-      keccak256(code).toLowerCase() !== contract.runtimeCodeHash.toLowerCase()
-    ) {
-      throw new Error(`${name} no longer matches the generated local manifest.`);
-    }
+    const actual = code && code !== "0x" ? keccak256(code) : null;
+    const verified = actual?.toLowerCase() === contract.runtimeCodeHash.toLowerCase();
+    if (!verified) throw new Error(`${name} no longer matches the generated local manifest.`);
+    codeHashes[name] = {
+      address: contract.address,
+      expected: contract.runtimeCodeHash,
+      actual,
+      verified,
+    };
   }
   const ready = await fetch(`${indexerUrl}/ready`);
   if (!ready.ok) throw new Error("The launch-fork indexer is not ready.");
+  const nextAvailableResponse = await fetch(`${indexerUrl}/genesis/next-available`);
+  if (!nextAvailableResponse.ok) throw new Error("The Genesis indexer fixture is not ready.");
+  const nextAvailable = await nextAvailableResponse.json();
+  const accounting = await publicClient.readContract({
+    address: manifest.contracts.vault.address,
+    abi: launchForkVaultStatusAbi,
+    functionName: "vaultAccounting",
+  });
+  const forkBlockData = await publicClient.getBlock({ blockNumber: context.forkBlock });
+  const sdkProvenance = JSON.parse(
+    readFileSync(resolve(siteRoot, "vendor/statics-sdk/provenance.json"), "utf8")
+  );
   return {
     ok: true,
-    chainId: 31_337,
-    forkBlock: context.forkBlock.toString(),
-    deploymentStartBlock: manifest.deploymentStartBlock,
-    operator: account.address,
+    sourceRepository: manifest.sourceRepository,
     protocolCommit: manifest.protocolCommit,
+    sdkSourceCommit: sdkProvenance.extensionSource?.commit ?? sdkProvenance.source?.commit,
+    deploymentChainId: 4_663,
+    chainId,
+    forkBlock: context.forkBlock.toString(),
+    forkBlockHash: forkBlockData.hash,
+    manifestForkBlock: manifest.dependencyManifest.forkBlock,
+    manifestForkBlockHash: manifest.dependencyManifest.forkBlockHash,
+    deploymentStartBlock: manifest.deploymentStartBlock,
+    codeHashesVerified: true,
+    contracts: codeHashes,
+    ponderReady: true,
+    indexedGenesisFixtureIds: nextAvailable.tokenId ? [nextAvailable.tokenId] : [],
+    genesis: {
+      vaultInventory: accounting.vaultInventory.toString(),
+      circulatingGenesis: accounting.circulatingGenesis.toString(),
+      reserveETH: accounting.reserveETH.toString(),
+      genesisEpochEnd: accounting.genesisEpochEnd.toString(),
+      epochActive: accounting.epochActive,
+      totalOutstandingCredit: accounting.outstandingGenesisCredit.toString(),
+    },
     rpcUrl,
     indexerUrl,
     appUrl,
@@ -376,6 +435,7 @@ function createControlServer(context) {
         .then(() => validateLaunchForkCommand(JSON.parse(body)))
         .then((command) => {
           if (command.action === "status") return verifiedStatus(context);
+          if (command.action === "advance-time") return advanceTime(command, context);
           if (command.action === "fund-wallet") return fundWallet(command, context);
           if (command.action === "generate-volume") return generateVolume(command, context);
           throw new Error("Unsupported launch-fork command.");

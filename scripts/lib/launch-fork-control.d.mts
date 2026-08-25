@@ -1,5 +1,6 @@
 export type LaunchForkCommand =
   | { action: "status" }
+  | { action: "advance-time"; seconds: number }
   | {
       action: "fund-wallet";
       wallet: `0x${string}`;

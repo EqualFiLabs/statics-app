@@ -13,6 +13,16 @@ describe("launch fork controls", () => {
     expect(LAUNCH_FORK_RPC_PORT).toBe(8_545);
   });
 
+  it("accepts only bounded forward time advances", () => {
+    expect(parseLaunchForkControl("advance-time", ["3600"])).toEqual({
+      action: "advance-time",
+      seconds: 3_600,
+    });
+    expect(() => parseLaunchForkControl("advance-time", ["0"])).toThrow("from 1 through");
+    expect(() => parseLaunchForkControl("advance-time", ["-1"])).toThrow("from 1 through");
+    expect(() => parseLaunchForkControl("advance-time", ["31536001"])).toThrow("31536000");
+    expect(() => parseLaunchForkControl("advance-time", ["1", "2"])).toThrow("exactly one");
+  });
   it("accepts only bounded typed wallet funding", () => {
     expect(
       parseLaunchForkControl("fund-wallet", [wallet, "--eth", "10", "--statics", "100000"])
@@ -58,6 +68,14 @@ describe("launch fork controls", () => {
         statics: "3",
       })
     ).toMatchObject({ action: "fund-wallet", eth: "1", weth: "2", statics: "3" });
+    expect(validateLaunchForkCommand({ action: "advance-time", seconds: 60 })).toEqual({
+      action: "advance-time",
+      seconds: 60,
+    });
+    expect(() => validateLaunchForkCommand({ action: "status", target: wallet })).toThrow("fields");
+    expect(() =>
+      validateLaunchForkCommand({ action: "advance-time", seconds: 60, method: "evm_mine" })
+    ).toThrow("fields");
     expect(() => validateLaunchForkCommand({ action: "arbitrary-call" })).toThrow("Unknown");
   });
 });
