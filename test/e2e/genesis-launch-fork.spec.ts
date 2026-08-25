@@ -19,36 +19,42 @@ async function selectLocalDeployment(page: Page) {
   await expect(page.getByRole("heading", { name: "Statics Genesis" })).toBeVisible();
 }
 
-test("renders the complete standalone Genesis launch surface on the local fork", async ({
+test("renders the Genesis launch-only surface and contextual utilities on the local fork", async ({
   page,
 }) => {
   const expectNoBrowserFailures = monitorBrowserFailures(page);
   await selectLocalDeployment(page);
-  await expect(page.getByText("Vault backing", { exact: true })).toBeVisible();
-  await expect(page.getByText("Vault inventory", { exact: true })).toBeVisible();
 
-  await page.goto("/app/swap");
-  await expect(page.getByRole("tab", { name: "Token" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("combobox", { name: "You receive asset" })).toHaveValue(
-    /^0x[a-fA-F0-9]{40}$/
-  );
-  await expect(page.getByRole("combobox", { name: "You pay asset" })).toContainText("WETH");
-  await page.getByRole("tab", { name: "NFT" }).click();
-  await expect(page.getByRole("heading", { name: "Fully backed Genesis inventory" })).toBeVisible();
-  await expect(page.getByText("STATICS backing", { exact: true })).toBeVisible();
-  await expect(page.getByText("Reserve buy-in", { exact: true })).toBeVisible();
-  await expect(page.getByText("Acquisition fee", { exact: true })).toBeVisible();
-  await expect(page.getByText("Total ETH required", { exact: true })).toBeVisible();
-  await expect(page.getByText("Genesis Epoch", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Acquire Genesis NFT" })).toBeVisible();
+  await expect(page.locator(".dapp-nav-item")).toHaveText([
+    "Overview",
+    "Trade",
+    "My Genesis",
+    "Rewards",
+  ]);
+  await expect(page.locator(".dapp-tabbar .dapp-tab:not(.dapp-nav-toggle)")).toHaveText([
+    "Overview",
+    "Trade",
+    "My Genesis",
+    "Rewards",
+  ]);
+  await expect(page.getByText("Dollar", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Baskets", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Position NFT", { exact: true })).toHaveCount(0);
 
-  await page.goto("/app/genesis");
-  await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
-  await expect(page.getByText(/view and manage your Genesis NFTs/i)).toBeVisible();
+  for (const href of ["/app", "/app/swap", "/app/genesis", "/app/genesis-rewards"]) {
+    await page.goto(href);
+    await expect(page).toHaveURL(new RegExp(`${href.replace("?", "\\?")}$`));
+  }
 
-  await page.goto("/app/genesis-rewards");
-  await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
-  await expect(page.getByText(/register Genesis NFTs and claim launch rewards/i)).toBeVisible();
+  await page.goto("/app/positions");
+  await expect(page).toHaveURL(/\/app$/);
+  await page.goto("/app/unknown");
+  await expect(page.getByText(/not found/i)).toBeVisible();
+
+  await page.goto("/app/wallet");
+  await expect(page.getByRole("link", { name: /activity/i })).toBeVisible();
+  await page.goto("/app/tools");
+  await expect(page).toHaveURL(/\/app\/tools$/);
   expectNoBrowserFailures();
 });
 
