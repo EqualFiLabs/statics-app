@@ -264,7 +264,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   };
 
   const recover = async (credit: RecoveryCredit) => {
-    if (!wallet || !publicClient) return;
+    if (!publicClient) return;
+    if (!wallet) {
+      if (walletState.status === "wallet-missing") void walletState.createWallet();
+      else walletState.connectWallet();
+      return;
+    }
     if (!walletState.isTargetChain) {
       await walletState.switchNetwork();
       return;
@@ -299,13 +304,9 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         predicate: (query) =>
           Array.isArray(query.queryKey) &&
           query.queryKey.includes(deployment.descriptor.deploymentId) &&
-          [
-            "launch-genesis-owned",
-            "launch-genesis-recoveries",
-            "launch-genesis-credit",
-            "genesis-rewards",
-            "genesis-vault",
-          ].some((prefix) => String(query.queryKey[0]).startsWith(prefix)),
+          ["launch-genesis-rewards", "genesis-vault"].some((prefix) =>
+            String(query.queryKey[0]).startsWith(prefix)
+          ),
       });
     } catch (cause) {
       setRecoveryError(describeGenesisError(cause));
@@ -392,7 +393,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   <button
                     className="ui-button ui-button--primary ui-button--block"
                     type="button"
-                    disabled={recoveryBusy !== null}
+                    disabled={recoveryBusy !== null && recoveryBusy !== credit.genesisId}
                     onClick={() => void recover(credit)}
                   >
                     {recoveryBusy === credit.genesisId
