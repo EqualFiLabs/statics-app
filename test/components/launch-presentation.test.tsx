@@ -15,10 +15,12 @@ import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 const readContract = vi.fn();
 const getBlock = vi.fn();
+const useBlock = vi.fn();
 const loadRecoverableGenesisCredits = vi.fn();
 
 vi.mock("wagmi", () => ({
   usePublicClient: () => ({ readContract, getBlock }),
+  useBlock: (...args: unknown[]) => useBlock(...args),
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
@@ -162,6 +164,7 @@ function renderWithProviders(ui: React.ReactNode, signedIn = true) {
 beforeEach(() => {
   readContract.mockReset();
   getBlock.mockReset();
+  useBlock.mockReturnValue({ data: { timestamp: 2_100_000_000n } });
   loadRecoverableGenesisCredits.mockReset();
   discoverWalletGenesisIds.mockReset();
 });
@@ -306,6 +309,31 @@ describe("Genesis credit presentation", () => {
     expect(screen.getByLabelText("Amount to borrow")).toBeInTheDocument();
   });
 
+  it("uses the latest chain timestamp for an advanced credit clock", async () => {
+    const maturity = 2_100_000_000n;
+    useBlock.mockReturnValue({ data: { timestamp: maturity + 30n * 86_400n + 86_401n } });
+    readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
+      if (functionName === "vaultAccounting") return vaultAccounting(false);
+      if (functionName === "creditOriginationsPaused") return false;
+      if (functionName === "credit") {
+        return {
+          owner: wallet,
+          principal: parseEther("1000"),
+          maturity: Number(maturity),
+          recoverableAt: Number(maturity + 3_600n),
+          active: true,
+        };
+      }
+      if (functionName === "creditLimit") return parseEther("171000");
+      throw new Error(`Unexpected read ${functionName}`);
+    });
+
+    renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
+
+    expect(await screen.findByText("Recoverable in")).toBeInTheDocument();
+    expect(screen.getByText("now")).toBeInTheDocument();
+  });
+
   it("states the recovery consequence before any borrow is confirmed", async () => {
     creditReads(false, false);
     renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
@@ -398,7 +426,7 @@ describe("consolidated Genesis rewards surface", () => {
     rewardsReads();
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    expect(await screen.findByText("Genesis held")).toBeInTheDocument();
+    expect(await screen.findByText("Operators held")).toBeInTheDocument();
     // Two NFTs at 2 STATICS each, plus 5 STATICS retained from past ownership.
     expect(screen.getByText("Claimable now").closest(".ui-stat")).toHaveTextContent("9 STATICS");
     expect(screen.getByText("Credit outstanding").closest(".ui-stat")).toHaveTextContent(
@@ -424,9 +452,9 @@ describe("consolidated Genesis rewards surface", () => {
     expect(await screen.findByText("Your weight")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Claim" }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Genesis #2/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Operator #2/ }));
     expect(
-      await screen.findByRole("button", { name: "Register Genesis #2 for rewards" })
+      await screen.findByRole("button", { name: "Register Operator #2 for rewards" })
     ).toBeInTheDocument();
   });
 
@@ -457,6 +485,6 @@ describe("consolidated Genesis rewards surface", () => {
     expect(await screen.findByText("No Operators NFTs yet")).toBeInTheDocument();
     expect(screen.getByText("Rewards from past ownership")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Claim" })).toHaveLength(2);
-    expect(screen.queryByRole("tab", { name: /Genesis #1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Operator #1/ })).not.toBeInTheDocument();
   });
 });

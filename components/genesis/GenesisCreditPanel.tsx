@@ -1,9 +1,9 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { encodeFunctionData, formatEther, getAddress, parseEther } from "viem";
-import { usePublicClient } from "wagmi";
+import { useBlock, usePublicClient } from "wagmi";
 import { dopplerStaticsTokenAbi } from "@statics-protocol/sdk";
 import {
   GENESIS_MAX_CREDIT_PRINCIPAL,
@@ -152,19 +152,17 @@ export function GenesisCreditPanel({
 }) {
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
+  const { data: latestBlock } = useBlock({
+    chainId: deployment.descriptor.chainId,
+    watch: true,
+  });
   const queryClient = useQueryClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Math.floor(Date.now() / 1_000));
-    }, 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const now = latestBlock ? Number(latestBlock.timestamp) : null;
 
   const state = useQuery({
     queryKey: [
@@ -267,7 +265,7 @@ export function GenesisCreditPanel({
     }
   };
 
-  if (!wallet || state.isLoading) {
+  if (!wallet || state.isLoading || now === null) {
     return <p className="dapp-loading">Loading secured credit…</p>;
   }
   if (state.error || !state.data) {
