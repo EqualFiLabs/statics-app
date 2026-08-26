@@ -10,6 +10,7 @@ import {
   getAddress,
   isAddress,
   parseAbi,
+  parseEther,
   zeroAddress,
   type Address,
   type Hex,
@@ -761,6 +762,7 @@ type TransferAsset = {
 const erc1155TransferAbi = parseAbi([
   "function safeTransferFrom(address from, address to, uint256 id, uint256 value, bytes data)",
 ]);
+const NATIVE_TRANSFER_FEE_RESERVE = parseEther("0.001");
 
 function SendDialog({
   assets,
@@ -906,13 +908,23 @@ function SendDialog({
                 amount={amountRaw}
                 maximum={asset.balance}
                 maximumSelection={
-                  asset.kind === "native" ? applyPercent(asset.balance, 99) : asset.balance
+                  asset.kind === "native"
+                    ? asset.balance > NATIVE_TRANSFER_FEE_RESERVE
+                      ? asset.balance - NATIVE_TRANSFER_FEE_RESERVE
+                      : 0n
+                    : asset.balance
                 }
                 label={t("amountShortcuts")}
                 disabled={pending}
                 onSelect={(percent) => {
-                  const safePercent = asset.kind === "native" && percent === 100 ? 99 : percent;
-                  setAmount(formatUnits(applyPercent(asset.balance!, safePercent), asset.decimals));
+                  const selected = applyPercent(asset.balance!, percent);
+                  const max =
+                    asset.kind === "native"
+                      ? asset.balance! > NATIVE_TRANSFER_FEE_RESERVE
+                        ? asset.balance! - NATIVE_TRANSFER_FEE_RESERVE
+                        : 0n
+                      : asset.balance!;
+                  setAmount(formatUnits(selected > max ? max : selected, asset.decimals));
                   setReviewing(false);
                   setError(null);
                 }}

@@ -36,7 +36,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "NEXT_PUBLIC_STATICS_CHAIN_ID= npm run build && playwright test",
+    "test:e2e": "node scripts/without-statics-env.mjs npm run build && playwright test",
     "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
     "verify": "npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
