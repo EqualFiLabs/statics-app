@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useBlock } from "wagmi";
 
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
@@ -27,16 +27,6 @@ export type EpochQuotes = Readonly<{
   /** GENESIS_MAX_CREDIT_PRINCIPAL. */
   maxCredit: bigint;
 }>;
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1_000)), 1_000);
-    return () => window.clearInterval(timer);
-  }, [active]);
-  return now;
-}
 
 function CountdownUnit({ value, label }: { value: number; label: string }) {
   return (
@@ -83,16 +73,19 @@ function Change({
  * that as "Active until <locale timestamp>", and afterwards as "Complete".
  */
 export function EpochBanner({
+  chainId,
   epochActive,
   epochEnd,
   quotes,
 }: Readonly<{
+  chainId: number;
   epochActive: boolean;
   /** Unix seconds. */
   epochEnd: number;
   quotes: EpochQuotes | null;
 }>) {
-  const now = useNow(epochActive);
+  const { data: block } = useBlock({ chainId, watch: true });
+  const now = block ? Number(block.timestamp) : 0;
   const remaining = Math.max(0, epochEnd - now);
   const days = Math.floor(remaining / 86_400);
   const hours = Math.floor((remaining % 86_400) / 3_600);

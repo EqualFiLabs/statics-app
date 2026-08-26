@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,13 +36,21 @@ const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: protocolRoot,
   encoding: "utf8",
 }).trim();
-const sdkTreeState = [sdkRoot, sdkExtensionRoot]
-  .filter(Boolean)
-  .some((root) =>
-    execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()
-  )
-  ? "dirty"
-  : "clean";
+function sdkTreeDirty(root) {
+  if (!root) return false;
+  const gitRoot = execFileSync("git", ["-C", root, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+  }).trim();
+  const relativeRoot = relative(gitRoot, root) || ".";
+  return Boolean(
+    execFileSync(
+      "git",
+      ["-C", gitRoot, "status", "--porcelain", "--untracked-files=all", "--", relativeRoot],
+      { encoding: "utf8" }
+    ).trim()
+  );
+}
+const sdkTreeState = sdkTreeDirty(sdkRoot) || sdkTreeDirty(sdkExtensionRoot) ? "dirty" : "clean";
 
 execFileSync("npm", ["run", "build"], { cwd: sdkRoot, stdio: "inherit" });
 if (sdkExtensionRoot) {

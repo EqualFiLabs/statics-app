@@ -239,7 +239,7 @@ export function borrowedLiquidityReadiness(
   if (unavailable) {
     return "Every canonical pool must be live and synced to the liquidity manager.";
   }
-  return plan ? null : "Enter collateral shares to calculate an executable liquidity plan.";
+  return plan ? null : "The current loan cannot fund a positive amount in every pool.";
 }
 
 /**
@@ -291,7 +291,7 @@ export function calculateBorrowLiquidityPlan({
     const weightPercent = weights[pool.poolId] ?? 100;
     if (!Number.isInteger(weightPercent) || weightPercent < 1 || weightPercent > 100) return null;
     const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
-    const assetIsCurrency0 = pool.key.currency0 === pool.asset.address;
+    const assetIsCurrency0 = pool.key.currency0.toLowerCase() === pool.asset.address.toLowerCase();
     const maximum = maximumLiquidityForAmounts(
       pool.sqrtPriceX96,
       tickLower,
@@ -321,8 +321,16 @@ export function calculateBorrowLiquidityPlan({
     const inputs = inputsAt(scale);
     if (inputs.some((input) => input.liquidity <= 0n)) return false;
     try {
-      quoteBorrowAndProvideLiquidity(snapshot, sharesIn, inputs, slippageBps);
-      return true;
+      const quote = quoteBorrowAndProvideLiquidity(snapshot, sharesIn, inputs, slippageBps);
+      const headroom = BPS + slippageBps;
+      return quote.totalPrincipalRequirements.every((requirement) => {
+        const principal =
+          borrow.principals.find(
+            (item) => item.asset.toLowerCase() === requirement.asset.toLowerCase()
+          )?.amount ?? 0n;
+        const withHeadroom = (requirement.amount * headroom + BPS - 1n) / BPS;
+        return withHeadroom <= principal;
+      });
     } catch {
       return false;
     }
@@ -477,58 +485,74 @@ async function loadPool(
   ) {
     throw new Error("Canonical pool configuration does not match its verified deployment.");
   }
-  const [assetToken, slot0, decommissioned, globalFees, poolFees, pending0, pending1, locked] =
-    await Promise.all([
-      loadTokenMetadata(publicClient, asset, undefined, blockNumber),
-      publicClient.readContract({
-        address: liquidity.contracts.stateView,
-        abi: v4StateViewReadAbi,
-        functionName: "getSlot0",
-        args: [configured.poolId],
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "poolDecommissioned",
-        args: [configured.poolId],
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "feeConfiguration",
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "poolFeeConfiguration",
-        args: [configured.poolId],
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "pendingPermanentLiquidity",
-        args: [configured.poolId, getAddress(configured.currency0)],
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "pendingPermanentLiquidity",
-        args: [configured.poolId, getAddress(configured.currency1)],
-        blockNumber,
-      }),
-      publicClient.readContract({
-        address: liquidity.contracts.swapFeeHook,
-        abi: staticsSwapFeeHookAbi,
-        functionName: "lockedLiquidity",
-        args: [configured.poolId],
-        blockNumber,
-      }),
-    ]);
+  const [
+    assetToken,
+    slot0,
+    decommissioned,
+    managerSynced,
+    globalFees,
+    poolFees,
+    pending0,
+    pending1,
+    locked,
+  ] = await Promise.all([
+    loadTokenMetadata(publicClient, asset, undefined, blockNumber),
+    publicClient.readContract({
+      address: liquidity.contracts.stateView,
+      abi: v4StateViewReadAbi,
+      functionName: "getSlot0",
+      args: [configured.poolId],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "poolDecommissioned",
+      args: [configured.poolId],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "isProtocolPool",
+      args: [configured.poolId],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "feeConfiguration",
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "poolFeeConfiguration",
+      args: [configured.poolId],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "pendingPermanentLiquidity",
+      args: [configured.poolId, getAddress(configured.currency0)],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "pendingPermanentLiquidity",
+      args: [configured.poolId, getAddress(configured.currency1)],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "lockedLiquidity",
+      args: [configured.poolId],
+      blockNumber,
+    }),
+  ]);
   const effective = poolFees.overridden ? poolFees : { ...globalFees, overridden: false };
   return {
     basketId: basket.basketId,
@@ -539,7 +563,7 @@ async function loadPool(
     poolId: configured.poolId,
     key,
     decommissioned,
-    managerSynced: true,
+    managerSynced,
     sqrtPriceX96: slot0[0],
     currentTick: slot0[1],
     lpFee: slot0[3],

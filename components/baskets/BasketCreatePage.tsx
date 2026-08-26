@@ -101,6 +101,7 @@ function BasketCreateRuntime() {
   const [ltvPercent, setLtvPercent] = useState(bpsToPercentInput(7_500));
   const [recoveryPercent, setRecoveryPercent] = useState(bpsToPercentInput(500));
   const [loanDurationDays, setLoanDurationDays] = useState("30");
+  const MAX_LOAN_DURATION_DAYS = Math.floor(Number((1n << 40n) - 1n) / 86_400);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<ProtocolActionProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +225,7 @@ function BasketCreateRuntime() {
     Object.values(economics).every((value) => value !== null) &&
     Number.isSafeInteger(durationDays) &&
     durationDays > 0 &&
+    durationDays <= MAX_LOAN_DURATION_DAYS &&
     (economics.ltv ?? 0) + Math.ceil(((economics.ltv ?? 0) * (economics.recovery ?? 0)) / 10_000) <=
       10_000;
   const identityValid = Boolean(name.trim()) && /^[A-Za-z][A-Za-z0-9-]{1,10}$/.test(symbol.trim());

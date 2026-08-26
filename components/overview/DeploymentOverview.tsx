@@ -73,8 +73,8 @@ export function DeploymentOverview() {
           <p className="dapp-eyebrow">Selected network</p>
           <h2>{active.descriptor.network}</h2>
           <p>
-            The same Operators launch application will be enabled here after its reviewed manifest is
-            published.
+            The same Operators launch application will be enabled here after its reviewed manifest
+            is published.
           </p>
         </section>
       </div>
@@ -201,6 +201,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   return (
     <div className="launch-overview">
       <EpochBanner
+        chainId={deployment.descriptor.chainId}
         epochActive={vault?.epochActive ?? true}
         epochEnd={Number(vault?.genesisEpochEnd ?? 0n)}
         quotes={quotes}
@@ -334,7 +335,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               </dt>
               <dd>
                 {backingAtMarket !== null
-                  ? `${formatTokenAmountGrouped(backingAtMarket, 18, 4)} ETH`
+                  ? `${formatTokenAmountGrouped(backingAtMarket, 18, 4)} WETH`
                   : "—"}
               </dd>
             </div>
@@ -342,7 +343,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               <dt>Reserve share per Operator</dt>
               <dd>
                 {vault
-                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} ETH`
+                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} WETH`
                   : "—"}
               </dd>
             </div>
@@ -350,12 +351,14 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               <dt>
                 {vault?.epochActive ? "Buy-in if the Epoch ended now" : "Buy-in charged today"}
               </dt>
-              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} ETH`}</dd>
+              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} WETH`}</dd>
             </div>
             <div className="is-total">
-              <dt>An Operator costs you, all in</dt>
+              <dt>An Operator costs you, all in (WETH-equivalent)</dt>
               <dd>
-                {allInCost !== null ? `${formatTokenAmountGrouped(allInCost, 18, 4)} ETH` : "—"}
+                {allInCost !== null
+                  ? `${formatTokenAmountGrouped(allInCost, 18, 4)} WETH-equivalent`
+                  : "—"}
               </dd>
             </div>
           </dl>

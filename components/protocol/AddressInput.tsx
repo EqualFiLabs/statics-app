@@ -46,12 +46,13 @@ export function AddressInput({
         <button
           type="button"
           disabled={disabled}
-          onClick={() =>
+          onClick={() => {
+            if (!navigator.clipboard?.readText) return;
             void navigator.clipboard
               .readText()
               .then((text) => onChange(text.trim()))
-              .catch(() => undefined)
-          }
+              .catch(() => undefined);
+          }}
         >
           {t("paste")}
         </button>

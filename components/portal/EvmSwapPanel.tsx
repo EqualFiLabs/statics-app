@@ -633,7 +633,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
         amount={amount}
         balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
         onMax={
-          balance === null || balance === 0n || !source
+          balance === null || balance === 0n || !source || source.kind === "native"
             ? undefined
             : () => {
                 setAmount(displayAmount(balance.toString(), source));

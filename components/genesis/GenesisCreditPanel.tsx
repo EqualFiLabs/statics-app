@@ -253,7 +253,7 @@ export function GenesisCreditPanel({
     setBusy(key);
     setError(null);
     try {
-      if (!publicClient || !wallet) return;
+      if (!publicClient || !wallet || !walletState.isTargetChain) return;
       await verifyLaunchDeployment(publicClient, deployment);
       await action();
       await refresh();
@@ -273,7 +273,7 @@ export function GenesisCreditPanel({
   }
 
   const credit = state.data.credit;
-  const maxPrincipal = state.data.limit > 0n ? state.data.limit : GENESIS_MAX_CREDIT_PRINCIPAL;
+  const maxPrincipal = state.data.limit;
   const backing = state.data.vaultPrice;
 
   if (credit.active) {
@@ -483,7 +483,7 @@ export function GenesisCreditPanel({
 
       <div className="genesis-borrow">
         <p className="genesis-borrow-amount">
-          <b>{formatTokenAmountGrouped(clamped, 18, 0)}</b>
+          <b>{formatTokenAmountGrouped(clamped, 18, 2)}</b>
           <span>STATICS · {ltv.toFixed(0)}% of backing</span>
         </p>
         <label className="ui-field">
@@ -563,7 +563,7 @@ export function GenesisCreditPanel({
       >
         {busy === "open"
           ? "Borrowing…"
-          : `Borrow ${formatTokenAmountGrouped(clamped, 18, 0)} STATICS`}
+          : `Borrow ${formatTokenAmountGrouped(clamped, 18, 2)} STATICS`}
       </button>
 
       {error && (

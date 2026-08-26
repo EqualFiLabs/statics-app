@@ -467,8 +467,9 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
                 {selectedLocked ? (
                   <p className="vault-notice is-error">
-                    <b>Operator #{selected?.id.toString()} has active secured credit.</b> Repay it in{" "}
-                    <Link href="/app/genesis">My Operators</Link> before this NFT can be redeemed.
+                    <b>Operator #{selected?.id.toString()} has active secured credit.</b> Repay it
+                    in <Link href="/app/genesis">My Operators</Link> before this NFT can be
+                    redeemed.
                   </p>
                 ) : (
                   <ul className="vault-legs">
@@ -492,7 +493,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 <button
                   className="portal-primary-action"
                   type="button"
-                  disabled={busy !== null || !selected || selectedLocked}
+                  disabled={busy !== null || !selected || !selectedOwnedId || selectedLocked}
                   onClick={() => void redeem()}
                 >
                   {busy === "redeem"

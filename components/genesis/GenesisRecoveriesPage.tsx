@@ -179,6 +179,16 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
     }
   };
 
+  if (epoch.isLoading) {
+    return <p className="dapp-loading">Checking recovery availability…</p>;
+  }
+  if (epoch.error) {
+    return (
+      <p className="dapp-inline-error" role="alert">
+        Recovery availability is temporarily unavailable.
+      </p>
+    );
+  }
   if (epoch.data !== false) {
     return (
       <EmptyState
@@ -253,7 +263,9 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
                 disabled={busy !== null && busy !== credit.genesisId}
                 onClick={() => void recover(credit)}
               >
-                {busy === credit.genesisId ? "Recovering…" : `Recover Operator #${credit.genesisId}`}
+                {busy === credit.genesisId
+                  ? "Recovering…"
+                  : `Recover Operator #${credit.genesisId}`}
               </button>
             </article>
           ))}
