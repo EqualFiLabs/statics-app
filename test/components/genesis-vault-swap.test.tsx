@@ -199,7 +199,9 @@ describe("Genesis Vault trade card", () => {
     });
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: "Acquire Operators #4913" })).not.toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: "Acquire Operators #4913" })
+    ).not.toBeDisabled();
   });
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {

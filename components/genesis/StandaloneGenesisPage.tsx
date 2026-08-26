@@ -629,9 +629,9 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 {!selected.registered ? (
                   <>
                     <p className="genesis-note is-warning">
-                      <b>This Operator is earning nothing.</b> Register it to start taking a share of
-                      market fees at its current {genesisTierMultiplier(selected.tier).toFixed(2)}×
-                      weight.
+                      <b>This Operator is earning nothing.</b> Register it to start taking a share
+                      of market fees at its current{" "}
+                      {genesisTierMultiplier(selected.tier).toFixed(2)}× weight.
                     </p>
                     <dl className="genesis-figures">
                       <div>
