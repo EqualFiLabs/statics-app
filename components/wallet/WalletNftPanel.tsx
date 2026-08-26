@@ -87,10 +87,10 @@ export function WalletNftPanel({
           tokenId,
           contract: deployment.contracts.genesis,
           name: `Genesis #${tokenId.toString()}`,
-          summary: "Statics Genesis",
+          summary: "Statics Operators",
           carries: [] as readonly string[],
           transferWarning:
-            "Transferring this Genesis NFT resets activation to Tier 0. Rewards earned before transfer remain claimable by the previous owner.",
+            "Transferring this Operator NFT resets activation to Tier 0. Rewards earned before transfer remain claimable by the previous owner.",
           blockedReason: null,
         }));
         const collectionNfts: readonly WalletNft[] = collectionResults.flatMap((result) =>

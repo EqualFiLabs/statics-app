@@ -1,4 +1,4 @@
-# ADR: Network-aware Statics Genesis launch application
+# ADR: Network-aware Statics Operators launch application
 
 - Status: Accepted
 - Date: 2026-08-19

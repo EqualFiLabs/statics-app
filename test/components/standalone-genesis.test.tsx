@@ -14,7 +14,7 @@ const statics = getAddress("0x1111111111111111111111111111111111111111");
 const weth = getAddress("0x7777777777777777777777777777777777777777");
 const descriptor = {
   deploymentId: "launch-fixture",
-  label: "Statics Genesis",
+  label: "Statics Operators",
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",

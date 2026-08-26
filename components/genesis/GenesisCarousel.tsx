@@ -29,7 +29,7 @@ function matches(item: GenesisCarouselItem, filter: Filter): boolean {
 }
 
 /**
- * The wallet's Genesis NFTs, as a paged rail rather than a wrapping chip row.
+ * The wallet's Operators NFTs, as a paged rail rather than a wrapping chip row.
  *
  * A wrapping row is fine at three NFTs and unusable at thirty: it grows a new
  * line for every few tokens, pushes the NFT you are managing below the fold,
@@ -119,9 +119,9 @@ export function GenesisCarousel({
   const selected = items.find((item) => item.id === selectedId) ?? null;
 
   return (
-    <section className="genesis-carousel" aria-label="Your Genesis NFTs">
+    <section className="genesis-carousel" aria-label="Your Operators NFTs">
       <div className="genesis-carousel-head">
-        <h2 className="ui-section-title">Your Genesis</h2>
+        <h2 className="ui-section-title">Your Operators</h2>
         <span className="genesis-carousel-count">
           {items.length} held{selected ? ` · #${selected.id} selected` : ""}
         </span>
@@ -144,7 +144,7 @@ export function GenesisCarousel({
                 type="button"
                 onClick={() => page(-1)}
                 disabled={!overflow.start}
-                aria-label="Previous Genesis NFTs"
+                aria-label="Previous Operators NFTs"
               >
                 <span aria-hidden="true">‹</span>
               </button>
@@ -152,7 +152,7 @@ export function GenesisCarousel({
                 type="button"
                 onClick={() => page(1)}
                 disabled={!overflow.end}
-                aria-label="More Genesis NFTs"
+                aria-label="More Operators NFTs"
               >
                 <span aria-hidden="true">›</span>
               </button>
@@ -190,7 +190,7 @@ export function GenesisCarousel({
         ref={railRef}
         onScroll={syncOverflow}
         role="tablist"
-        aria-label="Select a Genesis NFT"
+        aria-label="Select a Operator NFT"
       >
         {visible.map((item) => {
           const isSelected = item.id === selectedId;

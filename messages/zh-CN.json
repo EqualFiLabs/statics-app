@@ -51,7 +51,7 @@
       "overview": "概览",
       "swap": "兑换",
       "earn": "赚取",
-      "genesis": "Genesis NFT",
+      "genesis": "Operator NFT",
       "liquidity": "流动性",
       "baskets": "篮子",
       "create": "创建篮子",
@@ -77,18 +77,18 @@
     "overview": {
       "label": "概览",
       "status": "Genesis 启动",
-      "title": "Statics Genesis 启动",
-      "description": "在 Robinhood Chain 上交易 STATICS、获取有完全储备支持的 Genesis NFT，并关注 Genesis 纪元。"
+      "title": "Statics Operators 启动",
+      "description": "在 Robinhood Chain 上交易 STATICS、获取有完全储备支持的 Operator NFT，并关注 Genesis 纪元。"
     },
     "swap": {
       "label": "交易",
       "status": "STATICS 市场",
-      "title": "交易 STATICS 和 Genesis NFT",
-      "description": "通过规范市场买卖 STATICS，或通过金库获取有完全储备支持的 Genesis NFT。"
+      "title": "交易 STATICS 和 Operator NFT",
+      "description": "通过规范市场买卖 STATICS，或通过金库获取有完全储备支持的 Operator NFT。"
     },
     "genesis": {
       "label": "我的 Genesis",
-      "status": "Genesis NFT",
+      "status": "Operator NFT",
       "title": "管理我的 Genesis",
       "description": "查看 Genesis 艺术作品、激活奖励等级、注册以获取启动奖励，并在 Genesis 纪元结束后管理担保信贷。"
     }
@@ -103,8 +103,8 @@
     "swap": {
       "label": "兑换",
       "status": "STATICS 市场",
-      "title": "兑换代币和 Genesis NFT",
-      "description": "通过官方池买卖 STATICS，然后用 STATICS 兑换有完全储备支持的 Genesis NFT。"
+      "title": "兑换代币和 Operator NFT",
+      "description": "通过官方池买卖 STATICS，然后用 STATICS 兑换有完全储备支持的 Operator NFT。"
     },
     "dollar": {
       "label": "美元",
@@ -155,16 +155,16 @@
       "description": "质押一个头寸以获得协议费用分成。选择希望赚取的资产并领取累积奖励。"
     },
     "genesis": {
-      "label": "Genesis NFT",
-      "status": "Genesis NFT",
-      "title": "管理你的 Genesis NFTs",
+      "label": "Operator NFT",
+      "status": "Operator NFT",
+      "title": "管理你的 Operators NFTs",
       "description": "查看 Genesis 艺术作品，通过支付 STATICS 激活奖励等级，并管理每个 NFT 的协议功能。"
     },
     "genesisRecoveries": {
       "label": "回收",
       "status": "Genesis 回收",
       "title": "回收已到期的 Genesis 信贷",
-      "description": "查找担保信贷已超过期限的 Genesis NFT，回收其中一个即可获得执行者奖励。"
+      "description": "查找担保信贷已超过期限的 Operator NFT，回收其中一个即可获得执行者奖励。"
     },
     "liquidity": {
       "label": "流动性",

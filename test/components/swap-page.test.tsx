@@ -16,14 +16,14 @@ vi.mock("@/components/portal/EvmSwapPanel", () => ({
   ),
 }));
 vi.mock("@/components/genesis/GenesisVaultSwapPanel", () => ({
-  GenesisVaultSwapPanel: () => <div>Next available Genesis NFT</div>,
+  GenesisVaultSwapPanel: () => <div>Next available Operator NFT</div>,
 }));
 
 const statics = getAddress("0x1111111111111111111111111111111111111111");
 const weth = getAddress("0x7777777777777777777777777777777777777777");
 const descriptor = {
   deploymentId: "launch-fixture",
-  label: "Statics Genesis",
+  label: "Statics Operators",
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",
@@ -80,8 +80,8 @@ describe("Swap page", () => {
     );
 
     expect(screen.getByText("Token swap canonical")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Genesis NFT" }));
-    expect(screen.getByText("Next available Genesis NFT")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Operator NFT" }));
+    expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("Swap page", () => {
       </DeploymentContext.Provider>
     );
 
-    expect(screen.getByText("Next available Genesis NFT")).toBeInTheDocument();
+    expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
     searchParams.delete("mode");
   });

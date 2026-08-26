@@ -51,7 +51,7 @@
       "overview": "Resumen",
       "swap": "Intercambiar",
       "earn": "Ganar",
-      "genesis": "Genesis NFT",
+      "genesis": "Operator NFT",
       "liquidity": "Liquidez",
       "baskets": "Cestas",
       "create": "Crear cesta",
@@ -77,7 +77,7 @@
     "overview": {
       "label": "Resumen",
       "status": "Lanzamiento Genesis",
-      "title": "Lanzamiento de Statics Genesis",
+      "title": "Lanzamiento de Statics Operators",
       "description": "Intercambia STATICS, adquiere NFT Genesis con respaldo total y sigue la Época Genesis en Robinhood Chain."
     },
     "swap": {
@@ -155,9 +155,9 @@
       "description": "Haz staking de una posición para obtener una parte de las comisiones del protocolo. Elige en qué activos quieres ganar y reclama lo acumulado."
     },
     "genesis": {
-      "label": "Genesis NFT",
-      "status": "Genesis NFT",
-      "title": "Gestiona tus Genesis NFTs",
+      "label": "Operator NFT",
+      "status": "Operator NFT",
+      "title": "Gestiona tus Operators NFTs",
       "description": "Consulta el arte de Genesis, activa niveles de recompensa mediante pagos en STATICS y gestiona las funciones de cada NFT."
     },
     "genesisRecoveries": {

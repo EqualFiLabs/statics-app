@@ -433,7 +433,7 @@ export function GenesisCreditPanel({
       >
         <div className="genesis-panel-head">
           <h3>Secured credit</h3>
-          <p>Borrowing against a Genesis NFT opens once the Genesis Epoch ends.</p>
+          <p>Borrowing against a Operator NFT opens once the Genesis Epoch ends.</p>
         </div>
         <div className="genesis-locked">
           <strong>{formatCountdown(state.data.genesisEpochEnd - now)}</strong>

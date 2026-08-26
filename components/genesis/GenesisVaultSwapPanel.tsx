@@ -197,7 +197,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           wallet,
           chainId: deployment.descriptor.chainId,
           kind: "approve-staking-token",
-          label: "Enable Genesis NFT acquisition",
+          label: "Enable Operator NFT acquisition",
           amount: "Maximum STATICS",
           to: deployment.contracts.statics,
           data: encodeFunctionData({
@@ -215,7 +215,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         wallet,
         chainId: deployment.descriptor.chainId,
         kind: "buy-genesis",
-        label: `Acquire Genesis #${id}`,
+        label: `Acquire Operators #${id}`,
         amount: `${formatEther(quote.staticsPrice)} STATICS + ${formatEther(quote.requiredNative)} ETH`,
         to: deployment.contracts.vault,
         data: purchase.data,
@@ -343,7 +343,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           nextId === null ? (
             <EmptyState
               title="Vault inventory is exhausted"
-              description="Every Genesis NFT has been acquired. They can still be bought from holders, and redeemed back into the Vault at any time."
+              description="Every Operator NFT has been acquired. They can still be bought from holders, and redeemed back into the Vault at any time."
             />
           ) : (
             <>
@@ -357,7 +357,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                     tokenId: nextId,
                     contract: deployment.contracts.genesis,
                     name: `Genesis #${nextId}`,
-                    summary: "Next available Genesis NFT",
+                    summary: "Next available Operator NFT",
                     carries: [],
                     blockedReason: null,
                   }}
@@ -413,7 +413,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                   ? "Confirming…"
                   : wallet && cannotAfford
                     ? "Not enough to acquire"
-                    : `Acquire Genesis #${nextId}`}
+                    : `Acquire Operators #${nextId}`}
               </button>
             </>
           )
@@ -421,13 +421,13 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           <>
             {!wallet || owned.length === 0 ? (
               <EmptyState
-                title="No Genesis NFTs to redeem"
+                title="No Operators NFTs to redeem"
                 description="Redeeming returns a Genesis to the Vault in exchange for its full backing. Connect a wallet holding one to continue."
               />
             ) : (
               <>
                 <p className="portal-field-label">Choose a Genesis to redeem</p>
-                <div className="vault-owned" role="radiogroup" aria-label="Your Genesis NFTs">
+                <div className="vault-owned" role="radiogroup" aria-label="Your Operators NFTs">
                   {owned.map((item) => {
                     const isSelected = selected?.id === item.id;
                     return (
@@ -451,7 +451,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                             tokenId: item.id,
                             contract: deployment.contracts.genesis,
                             name: `Genesis #${item.id}`,
-                            summary: "Owned Genesis NFT",
+                            summary: "Owned Operator NFT",
                             carries: [],
                             blockedReason: item.creditActive
                               ? "Repay secured credit before redeeming."
@@ -468,7 +468,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 {selectedLocked ? (
                   <p className="vault-notice is-error">
                     <b>Genesis #{selected?.id.toString()} has active secured credit.</b> Repay it in{" "}
-                    <Link href="/app/genesis">My Genesis</Link> before this NFT can be redeemed.
+                    <Link href="/app/genesis">My Operators</Link> before this NFT can be redeemed.
                   </p>
                 ) : (
                   <ul className="vault-legs">

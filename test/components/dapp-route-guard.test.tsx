@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
 
 const launchDescriptor = {
   deploymentId: "launch",
-  label: "Genesis launch",
+  label: "Operators launch",
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",

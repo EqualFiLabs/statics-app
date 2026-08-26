@@ -187,7 +187,7 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         capability: "positions",
       },
       {
-        label: "Genesis NFT",
+        label: "Operator NFT",
         messageKey: "genesis",
         enabled: true,
         href: "/app/genesis",

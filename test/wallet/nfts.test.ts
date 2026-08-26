@@ -88,7 +88,7 @@ describe("position NFT description", () => {
     expect(describePositionNft(position(), diamond).contract).toBe(diamond);
   });
 
-  it("blocks transfer until a linked Genesis NFT is unlinked", () => {
+  it("blocks transfer until a linked Operator NFT is unlinked", () => {
     const nft = describePositionNft(position({ linkedGenesisId: 42n }), diamond);
     expect(nft.blockedReason).toMatch(/Unlink Genesis #42/);
   });

@@ -118,7 +118,7 @@ export function parseLaunchDeploymentManifest(
 
   const descriptor: DeploymentDescriptor = {
     deploymentId: manifest.deploymentId,
-    label: "Statics Genesis",
+    label: "Statics Operators",
     network: manifest.network,
     chainId: manifest.chainId,
     stage: "launch",

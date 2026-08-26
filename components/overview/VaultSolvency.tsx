@@ -42,7 +42,7 @@ function invariants(figures: VaultSolvencyFigures): readonly Invariant[] {
 
   return [
     {
-      label: "Backing covers every circulating Genesis",
+      label: "Backing covers every circulating Operators",
       left: statics(figures.tokenBacking),
       right: statics(figures.requiredBacking),
       holds: figures.tokenBacking >= figures.requiredBacking,

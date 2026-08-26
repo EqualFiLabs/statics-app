@@ -45,9 +45,9 @@ import { useWalletState } from "@/providers/wallet-context";
 function describeGenesisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/rejected/i.test(message)) return "The wallet request was rejected.";
-  if (message.includes("NotGenesisOwner")) return "This wallet no longer owns that Genesis NFT.";
+  if (message.includes("NotGenesisOwner")) return "This wallet no longer owns that Operator NFT.";
   if (message.includes("GenesisAlreadyRegistered"))
-    return "That Genesis NFT is already registered for rewards.";
+    return "That Operator NFT is already registered for rewards.";
   if (message.includes("NoRewards")) return "There is nothing to claim for that asset yet.";
   return message || "The Genesis transaction failed.";
 }
@@ -310,12 +310,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         {recoveriesLink}
         <EmptyState
           title="Connect your wallet"
-          description="Connect to view and manage your Genesis NFTs."
+          description="Connect to view and manage your Operators NFTs."
         />
       </div>
     );
   }
-  if (owned.isLoading) return <p className="dapp-loading">Loading Genesis NFTs…</p>;
+  if (owned.isLoading) return <p className="dapp-loading">Loading Operators NFTs…</p>;
   if (owned.error) {
     return (
       <div className="genesis-page">
@@ -332,13 +332,13 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       <div className="genesis-page">
         {recoveriesLink}
         <EmptyState
-          title="No Genesis NFTs yet"
+          title="No Operators NFTs yet"
           description={
             vault.data
-              ? `${vault.data.circulatingGenesis} of ${vault.data.maximumSupply} Genesis NFTs are in circulation, each backed by ${formatTokenAmountGrouped(vault.data.vaultPrice, 18, 0)} STATICS.`
-              : "Acquire a fully backed Genesis NFT through the Vault."
+              ? `${vault.data.circulatingGenesis} of ${vault.data.maximumSupply} Operators NFTs are in circulation, each backed by ${formatTokenAmountGrouped(vault.data.vaultPrice, 18, 0)} STATICS.`
+              : "Acquire a fully backed Operator NFT through the Vault."
           }
-          action={{ label: "Acquire a Genesis NFT", href: "/app/swap?mode=nft" }}
+          action={{ label: "Acquire a Operator NFT", href: "/app/swap?mode=nft" }}
         />
         {/* Rewards earned before a Genesis changed hands stay claimable by the
             previous owner, so a wallet holding none of them still has somewhere
@@ -348,7 +348,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
             <div className="genesis-panel-head">
               <h3>Rewards from past ownership</h3>
               <p>
-                These accrued while you held a Genesis NFT that has since moved on. They remain
+                These accrued while you held a Operator NFT that has since moved on. They remain
                 yours to claim.
               </p>
             </div>
@@ -408,7 +408,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   return (
     <div className="genesis-page">
       {recoveriesLink}
-      <section className="genesis-summary ui-card" aria-label="Your Genesis holdings">
+      <section className="genesis-summary ui-card" aria-label="Your Operators holdings">
         <div className="ui-stat">
           <span className="ui-stat__label">Genesis held</span>
           <strong className="ui-stat__value">{items.length}</strong>
@@ -621,7 +621,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 <div className="genesis-panel-head">
                   <h3>Launch rewards</h3>
                   <p>
-                    Registered Genesis NFTs split {Number(owned.data?.rewardShareBps ?? 0) / 100}%
+                    Registered Operators NFTs split {Number(owned.data?.rewardShareBps ?? 0) / 100}%
                     of market fees, weighted by activation tier.
                   </p>
                 </div>
@@ -762,7 +762,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       void act("accrue", () =>
                         send(
                           "accrue-genesis-rewards",
-                          "Update Genesis launch rewards",
+                          "Update Operators launch rewards",
                           deployment.contracts.launchDistributor,
                           buildAccrueGenesisLaunchRewardsCall(),
                           "Current market fees"
@@ -788,7 +788,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         <AddressDisplay
           address={deployment.contracts.genesis}
           chainId={deployment.descriptor.chainId}
-          label="Genesis NFT"
+          label="Operator NFT"
         />
         <AddressDisplay
           address={deployment.contracts.launchDistributor}

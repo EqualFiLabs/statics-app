@@ -4,7 +4,7 @@ import { SwapPage } from "@/components/swap/SwapPage";
 
 export const metadata: Metadata = {
   title: "Swap | Statics",
-  description: "Swap through the canonical STATICS market or the backed Genesis NFT Vault.",
+  description: "Swap through the canonical STATICS market or the backed Operator NFT Vault.",
 };
 
 export default function SwapRoute() {

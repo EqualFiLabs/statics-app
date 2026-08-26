@@ -63,9 +63,9 @@ const routePresentations = {
   swap: {
     label: "Swap",
     status: "STATICS market",
-    title: "Swap tokens and Genesis NFTs",
+    title: "Swap tokens and Operators NFTs",
     description:
-      "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Genesis NFT.",
+      "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Operator NFT.",
   },
   dollar: {
     label: "Dollar",
@@ -124,18 +124,18 @@ const routePresentations = {
       "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
   },
   genesis: {
-    label: "Genesis NFT",
-    status: "Genesis NFT",
-    title: "Manage your Genesis NFTs",
+    label: "Operator NFT",
+    status: "Operator NFT",
+    title: "Manage your Operators NFTs",
     description:
-      "Activate a Genesis NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+      "Activate a Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
   },
   genesisRecoveries: {
     label: "Recoveries",
-    status: "Genesis recoveries",
+    status: "Operator recoveries",
     title: "Recover matured Genesis credit",
     description:
-      "Find Genesis NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
+      "Find Operators NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
   },
   liquidity: {
     label: "Liquidity",

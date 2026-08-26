@@ -33,7 +33,7 @@ const weth = getAddress("0x7777777777777777777777777777777777777777");
 const wallet = getAddress("0x2222222222222222222222222222222222222222");
 const descriptor = {
   deploymentId: "launch-fixture",
-  label: "Statics Genesis",
+  label: "Statics Operators",
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",
@@ -199,7 +199,7 @@ describe("Genesis Vault trade card", () => {
     });
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: "Acquire Genesis #4913" })).not.toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Acquire Operators #4913" })).not.toBeDisabled();
   });
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {

@@ -20,10 +20,10 @@ function monitorBrowserFailures(page: Page): () => void {
 async function selectLocalDeployment(page: Page) {
   await page.goto("/app");
   await expect(page.getByRole("combobox", { name: "Statics network" })).toHaveValue("anvil");
-  await expect(page.getByRole("heading", { name: "Statics Genesis" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Statics Operators" })).toBeVisible();
 }
 
-test("renders the Genesis launch-only surface and contextual utilities on the local fork", async ({
+test("renders the Operators launch-only surface and contextual utilities on the local fork", async ({
   page,
 }) => {
   const expectNoBrowserFailures = monitorBrowserFailures(page);
@@ -32,12 +32,12 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
   await expect(page.locator(".dapp-nav-item")).toHaveText([
     "Overview",
     "Trade",
-    "My Genesis",
+    "My Operators",
     "Wallet",
   ]);
   await expect(page.locator(".dapp-tabbar .dapp-tab:not(.dapp-nav-toggle)")).toHaveText([
     "Trade",
-    "My Genesis",
+    "My Operators",
     "Wallet",
   ]);
   await expect(page.getByRole("link", { name: "Add funds" })).toHaveAttribute(
@@ -74,7 +74,7 @@ test("renders the Genesis launch-only surface and contextual utilities on the lo
 test("does not expose a fake browser transfer path", async ({ page }) => {
   await page.goto("/app/genesis");
   await expect(page.getByRole("button", { name: /transfer genesis|send genesis/i })).toHaveCount(0);
-  await expect(page.getByText(/Transferring this Genesis NFT resets its activation/i)).toHaveCount(
+  await expect(page.getByText(/Transferring this Operator NFT resets its activation/i)).toHaveCount(
     0
   );
 });

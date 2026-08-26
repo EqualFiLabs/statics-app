@@ -46,7 +46,7 @@ const weth = getAddress("0x7777777777777777777777777777777777777777");
 const wallet = getAddress("0x2222222222222222222222222222222222222222");
 const descriptor = {
   deploymentId: "launch-fixture",
-  label: "Statics Genesis",
+  label: "Statics Operators",
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",
@@ -188,7 +188,7 @@ describe("launch overview", () => {
     renderWithProviders(<DeploymentOverview />);
 
     expect(await screen.findByText("The Epoch ends in")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Acquire Genesis/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Acquire Operators/ })).toHaveAttribute(
       "href",
       "/app/swap?mode=nft"
     );
@@ -202,8 +202,8 @@ describe("launch overview", () => {
 
     // Await a figure rather than a static label, so the quotes have landed.
     expect(await screen.findByText("180,000 STATICS, no ETH")).toBeInTheDocument();
-    expect(screen.getByText("Acquiring a Genesis")).toBeInTheDocument();
-    expect(screen.getByText("Redeeming a Genesis")).toBeInTheDocument();
+    expect(screen.getByText("Acquiring an Operator")).toBeInTheDocument();
+    expect(screen.getByText("Redeeming an Operator")).toBeInTheDocument();
     expect(screen.getByText("Secured credit")).toBeInTheDocument();
     expect(screen.getByText("Closed")).toBeInTheDocument();
     expect(screen.getByText("Up to 171,000 STATICS")).toBeInTheDocument();
@@ -241,7 +241,7 @@ describe("launch overview", () => {
     renderWithProviders(<DeploymentOverview />);
 
     expect(await screen.findByText("All three hold")).toBeInTheDocument();
-    expect(screen.getByText("Backing covers every circulating Genesis")).toBeInTheDocument();
+    expect(screen.getByText("Backing covers every circulating Operators")).toBeInTheDocument();
     expect(screen.getByText("The Vault holds that STATICS")).toBeInTheDocument();
     expect(screen.getByText("The Vault holds the ETH reserve")).toBeInTheDocument();
     expect(screen.getByText("655 circulating × 180,000")).toBeInTheDocument();
@@ -252,7 +252,7 @@ describe("launch overview", () => {
     renderWithProviders(<DeploymentOverview />);
 
     expect(await screen.findByText("Fixed at 5,555")).toBeInTheDocument();
-    expect(screen.getByText("Treasury at genesis")).toBeInTheDocument();
+    expect(screen.getByText("Treasury at launch")).toBeInTheDocument();
     expect(screen.getByText("Vault inventory")).toBeInTheDocument();
   });
 
@@ -261,7 +261,7 @@ describe("launch overview", () => {
     renderWithProviders(<DeploymentOverview />, false);
 
     expect(await screen.findByText("Connect to see where you stand")).toBeInTheDocument();
-    expect(screen.queryByText("Your Genesis")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your Operators")).not.toBeInTheDocument();
   });
 
   it("formats either canonical token ordering without floating-point input", () => {
@@ -454,7 +454,7 @@ describe("consolidated Genesis rewards surface", () => {
     discoverWalletGenesisIds.mockResolvedValue([]);
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    expect(await screen.findByText("No Genesis NFTs yet")).toBeInTheDocument();
+    expect(await screen.findByText("No Operators NFTs yet")).toBeInTheDocument();
     expect(screen.getByText("Rewards from past ownership")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Claim" })).toHaveLength(2);
     expect(screen.queryByRole("tab", { name: /Genesis #1/ })).not.toBeInTheDocument();

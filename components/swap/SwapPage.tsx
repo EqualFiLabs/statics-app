@@ -39,7 +39,7 @@ export function SwapPage() {
             aria-selected={mode === item}
             onClick={() => setMode(item)}
           >
-            {item === "token" ? "Token" : "Genesis NFT"}
+            {item === "token" ? "Token" : "Operator NFT"}
           </button>
         ))}
       </div>

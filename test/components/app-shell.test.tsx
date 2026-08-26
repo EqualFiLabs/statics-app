@@ -47,7 +47,7 @@ describe("DApp wallet shell", () => {
   it("places Wallet in launch navigation and Add funds in the navbar", () => {
     const descriptor = {
       deploymentId: "launch-fixture",
-      label: "Genesis launch",
+      label: "Operators launch",
       network: "Robinhood Chain",
       chainId: 4_663,
       stage: "launch",

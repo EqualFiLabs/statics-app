@@ -51,7 +51,7 @@
       "overview": "Overview",
       "swap": "Swap",
       "earn": "Earn",
-      "genesis": "Genesis NFT",
+      "genesis": "Operator NFT",
       "liquidity": "Liquidity",
       "baskets": "Baskets",
       "create": "Create basket",
@@ -76,21 +76,21 @@
   "launchRoutes": {
     "overview": {
       "label": "Overview",
-      "status": "Genesis launch",
-      "title": "Statics Genesis launch",
-      "description": "Trade STATICS, acquire fully backed Genesis NFTs, and follow the Genesis Epoch on Robinhood Chain."
+      "status": "Operators launch",
+      "title": "Statics Operators launch",
+      "description": "Trade STATICS, acquire fully backed Operators NFTs, and follow the Genesis Epoch on Robinhood Chain."
     },
     "swap": {
       "label": "Trade",
       "status": "STATICS market",
-      "title": "Trade STATICS and Genesis NFTs",
-      "description": "Buy or sell STATICS through its canonical market, or acquire a fully backed Genesis NFT through the Vault."
+      "title": "Trade STATICS and Operators NFTs",
+      "description": "Buy or sell STATICS through its canonical market, or acquire a fully backed Operator NFT through the Vault."
     },
     "genesis": {
-      "label": "My Genesis",
-      "status": "Genesis NFTs",
+      "label": "My Operators",
+      "status": "Operators NFTs",
       "title": "Manage my Genesis",
-      "description": "View Genesis artwork, activate reward tiers, register for launch rewards, and manage secured credit after the Genesis Epoch."
+      "description": "View Operator artwork, activate reward tiers, register for launch rewards, and manage secured credit after the Genesis Epoch."
     }
   },
   "routes": {
@@ -103,8 +103,8 @@
     "swap": {
       "label": "Swap",
       "status": "STATICS market",
-      "title": "Swap tokens and Genesis NFTs",
-      "description": "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Genesis NFT."
+      "title": "Swap tokens and Operators NFTs",
+      "description": "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Operator NFT."
     },
     "dollar": {
       "label": "Dollar",
@@ -155,16 +155,16 @@
       "description": "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up."
     },
     "genesis": {
-      "label": "Genesis NFT",
-      "status": "Genesis NFT",
-      "title": "Manage your Genesis NFTs",
-      "description": "View Genesis artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
+      "label": "Operator NFT",
+      "status": "Operator NFT",
+      "title": "Manage your Operators NFTs",
+      "description": "View Operator artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
     },
     "genesisRecoveries": {
       "label": "Recoveries",
-      "status": "Genesis recoveries",
+      "status": "Operator recoveries",
       "title": "Recover matured Genesis credit",
-      "description": "Find Genesis NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive."
+      "description": "Find Operators NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive."
     },
     "liquidity": {
       "label": "Liquidity",

@@ -118,7 +118,7 @@ export function launchApprovalDefinitions(
       purpose,
     });
 
-  addErc20(statics, deployment.contracts.vault, "Genesis Vault", "Acquire Genesis NFTs");
+  addErc20(statics, deployment.contracts.vault, "Genesis Vault", "Acquire Operators NFTs");
   addErc20(
     statics,
     deployment.contracts.activationRegistry,

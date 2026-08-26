@@ -40,10 +40,10 @@ export const EMPTY_GENESIS_PORTFOLIO: OwnedGenesisPortfolio = {
 };
 
 /**
- * The query key both My Genesis and the Overview mount.
+ * The query key both My Operators and the Overview mount.
  *
  * Sharing the key is the point: this walk is one discovery call plus seven
- * reads per NFT, and the Overview needs the same totals My Genesis already
+ * reads per NFT, and the Overview needs the same totals My Operators already
  * fetched. Same key, same fetcher, one request.
  */
 export function ownedGenesisQueryKey(deploymentId: string, wallet: `0x${string}` | null) {

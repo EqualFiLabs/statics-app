@@ -3,7 +3,7 @@ import type { Address } from "viem";
 const Q192 = 1n << 192n;
 
 /**
- * What a Genesis NFT's STATICS backing is worth at the current market price,
+ * What a Operator NFT's STATICS backing is worth at the current market price,
  * denominated in the pool's numeraire (WETH), in wei.
  *
  * This is the figure the Overview was missing: a raw `WETH per STATICS` ratio

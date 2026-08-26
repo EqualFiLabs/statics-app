@@ -45,7 +45,7 @@ function displayTimestamp(timestamp: bigint): string {
 
 export function GenesisRecoveriesPage() {
   const { active } = useDeployment();
-  if (!active.launch) return <UnconfiguredSurface subject="Genesis recoveries" />;
+  if (!active.launch) return <UnconfiguredSurface subject="Operator recoveries" />;
   return <LaunchGenesisRecoveries deployment={active.launch} />;
 }
 
@@ -53,7 +53,7 @@ export function GenesisRecoveriesPage() {
  * Permissionless recovery of other people's defaulted Genesis credit.
  *
  * This is keeper work, not Genesis ownership, which is why it has its own
- * destination: it used to sit as the first tab on My Genesis, so every holder
+ * destination: it used to sit as the first tab on My Operators, so every holder
  * had to step past somebody else's liquidations to reach their own NFTs.
  */
 function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment }) {
@@ -184,7 +184,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
       <EmptyState
         title="Recovery opens after the Genesis Epoch"
         description="Genesis credit cannot be opened, and so cannot default, while the Epoch is running."
-        secondary={{ label: "Back to My Genesis", href: "/app/genesis" }}
+        secondary={{ label: "Back to My Operators", href: "/app/genesis" }}
       />
     );
   }
@@ -207,7 +207,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
         <EmptyState
           title="No recoverable Genesis credits"
           description="No indexed credit is currently eligible for permissionless recovery."
-          secondary={{ label: "Back to My Genesis", href: "/app/genesis" }}
+          secondary={{ label: "Back to My Operators", href: "/app/genesis" }}
         />
       ) : (
         <div className="genesis-grid">

@@ -5,7 +5,7 @@ import { parseAbi, type Address, type PublicClient } from "viem";
 /**
  * Resolves the artwork for an NFT, when it has any.
  *
- * Statics Genesis NFTs return self-contained onchain JSON and SVG metadata.
+ * Statics Operators NFTs return self-contained onchain JSON and SVG metadata.
  * PositionNFT metadata is intentionally text-only, while other collections can
  * omit metadata or depend on an unavailable gateway, so no resolution step
  * throws and callers retain a deliberate placeholder.
@@ -67,7 +67,7 @@ const EMPTY_METADATA: NftMetadata = { image: null, traits: [] };
 /**
  * Reads the `attributes` array, tolerating every shape a collection might use.
  *
- * Statics Genesis returns eight string traits plus a numeric Activation Tier
+ * Statics Operators returns eight string traits plus a numeric Activation Tier
  * carrying a `max_value`. Arbitrary collections return anything at all, so a
  * malformed entry is skipped rather than failing the whole list -- artwork must
  * still render when the traits beside it are unusable.

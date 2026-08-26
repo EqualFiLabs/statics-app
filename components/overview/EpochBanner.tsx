@@ -149,14 +149,14 @@ export function EpochBanner({
 
       <div className="epoch-changes">
         <Change
-          label="Acquiring a Genesis"
+          label="Acquiring an Operator"
           current={`${statics} STATICS + ${feeOnly} ETH`}
           other={`${statics} STATICS + ${feePlusBuyIn} ETH`}
           caveat="Buy-in shown at today's reserve. Every acquisition fee accretes to it, so the amount owed rises with each sale."
           complete={!epochActive}
         />
         <Change
-          label="Redeeming a Genesis"
+          label="Redeeming an Operator"
           current={`${statics} STATICS, no ETH`}
           other={`${statics} STATICS + ${payout} ETH`}
           caveat="Reserve share at today's reserve. It rises for the same reason."

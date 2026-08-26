@@ -61,7 +61,7 @@ function target(
   );
   const descriptor: DeploymentDescriptor = {
     deploymentId,
-    label: protocol ? "Statics Protocol" : "Statics Genesis launch",
+    label: protocol ? "Statics Protocol" : "Statics Operators launch",
     network,
     chainId,
     stage: protocol ? "full-protocol" : "launch",

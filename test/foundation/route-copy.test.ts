@@ -89,7 +89,7 @@ describe("dapp route copy", () => {
 describe("stage-aware dapp navigation", () => {
   const launch = {
     deploymentId: "launch",
-    label: "Genesis launch",
+    label: "Operators launch",
     network: "Robinhood Chain",
     chainId: 4663,
     stage: "launch" as const,
@@ -180,7 +180,7 @@ describe("sidebar completeness", () => {
       "Create basket",
       "Dollar",
       "Position NFT",
-      "Genesis NFT",
+      "Operator NFT",
       "Loans",
       "Wallet",
       "Faucet",
@@ -201,7 +201,7 @@ describe("sidebar completeness", () => {
   it("uses the exact NFT product labels in every locale", () => {
     for (const messages of [english, spanish, chinese]) {
       expect(messages.navigation.items.positions).toBe("Position NFT");
-      expect(messages.navigation.items.genesis).toBe("Genesis NFT");
+      expect(messages.navigation.items.genesis).toBe("Operator NFT");
     }
   });
 

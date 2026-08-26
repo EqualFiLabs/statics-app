@@ -73,7 +73,7 @@ export function DeploymentOverview() {
           <p className="dapp-eyebrow">Selected network</p>
           <h2>{active.descriptor.network}</h2>
           <p>
-            The same Genesis launch application will be enabled here after its reviewed manifest is
+            The same Operators launch application will be enabled here after its reviewed manifest is
             published.
           </p>
         </section>
@@ -136,7 +136,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     },
   });
 
-  // Same key and fetcher My Genesis mounts, so the two surfaces share one walk
+  // Same key and fetcher My Operators mounts, so the two surfaces share one walk
   // of the wallet rather than each paying for it.
   const portfolio = useQuery({
     queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
@@ -208,7 +208,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
 
       <div className="launch-actions">
         <Link className="ui-button ui-button--primary" href="/app/swap?mode=nft">
-          Acquire Genesis
+          Acquire Operators
           <small>
             {metrics.data
               ? `${formatTokenAmountGrouped(metrics.data.purchase.staticsPrice, 18, 0)} STATICS + ${formatTokenAmountGrouped(metrics.data.purchase.requiredNative, 18, 5)} ETH`
@@ -239,7 +239,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             </strong>
           </div>
           <div className="ui-stat">
-            <span className="ui-stat__label">Your Genesis</span>
+            <span className="ui-stat__label">Your Operators</span>
             <strong className="ui-stat__value">{portfolio.isLoading ? "—" : genesisHeld}</strong>
             <small>
               {genesisHeld > 0 && vault
@@ -255,10 +255,10 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             <small>{formatTokenAmountGrouped(rewards.claimableWeth, 18, 4)} WETH</small>
           </div>
           {/* Names its destination, not an action: claiming is one transaction
-              per NFT and asset, and My Genesis is where that sequence is priced
+              per NFT and asset, and My Operators is where that sequence is priced
               honestly. Revisit when the batch claim entry point lands. */}
           <Link className="ui-button ui-button--secondary" href="/app/genesis">
-            Open My Genesis
+            Open My Operators
           </Link>
         </section>
       ) : (
@@ -279,7 +279,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
       )}
 
       <div className="launch-duo">
-        <section className="ui-card overview-panel" aria-label="Genesis supply">
+        <section className="ui-card overview-panel" aria-label="Operators supply">
           <div className="overview-panel-head">
             <h3>Supply</h3>
             <span>Fixed at {count(supply)}</span>
@@ -297,7 +297,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             <div>
               <dt>
                 <i className="is-treasury" aria-hidden="true" />
-                Treasury at genesis
+                Treasury at launch
               </dt>
               <dd>{count(TREASURY_GENESIS)}</dd>
             </div>
@@ -339,7 +339,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               </dd>
             </div>
             <div>
-              <dt>Reserve share per Genesis</dt>
+              <dt>Reserve share per Operator</dt>
               <dd>
                 {vault
                   ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} ETH`
@@ -353,7 +353,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} ETH`}</dd>
             </div>
             <div className="is-total">
-              <dt>A Genesis costs you, all in</dt>
+              <dt>An Operator costs you, all in</dt>
               <dd>
                 {allInCost !== null ? `${formatTokenAmountGrouped(allInCost, 18, 4)} ETH` : "—"}
               </dd>

@@ -12,7 +12,7 @@ describe("DApp route presentation", () => {
 
   it.each([
     ["/app", "Overview", "Your portfolio"],
-    ["/app/swap", "Swap", "Swap tokens and Genesis NFTs"],
+    ["/app/swap", "Swap", "Swap tokens and Operators NFTs"],
     ["/app/wallet", "Wallet", "Your wallet"],
     ["/app/faucet", "Faucet", "Get testnet assets"],
     ["/app/portal", "Add funds", "Add funds to Statics"],
@@ -22,7 +22,7 @@ describe("DApp route presentation", () => {
     ["/app/positions", "Position NFT", "Your Position NFTs"],
     ["/app/loans", "Loans", "Your loans"],
     ["/app/rewards", "Rewards", "Your rewards"],
-    ["/app/genesis", "Genesis NFT", "Manage your Genesis NFTs"],
+    ["/app/genesis", "Operator NFT", "Manage your Operators NFTs"],
     ["/app/liquidity", "Liquidity", "Provide liquidity"],
     ["/app/activity", "Activity", "Your activity"],
     ["/app/tools", "Tools", "Approval tools"],

@@ -121,7 +121,7 @@ function defaultNftCollections(
       ? deployment.contracts.genesis
       : deployment.protocol.genesis?.collection;
   return address
-    ? [{ address, name: "Statics Genesis", symbol: "GENESIS", standard: "erc721" }]
+    ? [{ address, name: "Statics Operators", symbol: "GENESIS", standard: "erc721" }]
     : [];
 }
 

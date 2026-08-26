@@ -33,9 +33,9 @@ import { StandaloneGenesisPage } from "@/components/genesis/StandaloneGenesisPag
 function describeGenesisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("GenesisLinkedOnTransfer"))
-    return "Unlink this Genesis NFT before transferring it.";
-  if (message.includes("GenesisAlreadyLinked")) return "This Genesis NFT is already linked.";
-  if (message.includes("PositionAlreadyLinked")) return "That Position already has a Genesis NFT.";
+    return "Unlink this Operator NFT before transferring it.";
+  if (message.includes("GenesisAlreadyLinked")) return "This Operator NFT is already linked.";
+  if (message.includes("PositionAlreadyLinked")) return "That Position already has a Operator NFT.";
   if (message.includes("InvalidActivationTier")) return "Choose a higher activation tier.";
   if (message.includes("ERC20InsufficientAllowance"))
     return "Approve STATICS before activating this tier.";
@@ -151,10 +151,10 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
     return (
       <EmptyState
         title="Connect your wallet"
-        description="Connect to view and activate your Genesis NFTs."
+        description="Connect to view and activate your Operators NFTs."
       />
     );
-  if (portfolio.isLoading) return <p className="dapp-loading">Loading Genesis NFTs…</p>;
+  if (portfolio.isLoading) return <p className="dapp-loading">Loading Operators NFTs…</p>;
   if (portfolio.isError)
     return (
       <EmptyState
@@ -166,8 +166,8 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
   if (!portfolio.data?.genesis.length) {
     return (
       <EmptyState
-        title="No Genesis NFTs found"
-        description="This wallet does not currently own a Statics Genesis NFT."
+        title="No Operators NFTs found"
+        description="This wallet does not currently own a Statics Operators NFT."
       />
     );
   }
@@ -430,7 +430,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
         <AddressDisplay
           address={genesisDeployment.collection}
           chainId={deployment.chainId}
-          label="Genesis NFT"
+          label="Operator NFT"
         />
         <AddressDisplay
           address={genesisDeployment.token}
