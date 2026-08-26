@@ -180,7 +180,7 @@ describe("canonical liquidity identifiers", () => {
 
     expect(borrowedLiquidityReadiness(basket, [readyPool], null)).toMatch(/Every basket/);
     expect(borrowedLiquidityReadiness(basket, [readyPool, secondPool], null)).toMatch(
-      /calculate an executable liquidity plan/
+      /cannot fund a positive amount in every pool/
     );
     expect(
       borrowedLiquidityReadiness(basket, [{ ...readyPool, managerSynced: false }, secondPool], null)
