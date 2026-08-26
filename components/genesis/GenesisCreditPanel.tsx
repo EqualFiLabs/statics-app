@@ -287,7 +287,7 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Genesis #${genesisId} secured credit`}
+        aria-label={`Operator #${genesisId} secured credit`}
       >
         <div className="genesis-panel-head">
           <h3>Secured credit — active</h3>
@@ -359,7 +359,7 @@ export function GenesisCreditPanel({
                 );
                 await send(
                   "extend-genesis-credit",
-                  `Extend Genesis #${genesisId} credit`,
+                  `Extend Operator #${genesisId} credit`,
                   transaction.data,
                   `${formatEther(quote.totalNativeFee)} ETH fee`,
                   transaction.value
@@ -403,7 +403,7 @@ export function GenesisCreditPanel({
                 }
                 await send(
                   "repay-genesis-credit",
-                  `Repay Genesis #${genesisId} credit`,
+                  `Repay Operator #${genesisId} credit`,
                   buildRepayGenesisCreditCall(genesisId),
                   `${formatEther(credit.principal)} STATICS`
                 );
@@ -429,11 +429,11 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Genesis #${genesisId} secured credit`}
+        aria-label={`Operator #${genesisId} secured credit`}
       >
         <div className="genesis-panel-head">
           <h3>Secured credit</h3>
-          <p>Borrowing against a Operator NFT opens once the Genesis Epoch ends.</p>
+          <p>Borrowing against an Operator NFT opens once the Genesis Epoch ends.</p>
         </div>
         <div className="genesis-locked">
           <strong>{formatCountdown(state.data.genesisEpochEnd - now)}</strong>
@@ -451,7 +451,7 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Genesis #${genesisId} secured credit`}
+        aria-label={`Operator #${genesisId} secured credit`}
       >
         <div className="genesis-panel-head">
           <h3>Secured credit</h3>
@@ -474,7 +474,7 @@ export function GenesisCreditPanel({
   const maxLtv = backing > 0n ? Number((maxPrincipal * 10_000n) / backing) / 100 : 0;
 
   return (
-    <section className="ui-card genesis-panel" aria-label={`Genesis #${genesisId} secured credit`}>
+    <section className="ui-card genesis-panel" aria-label={`Operator #${genesisId} secured credit`}>
       <div className="genesis-panel-head">
         <h3>Borrow against this Genesis</h3>
         <p>
@@ -554,7 +554,7 @@ export function GenesisCreditPanel({
             );
             await send(
               "open-genesis-credit",
-              `Borrow against Genesis #${genesisId}`,
+              `Borrow against Operator #${genesisId}`,
               transaction.data,
               `${formatEther(clamped)} STATICS + ${formatEther(quote.totalNativeFee)} ETH fee`,
               transaction.value

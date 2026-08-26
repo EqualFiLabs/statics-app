@@ -35,7 +35,7 @@ function describeGenesisError(error: unknown): string {
   if (message.includes("GenesisLinkedOnTransfer"))
     return "Unlink this Operator NFT before transferring it.";
   if (message.includes("GenesisAlreadyLinked")) return "This Operator NFT is already linked.";
-  if (message.includes("PositionAlreadyLinked")) return "That Position already has a Operator NFT.";
+  if (message.includes("PositionAlreadyLinked")) return "That Position already has an Operator NFT.";
   if (message.includes("InvalidActivationTier")) return "Choose a higher activation tier.";
   if (message.includes("ERC20InsufficientAllowance"))
     return "Approve STATICS before activating this tier.";
@@ -158,7 +158,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
   if (portfolio.isError)
     return (
       <EmptyState
-        title="Genesis data unavailable"
+        title="Operators data unavailable"
         description={portfolio.error.message}
         tone="error"
       />
@@ -233,7 +233,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
           <strong className="ui-stat__value">{formatEther(portfolio.data.balance)} STATICS</strong>
         </div>
         <div className="ui-stat">
-          <span className="ui-stat__label">Genesis collection</span>
+          <span className="ui-stat__label">Operators collection</span>
           <strong className="ui-stat__value">5,555 fixed NFTs</strong>
         </div>
         <div className="ui-stat">
@@ -262,7 +262,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
             <article className="ui-card genesis-card" key={actionKey}>
               <div className="genesis-card-heading">
                 <div>
-                  <h2 className="ui-section-title">Genesis #{actionKey}</h2>
+                  <h2 className="ui-section-title">Operator #{actionKey}</h2>
                   <span className="ui-pill">
                     Tier {currentTier} · {(Number(state.multiplierBps) / 10_000).toFixed(2)}×
                   </span>
@@ -274,7 +274,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                     kind: "collection",
                     tokenId: id,
                     contract: genesisDeployment.collection,
-                    name: `Genesis #${actionKey}`,
+                    name: `Operator #${actionKey}`,
                     summary: `Tier ${currentTier}`,
                     carries: [],
                     blockedReason: linked ? "Unlink before transfer." : null,
@@ -344,7 +344,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                           if (linked) await checkpointPosition(state.linkedPositionId);
                           await send(
                             "activate-genesis",
-                            `Activate Genesis #${actionKey} to tier ${target}`,
+                            `Activate Operator #${actionKey} to tier ${target}`,
                             buildActivateGenesisCall(id, target, cost),
                             `${formatEther(cost)} STATICS activation payment`
                           );
@@ -365,7 +365,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                       await checkpointPosition(state.linkedPositionId);
                       await send(
                         "unlink-genesis",
-                        `Unlink Genesis #${actionKey}`,
+                        `Unlink Operator #${actionKey}`,
                         buildUnlinkGenesisCall(id),
                         `Position #${state.linkedPositionId}`
                       );
@@ -403,7 +403,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                         await checkpointPosition(positionId);
                         await send(
                           "link-genesis",
-                          `Link Genesis #${actionKey}`,
+                          `Link Operator #${actionKey}`,
                           buildLinkGenesisCall(id, positionId),
                           `Position #${positionId}`
                         );

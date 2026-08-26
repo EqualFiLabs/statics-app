@@ -244,7 +244,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     }
     await send(
       "activate-genesis",
-      `Activate Genesis #${item.id} to tier ${targetTier}`,
+      `Activate Operator #${item.id} to tier ${targetTier}`,
       deployment.contracts.activationRegistry,
       buildActivateGenesisCall(item.id, targetTier),
       `${formatEther(cost)} STATICS activation payment`
@@ -256,14 +256,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     for (const item of items) {
       if (item.pendingStatics > 0n) {
         jobs.push({
-          label: `Claim Genesis #${item.id} STATICS rewards`,
+          label: `Claim Operator #${item.id} STATICS rewards`,
           data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.statics, wallet!),
           amount: `${formatEther(item.pendingStatics)} STATICS`,
         });
       }
       if (item.pendingWeth > 0n) {
         jobs.push({
-          label: `Claim Genesis #${item.id} WETH rewards`,
+          label: `Claim Operator #${item.id} WETH rewards`,
           data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.weth, wallet!),
           amount: `${formatEther(item.pendingWeth)} WETH`,
         });
@@ -300,7 +300,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const recoveriesLink =
     vault.data?.epochActive === false ? (
       <Link className="genesis-recoveries-link" href="/app/genesis/recoveries">
-        Recover matured Genesis credit <span aria-hidden="true">→</span>
+        Recover matured Operator credit <span aria-hidden="true">→</span>
       </Link>
     ) : null;
 
@@ -321,7 +321,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       <div className="genesis-page">
         {recoveriesLink}
         <EmptyState
-          title="Genesis data unavailable"
+          title="Operators data unavailable"
           description={describeGenesisError(owned.error)}
         />
       </div>
@@ -338,7 +338,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
               ? `${vault.data.circulatingGenesis} of ${vault.data.maximumSupply} Operators NFTs are in circulation, each backed by ${formatTokenAmountGrouped(vault.data.vaultPrice, 18, 0)} STATICS.`
               : "Acquire a fully backed Operator NFT through the Vault."
           }
-          action={{ label: "Acquire a Operator NFT", href: "/app/swap?mode=nft" }}
+          action={{ label: "Acquire an Operator NFT", href: "/app/swap?mode=nft" }}
         />
         {/* Rewards earned before a Genesis changed hands stay claimable by the
             previous owner, so a wallet holding none of them still has somewhere
@@ -348,7 +348,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
             <div className="genesis-panel-head">
               <h3>Rewards from past ownership</h3>
               <p>
-                These accrued while you held a Operator NFT that has since moved on. They remain
+                These accrued while you held an Operator NFT that has since moved on. They remain
                 yours to claim.
               </p>
             </div>
@@ -410,7 +410,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       {recoveriesLink}
       <section className="genesis-summary ui-card" aria-label="Your Operators holdings">
         <div className="ui-stat">
-          <span className="ui-stat__label">Genesis held</span>
+          <span className="ui-stat__label">Operators held</span>
           <strong className="ui-stat__value">{items.length}</strong>
           <small>
             {summary.activated} activated · {summary.unregistered} not registered
@@ -504,7 +504,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           />
 
           <div className="genesis-actions">
-            <div className="genesis-tabs" role="tablist" aria-label="Genesis actions">
+            <div className="genesis-tabs" role="tablist" aria-label="Operator actions">
               <button
                 type="button"
                 role="tab"
@@ -610,7 +610,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   </>
                 ) : (
                   <p className="genesis-note">
-                    <b>Tier 4 reached.</b> This Genesis earns the maximum 1.25× reward weight.
+                    <b>Tier 4 reached.</b> This Operator earns the maximum 1.25× reward weight.
                   </p>
                 )}
               </section>
@@ -629,7 +629,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 {!selected.registered ? (
                   <>
                     <p className="genesis-note is-warning">
-                      <b>This Genesis is earning nothing.</b> Register it to start taking a share of
+                      <b>This Operator is earning nothing.</b> Register it to start taking a share of
                       market fees at its current {genesisTierMultiplier(selected.tier).toFixed(2)}×
                       weight.
                     </p>
@@ -651,17 +651,17 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                         void act(`register-${selected.id}`, () =>
                           send(
                             "claim-rewards",
-                            `Register Genesis #${selected.id}`,
+                            `Register Operator #${selected.id}`,
                             deployment.contracts.launchDistributor,
                             buildRegisterGenesisCall(selected.id),
-                            `Genesis #${selected.id}`
+                            `Operator #${selected.id}`
                           )
                         )
                       }
                     >
                       {busy === `register-${selected.id}`
                         ? "Registering…"
-                        : `Register Genesis #${selected.id} for rewards`}
+                        : `Register Operator #${selected.id} for rewards`}
                     </button>
                   </>
                 ) : (
@@ -702,7 +702,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               void act(`claim-${selected.id}-${symbol}`, () =>
                                 send(
                                   "claim-rewards",
-                                  `Claim Genesis #${selected.id} ${symbol} rewards`,
+                                  `Claim Operator #${selected.id} ${symbol} rewards`,
                                   deployment.contracts.launchDistributor,
                                   buildClaimGenesisLaunchRewardsCall(selected.id, asset, wallet),
                                   symbol
@@ -717,7 +717,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       {(summary.ownerStatics > 0n || summary.ownerWeth > 0n) && (
                         <li>
                           <div>
-                            <span>From Genesis you no longer own</span>
+                            <span>From Operators you no longer own</span>
                             <strong>
                               {formatTokenAmountGrouped(summary.ownerStatics, 18, 2)} STATICS
                             </strong>
@@ -803,7 +803,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         <AddressDisplay
           address={deployment.contracts.vault}
           chainId={deployment.descriptor.chainId}
-          label="Genesis Vault"
+          label="Operators Vault"
         />
       </section>
     </div>

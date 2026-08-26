@@ -190,7 +190,7 @@ export function GenesisCarousel({
         ref={railRef}
         onScroll={syncOverflow}
         role="tablist"
-        aria-label="Select a Operator NFT"
+        aria-label="Select an Operator NFT"
       >
         {visible.map((item) => {
           const isSelected = item.id === selectedId;
@@ -226,14 +226,14 @@ export function GenesisCarousel({
                   kind: "collection",
                   tokenId: item.id,
                   contract: collection,
-                  name: `Genesis #${item.id}`,
+                  name: `Operator #${item.id}`,
                   summary: `Tier ${item.tier}`,
                   carries: [],
                   blockedReason: null,
                 }}
               />
               <span className="genesis-carousel-id">
-                Genesis #{item.id.toString()}
+                Operator #{item.id.toString()}
                 <b>T{item.tier}</b>
               </span>
               <span className="genesis-carousel-flags">

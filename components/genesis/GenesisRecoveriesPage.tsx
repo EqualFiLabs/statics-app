@@ -35,7 +35,7 @@ function describeRecoveryError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/rejected/i.test(message)) return "The wallet request was rejected.";
   if (message.includes("CreditNotRecoverable")) return "This credit is not recoverable yet.";
-  if (message.includes("CreditNotActive")) return "This Genesis credit is no longer active.";
+  if (message.includes("CreditNotActive")) return "This Operator credit is no longer active.";
   return message || "The recovery transaction failed.";
 }
 
@@ -147,7 +147,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
         chainId: deployment.descriptor.chainId,
         deploymentId: deployment.descriptor.deploymentId,
         kind: "recover-genesis-credit",
-        label: `Recover Genesis #${credit.genesisId}`,
+        label: `Recover Operator #${credit.genesisId}`,
         amount: `${formatEther(credit.callerIncentive)} STATICS caller incentive`,
         to: deployment.contracts.vault,
         data: buildRecoverGenesisCreditCall(credit.genesisId),
@@ -183,7 +183,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
     return (
       <EmptyState
         title="Recovery opens after the Genesis Epoch"
-        description="Genesis credit cannot be opened, and so cannot default, while the Epoch is running."
+        description="Operator credit cannot be opened, and so cannot default, while the Epoch is running."
         secondary={{ label: "Back to My Operators", href: "/app/genesis" }}
       />
     );
@@ -197,15 +197,15 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
         </p>
       )}
       {recoveries.isLoading ? (
-        <p className="dapp-loading">Loading recoverable Genesis credits…</p>
+        <p className="dapp-loading">Loading recoverable Operator credits…</p>
       ) : recoveries.error ? (
         <p className="dapp-inline-error" role="alert">
           Recovery discovery is temporarily unavailable because the deployment indexer could not be
-          reached. Owned Genesis management remains available.
+          reached. Owned Operators management remains available.
         </p>
       ) : !recoveries.data?.length ? (
         <EmptyState
-          title="No recoverable Genesis credits"
+          title="No recoverable Operator credits"
           description="No indexed credit is currently eligible for permissionless recovery."
           secondary={{ label: "Back to My Operators", href: "/app/genesis" }}
         />
@@ -213,7 +213,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
         <div className="genesis-grid">
           {recoveries.data.map((credit) => (
             <article className="ui-card genesis-card" key={credit.genesisId.toString()}>
-              <h2 className="ui-section-title">Genesis #{credit.genesisId.toString()}</h2>
+              <h2 className="ui-section-title">Operator #{credit.genesisId.toString()}</h2>
               <AddressDisplay
                 address={credit.owner}
                 chainId={deployment.descriptor.chainId}
@@ -253,7 +253,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
                 disabled={busy !== null && busy !== credit.genesisId}
                 onClick={() => void recover(credit)}
               >
-                {busy === credit.genesisId ? "Recovering…" : `Recover Genesis #${credit.genesisId}`}
+                {busy === credit.genesisId ? "Recovering…" : `Recover Operator #${credit.genesisId}`}
               </button>
             </article>
           ))}

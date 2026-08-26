@@ -38,8 +38,8 @@ function describeError(error: unknown): string {
   if (message.includes("CreditAlreadyActive"))
     return "Repay or recover this Genesis credit before redeeming.";
   if (message.includes("GenesisLocked"))
-    return "This Genesis is currently locked and cannot be redeemed.";
-  return message || "The Genesis Vault transaction failed.";
+    return "This Operator is currently locked and cannot be redeemed.";
+  return message || "The Operators Vault transaction failed.";
 }
 
 export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeployment }) {
@@ -255,8 +255,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           wallet,
           chainId: deployment.descriptor.chainId,
           kind: "approve-genesis",
-          label: `Approve Genesis #${id} redemption`,
-          amount: `Genesis #${id}`,
+          label: `Approve Operator #${id} redemption`,
+          amount: `Operator #${id}`,
           to: deployment.contracts.genesis,
           data: encodeFunctionData({
             abi: staticsGenesisAbi,
@@ -272,7 +272,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         wallet,
         chainId: deployment.descriptor.chainId,
         kind: "redeem-genesis",
-        label: `Redeem Genesis #${id}`,
+        label: `Redeem Operator #${id}`,
         amount: `${formatEther(redemptionQuote.staticsPayout)} STATICS + ${formatEther(redemptionQuote.reservePayout)} ETH`,
         to: deployment.contracts.vault,
         data: buildRedeemGenesisCall(id, wallet),
@@ -289,10 +289,10 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     }
   };
 
-  if (vault.isLoading) return <p className="dapp-loading">Loading the Genesis Vault…</p>;
+  if (vault.isLoading) return <p className="dapp-loading">Loading the Operators Vault…</p>;
   if (vault.error)
     return (
-      <EmptyState title="Genesis Vault unavailable" description={describeError(vault.error)} />
+      <EmptyState title="Operators Vault unavailable" description={describeError(vault.error)} />
     );
 
   const nextId = vault.data?.nextId ?? null;
@@ -321,7 +321,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
   return (
     <div className="genesis-vault-swap">
-      <section className="portal-panel" aria-label="Genesis Vault">
+      <section className="portal-panel" aria-label="Operators Vault">
         <div className="portal-direction-tabs" role="tablist" aria-label="Vault direction">
           {(["acquire", "redeem"] as const).map((item) => (
             <button
@@ -356,14 +356,14 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                     kind: "collection",
                     tokenId: nextId,
                     contract: deployment.contracts.genesis,
-                    name: `Genesis #${nextId}`,
+                    name: `Operator #${nextId}`,
                     summary: "Next available Operator NFT",
                     carries: [],
                     blockedReason: null,
                   }}
                 />
                 <div className="vault-hero-copy">
-                  <h3>Genesis #{nextId.toString()}</h3>
+                  <h3>Operator #{nextId.toString()}</h3>
                   <p>Next from the Vault. Redeemable for its full backing at any time.</p>
                   <span className="ui-pill is-ready">Fully backed</span>
                 </div>
@@ -450,7 +450,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                             kind: "collection",
                             tokenId: item.id,
                             contract: deployment.contracts.genesis,
-                            name: `Genesis #${item.id}`,
+                            name: `Operator #${item.id}`,
                             summary: "Owned Operator NFT",
                             carries: [],
                             blockedReason: item.creditActive
@@ -467,7 +467,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
                 {selectedLocked ? (
                   <p className="vault-notice is-error">
-                    <b>Genesis #{selected?.id.toString()} has active secured credit.</b> Repay it in{" "}
+                    <b>Operator #{selected?.id.toString()} has active secured credit.</b> Repay it in{" "}
                     <Link href="/app/genesis">My Operators</Link> before this NFT can be redeemed.
                   </p>
                 ) : (
@@ -499,7 +499,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                     ? "Confirming…"
                     : selectedLocked
                       ? "Repay credit first"
-                      : `Redeem Genesis #${selected?.id ?? ""}`}
+                      : `Redeem Operator #${selected?.id ?? ""}`}
                 </button>
               </>
             )}

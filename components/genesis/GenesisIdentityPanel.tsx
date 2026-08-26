@@ -57,7 +57,7 @@ export function GenesisIdentityPanel({
   );
 
   return (
-    <aside className="genesis-identity ui-card" aria-label={`Genesis #${id} details`}>
+    <aside className="genesis-identity ui-card" aria-label={`Operator #${id} details`}>
       <div className="genesis-identity-art">
         <NftArtwork
           chainId={chainId}
@@ -67,7 +67,7 @@ export function GenesisIdentityPanel({
             kind: "collection",
             tokenId: id,
             contract: collection,
-            name: `Genesis #${id}`,
+            name: `Operator #${id}`,
             summary: `Tier ${tier}`,
             carries: [],
             blockedReason: creditActive ? "Repay secured credit before transfer." : null,
@@ -77,7 +77,7 @@ export function GenesisIdentityPanel({
 
       <div className="genesis-identity-heading">
         <div>
-          <h2 className="ui-section-title">Genesis #{id.toString()}</h2>
+          <h2 className="ui-section-title">Operator #{id.toString()}</h2>
           <p className="genesis-identity-sub">1 of {maximumSupply.toString()} · fully backed</p>
         </div>
         <span className="genesis-tier-badge" data-tier={tier}>

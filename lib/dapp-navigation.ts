@@ -128,14 +128,14 @@ const routePresentations = {
     status: "Operator NFT",
     title: "Manage your Operators NFTs",
     description:
-      "Activate a Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
   },
   genesisRecoveries: {
     label: "Recoveries",
     status: "Operator recoveries",
-    title: "Recover matured Genesis credit",
+    title: "Recover matured Operator credit",
     description:
-      "Find Operators NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
+      "Find Operator NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
   },
   liquidity: {
     label: "Liquidity",
