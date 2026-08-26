@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { cumulativeGenesisActivationCost } from "@statics-protocol/sdk";
 
-import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
+import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 
 describe("Genesis activation tier costs", () => {
   it("aligns RPC tier reads with the SDK's one-indexed cost lookup", () => {
@@ -15,5 +15,9 @@ describe("Genesis activation tier costs", () => {
 
   it("rejects incomplete tier-cost reads", () => {
     expect(() => oneIndexedGenesisTierCosts([10n, 20n, 30n])).toThrow("exactly four tier costs");
+  });
+
+  it("does not ask the SDK to price an already-maxed Tier 4 Genesis", () => {
+    expect(genesisActivationCost([10n, 20n, 30n, 40n], 4, 4)).toBe(0n);
   });
 });

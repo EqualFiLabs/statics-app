@@ -28,7 +28,7 @@ import {
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
-import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
+import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   EMPTY_GENESIS_PORTFOLIO,
@@ -402,7 +402,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     ? (targetTiers[selected.id.toString()] ?? Math.min(GENESIS_MAX_TIER, selected.tier + 1))
     : 0;
   const activationCost = selected
-    ? cumulativeGenesisActivationCost(owned.data?.tierCosts ?? [], selected.tier, targetTier)
+    ? genesisActivationCost(owned.data?.tierCosts ?? [], selected.tier, targetTier)
     : 0n;
 
   return (
