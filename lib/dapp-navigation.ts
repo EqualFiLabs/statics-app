@@ -1,3 +1,39 @@
+import type { DeploymentCapability, DeploymentDescriptor } from "@/lib/deployments/types";
+
+export type DappRouteCapability = DeploymentCapability;
+
+/** Exact runtime route policy; unknown paths intentionally return null. */
+export function getDappRouteCapability(pathname: string): DappRouteCapability | null {
+  if (pathname === "/app" || pathname === "/app/") return "overview";
+  if (pathname === "/app/swap") return "canonical-statics-market";
+  if (pathname === "/app/genesis" || pathname === "/app/genesis/recoveries") return "genesis-vault";
+  if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
+  if (pathname === "/app/activity") return "activity";
+  if (pathname === "/app/tools") return "approval-tools";
+  if (pathname === "/app/dollar") return "dollar";
+  if (pathname === "/app/baskets" || pathname.startsWith("/app/baskets/")) return "baskets";
+  if (pathname === "/app/create") return "baskets";
+  if (pathname === "/app/positions" || pathname.startsWith("/app/positions/")) return "positions";
+  if (pathname === "/app/loans") return "loans";
+  if (pathname === "/app/rewards") return "protocol-rewards";
+  if (pathname === "/app/liquidity") return "protocol-liquidity";
+  if (pathname === "/app/faucet") return "faucet";
+  return null;
+}
+
+export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescriptor): boolean {
+  const capability = getDappRouteCapability(pathname);
+  if (capability === null) return true;
+  if (descriptor.stage === "full-protocol") return true;
+  return (
+    capability === "overview" ||
+    capability === "canonical-statics-market" ||
+    capability === "genesis-vault" ||
+    capability === "wallet" ||
+    capability === "activity" ||
+    capability === "approval-tools"
+  );
+}
 export type DappRoutePresentation = {
   label: string;
   status: string;
@@ -23,6 +59,13 @@ const routePresentations = {
     title: "Your portfolio",
     description:
       "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
+  },
+  swap: {
+    label: "Swap",
+    status: "STATICS market",
+    title: "Swap tokens and Operators NFTs",
+    description:
+      "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Operator NFT.",
   },
   dollar: {
     label: "Dollar",
@@ -60,9 +103,9 @@ const routePresentations = {
       "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
-    label: "Positions",
-    status: "Positions",
-    title: "Your positions",
+    label: "Position NFT",
+    status: "Position NFT",
+    title: "Your Position NFTs",
     description:
       "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
   },
@@ -80,6 +123,20 @@ const routePresentations = {
     description:
       "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
   },
+  genesis: {
+    label: "Operator NFT",
+    status: "Operator NFT",
+    title: "Manage your Operators NFTs",
+    description:
+      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+  },
+  genesisRecoveries: {
+    label: "Recoveries",
+    status: "Operator recoveries",
+    title: "Recover matured Operator credit",
+    description:
+      "Find Operator NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive.",
+  },
   liquidity: {
     label: "Liquidity",
     status: "Liquidity",
@@ -88,11 +145,11 @@ const routePresentations = {
       "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
   },
   create: {
-    label: "Launch policy",
-    status: "Governed",
-    title: "Basket launch policy",
+    label: "Create basket",
+    status: "Create",
+    title: "Launch an index basket",
     description:
-      "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available.",
+      "Choose a fixed asset bundle, fund its trading pools, and earn the creator share of its swap fees.",
   },
   activity: {
     label: "Activity",
@@ -112,6 +169,7 @@ const routePresentations = {
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/swap")) return "swap";
   if (pathname.startsWith("/app/wallet")) return "wallet";
   if (pathname.startsWith("/app/faucet")) return "faucet";
   if (pathname.startsWith("/app/portal")) return "portal";
@@ -121,6 +179,9 @@ export function getDappRouteId(pathname: string): DappRouteId {
   if (pathname.startsWith("/app/positions")) return "positions";
   if (pathname.startsWith("/app/loans")) return "loans";
   if (pathname.startsWith("/app/rewards")) return "rewards";
+  // Ordered before the /app/genesis prefix, which would otherwise swallow it.
+  if (pathname.startsWith("/app/genesis/recoveries")) return "genesisRecoveries";
+  if (pathname.startsWith("/app/genesis")) return "genesis";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";
   if (pathname.startsWith("/app/tools")) return "tools";

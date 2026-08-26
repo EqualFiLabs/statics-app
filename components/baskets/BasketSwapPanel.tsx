@@ -18,26 +18,26 @@ import {
 
 import {
   canonicalSwapPoolKey,
-  buildSwapTokenApproval,
+  buildMaximumSwapTokenApproval,
   isCurrentCanonicalSwapQuote,
   SWAP_PERMIT_TTL_SECONDS,
   zeroForExactInput,
 } from "@/lib/baskets/swap";
+import { describeBasketError, minimumWithSlippage, type BasketRecord } from "@/lib/baskets/baskets";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
-  describeBasketError,
-  minimumWithSlippage,
-  parseSlippageBps,
-  type BasketRecord,
-} from "@/lib/baskets/baskets";
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
 import {
-  readClientDollarDeployment,
   verifyDollarDeployment,
   verifyLiquidityDeployment,
+  type DollarDeployment,
 } from "@/lib/dollar/deployment";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import {
+  MAX_ERC20_ALLOWANCE,
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
   hasUsablePermit2Allowance,
@@ -45,8 +45,8 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-
-const deploymentState = readClientDollarDeployment();
+import { applyPercent } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 function display(value: bigint, decimals: number): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -54,21 +54,26 @@ function display(value: bigint, decimals: number): string {
   return short ? `${whole}.${short}` : whole;
 }
 
-export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
+export function BasketSwapPanel({
+  basket,
+  deployment,
+}: {
+  basket: BasketRecord;
+  deployment: DollarDeployment;
+}) {
   const locale = useAppLocale();
   const t = useTranslations("baskets");
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
   const queryClient = useQueryClient();
+  const protocolSlippage = useProtocolSlippage();
+  const deploymentState = { status: "configured", deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [assetIndex, setAssetIndex] = useState(0);
   const [direction, setDirection] = useState<"asset-in" | "basket-in">("asset-in");
   const [amountInput, setAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const constituent = basket.constituents[assetIndex] ?? basket.constituents[0]!;
@@ -81,10 +86,15 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   } catch {
     amount = 0n;
   }
-  const slippageBps = parseSlippageBps(slippageInput);
+  const slippageBps = slippagePercentToBps(protocolSlippage);
 
   const pool = useQuery({
-    queryKey: ["canonical-swap-pool", basket.basketId.toString(), constituent.token.address],
+    queryKey: [
+      "canonical-swap-pool",
+      deployment.protocolCommit,
+      basket.basketId.toString(),
+      constituent.token.address,
+    ],
     enabled: Boolean(publicClient) && deploymentState.status === "configured",
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
@@ -118,6 +128,7 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
   const quote = useQuery({
     queryKey: [
       "canonical-swap-quote",
+      deployment.protocolCommit,
       basket.basketId.toString(),
       constituent.token.address,
       direction,
@@ -176,7 +187,13 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
       ? minimumWithSlippage(currentQuote.amountOut, slippageBps)
       : null;
   const permit2Approval = useQuery({
-    queryKey: ["canonical-swap-permit2-approval", wallet, inputToken.address, amount.toString()],
+    queryKey: [
+      "canonical-swap-permit2-approval",
+      deployment.protocolCommit,
+      wallet,
+      inputToken.address,
+      amount.toString(),
+    ],
     enabled:
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -256,9 +273,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
           chainId: deploymentState.deployment.chainId,
           kind: "approve-swap",
           label: `Enable ${inputToken.symbol} swaps`,
-          amount: `${display(amount, inputToken.decimals)} ${inputToken.symbol}`,
+          amount: `Maximum ${inputToken.symbol}`,
           to: inputToken.address,
-          data: buildSwapTokenApproval(liquidity.contracts.permit2, amount),
+          data: buildMaximumSwapTokenApproval(liquidity.contracts.permit2),
           sendTransaction: walletState.sendEvmTransaction,
           describeError: describeBasketError,
           verifyConfirmation: async () => {
@@ -268,7 +285,9 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
               functionName: "allowance",
               args: [wallet, liquidity.contracts.permit2],
             });
-            if (allowance < amount) throw new Error("The Permit2 allowance is still insufficient.");
+            if (allowance !== MAX_ERC20_ALLOWANCE) {
+              throw new Error("The confirmed Permit2 token approval is not maximum.");
+            }
           },
         });
         await permit2Approval.refetch();
@@ -478,20 +497,17 @@ export function BasketSwapPanel({ basket }: { basket: BasketRecord }) {
             symbol: inputToken.symbol,
           })}
         </small>
+        <AmountPercentageSlider
+          amount={amount}
+          maximum={inputBalance}
+          disabled={pending || inputBalance <= 0n}
+          label={t("amountShortcuts")}
+          onSelect={(percent) =>
+            setAmountInput(display(applyPercent(inputBalance, percent), inputToken.decimals))
+          }
+        />
       </label>
-      <label className="basket-field">
-        <span>{t("slippage")}</span>
-        <div>
-          <input
-            value={slippageInput}
-            onChange={(event) => setSlippageInput(event.target.value)}
-            inputMode="decimal"
-            disabled={pending}
-          />
-          <strong>%</strong>
-        </div>
-        <small>{t("slippageHelp")}</small>
-      </label>
+      <ProtocolSlippageControl />
       <div className="basket-quote">
         <span>{t("v4Quote")}</span>
         <strong>

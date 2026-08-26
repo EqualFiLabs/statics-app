@@ -25,18 +25,21 @@ import {
 } from "@statics-protocol/sdk";
 
 import {
-  DEFAULT_BASKET_SLIPPAGE_BPS,
   basketStatusLabel,
   deriveBasketActionAvailability,
   describeBasketError,
   loadBasketCatalog,
   maximumWithSlippage,
   minimumWithSlippage,
-  parseSlippageBps,
   validateBasketCollateralSimulation,
   validateBasketSimulation,
   type BasketRecord,
 } from "@/lib/baskets/baskets";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
+import {
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
 import {
   positionSelection,
   recommendedMintSelection,
@@ -45,10 +48,15 @@ import {
   type BasketConversionSelection,
 } from "@/lib/baskets/conversion-navigation";
 import { BasketSwapPanel } from "@/components/baskets/BasketSwapPanel";
+import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { loadPositionCatalog, unlockedCollateral } from "@/lib/positions/positions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -56,17 +64,13 @@ import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-
-const deploymentState = readClientDollarDeployment();
+import { applyPercent } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
   const shortFraction = fraction.slice(0, precision).replace(/0+$/, "");
   return shortFraction ? `${whole}.${shortFraction}` : whole;
-}
-
-function shortAddress(address: Address): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 function feeTierLabel(
@@ -97,11 +101,13 @@ export function BasketDetailPage({
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("singular")} />;
   return (
-    <BasketDetailRuntime
-      basketId={basketId}
-      initialAction={initialAction}
-      initialPositionId={initialPositionId}
-    />
+    <ProtocolActionScope>
+      <BasketDetailRuntime
+        basketId={basketId}
+        initialAction={initialAction}
+        initialPositionId={initialPositionId}
+      />
+    </ProtocolActionScope>
   );
 }
 
@@ -119,6 +125,9 @@ function BasketDetailRuntime({
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocolSlippage = useProtocolSlippage();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<"mint" | "redeem" | "swap">(initialAction);
@@ -126,9 +135,6 @@ function BasketDetailRuntime({
     null
   );
   const [amountInput, setAmountInput] = useState("");
-  const [slippageInput, setSlippageInput] = useState(
-    (DEFAULT_BASKET_SLIPPAGE_BPS / 100).toFixed(2)
-  );
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   let amount = 0n;
@@ -137,7 +143,7 @@ function BasketDetailRuntime({
   } catch {
     amount = 0n;
   }
-  const slippageBps = parseSlippageBps(slippageInput);
+  const slippageBps = slippagePercentToBps(protocolSlippage);
 
   const positions = useQuery({
     queryKey: protocolQueryKeys.positionCatalog(
@@ -147,6 +153,7 @@ function BasketDetailRuntime({
       wallet
     ),
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -167,7 +174,7 @@ function BasketDetailRuntime({
         : undefined,
       wallet
     ),
-    enabled: deploymentState.status === "configured" && Boolean(publicClient),
+    enabled: protocol.available && Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient || deploymentState.status !== "configured") {
         throw new Error("No verified Statics deployment is configured.");
@@ -214,6 +221,7 @@ function BasketDetailRuntime({
   const quote = useQuery({
     queryKey: ["basket-quote", basketId.toString(), mode, amount.toString()],
     enabled:
+      protocol.available &&
       Boolean(publicClient) &&
       deploymentState.status === "configured" &&
       Boolean(basket) &&
@@ -466,15 +474,6 @@ function BasketDetailRuntime({
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject={t("singular")}
-        empty={{ title: t("unavailable"), description: t("noData") }}
-      />
-    );
-  }
   if ((catalog.isPending || catalog.isError) && !catalog.data) {
     return (
       <SurfaceEmptyState
@@ -539,9 +538,12 @@ function BasketDetailRuntime({
             Basket #{basket.basketId.toString()} · {basketStatusLabel(basket.status)}
           </p>
           <h2>{basket.name}</h2>
-          <p>
-            {basket.symbol} · {shortAddress(basket.token.address)}
-          </p>
+          <p>{basket.symbol}</p>
+          <AddressDisplay
+            address={basket.token.address}
+            chainId={deploymentState.deployment.chainId}
+            label={basket.symbol}
+          />
         </div>
         <dl>
           <div>
@@ -554,7 +556,12 @@ function BasketDetailRuntime({
           </div>
           <div>
             <dt>{t("creator")}</dt>
-            <dd title={basket.creator}>{shortAddress(basket.creator)}</dd>
+            <dd>
+              <AddressDisplay
+                address={basket.creator}
+                chainId={deploymentState.deployment.chainId}
+              />
+            </dd>
           </div>
         </dl>
       </section>
@@ -575,9 +582,11 @@ function BasketDetailRuntime({
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <strong>{constituent.token.symbol}</strong>
-                  <small title={constituent.token.address}>
-                    {constituent.token.name} · {shortAddress(constituent.token.address)}
-                  </small>
+                  <small>{constituent.token.name}</small>
+                  <AddressDisplay
+                    address={constituent.token.address}
+                    chainId={deploymentState.deployment.chainId}
+                  />
                   {!constituent.token.metadataAvailable && (
                     <small className="is-warning">{t("metadataUnavailable")}</small>
                   )}
@@ -612,7 +621,7 @@ function BasketDetailRuntime({
             ))}
           </div>
           {mode === "swap" ? (
-            <BasketSwapPanel basket={basket} />
+            <BasketSwapPanel basket={basket} deployment={deploymentState.deployment} />
           ) : (
             <>
               <h3 id="basket-action-title">
@@ -630,24 +639,19 @@ function BasketDetailRuntime({
                   placeholder="0.00"
                   disabled={pending}
                 />
-              </label>
-              <label className="basket-field">
-                <span>{t("slippage")}</span>
-                <div>
-                  <input
-                    value={slippageInput}
-                    onChange={(event) => {
-                      setSlippageInput(event.target.value);
-                      setActionError(null);
-                    }}
-                    inputMode="decimal"
-                    aria-describedby="basket-slippage-help"
-                    disabled={pending}
+                {mode === "redeem" && (
+                  <AmountPercentageSlider
+                    amount={amount}
+                    maximum={sourceBalance}
+                    disabled={pending || sourceBalance <= 0n}
+                    label={t("amountShortcuts")}
+                    onSelect={(percent) =>
+                      setAmountInput(displayAmount(applyPercent(sourceBalance, percent), 18, 18))
+                    }
                   />
-                  <strong>%</strong>
-                </div>
-                <small id="basket-slippage-help">{t("slippageHelp")}</small>
+                )}
               </label>
+              <ProtocolSlippageControl />
               <label className="basket-field">
                 <span>{mode === "mint" ? t("receiveIn") : t("redeemFrom")}</span>
                 <select

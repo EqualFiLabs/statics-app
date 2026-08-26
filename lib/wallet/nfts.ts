@@ -45,6 +45,8 @@ export type WalletNft = Readonly<{
    * only case where transferring is a low-stakes action.
    */
   carries: readonly string[];
+  /** A consequence that does not prevent transfer but must be reviewed first. */
+  transferWarning?: string;
   /** Set when the token cannot be moved, with the reason. */
   blockedReason: string | null;
 }>;
@@ -84,7 +86,10 @@ export function describePositionNft(position: PositionRecord, diamond: Address):
           ? `${plural(position.unresolvedObligationCount, "unresolved obligation")}`
           : "Empty position",
     carries,
-    blockedReason: null,
+    blockedReason:
+      position.linkedGenesisId !== 0n
+        ? `Unlink Genesis #${position.linkedGenesisId.toString()} before transferring this PositionNFT.`
+        : null,
   };
 }
 

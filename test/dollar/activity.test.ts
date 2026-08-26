@@ -76,22 +76,22 @@ describe("Dollar activity storage", () => {
     getItem.mockRestore();
   });
 
-  it("retains legacy Dollar entries beside new protocol activity", () => {
-    window.localStorage.setItem(
-      `statics:dollar:activity:31337:${wallet.toLowerCase()}`,
-      JSON.stringify([activity({ id: "legacy", createdAt: 1 })])
-    );
+  it("isolates records for deployments that share a chain", () => {
     writeDollarActivity(
       activity({
         id: "basket",
+        deploymentId: "protocol-a",
         kind: "mint-basket",
         label: "Mint local basket",
         createdAt: 2,
       })
     );
-    expect(readDollarActivity(wallet, 31_337).map((entry) => entry.id)).toEqual([
+    writeDollarActivity(activity({ id: "other", deploymentId: "protocol-b", createdAt: 1 }));
+    expect(readDollarActivity(wallet, 31_337, "protocol-a").map((entry) => entry.id)).toEqual([
       "basket",
-      "legacy",
+    ]);
+    expect(readDollarActivity(wallet, 31_337, "protocol-b").map((entry) => entry.id)).toEqual([
+      "other",
     ]);
   });
 

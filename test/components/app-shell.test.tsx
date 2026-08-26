@@ -3,6 +3,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/app-shell/AppShell";
+import type { DeploymentOption } from "@/lib/deployments/types";
+import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
 import english from "@/messages/en.json";
 
@@ -41,6 +43,33 @@ describe("DApp wallet shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close ×" }));
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveFocus();
+  });
+  it("places Wallet in launch navigation and Add funds in the navbar", () => {
+    const descriptor = {
+      deploymentId: "launch-fixture",
+      label: "Operators launch",
+      network: "Robinhood Chain",
+      chainId: 4_663,
+      stage: "launch",
+      capabilities: [],
+      available: true,
+    } as const;
+    const active = {
+      networkId: "robinhood",
+      descriptor,
+      launch: null,
+      protocol: null,
+    } satisfies DeploymentOption;
+    renderWithWallet(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <AppShell>Overview</AppShell>
+      </DeploymentContext.Provider>
+    );
+
+    expect(
+      within(screen.getByLabelText("DApp navigation")).getByRole("link", { name: "Wallet" })
+    ).toHaveAttribute("href", "/app/wallet");
+    expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
   });
 
   it("offers independent Privy sign-in and external wallet connection", () => {
@@ -178,7 +207,7 @@ describe("DApp wallet shell", () => {
     expect(screen.queryByRole("button", { name: "Copy Solana address" })).not.toBeInTheDocument();
   });
 
-  it("explains the mismatch and names the chain the wallet is actually on", () => {
+  it("explains a mismatch while keeping the selected Statics network visible", () => {
     renderWithWallet(<AppShell>Overview</AppShell>, {
       status: "ready",
       authenticated: true,
@@ -192,9 +221,9 @@ describe("DApp wallet shell", () => {
     expect(screen.getByText(/wrong network/i)).toBeInTheDocument();
     expect(screen.getByText(/switch to Anvil/i)).toBeInTheDocument();
     expect(screen.getByText(/chain 31337/i)).toBeInTheDocument();
-    // The indicator reports the id, because the context carries no name for
-    // whichever chain the wallet actually sits on.
-    expect(screen.getByText("Chain 1")).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveValue(
+      "robinhood-testnet"
+    );
   });
 
   it("names the network and offers no switch once the wallet is on target", () => {
@@ -208,8 +237,9 @@ describe("DApp wallet shell", () => {
       isTargetChain: true,
     });
 
-    // Scoped to the indicator so this cannot pass on some other mention.
-    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveDisplayValue(
+      "Robinhood Chain Testnet"
+    );
     expect(screen.queryByRole("button", { name: "Switch network" })).not.toBeInTheDocument();
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
   });
@@ -221,8 +251,20 @@ describe("DApp wallet shell", () => {
       targetChainId: 31_337,
     });
 
-    expect(document.querySelector(".dapp-network")).toHaveTextContent("Anvil");
+    expect(screen.getAllByRole("combobox", { name: "Statics network" })[0]).toHaveDisplayValue(
+      "Robinhood Chain Testnet"
+    );
     expect(screen.queryByText(/wrong network/i)).not.toBeInTheDocument();
+  });
+
+  it("uses the network selector to switch the application and wallet together", () => {
+    const selectNetwork = vi.fn().mockResolvedValue(undefined);
+    renderWithWallet(<AppShell>Overview</AppShell>, { selectNetwork });
+
+    fireEvent.change(screen.getAllByRole("combobox", { name: "Statics network" })[0], {
+      target: { value: "robinhood" },
+    });
+    expect(selectNetwork).toHaveBeenCalledWith("robinhood");
   });
 
   it("exports embedded wallets from the account dialog", () => {

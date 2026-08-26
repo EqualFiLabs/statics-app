@@ -10,16 +10,18 @@ import { useTranslations } from "next-intl";
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk";
 
 import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describePositionError, loadPositionCatalog } from "@/lib/positions/positions";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
-
-const deploymentState = readClientDollarDeployment();
 
 function displayAmount(value: bigint, decimals = 18): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -31,7 +33,11 @@ export function PositionListPage() {
   const t = useTranslations("positions");
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
-  return <PositionListRuntime />;
+  return (
+    <ProtocolActionScope>
+      <PositionListRuntime />
+    </ProtocolActionScope>
+  );
 }
 
 function PositionListRuntime() {
@@ -39,6 +45,8 @@ function PositionListRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [pending, setPending] = useState(false);
@@ -51,6 +59,7 @@ function PositionListRuntime() {
       wallet
     ),
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -112,16 +121,6 @@ function PositionListRuntime() {
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject={t("subject")}
-        empty={{ title: t("emptyTitle"), description: t("emptyDescription") }}
-      />
-    );
-  }
-
   const surfaceState = deriveSurfaceState({
     walletStatus: walletState.status,
     isTargetChain: walletState.isTargetChain,
@@ -164,7 +163,7 @@ function PositionListRuntime() {
           className="dollar-submit"
           type="button"
           onClick={primaryAction ?? undefined}
-          disabled={pending || primaryAction === null}
+          disabled={!protocol.available || pending || primaryAction === null}
         >
           {pending ? t("creatingPosition") : primaryLabel}
         </button>
@@ -183,7 +182,7 @@ function PositionListRuntime() {
       )}
       {!catalog.data || !isSurfaceReady(surfaceState) ? (
         <SurfaceEmptyState
-          state={surfaceState}
+          state={protocol.available ? surfaceState : "empty"}
           subject={t("subject")}
           onRetry={() => void catalog.refetch()}
           empty={{

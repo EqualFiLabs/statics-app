@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./genesis-credit": {
+      "types": "./dist/genesis-credit.d.ts",
+      "import": "./dist/genesis-credit.js"
     }
   },
   "peerDependencies": {

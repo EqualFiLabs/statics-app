@@ -59,9 +59,6 @@ test.describe("landing foundation", () => {
       .first()
       .click();
     await expect(page).toHaveURL(/\/app$/);
-    // Matches the overview title from lib/dapp-navigation.ts. Its exact wording
-    // is guarded by test/foundation/route-copy.test.ts; this only asserts that
-    // the destination rendered.
     await expect(page.getByRole("heading", { name: "Your portfolio", level: 1 })).toBeVisible();
   });
 
@@ -116,6 +113,10 @@ test.describe("Dollar DApp foundation", () => {
     await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
     await page.keyboard.press("Escape");
 
+    await navigateDapp(page, "/app/swap");
+    await expect(page).toHaveURL(/\/app\/swap$/);
+    await expect(page.getByRole("heading", { name: "Launch market not deployed" })).toBeVisible();
+
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
 
@@ -124,9 +125,7 @@ test.describe("Dollar DApp foundation", () => {
     await page.goto("/app/baskets/0");
     await expect(page).toHaveURL(/\/app\/baskets\/0$/);
     await page.goto("/app/create");
-    await expect(
-      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
 
     await navigateDapp(page, "/app/positions");
     await expect(page).toHaveURL(/\/app\/positions$/);
@@ -138,6 +137,12 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/rewards");
     await expect(page).toHaveURL(/\/app\/rewards$/);
+
+    await navigateDapp(page, "/app/genesis");
+    await expect(page).toHaveURL(/\/app\/genesis$/);
+
+    await page.goto("/app/genesis-rewards");
+    await expect(page).toHaveURL(/\/app\/genesis$/);
 
     await navigateDapp(page, "/app/liquidity");
     await expect(page).toHaveURL(/\/app\/liquidity$/);
@@ -167,6 +172,19 @@ test.describe("Dollar DApp foundation", () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#dapp-navigation-panel")).toBeVisible();
+    const panelBox = await page.locator("#dapp-navigation-panel").boundingBox();
+    const viewport = page.viewportSize();
+    expect(panelBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (panelBox && viewport) {
+      expect(panelBox.x).toBeLessThanOrEqual(1);
+      expect(panelBox.y).toBeLessThanOrEqual(1);
+      expect(panelBox.width).toBeGreaterThanOrEqual(viewport.width - 1);
+      expect(panelBox.height).toBeGreaterThanOrEqual(viewport.height - 1);
+    }
+    await expect(
+      page.locator("#dapp-navigation-panel").getByRole("combobox", { name: "Statics network" })
+    ).toBeVisible();
     await expect(page.locator('.dapp-nav-item[href="/app"]')).toBeFocused();
 
     await page.keyboard.press("Escape");
@@ -183,17 +201,47 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("keeps governed basket creation informational", async ({ page }) => {
+  test("keeps basket creation navigable and wallet-gated", async ({ page }) => {
     await page.goto("/app/create");
 
-    await expect(
-      page.getByRole("heading", { name: "Basket launches are steward-controlled" })
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /create basket/i })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Browse baskets" })).toHaveAttribute(
-      "href",
-      "/app/baskets"
-    );
+    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
+  });
+
+  test("uses the network selector for public and local targets", async ({ page }) => {
+    await page.goto("/app/positions");
+    const selector = page.getByRole("combobox", { name: "Statics network" });
+
+    await expect(selector).toHaveValue("robinhood-testnet");
+    await expect(selector.locator("option")).toHaveText([
+      "Local Anvil",
+      "Robinhood Chain",
+      "Robinhood Chain Testnet",
+    ]);
+    await selector.selectOption("robinhood");
+    await expect(selector).toHaveValue("robinhood");
+    await expect(page.getByRole("heading", { name: "Your Position NFTs" })).toBeVisible();
+    await expect(page.locator(".protocol-action-scope")).toHaveAttribute("aria-disabled", "true");
+
+    await selector.selectOption("anvil");
+    await expect(selector).toHaveValue("anvil");
+
+    await selector.selectOption("robinhood-testnet");
+    await expect(selector).toHaveValue("robinhood-testnet");
+  });
+
+  test("keeps desktop navbar controls aligned to the right", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "Desktop navbar layout assertion");
+    await page.goto("/app");
+
+    const header = await page.locator(".dapp-header").boundingBox();
+    const actions = await page.locator(".dapp-header-actions").boundingBox();
+    expect(header).not.toBeNull();
+    expect(actions).not.toBeNull();
+    if (!header || !actions) return;
+
+    await expect(page.locator(".dapp-header-actions")).toHaveCSS("justify-self", "end");
+    expect(header.x + header.width - (actions.x + actions.width)).toBeLessThan(50);
   });
 
   test("keeps the basket route responsive and accessible", async ({ page }) => {
@@ -223,6 +271,7 @@ test.describe("Dollar DApp foundation", () => {
       "/app/positions/1042",
       "/app/loans",
       "/app/rewards",
+      "/app/genesis",
       "/app/liquidity",
       "/app/faucet",
       "/app/tools",

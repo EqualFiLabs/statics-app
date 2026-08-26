@@ -52,6 +52,7 @@ export type PositionRecord = Readonly<{
   closable: boolean;
   collateral: readonly PositionCollateral[];
   stakedBalance: bigint;
+  linkedGenesisId: bigint;
   claimAssetCount: bigint;
   selectedRewardAssets: readonly Address[];
   rewards: readonly PositionReward[];
@@ -108,39 +109,47 @@ async function readOwnedPosition(
   baskets: readonly BasketRecord[],
   blockNumber: bigint
 ): Promise<PositionRecord> {
-  const [state, closable, stake, selectedRewardAssets, portfolio] = await Promise.all([
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "positionState",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "isPositionClosable",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      account: wallet,
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "stakePosition",
-      args: [positionId],
-      blockNumber,
-    }),
-    publicClient.readContract({
-      account: wallet,
-      address: deployment.contracts.diamond,
-      abi: staticsAbi,
-      functionName: "positionRewardAssets",
-      args: [positionId],
-      blockNumber,
-    }),
-    loadPositionPortfolio(publicClient, deployment.contracts.diamond, positionId, blockNumber),
-  ]);
+  const [state, closable, stake, selectedRewardAssets, linkedGenesisId, portfolio] =
+    await Promise.all([
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "positionState",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "isPositionClosable",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        account: wallet,
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "stakePosition",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        account: wallet,
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "positionRewardAssets",
+        args: [positionId],
+        blockNumber,
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "linkedGenesis",
+        args: [positionId],
+        blockNumber,
+      }),
+      loadPositionPortfolio(publicClient, deployment.contracts.diamond, positionId, blockNumber),
+    ]);
   if (!state.exists) {
     throw new Error(`Position #${positionId.toString()} disappeared from the owner index.`);
   }
@@ -196,6 +205,7 @@ async function readOwnedPosition(
     closable,
     collateral: collateral.filter((item): item is PositionCollateral => item !== null),
     stakedBalance: stake.stakedBalance,
+    linkedGenesisId,
     claimAssetCount: stake.claimAssetCount,
     selectedRewardAssets: normalizedSelectedRewardAssets,
     rewards: rewardMetadata.map((token, index) => ({
@@ -359,13 +369,13 @@ export async function loadPositionCatalog(
  * Reloads the complete position catalog at the transaction's confirmed block
  * and rejects until the requested reward membership is authoritative there.
  */
-export async function loadConfirmedRewardSelection(
+export async function loadConfirmedRewardSelections(
   publicClient: PublicClient,
   deployment: DollarDeployment,
   wallet: Address,
   positionId: bigint,
-  asset: Address,
-  expectedSelected: boolean,
+  expectedSelected: readonly Address[],
+  expectedUnselected: readonly Address[],
   blockNumber: bigint
 ): Promise<PositionCatalog> {
   const catalog = await loadPositionCatalog(publicClient, deployment, wallet, blockNumber);
@@ -373,8 +383,11 @@ export async function loadConfirmedRewardSelection(
   if (!position) {
     throw new Error("This PositionNFT is no longer owned by the connected wallet.");
   }
-  if (position.selectedRewardAssets.includes(asset) !== expectedSelected) {
-    throw new Error("The confirmed reward selection is not yet available from the read RPC.");
+  const selected = new Set(position.selectedRewardAssets.map((asset) => getAddress(asset)));
+  const missingSelection = expectedSelected.some((asset) => !selected.has(getAddress(asset)));
+  const retainedSelection = expectedUnselected.some((asset) => selected.has(getAddress(asset)));
+  if (missingSelection || retainedSelection) {
+    throw new Error("The confirmed reward selections are not yet available from the read RPC.");
   }
   return catalog;
 }

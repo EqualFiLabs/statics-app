@@ -1,4 +1,4 @@
-import { encodeAbiParameters, encodeFunctionData, parseAbi, parseAbiParameters, toHex, } from "viem";
+import { encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, toHex, } from "viem";
 export { robinhoodChain } from "./generated/robinhoodChain.js";
 export const BPS = 10000n;
 export const SHARE_SCALE = 10n ** 18n;
@@ -12,10 +12,189 @@ export const Q192 = 1n << 192n;
 export const MAX_UINT256 = (1n << 256n) - 1n;
 export const MIN_TICK = -887_272;
 export const MAX_TICK = 887_272;
+export const STATICS_MAX_SUPPLY = 1000000000n * 10n ** 18n;
+export const STATICS_TREASURY_ALLOCATION = 200000000n * 10n ** 18n;
+export const STATICS_DOPPLER_INVENTORY = 800000000n * 10n ** 18n;
+export const DOPPLER_OWNER_FEE_SHARE = 5n * 10n ** 16n;
+export const STATICS_FEE_RECEIVER_SHARE = 95n * 10n ** 16n;
+export const GENESIS_COLLECTION_SIZE = 5555n;
+export const GENESIS_VAULT_PRICE = 180018n * 10n ** 18n;
+export const GENESIS_FULL_BACKING = GENESIS_COLLECTION_SIZE * GENESIS_VAULT_PRICE;
+export const GENESIS_SUPPLY_RESIDUAL = STATICS_MAX_SUPPLY - GENESIS_FULL_BACKING;
+export const DOPPLER_GENESIS_FIXTURE = {
+    productionApproved: false,
+    sdkRevision: "daa12c19d849f41ec5126168055935b143948c54",
+    contractsRevision: "86a5200456b148c156d2eb81a893747dd601c3ca",
+    tickSpacing: 100,
+    farTick: -83_100,
+    curves: [
+        { name: "low", tickLower: -887_200, tickUpper: -142_200, numPositions: 11, shareWad: 500000000000000000n, staticsAmount: 400000000n * 10n ** 18n },
+        { name: "medium", tickLower: -222_200, tickUpper: -116_300, numPositions: 11, shareWad: 250000000000000000n, staticsAmount: 200000000n * 10n ** 18n },
+        { name: "high", tickLower: -176_200, tickUpper: -84_100, numPositions: 11, shareWad: 240000000000000000n, staticsAmount: 192000000n * 10n ** 18n },
+        { name: "filler", tickLower: -84_100, tickUpper: -83_000, numPositions: 11, shareWad: 10000000000000000n, staticsAmount: 8000000n * 10n ** 18n },
+    ],
+};
+export const dopplerGenesisModules = {
+    4_663: {
+        airlock: "0xeB7c034704eF8dCd2d32324C1545f62fb4aD0862",
+        tokenFactory: "0x1B37D3a72082029c44b35B604eA473617580b69A",
+        governanceFactory: "0xDB036746d65dD52126b1915F1Adf555E6C5237Cf",
+        poolInitializer: "0x4E3468951D49f2eeA976ed0d6e75FfCB44a9a544",
+        noOpMigrator: "0xBA2F330EDb16CD8056F5988D8CE19bBc63475a0E",
+    },
+    84_532: {
+        airlock: "0x3411306cE66c9469BFf1535BA955503c4BDE1C6E",
+        tokenFactory: "0x89C261c05B5F9B6bCbA07C199B8DeE7CFaD45292",
+        governanceFactory: "0x0902e7C7207dF8ED6303aef4382bCAb181B5fbfA",
+        poolInitializer: "0xBDF938149aC6a781f94FaA0eD45E6A0E984c6544",
+        noOpMigrator: "0xF11066ABBd329aC4BbA39455340539322C222EB0",
+    },
+};
+export function getDopplerGenesisModules(chainId) {
+    const modules = dopplerGenesisModules[chainId];
+    if (!modules)
+        throw new Error(`unsupported Doppler Genesis chain: ${chainId}`);
+    return modules;
+}
+export const staticsGenesisAbi = parseAbi([
+    "function COLLECTION_SIZE() view returns (uint256)",
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function mintedSupply() view returns (uint256)",
+    "function vault() view returns (address)",
+    "function activationRegistry() view returns (address)",
+    "function protocol() view returns (address)",
+    "function launchFinalized() view returns (bool)",
+    "function contractURI() view returns (string)",
+    "function externalURLBase() view returns (string)",
+    "function owner() view returns (address)",
+    "function pendingOwner() view returns (address)",
+    "function ownerOf(uint256 tokenId) view returns (address)",
+    "function balanceOf(address owner) view returns (uint256)",
+    "function getApproved(uint256 tokenId) view returns (address)",
+    "function isApprovedForAll(address owner, address operator) view returns (bool)",
+    "function approve(address to, uint256 tokenId)",
+    "function setApprovalForAll(address operator, bool approved)",
+    "function transferFrom(address from, address to, uint256 tokenId)",
+    "function safeTransferFrom(address from, address to, uint256 tokenId)",
+    "function safeTransferFrom(address from, address to, uint256 tokenId, bytes data)",
+    "function tokenURI(uint256 tokenId) view returns (string)",
+    "function locked(uint256 genesisId) view returns (bool)",
+    "function royaltyInfo(uint256 tokenId, uint256 salePrice) view returns (address receiver, uint256 royaltyAmount)",
+    "function getTransferValidator() view returns (address validator)",
+    "function getTransferValidationFunction() pure returns (bytes4 functionSignature, bool isViewFunction)",
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+    "event ConsecutiveTransfer(uint256 indexed fromTokenId,uint256 toTokenId,address indexed fromAddress,address indexed toAddress)",
+    "event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)",
+    "event ApprovalForAll(address indexed owner, address indexed operator, bool approved)",
+    "event ProtocolBound(address indexed protocol)",
+    "event MetadataUpdate(uint256 _tokenId)",
+    "event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId)",
+    "event Locked(uint256 tokenId)",
+    "event Unlocked(uint256 tokenId)",
+]);
+export const staticsGenesisVaultAbi = parseAbi([
+    "function statics() view returns (address)",
+    "function genesis() view returns (address)",
+    "function finalized() view returns (bool)",
+    "function buyGenesis(uint256 tokenId, address receiver) payable",
+    "function redeemGenesis(uint256 tokenId, address receiver)",
+    "function quoteGenesisPurchase() view returns (uint256 staticsPrice, uint256 nativeFee)",
+    "function vaultPrice() view returns (uint256)",
+    "function nativeAcquisitionFee() view returns (uint256)",
+    "function nativeFeeRecipient() view returns (address)",
+    "function claimableNativeFees(address recipient) view returns (uint256)",
+    "function totalNativeFeeLiability() view returns (uint256)",
+    "function circulatingGenesis() view returns (uint256)",
+    "function vaultInventory() view returns (uint256)",
+    "function requiredBacking() view returns (uint256)",
+    "function isVaultInventory(uint256 tokenId) view returns (bool)",
+    "function vaultAccounting() view returns ((uint256 vaultPrice, uint256 maximumSupply, uint256 mintedSupply, uint256 vaultInventory, uint256 circulatingGenesis, uint256 tokenBacking, uint256 requiredBacking, uint256 tokenCustody) accounting)",
+    "event GenesisPurchased(address indexed payer, address indexed receiver, uint256 indexed tokenId, uint256 staticsPrice, uint256 nativeFee)",
+    "event GenesisRedeemed(address indexed owner, address indexed receiver, uint256 indexed tokenId, uint256 price)",
+]);
+export const genesisActivationRegistryAbi = parseAbi([
+    "function statics() view returns (address)",
+    "function genesisCollection() view returns (address)",
+    "function tierOf(uint256 genesisId) view returns (uint8)",
+    "function multiplierBps(uint256 genesisId) view returns (uint16)",
+    "function tierCost(uint8 tier) view returns (uint256)",
+    "function activeConsumer() view returns (address)",
+    "function pendingConsumer() view returns (address)",
+    "function activate(uint256 genesisId, uint8 targetTier) returns (uint256 burned)",
+    "event GenesisActivated(uint256 indexed genesisId, uint8 previousTier, uint8 newTier, uint256 staticsBurned)",
+    "event GenesisActivationReset(uint256 indexed genesisId, address indexed previousOwner, address indexed nextOwner)",
+    "event TierCostUpdated(uint8 indexed tier, uint256 previousCost, uint256 newCost)",
+]);
+export const staticsFeeReceiverAbi = parseAbi([
+    "function statics() view returns (address)",
+    "function numeraire() view returns (address)",
+    "function poolInitializer() view returns (address)",
+    "function poolId() view returns (bytes32)",
+    "function activeDistributor() view returns (address)",
+    "function pendingDistributor() view returns (address)",
+    "function cumulativeHarvested(address asset) view returns (uint256)",
+    "function cumulativeDistributorAttributed(address distributor, address asset) view returns (uint256)",
+    "function distributorClaimable(address distributor, address asset) view returns (uint256)",
+    "function totalDistributorLiability(address asset) view returns (uint256)",
+    "function harvest() returns (uint256 staticsAmount, uint256 numeraireAmount)",
+    "function claimDistributorFees(address asset, address receiver) returns (uint256 amount)",
+    "event MarketBound(address indexed statics, address indexed numeraire, bytes32 indexed poolId)",
+    "event FeesHarvested(address indexed distributor, address indexed asset, uint256 amount, uint256 cumulativeAmount)",
+    "event DistributorProposed(address indexed currentDistributor, address indexed pendingDistributor)",
+    "event DistributorAccepted(address indexed previousDistributor, address indexed newDistributor)",
+]);
+export const genesisLaunchDistributorAbi = parseAbi([
+    "function feeReceiver() view returns (address)",
+    "function genesis() view returns (address)",
+    "function activationRegistry() view returns (address)",
+    "function statics() view returns (address)",
+    "function numeraire() view returns (address)",
+    "function vault() view returns (address)",
+    "function treasury() view returns (address)",
+    "function registerGenesis(uint256 genesisId)",
+    "function accrue() returns (uint256 staticsAmount, uint256 numeraireAmount)",
+    "function claimGenesis(uint256 genesisId, address asset, address receiver) returns (uint256 amount)",
+    "function claimOwnerRewards(address asset, address receiver) returns (uint256 amount)",
+    "function pendingGenesis(uint256 genesisId, address asset) view returns (uint256 amount)",
+    "function registered(uint256 genesisId) view returns (bool)",
+    "function effectiveWeight(uint256 genesisId) view returns (uint256)",
+    "function ownerClaimable(address owner, address asset) view returns (uint256)",
+    "function genesisRewardShareBps() view returns (uint16)",
+    "function totalWeight() view returns (uint256)",
+    "function finalized() view returns (bool)",
+    "function indexedReceiverAttribution(address asset) view returns (uint256)",
+    "function rewardBook(address asset) view returns ((uint256 indexRay, uint256 indexRemainder, uint256 indexedAmount, uint256 crystallizedAmount, uint256 totalClaimable, uint256 totalClaimed, uint256 treasuryClaimable) book)",
+    "event GenesisRegistered(uint256 indexed genesisId, uint256 weight, uint256 totalWeight)",
+    "event GenesisWeightChanged(uint256 indexed genesisId, uint256 previousWeight, uint256 newWeight, uint256 totalWeight)",
+    "event RevenueAccrued(address indexed asset, uint256 amount, uint256 genesisAmount, uint256 treasuryAmount, uint256 indexRay)",
+    "event GenesisRewardsClaimed(uint256 indexed genesisId, address indexed owner, address indexed asset, address receiver, uint256 amount)",
+    "event OwnerRewardsClaimed(address indexed owner, address indexed asset, address indexed receiver, uint256 amount)",
+]);
+export const dopplerStaticsTokenAbi = parseAbi([
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function totalSupply() view returns (uint256)",
+    "function balanceOf(address account) view returns (uint256)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+    "function transferFrom(address from, address to, uint256 amount) returns (bool)",
+    "function nonces(address owner) view returns (uint256)",
+    "function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)",
+    "function burn(uint256 amount)",
+    "function tokenURI() view returns (string)",
+]);
 export const BasketStatus = {
     Active: 0,
     Quarantined: 1,
     ExitOnly: 2,
+};
+export const ProtocolPoolKind = {
+    None: 0,
+    BasketCanonical: 1,
+    Governance: 2,
 };
 export function mulDivDown(value, multiplier, denominator) {
     if (denominator === 0n)
@@ -51,44 +230,68 @@ export function encodeSqrtPriceAssetPerBasketX96(assetAmountRaw, basketAmountRaw
     }
     return sqrtPriceX96;
 }
+export function encodeSqrtPriceBPerAX96(tokenBAmountRaw, tokenAAmountRaw) {
+    return encodeSqrtPriceAssetPerBasketX96(tokenBAmountRaw, tokenAAmountRaw);
+}
 export function quoteHookFee(realizedAmount, hookFeeBps) {
     if (realizedAmount < 0n || hookFeeBps < 0n || hookFeeBps > BPS)
         throw new Error("invalid hook fee input");
     return mulDivUp(realizedAmount, hookFeeBps, BPS);
 }
 export function splitSwapFee(chargedAmount, configuration, liquidityProvidersEligible, basketStakersEligible, staticsStakersEligible) {
-    const shareTotal = configuration.polShareBps + configuration.liquidityProviderShareBps
+    const shareTotal = configuration.lockedLiquidityShareBps + configuration.liquidityProviderShareBps
         + configuration.basketStakerShareBps + configuration.staticsStakerShareBps
+        + configuration.stonkBrokersShareBps + configuration.indexCreatorShareBps
         + configuration.treasuryShareBps;
     if (chargedAmount < 0n
         || configuration.inputFeeBps < 0n
         || configuration.outputFeeBps < 0n
         || configuration.inputFeeBps + configuration.outputFeeBps > 200n
-        || configuration.polShareBps < 0n
+        || configuration.lockedLiquidityShareBps < 0n
         || configuration.liquidityProviderShareBps < 0n
         || configuration.basketStakerShareBps < 0n
         || configuration.staticsStakerShareBps < 0n
+        || configuration.stonkBrokersShareBps < 0n
+        || configuration.indexCreatorShareBps < 0n
         || configuration.treasuryShareBps < 0n
         || shareTotal !== BPS)
         throw new Error("invalid swap fee split");
-    let polAmount = mulDivDown(chargedAmount, configuration.polShareBps, BPS);
+    let lockedLiquidityAmount = mulDivDown(chargedAmount, configuration.lockedLiquidityShareBps, BPS);
     let liquidityProviderAmount = mulDivDown(chargedAmount, configuration.liquidityProviderShareBps, BPS);
     let basketStakerAmount = mulDivDown(chargedAmount, configuration.basketStakerShareBps, BPS);
     let staticsStakerAmount = mulDivDown(chargedAmount, configuration.staticsStakerShareBps, BPS);
-    const treasuryAmount = chargedAmount - polAmount - liquidityProviderAmount - basketStakerAmount - staticsStakerAmount;
+    const stonkBrokersAmount = mulDivDown(chargedAmount, configuration.stonkBrokersShareBps, BPS);
+    const indexCreatorAmount = mulDivDown(chargedAmount, configuration.indexCreatorShareBps, BPS);
+    const treasuryAmount = chargedAmount - lockedLiquidityAmount - liquidityProviderAmount - basketStakerAmount - staticsStakerAmount
+        - stonkBrokersAmount - indexCreatorAmount;
     if (!liquidityProvidersEligible) {
-        polAmount += liquidityProviderAmount;
+        lockedLiquidityAmount += liquidityProviderAmount;
         liquidityProviderAmount = 0n;
     }
     if (!basketStakersEligible) {
-        polAmount += basketStakerAmount;
+        lockedLiquidityAmount += basketStakerAmount;
         basketStakerAmount = 0n;
     }
     if (!staticsStakersEligible) {
-        polAmount += staticsStakerAmount;
-        staticsStakerAmount = 0n;
+        return {
+            lockedLiquidityAmount,
+            liquidityProviderAmount,
+            basketStakerAmount,
+            staticsStakerAmount: 0n,
+            stonkBrokersAmount,
+            indexCreatorAmount,
+            treasuryAmount: treasuryAmount + staticsStakerAmount,
+        };
     }
-    return { polAmount, liquidityProviderAmount, basketStakerAmount, staticsStakerAmount, treasuryAmount };
+    return {
+        lockedLiquidityAmount,
+        liquidityProviderAmount,
+        basketStakerAmount,
+        staticsStakerAmount,
+        stonkBrokersAmount,
+        indexCreatorAmount,
+        treasuryAmount,
+    };
 }
 export function effectiveCanonicalFees(lpFeePips, inputFeeBps, outputFeeBps) {
     if (lpFeePips < 0n || lpFeePips % 100n !== 0n)
@@ -415,16 +618,36 @@ export const staticsAbi = parseAbi([
     "function distributeTreasuryFees(address asset) returns (uint256 amount)",
     "function pendingRewards(uint256 positionId,address[] assets) view returns (uint256[] amounts)",
     "function stakePosition(uint256 positionId) view returns ((uint256 stakedBalance,uint256 claimAssetCount,uint256 optedInAssetCount) position)",
-    "function rewardAsset(address asset) view returns ((uint256 eligibleStake,uint256 pendingStake,uint256 indexRay,uint256 indexedReserve,uint256 totalClaimable) state)",
+    "function rewardAsset(address asset) view returns ((uint256 actualEligibleStake,uint256 actualPendingStake,uint256 effectiveEligibleWeight,uint256 effectivePendingWeight,uint256 indexRay,uint256 indexRemainder,uint256 indexedReserve,uint256 totalClaimable) state)",
     "function positionRewardAssets(uint256 positionId) view returns (address[] assets)",
     "function isRewardAssetOptedIn(uint256 positionId,address asset) view returns (bool)",
-    "function rewardSelection(uint256 positionId,address asset) view returns ((bool selected,uint256 eligibleStake,uint256 pendingStake,uint40 eligibleAt) selection)",
+    "function rewardSelection(uint256 positionId,address asset) view returns ((bool selected,uint256 actualEligibleStake,uint256 actualPendingStake,uint256 effectiveEligibleWeight,uint256 effectivePendingWeight,uint40 eligibleAt) selection)",
     "function maxRewardAssetsPerPosition() pure returns (uint256)",
     "function rewardEligibilityDelay() pure returns (uint256)",
     "function rewardEligibilityBucketSize() pure returns (uint256)",
     "function stakingToken() view returns (address)",
     "function totalStaked() view returns (uint256)",
     "function treasuryAccrued(address asset) view returns (uint256)",
+    "function canAccrueStakerRewards(address asset) view returns (bool)",
+    "function checkpointRewardAssets(address[] assets)",
+    "function rewardBookNeedsCheckpoint(address asset) view returns (bool)",
+    "function genesisCollection() view returns (address)",
+    "function genesisState(uint256 genesisId) view returns ((uint8 tier,uint16 multiplierBps,uint256 linkedPositionId) state)",
+    "function genesisTier(uint256 genesisId) view returns (uint8)",
+    "function genesisActivationCost(uint8 tier) view returns (uint256)",
+    "function linkedPosition(uint256 genesisId) view returns (uint256)",
+    "function linkedGenesis(uint256 positionId) view returns (uint256)",
+    "function positionRewardMultiplierBps(uint256 positionId) view returns (uint16)",
+    "function linkGenesis(uint256 genesisId,uint256 positionId)",
+    "function unlinkGenesis(uint256 genesisId)",
+    "function activateGenesis(uint256 genesisId,uint8 targetTier,uint256 maxBurn)",
+    "function creatorRewardCredit(address creator,address asset) view returns (uint256)",
+    "function partnerAccrued(address recipient,address asset) view returns (uint256)",
+    "function partnerRecipient() view returns (address)",
+    "function partnerDistributionTipBps() view returns (uint16)",
+    "function protocolRevenueLiabilities(address asset) view returns (uint256 creator,uint256 partner)",
+    "function claimCreatorRevenue(address asset,address receiver,uint256 minReceived) returns (uint256 received)",
+    "function distributePartnerRevenue(address recipient,address asset) returns (uint256 distributed,uint256 tip)",
     "function borrow(uint256 positionId,uint256 basketId,uint256 sharesIn,address receiver) returns (uint256 loanId,uint256[] principals)",
     "function repay(uint256 loanId)",
     "function extend(uint256 loanId,uint256[] grossAmountsIn) returns (uint256[] receivedAmounts)",
@@ -446,8 +669,6 @@ export const staticsAbi = parseAbi([
     "function createPosition(address receiver) payable returns (uint256 positionId)",
     "function positionCreationFee() view returns (uint256 amount)",
     "function setPositionCreationFee(uint256 amount)",
-    "function positionRenderer() view returns (address renderer)",
-    "function setPositionRenderer(address newRenderer)",
     "function closePosition(uint256 positionId)",
     "function nextPositionId() view returns (uint256)",
     "function activeLegCount(uint256 positionId) view returns (uint256)",
@@ -492,13 +713,22 @@ export const staticsAbi = parseAbi([
     "function claimPeggedProtocolRevenue(uint256 profileId,uint256 amount,address receiver) returns (uint256 spent,uint256 received)",
     "function installCanonicalPoolIntegration(address poolManager,address hook)",
     "function canonicalPool(uint256 basketId,address asset) view returns ((bytes32 poolId,address basketToken,address asset,address currency0,address currency1,address hook,uint24 lpFee,int24 tickSpacing,int24 spotTick) pool)",
+    "function quoteGovernancePool((address tokenA,address tokenB,uint160 sqrtPriceBPerAX96,uint256 amountAMax,uint256 amountBMax,uint128 minLiquidity,address payer,uint256 deadline) params) view returns ((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,bytes32 poolId,uint160 sqrtPriceX96,uint128 liquidity,uint256 amountA,uint256 amountB)",
+    "function createGovernancePool((address tokenA,address tokenB,uint160 sqrtPriceBPerAX96,uint256 amountAMax,uint256 amountBMax,uint128 minLiquidity,address payer,uint256 deadline) params) returns (bytes32 poolId,uint128 liquidity,uint256 amountA,uint256 amountB)",
+    "function setProtocolPoolFeeConfiguration(bytes32 poolId,(uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
+    "function clearProtocolPoolFeeConfiguration(bytes32 poolId)",
+    "function protocolPoolFeeConfiguration(bytes32 poolId) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps,bool overridden) configuration)",
+    "function decommissionGovernancePool(bytes32 poolId) returns (uint256 amount0,uint256 amount1)",
+    "function replaceLiquidityManager(address newManager)",
+    "function protocolPool(bytes32 poolId) view returns ((bytes32 poolId,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,uint8 kind,bool decommissioned,uint256 basketId,address basketAsset,uint128 permanentLiquidity) pool)",
+    "function isProtocolPool(bytes32 poolId) view returns (bool registered)",
     "function liquidityIntegration() view returns (address poolManager,address hook,bool installed)",
     "function installLiquidityManager(address manager)",
-    "function setSwapFeeConfiguration((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
-    "function swapFeeConfiguration() view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
-    "function setCanonicalPoolFeeConfiguration(uint256 basketId,address asset,(uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
+    "function setSwapFeeConfiguration((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
+    "function swapFeeConfiguration() view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
+    "function setCanonicalPoolFeeConfiguration(uint256 basketId,address asset,(uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
     "function clearCanonicalPoolFeeConfiguration(uint256 basketId,address asset)",
-    "function canonicalPoolFeeConfiguration(uint256 basketId,address asset) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps,bool overridden) configuration)",
+    "function canonicalPoolFeeConfiguration(uint256 basketId,address asset) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps,bool overridden) configuration)",
     "function liquidityManager() view returns (address manager,bool installed)",
     "function unwindBasketLiquidity(uint256 basketId,address asset)",
     "function basketLiquidityUnwound(uint256 basketId,address asset) view returns (bool unwound)",
@@ -528,7 +758,6 @@ export const staticsAbi = parseAbi([
     "event PositionClosed(uint256 indexed positionId)",
     "event PositionCreationFeeSet(uint256 previousAmount,uint256 newAmount)",
     "event PositionCreationFeePaid(uint256 indexed positionId,address indexed treasury,uint256 amount)",
-    "event PositionRendererSet(address indexed previousRenderer,address indexed newRenderer)",
     "event PositionOwnerIndexSynced(uint256 indexed positionId,address indexed owner)",
     "event MetadataUpdate(uint256 tokenId)",
     "event BatchMetadataUpdate(uint256 fromTokenId,uint256 toTokenId)",
@@ -551,19 +780,34 @@ export const staticsAbi = parseAbi([
     "event GlobalFeeAccrued(address indexed asset,uint256 grossFee,uint256 stakerAmount,uint256 treasuryAmount,uint256 indexRay)",
     "event RewardClaimed(uint256 indexed positionId,address indexed receiver,address indexed asset,uint256 amount)",
     "event TreasuryFeesDistributed(address indexed asset,address indexed treasury,uint256 amount)",
-    "event RewardAssetOptedIn(uint256 indexed positionId,address indexed asset,uint256 pendingStake,uint40 eligibleAt)",
-    "event RewardStakeScheduled(uint256 indexed positionId,address indexed asset,uint256 pendingStake,uint40 eligibleAt)",
-    "event RewardBucketMatured(address indexed asset,uint40 indexed eligibleAt,uint256 amount,uint256 eligibleStake,uint256 indexRay)",
-    "event PositionRewardEligibilityActivated(uint256 indexed positionId,address indexed asset,uint256 amount,uint40 eligibleAt,uint256 activationIndexRay)",
-    "event RewardAssetOptedOut(uint256 indexed positionId,address indexed asset,uint256 removedEligibleStake,uint256 removedPendingStake)",
+    "event RewardAssetOptedIn(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
+    "event RewardStakeScheduled(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
+    "event RewardBucketMatured(address indexed asset,uint40 indexed eligibleAt,uint256 actualStake,uint256 effectiveWeight,uint256 totalActualEligibleStake,uint256 totalEffectiveEligibleWeight,uint256 indexRay)",
+    "event PositionRewardEligibilityActivated(uint256 indexed positionId,address indexed asset,uint256 actualStake,uint256 effectiveWeight,uint40 eligibleAt,uint256 activationIndexRay)",
+    "event RewardAssetOptedOut(uint256 indexed positionId,address indexed asset,uint256 removedActualEligibleStake,uint256 removedActualPendingStake,uint256 removedEffectiveEligibleWeight,uint256 removedEffectivePendingWeight)",
+    "event PositionRewardWeightChanged(uint256 indexed positionId,address indexed asset,uint16 previousMultiplierBps,uint16 newMultiplierBps,uint256 effectiveEligibleWeight,uint256 effectivePendingWeight)",
     "event RewardAssetDustRouted(address indexed asset,uint256 amount)",
+    "event RewardBookCheckpointed(address indexed asset)",
     "event PositionRewardSettled(uint256 indexed positionId,address indexed asset,uint256 amount)",
+    "event GenesisLinked(uint256 indexed genesisId,uint256 indexed positionId,address indexed owner)",
+    "event GenesisUnlinked(uint256 indexed genesisId,uint256 indexed positionId,address indexed owner)",
+    "event GenesisActivated(uint256 indexed genesisId,uint8 previousTier,uint8 newTier,uint256 burnedAmount,uint16 multiplierBps)",
+    "event GenesisActivationReset(uint256 indexed genesisId,address indexed previousOwner,address indexed newOwner)",
+    "event CreatorRevenueAccrued(address indexed creator,address indexed asset,uint256 amount)",
+    "event PartnerRevenueAccrued(address indexed recipient,address indexed asset,uint256 amount)",
+    "event CreatorRevenueClaimed(address indexed creator,address indexed asset,address indexed receiver,uint256 amount)",
+    "event PartnerRevenueDistributed(address indexed recipient,address indexed asset,address indexed caller,uint256 grossAmount,uint256 distributedAmount,uint256 tip)",
     "event LiquidityIntegrationInstalled(address indexed poolManager,address indexed hook)",
     "event CanonicalPoolInitialized(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,address currency0,address currency1,uint160 sqrtPriceX96,int24 tick)",
+    "event GovernancePoolCreated(bytes32 indexed poolId,address indexed tokenA,address indexed tokenB,address payer,address currency0,address currency1,uint160 sqrtPriceX96,int24 tick,uint128 liquidity,uint256 amountA,uint256 amountB)",
+    "event ProtocolPoolFeeConfigurationSet(bytes32 indexed poolId)",
+    "event ProtocolPoolFeeConfigurationCleared(bytes32 indexed poolId)",
+    "event GovernancePoolDecommissioned(bytes32 indexed poolId,address indexed currency0,address indexed currency1,uint256 amount0,uint256 amount1)",
+    "event LiquidityManagerReplaced(address indexed oldManager,address indexed newManager)",
     "event LiquidityManagerInstalled(address indexed manager)",
     "event CanonicalPoolSyncedToManager(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,address manager)",
-    "event SwapFeeConfigurationChanged((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
-    "event CanonicalPoolFeeConfigurationSet(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
+    "event SwapFeeConfigurationChanged((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
+    "event CanonicalPoolFeeConfigurationSet(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps)",
     "event CanonicalPoolFeeConfigurationCleared(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId)",
     "event PermanentLiquidityTreasuryAccrued(uint256 indexed basketId,address indexed sourcePoolAsset,address indexed rewardAsset,uint256 amount)",
     "event BasketLiquidityUnwound(uint256 indexed basketId,address indexed asset,bytes32 indexed poolId,uint256 constituentReleased,uint256 basketTokensBurned)",
@@ -589,16 +833,18 @@ export const staticsPositionPortfolioAbi = parseAbi([
     "function liquidityPositionIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] tokenIds,uint256 nextCursor)",
     "function globalRewardAssetsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (address[] assets,uint256 nextCursor)",
     "function riskSeriesIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] seriesIds,uint256 nextCursor)",
+]);
+export const staticsPositionPortfolioErrorAbi = parseAbi([
     "error InvalidPortfolioPageSize(uint256 requested,uint256 maximum)",
 ]);
 export const staticsSwapFeeHookAbi = parseAbi([
     "function staticsDiamond() view returns (address)",
     "function poolManager() view returns (address)",
-    "function feeConfiguration() view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) config)",
-    "function setFeeConfiguration(uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
-    "function setPoolFeeConfiguration(bytes32 poolId,(uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) configuration)",
+    "function feeConfiguration() view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) config)",
+    "function setFeeConfiguration(uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps)",
+    "function setPoolFeeConfiguration(bytes32 poolId,(uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps) configuration)",
     "function clearPoolFeeConfiguration(bytes32 poolId)",
-    "function poolFeeConfiguration(bytes32 poolId) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps,bool overridden) configuration)",
+    "function poolFeeConfiguration(bytes32 poolId) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps,bool overridden) configuration)",
     "function registerPool((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key) returns (bytes32 poolId)",
     "function decommissionPool((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key)",
     "function poolDecommissioned(bytes32 poolId) view returns (bool decommissioned)",
@@ -608,26 +854,39 @@ export const staticsSwapFeeHookAbi = parseAbi([
     "function compoundPermanentLiquidity((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key) returns (uint128 liquidityAdded)",
     "function releasePermanentLiquidity((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,address receiver) returns (uint256 amount0,uint256 amount1)",
     "event PoolRegistered(bytes32 indexed poolId,address indexed currency0,address indexed currency1)",
-    "event SwapLegFeeAccrued(bytes32 indexed poolId,address indexed currency,bool indexed specifiedLeg,uint256 realizedAmount,uint256 chargedAmount,uint256 polAmount,uint256 liquidityProviderAmount,uint256 basketStakerAmount,uint256 staticsStakerAmount,uint256 treasuryAmount)",
+    "event SwapLegFeeAccrued(bytes32 indexed poolId,address indexed currency,bool indexed specifiedLeg,uint256 realizedAmount,uint256 chargedAmount,uint256 lockedLiquidityAmount,uint256 liquidityProviderAmount,uint256 basketStakerAmount,uint256 staticsStakerAmount,uint256 stonkBrokersAmount,uint256 indexCreatorAmount,uint256 treasuryAmount)",
     "event PermanentLiquidityAdded(bytes32 indexed poolId,uint128 liquidity,uint256 amount0,uint256 amount1,uint256 pending0,uint256 pending1)",
     "event PermanentLiquidityFeesCollected(bytes32 indexed poolId,address indexed currency,uint256 amount,uint256 pendingAmount)",
     "event PermanentLiquidityReleased(bytes32 indexed poolId,address indexed receiver,uint128 liquidity,uint256 amount0,uint256 amount1)",
     "event PoolDecommissioned(bytes32 indexed poolId)",
-    "event FeeConfigurationSet(uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
-    "event PoolFeeConfigurationSet(bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,uint16 polShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
+    "event FeeConfigurationSet(uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps)",
+    "event PoolFeeConfigurationSet(bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,uint16 lockedLiquidityShareBps,uint16 liquidityProviderShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 stonkBrokersShareBps,uint16 indexCreatorShareBps,uint16 treasuryShareBps)",
     "event PoolFeeConfigurationCleared(bytes32 indexed poolId)",
+]);
+export const staticsTokenAbi = parseAbi([
+    "function FIXED_SUPPLY() view returns (uint256)",
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function totalSupply() view returns (uint256)",
+    "function balanceOf(address account) view returns (uint256)",
+    "function allowance(address owner,address spender) view returns (uint256)",
+    "function approve(address spender,uint256 amount) returns (bool)",
+    "function transfer(address to,uint256 amount) returns (bool)",
+    "function burn(uint256 amount)",
+    "function nonces(address owner) view returns (uint256)",
+    "event Transfer(address indexed from,address indexed to,uint256 amount)",
+    "event Approval(address indexed owner,address indexed spender,uint256 amount)",
 ]);
 export const staticsLiquidityManagerAbi = parseAbi([
     "function staticsDiamond() view returns (address)",
     "function positionManager() view returns (address)",
     "function poolManager() view returns (address)",
     "function permit2() view returns (address)",
-    "function registerCanonicalPool(uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key)",
-    "function mintUserPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,address recipient,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
-    "function increaseUserPosition((uint256 basketId,address asset,(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,uint256 tokenId,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
-    "function canonicalPoolHash(uint256 basketId,address asset) view returns (bytes32)",
-    "event CanonicalPoolRegistered(uint256 indexed basketId,address indexed asset,bytes32 indexed poolKeyHash)",
-    "event UserPositionMinted(uint256 indexed basketId,address indexed asset,uint256 indexed tokenId,address recipient,address refundRecipient,uint256 spent0,uint256 spent1,uint256 refund0,uint256 refund1)",
+    "function mintUserPosition(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,address recipient,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
+    "function increaseUserPosition(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,int24 tickLower,int24 tickUpper,uint256 liquidity,uint256 amount0Limit,uint256 amount1Limit,uint256 deadline) request,uint256 tokenId,address refundRecipient) returns ((uint256 tokenId,uint256 spent0,uint256 received0,uint256 spent1,uint256 received1) movement,uint256 refund0,uint256 refund1)",
+    "event UserPositionMinted(bytes32 indexed poolId,uint256 indexed tokenId,address recipient,address refundRecipient,uint256 spent0,uint256 spent1,uint256 refund0,uint256 refund1)",
+    "event UserPositionIncreased(bytes32 indexed poolId,uint256 indexed tokenId,address refundRecipient,uint256 liquidity,uint256 spent0,uint256 spent1,uint256 refund0,uint256 refund1)",
 ]);
 export const v4PositionManagerReadAbi = parseAbi([
     "function nextTokenId() view returns (uint256)",
@@ -642,6 +901,7 @@ export const v4PositionManagerReadAbi = parseAbi([
 export const v4StateViewReadAbi = parseAbi([
     "function poolManager() view returns (address)",
     "function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96,int24 tick,uint24 protocolFee,uint24 lpFee)",
+    "function getLiquidity(bytes32 poolId) view returns (uint128 liquidity)",
     "function getPositionInfo(bytes32 poolId,address owner,int24 tickLower,int24 tickUpper,bytes32 salt) view returns (uint128 liquidity,uint256 feeGrowthInside0LastX128,uint256 feeGrowthInside1LastX128)",
     "function getFeeGrowthInside(bytes32 poolId,int24 tickLower,int24 tickUpper) view returns (uint256 feeGrowthInside0X128,uint256 feeGrowthInside1X128)",
 ]);
@@ -706,6 +966,28 @@ export const staticsBasketErrorAbi = parseAbi([
     "error LaunchDeadlineExpired(uint256 deadline,uint256 timestamp)",
     "error InsufficientTransferReceived(address asset,uint256 required,uint256 received)",
     "error BasketNotActive(uint256 basketId,uint8 status)",
+]);
+export const staticsProtocolPoolErrorAbi = parseAbi([
+    "error LiquidityIntegrationNotInstalled()",
+    "error InvalidToken(address token)",
+    "error IdenticalTokens(address token)",
+    "error InvalidPayer()",
+    "error DeadlineExpired(uint256 deadline)",
+    "error InvalidPoolPrice(uint160 sqrtPriceBPerAX96)",
+    "error InsufficientSeedLiquidity(uint128 calculated,uint128 minimum)",
+    "error InvalidSeedAmounts(uint256 amountA,uint256 amountB)",
+    "error IncompatibleTokenTransfer(address token,uint256 expected,uint256 observed)",
+    "error PoolAlreadyInitialized(bytes32 poolId)",
+    "error PoolAlreadyRegisteredInHook(bytes32 poolId)",
+    "error PoolAlreadyDecommissioned(bytes32 poolId)",
+    "error ActionPaused(uint256 action)",
+    "error InvalidLiquidityManager(address manager)",
+    "error LiquidityManagerBindingMismatch(address manager,address expected,address actual)",
+    "error LiquidityManagerUnchanged(address manager)",
+    "error LiquidityManagerApprovalMismatch(address manager,bool expected)",
+    "error ProtocolPoolNotRegistered(bytes32 poolId)",
+    "error ProtocolPoolAlreadyRegistered(bytes32 poolId,uint8 kind)",
+    "error GovernancePoolNotRegistered(bytes32 poolId)",
 ]);
 export const staticsPositionErrorAbi = parseAbi([
     "error OnlyDiamondSelf(address caller)",
@@ -773,6 +1055,26 @@ export const staticsRewardsErrorAbi = parseAbi([
     "error RewardAssetNotOptedIn(uint256 positionId,address asset)",
     "error RewardAssetLimitExceeded(uint256 positionId)",
     "error InvalidMaturitySchedule(uint40 eligibleAt)",
+]);
+export const staticsGenesisErrorAbi = parseAbi([
+    "error GenesisOwnerMismatch(uint256 genesisId,address expected,address actual)",
+    "error PositionOwnerMismatch(uint256 positionId,address expected,address actual)",
+    "error UnauthorizedGenesisCollection(address caller)",
+    "error ActivationBurnExceedsMaximum(uint256 required,uint256 maximum)",
+    "error GenesisAlreadyLinked(uint256 genesisId,uint256 positionId)",
+    "error PositionAlreadyLinked(uint256 positionId,uint256 genesisId)",
+    "error GenesisNotLinked(uint256 genesisId)",
+    "error GenesisLinkedOnTransfer(uint256 genesisId,uint256 positionId)",
+    "error InvalidActivationTier(uint8 currentTier,uint8 targetTier)",
+    "error InvalidActivationCost(uint256 cost)",
+]);
+export const staticsProtocolRevenueErrorAbi = parseAbi([
+    "error InvalidReceiver()",
+    "error NoRevenue(address account,address asset)",
+    "error MinimumOutputNotMet(address asset,uint256 actual,uint256 minimum)",
+    "error IncompatibleRevenueAsset(address asset,uint256 expected,uint256 spent,uint256 received)",
+    "error InvalidPartnerTip(uint16 tipBps)",
+    "error InvalidPartnerRecipient(address recipient)",
 ]);
 export const staticsTokenErrorAbi = parseAbi([
     "error ERC20InsufficientBalance(address sender,uint256 balance,uint256 needed)",
@@ -939,6 +1241,85 @@ export const staticsDollarErrorAbi = parseAbi([
     "error UnexpectedRiskIngressState()",
     "error NativeTransferFailed(address receiver,uint256 amount)",
 ]);
+export function buildBuyGenesisTransaction(tokenId, receiver, nativeFee) {
+    if (nativeFee < 0n)
+        throw new Error("native Genesis acquisition fee cannot be negative");
+    return {
+        data: encodeFunctionData({
+            abi: staticsGenesisVaultAbi,
+            functionName: "buyGenesis",
+            args: [tokenId, receiver],
+        }),
+        value: nativeFee,
+    };
+}
+export function buildRedeemGenesisCall(tokenId, receiver) {
+    return encodeFunctionData({
+        abi: staticsGenesisVaultAbi,
+        functionName: "redeemGenesis",
+        args: [tokenId, receiver],
+    });
+}
+export function buildActivateGenesisCall(genesisId, targetTier, maxBurn) {
+    if (!Number.isInteger(targetTier) || targetTier < 1 || targetTier > 4) {
+        throw new Error("target Genesis tier must be between 1 and 4");
+    }
+    if (maxBurn !== undefined) {
+        return encodeFunctionData({
+            abi: staticsAbi,
+            functionName: "activateGenesis",
+            args: [genesisId, targetTier, maxBurn],
+        });
+    }
+    return encodeFunctionData({
+        abi: genesisActivationRegistryAbi,
+        functionName: "activate",
+        args: [genesisId, targetTier],
+    });
+}
+export function buildRegisterGenesisCall(genesisId) {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "registerGenesis",
+        args: [genesisId],
+    });
+}
+export function buildClaimGenesisLaunchRewardsCall(genesisId, asset, receiver) {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "claimGenesis",
+        args: [genesisId, asset, receiver],
+    });
+}
+export function buildClaimOwnerGenesisLaunchRewardsCall(asset, receiver) {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "claimOwnerRewards",
+        args: [asset, receiver],
+    });
+}
+export function buildAccrueGenesisLaunchRewardsCall() {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "accrue",
+    });
+}
+export function cumulativeGenesisActivationCost(tierCosts, currentTier, targetTier) {
+    if (!Number.isInteger(currentTier) || currentTier < 0 || currentTier > 3) {
+        throw new Error("Genesis current tier must be an integer from 0 through 3");
+    }
+    if (!Number.isInteger(targetTier) || targetTier <= currentTier || targetTier > 4) {
+        throw new Error("Genesis target tier must be above the current tier and no greater than 4");
+    }
+    let total = 0n;
+    for (let tier = currentTier + 1; tier <= targetTier; tier += 1) {
+        const cost = tierCosts[tier];
+        if (cost === undefined || cost < 0n)
+            throw new Error(`missing or invalid Genesis tier ${tier} cost`);
+        total += cost;
+    }
+    return total;
+}
 export function buildCreateBasketTransaction(params, pools, maxAmountsIn, launchDeadline, creationFee) {
     return {
         data: encodeFunctionData({
@@ -1034,6 +1415,9 @@ export function buildQuoteV4ExactInputSingleCall(poolKey, zeroForOne, exactAmoun
         args: [{ poolKey, zeroForOne, exactAmount, hookData }],
     });
 }
+export function v4PoolId(poolKey) {
+    return keccak256(encodeAbiParameters(parseAbiParameters("(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)"), [poolKey]));
+}
 export function buildV4ExactInputSingleSwap(request) {
     _validateUint128(request.amountIn, "swap input amount");
     _validateUint128(request.amountOutMinimum, "minimum swap output");
@@ -1041,7 +1425,22 @@ export function buildV4ExactInputSingleSwap(request) {
     const outputCurrency = request.zeroForOne ? request.poolKey.currency1 : request.poolKey.currency0;
     const hookData = request.hookData ?? "0x";
     const minHopPriceX36 = request.minHopPriceX36 ?? 0n;
-    const actions = toHex(new Uint8Array([0x06, 0x0c, 0x0f]));
+    const settlement = request.settlement ?? { input: "erc20", output: "erc20" };
+    const nativeInput = settlement.input === "native";
+    const nativeOutput = settlement.output === "native";
+    if (nativeInput && nativeOutput)
+        throw new Error("a single-hop swap cannot use native input and output");
+    if (nativeInput && settlement.wrappedNative.toLowerCase() !== inputCurrency.toLowerCase()) {
+        throw new Error("native input must be the configured wrapped-native pool currency");
+    }
+    if (nativeOutput && settlement.wrappedNative.toLowerCase() !== outputCurrency.toLowerCase()) {
+        throw new Error("native output must be the configured wrapped-native pool currency");
+    }
+    if (nativeInput && request.permit)
+        throw new Error("native input cannot include a Permit2 permit");
+    const msgSender = "0x0000000000000000000000000000000000000001";
+    const routerAddress = "0x0000000000000000000000000000000000000002";
+    const actions = toHex(new Uint8Array(nativeInput ? [0x06, 0x0b, 0x0f] : nativeOutput ? [0x06, 0x0c, 0x0e] : [0x06, 0x0c, 0x0f]));
     const params = [
         encodeAbiParameters(parseAbiParameters("((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint256 minHopPriceX36,bytes hookData)"), [{
                 poolKey: request.poolKey,
@@ -1051,12 +1450,26 @@ export function buildV4ExactInputSingleSwap(request) {
                 minHopPriceX36,
                 hookData,
             }]),
-        encodeAbiParameters(parseAbiParameters("address currency,uint256 amount"), [inputCurrency, request.amountIn]),
-        encodeAbiParameters(parseAbiParameters("address currency,uint256 minimumAmount"), [outputCurrency, request.amountOutMinimum]),
+        nativeInput
+            ? encodeAbiParameters(parseAbiParameters("address currency,uint256 amount,bool payerIsUser"), [inputCurrency, request.amountIn, false])
+            : encodeAbiParameters(parseAbiParameters("address currency,uint256 amount"), [inputCurrency, request.amountIn]),
+        nativeOutput
+            ? encodeAbiParameters(parseAbiParameters("address currency,address recipient,uint256 amount"), [outputCurrency, routerAddress, 0n])
+            : encodeAbiParameters(parseAbiParameters("address currency,uint256 minimumAmount"), [outputCurrency, request.amountOutMinimum]),
     ];
     const swapPlan = encodeAbiParameters(parseAbiParameters("bytes actions,bytes[] params"), [actions, params]);
-    let commands = toHex(new Uint8Array([0x10]));
-    let inputs = [swapPlan];
+    let commands = toHex(new Uint8Array(nativeInput ? [0x0b, 0x10] : nativeOutput ? [0x10, 0x0c] : [0x10]));
+    let inputs = nativeInput
+        ? [
+            encodeAbiParameters(parseAbiParameters("address recipient,uint256 amount"), [routerAddress, request.amountIn]),
+            swapPlan,
+        ]
+        : nativeOutput
+            ? [
+                swapPlan,
+                encodeAbiParameters(parseAbiParameters("address recipient,uint256 amountMinimum"), [msgSender, request.amountOutMinimum]),
+            ]
+            : [swapPlan];
     if (request.permit) {
         const { permitSingle, signature } = request.permit;
         _validatePermit2Permit(permitSingle);
@@ -1069,10 +1482,15 @@ export function buildV4ExactInputSingleSwap(request) {
         if (permitSingle.details.amount !== request.amountIn) {
             throw new Error("Permit2 amount must equal the swap input amount");
         }
-        commands = toHex(new Uint8Array([0x0a, 0x10]));
+        commands = toHex(new Uint8Array(nativeOutput ? [0x0a, 0x10, 0x0c] : [0x0a, 0x10]));
         inputs = [
             encodeAbiParameters(parseAbiParameters("((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline) permitSingle,bytes signature"), [permitSingle, signature]),
             swapPlan,
+            ...(nativeOutput
+                ? [
+                    encodeAbiParameters(parseAbiParameters("address recipient,uint256 amountMinimum"), [msgSender, request.amountOutMinimum]),
+                ]
+                : []),
         ];
     }
     return {
@@ -1082,7 +1500,7 @@ export function buildV4ExactInputSingleSwap(request) {
             functionName: "execute",
             args: [commands, inputs, request.deadline],
         }),
-        value: 0n,
+        value: nativeInput ? request.amountIn : 0n,
     };
 }
 function _validatePermit2Permit(permitSingle) {
@@ -1194,6 +1612,29 @@ export function buildStakeCall(positionId, amount) {
 export function buildUnstakeCall(positionId, amount, receiver) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "unstake", args: [positionId, amount, receiver] });
 }
+export function buildCheckpointRewardAssetsCall(assets) {
+    return encodeFunctionData({ abi: staticsAbi, functionName: "checkpointRewardAssets", args: [assets] });
+}
+export function buildLinkGenesisCall(genesisId, positionId) {
+    return encodeFunctionData({ abi: staticsAbi, functionName: "linkGenesis", args: [genesisId, positionId] });
+}
+export function buildUnlinkGenesisCall(genesisId) {
+    return encodeFunctionData({ abi: staticsAbi, functionName: "unlinkGenesis", args: [genesisId] });
+}
+export function buildClaimCreatorRevenueCall(asset, receiver, minReceived) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "claimCreatorRevenue",
+        args: [asset, receiver, minReceived],
+    });
+}
+export function buildDistributePartnerRevenueCall(recipient, asset) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "distributePartnerRevenue",
+        args: [recipient, asset],
+    });
+}
 export function buildBorrowCall(positionId, basketId, sharesIn, receiver) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "borrow", args: [positionId, basketId, sharesIn, receiver] });
 }
@@ -1215,9 +1656,6 @@ export function buildCreatePositionCall(receiver) {
 export function buildSetPositionCreationFeeCall(amount) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "setPositionCreationFee", args: [amount] });
 }
-export function buildSetPositionRendererCall(newRenderer) {
-    return encodeFunctionData({ abi: staticsAbi, functionName: "setPositionRenderer", args: [newRenderer] });
-}
 export function buildClosePositionCall(positionId) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "closePosition", args: [positionId] });
 }
@@ -1230,52 +1668,90 @@ export function buildReleaseBasketQuarantineCall(basketId) {
 export function buildDecommissionBasketCall(basketId) {
     return encodeFunctionData({ abi: staticsAbi, functionName: "decommissionBasket", args: [basketId] });
 }
-export function buildSetSwapFeeConfigurationCall(configuration) {
-    const uint16 = (value, field) => {
-        if (value < 0n || value > 65535n)
-            throw new Error(`${field} exceeds uint16`);
-        return Number(value);
-    };
-    return encodeFunctionData({
-        abi: staticsAbi,
-        functionName: "setSwapFeeConfiguration",
-        args: [{
-                inputFeeBps: uint16(configuration.inputFeeBps, "inputFeeBps"),
-                outputFeeBps: uint16(configuration.outputFeeBps, "outputFeeBps"),
-                polShareBps: uint16(configuration.polShareBps, "polShareBps"),
-                liquidityProviderShareBps: uint16(configuration.liquidityProviderShareBps, "liquidityProviderShareBps"),
-                basketStakerShareBps: uint16(configuration.basketStakerShareBps, "basketStakerShareBps"),
-                staticsStakerShareBps: uint16(configuration.staticsStakerShareBps, "staticsStakerShareBps"),
-                treasuryShareBps: uint16(configuration.treasuryShareBps, "treasuryShareBps"),
-            }],
-    });
+function toUint16(value, field) {
+    if (value < 0n || value > 65535n)
+        throw new Error(`${field} exceeds uint16`);
+    return Number(value);
 }
-export function buildSetCanonicalPoolFeeConfigurationCall(basketId, asset, configuration) {
-    const uint16 = (value, field) => {
-        if (value < 0n || value > 65535n)
-            throw new Error(`${field} exceeds uint16`);
-        return Number(value);
+function coerceSwapFeeConfiguration(configuration) {
+    return {
+        inputFeeBps: toUint16(configuration.inputFeeBps, "inputFeeBps"),
+        outputFeeBps: toUint16(configuration.outputFeeBps, "outputFeeBps"),
+        lockedLiquidityShareBps: toUint16(configuration.lockedLiquidityShareBps, "lockedLiquidityShareBps"),
+        liquidityProviderShareBps: toUint16(configuration.liquidityProviderShareBps, "liquidityProviderShareBps"),
+        basketStakerShareBps: toUint16(configuration.basketStakerShareBps, "basketStakerShareBps"),
+        staticsStakerShareBps: toUint16(configuration.staticsStakerShareBps, "staticsStakerShareBps"),
+        stonkBrokersShareBps: toUint16(configuration.stonkBrokersShareBps, "stonkBrokersShareBps"),
+        indexCreatorShareBps: toUint16(configuration.indexCreatorShareBps, "indexCreatorShareBps"),
+        treasuryShareBps: toUint16(configuration.treasuryShareBps, "treasuryShareBps"),
     };
+}
+function validatedPoolFeeConfiguration(configuration) {
     if (configuration.inputFeeBps + configuration.outputFeeBps > 200n) {
         throw new Error("combined pool fee rate exceeds 200 BPS");
     }
-    if (configuration.polShareBps + configuration.liquidityProviderShareBps
+    if (configuration.lockedLiquidityShareBps + configuration.liquidityProviderShareBps
         + configuration.basketStakerShareBps + configuration.staticsStakerShareBps
+        + configuration.stonkBrokersShareBps + configuration.indexCreatorShareBps
         + configuration.treasuryShareBps !== BPS) {
         throw new Error("pool fee shares must sum to 10000 BPS");
     }
+    return coerceSwapFeeConfiguration(configuration);
+}
+export function buildSetSwapFeeConfigurationCall(configuration) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "setSwapFeeConfiguration",
+        args: [coerceSwapFeeConfiguration(configuration)],
+    });
+}
+export function buildSetCanonicalPoolFeeConfigurationCall(basketId, asset, configuration) {
     return encodeFunctionData({
         abi: staticsAbi,
         functionName: "setCanonicalPoolFeeConfiguration",
-        args: [basketId, asset, {
-                inputFeeBps: uint16(configuration.inputFeeBps, "inputFeeBps"),
-                outputFeeBps: uint16(configuration.outputFeeBps, "outputFeeBps"),
-                polShareBps: uint16(configuration.polShareBps, "polShareBps"),
-                liquidityProviderShareBps: uint16(configuration.liquidityProviderShareBps, "liquidityProviderShareBps"),
-                basketStakerShareBps: uint16(configuration.basketStakerShareBps, "basketStakerShareBps"),
-                staticsStakerShareBps: uint16(configuration.staticsStakerShareBps, "staticsStakerShareBps"),
-                treasuryShareBps: uint16(configuration.treasuryShareBps, "treasuryShareBps"),
-            }],
+        args: [basketId, asset, validatedPoolFeeConfiguration(configuration)],
+    });
+}
+export function buildQuoteGovernancePoolCall(params) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "quoteGovernancePool",
+        args: [params],
+    });
+}
+export function buildCreateGovernancePoolCall(params) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "createGovernancePool",
+        args: [params],
+    });
+}
+export function buildSetProtocolPoolFeeConfigurationCall(poolId, configuration) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "setProtocolPoolFeeConfiguration",
+        args: [poolId, validatedPoolFeeConfiguration(configuration)],
+    });
+}
+export function buildClearProtocolPoolFeeConfigurationCall(poolId) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "clearProtocolPoolFeeConfiguration",
+        args: [poolId],
+    });
+}
+export function buildDecommissionGovernancePoolCall(poolId) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "decommissionGovernancePool",
+        args: [poolId],
+    });
+}
+export function buildReplaceLiquidityManagerCall(newManager) {
+    return encodeFunctionData({
+        abi: staticsAbi,
+        functionName: "replaceLiquidityManager",
+        args: [newManager],
     });
 }
 export function buildClearCanonicalPoolFeeConfigurationCall(basketId, asset) {

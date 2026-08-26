@@ -62,9 +62,14 @@ function parseNetwork(
     throw new Error("NEXT_PUBLIC_APP_NETWORK must be robinhood, robinhood-testnet, or anvil.");
   }
   if (network === "anvil" && appEnvironment !== "development") {
-    throw new Error("Anvil is only available when NEXT_PUBLIC_APP_ENV is development.");
+    throw new Error("Local chains are only available when NEXT_PUBLIC_APP_ENV is development.");
   }
   return network;
+}
+
+function isLoopbackUrl(value: string): boolean {
+  const hostname = new URL(value).hostname.toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
 function parsePublicRpc(value: string | undefined, variableName: string): string | null {
@@ -95,6 +100,16 @@ export type WalletEnvironment = Readonly<{
   supportedChains: readonly [Chain, ...Chain[]];
   configured: boolean;
 }>;
+
+function chainWithRpc(chain: Chain, rpcUrl: string): Chain {
+  return {
+    ...chain,
+    rpcUrls: {
+      ...chain.rpcUrls,
+      default: { http: [rpcUrl] },
+    },
+  };
+}
 
 export function readWalletEnvironment(
   environment: Record<string, string | undefined> = process.env
@@ -129,9 +144,19 @@ export function readWalletEnvironment(
   ) {
     throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required for Robinhood testnet.");
   }
+  if (network === "anvil" && configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
+    throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
+  }
 
+  const anvilRpcUrl = configuredAnvilRpc ?? "http://127.0.0.1:8545/";
+  const configuredAnvil = chainWithRpc(anvil, anvilRpcUrl);
   const defaultChain =
-    network === "anvil" ? anvil : network === "robinhood" ? robinhoodMainnet : robinhoodTestnet;
+    network === "anvil"
+      ? configuredAnvil
+      : network === "robinhood"
+        ? robinhoodMainnet
+        : robinhoodTestnet;
+  const publicRobinhoodChains = [robinhoodMainnet, robinhoodTestnet];
   return {
     appEnvironment,
     network,
@@ -139,17 +164,15 @@ export function readWalletEnvironment(
     clientId,
     robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
-    anvilRpcUrl: configuredAnvilRpc ?? "http://127.0.0.1:8545/",
+    anvilRpcUrl,
     defaultChain,
-    supportedChains:
-      appEnvironment === "development"
-        ? ([
-            defaultChain,
-            ...[robinhoodMainnet, robinhoodTestnet, anvil].filter(
-              (chain) => chain.id !== defaultChain.id
-            ),
-          ] as [Chain, ...Chain[]])
-        : ([defaultChain] as const),
+    supportedChains: [
+      defaultChain,
+      ...publicRobinhoodChains.filter((chain) => chain.id !== defaultChain.id),
+      ...(appEnvironment === "development" && defaultChain.id !== anvil.id
+        ? [configuredAnvil]
+        : []),
+    ] as [Chain, ...Chain[]],
     configured: Boolean(appId),
   };
 }

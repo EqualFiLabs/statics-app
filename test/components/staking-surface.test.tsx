@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@/test/render";
+import { useState } from "react";
+import { fireEvent, render, screen, within } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
 
 import { RewardAssetPicker } from "@/components/rewards/RewardAssetPicker";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
+import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import type { StakingSnapshot } from "@/lib/positions/staking";
 
 const token = (symbol: string, last: string) => ({
@@ -27,8 +29,10 @@ function snapshot(overrides: Partial<StakingSnapshot> = {}): StakingSnapshot {
 const selection = (t: ReturnType<typeof token>, pending: bigint, eligibleAt: bigint) => ({
   token: t,
   selected: true,
-  eligibleStake: 0n,
-  pendingStake: pending,
+  actualEligibleStake: 0n,
+  actualPendingStake: pending,
+  effectiveEligibleWeight: 0n,
+  effectivePendingWeight: pending,
   eligibleAt,
 });
 
@@ -38,6 +42,7 @@ describe("stake maturity", () => {
       <StakeMaturity
         snapshot={snapshot({
           stakedBalance: 100n * 10n ** 18n,
+          selections: [selection(wbtc, 40n * 10n ** 18n, laterToday)],
           maturing: [selection(wbtc, 40n * 10n ** 18n, laterToday)],
         })}
         stakingToken={weth}
@@ -77,7 +82,15 @@ describe("stake maturity", () => {
   it("confirms everything is earning once nothing is pending", () => {
     render(
       <StakeMaturity
-        snapshot={snapshot({ earning: [{ ...selection(wbtc, 0n, 0n), eligibleStake: 100n }] })}
+        snapshot={snapshot({
+          earning: [
+            {
+              ...selection(wbtc, 0n, 0n),
+              actualEligibleStake: 100n,
+              effectiveEligibleWeight: 100n,
+            },
+          ],
+        })}
         stakingToken={weth}
         now={now}
       />
@@ -175,5 +188,49 @@ describe("reward asset picker", () => {
 
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+});
+
+describe("position reward selection editor", () => {
+  function DraftEditor({ onSave }: { onSave: () => void }) {
+    const [selected, setSelected] = useState<readonly `0x${string}`[]>([]);
+    return (
+      <RewardSelectionEditor
+        candidates={[{ token: wbtc, sources: ["Fee history"] }]}
+        confirmed={[]}
+        selected={selected}
+        rewards={[]}
+        maximum={64n}
+        chainId={46_630}
+        changeCount={selected.length}
+        disabled={false}
+        saving={false}
+        onToggle={(asset) =>
+          setSelected((current) =>
+            current.includes(asset) ? current.filter((item) => item !== asset) : [...current, asset]
+          )
+        }
+        onSave={onSave}
+      />
+    );
+  }
+
+  it("highlights card choices locally and waits for the explicit batch save", () => {
+    const onSave = vi.fn();
+    render(<DraftEditor onSave={onSave} />);
+
+    const card = screen.getByText("WBTC").closest("article");
+    expect(card).not.toHaveClass("is-selected");
+    expect(screen.getByRole("button", { name: "Save 0 reward changes" })).toBeDisabled();
+
+    fireEvent.click(within(card!).getByRole("button", { name: "Select reward" }));
+
+    expect(card).toHaveClass("is-selected", "is-changed");
+    expect(screen.getByText("Will be selected")).toBeInTheDocument();
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save 1 reward change" }));
+    expect(onSave).toHaveBeenCalledOnce();
   });
 });

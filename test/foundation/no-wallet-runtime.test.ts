@@ -51,8 +51,11 @@ describe("wallet runtime boundary", () => {
   it("binds external wallet transactions to the requested supported chain", () => {
     const source = fs.readFileSync("providers/DAppProviders.tsx", "utf8");
 
-    expect(source).toContain("const transactionNetwork = getFundingNetwork(request.chainId)");
-    expect(source.match(/chain: transactionNetwork\.chain/g)).toHaveLength(2);
+    expect(source).toContain(
+      "const fundingTransactionNetwork = getFundingNetwork(request.chainId)"
+    );
+    expect(source).toContain("request.chainId === active.descriptor.chainId");
+    expect(source.match(/chain: transactionChain/g)).toHaveLength(2);
     expect(source).not.toContain("chain: undefined");
   });
 });

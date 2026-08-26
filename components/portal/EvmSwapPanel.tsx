@@ -2,7 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { createPublicClient, custom, formatUnits, getAddress, type Address } from "viem";
+import {
+  createPublicClient,
+  custom,
+  decodeFunctionResult,
+  encodeFunctionData,
+  formatUnits,
+  getAddress,
+  zeroAddress,
+  type Address,
+} from "viem";
+import {
+  buildQuoteV4ExactInputSingleCall,
+  buildV4ExactInputSingleSwap,
+  dopplerStaticsTokenAbi,
+  permit2AllowanceAbi,
+  v4QuoterAbi,
+} from "@statics-protocol/sdk";
 
 import {
   getDefaultEvmSwapTokens,
@@ -11,6 +27,7 @@ import {
   type EvmSwapToken,
 } from "@/lib/portal/uniswap";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import {
@@ -22,6 +39,25 @@ import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { minimumWithSlippage } from "@/lib/baskets/baskets";
+import {
+  canonicalTradeDirection,
+  maximumTokenApproval,
+  poolKeyForLaunch,
+  settlementForTrade,
+  swapDeadlineBase,
+  tokenAddress,
+  zeroForTrade,
+} from "@/lib/trade/canonical-market";
+import {
+  MAX_PERMIT2_ALLOWANCE,
+  MAX_PERMIT2_EXPIRATION,
+  hasUsablePermit2Allowance,
+} from "@/lib/protocol/approvals";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+
+const PERMIT_TTL = 20n * 60n;
 
 const erc20BalanceAbi = [
   {
@@ -68,28 +104,60 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
     : whole;
 }
 
-export function EvmSwapPanel() {
+export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolean }) {
   const t = useTranslations("portal");
   const locale = useAppLocale();
   const wallet = useWalletState();
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const walletTokens = useWalletTokens(wallet.fundingChainId);
-  const tokens = useMemo(
-    () => [
-      ...getDefaultEvmSwapTokens(wallet.fundingChainId).filter((token) => token.kind === "native"),
-      ...walletTokens.tokens.map((token): EvmSwapToken => ({
-        address: token.address,
-        decimals: token.decimals,
-        kind: "erc20",
-        name: token.name,
-        symbol: token.symbol,
-      })),
-    ],
-    [wallet.fundingChainId, walletTokens.tokens]
+  const { active } = useDeployment();
+  const launch =
+    active.launch && active.launch.descriptor.chainId === wallet.fundingChainId
+      ? active.launch
+      : null;
+  const walletTokens = useWalletTokens(wallet.fundingChainId, active.protocol ?? active.launch);
+  const tokens = useMemo(() => {
+    const native = getDefaultEvmSwapTokens(wallet.fundingChainId).filter(
+      (token) => token.kind === "native"
+    );
+    const canonical: EvmSwapToken[] = launch
+      ? [
+          {
+            address: launch.contracts.statics,
+            decimals: 18,
+            kind: "erc20",
+            name: "Statics",
+            symbol: "STATICS",
+          },
+          {
+            address: launch.contracts.weth,
+            decimals: 18,
+            kind: "erc20",
+            name: "Wrapped Ether",
+            symbol: "WETH",
+          },
+        ]
+      : [];
+    const discovered = canonicalOnly
+      ? []
+      : walletTokens.tokens.map((token): EvmSwapToken => ({
+          address: token.address,
+          decimals: token.decimals,
+          kind: "erc20",
+          name: token.name,
+          symbol: token.symbol,
+        }));
+    return [...native, ...canonical, ...discovered].filter(
+      (token, index, values) =>
+        values.findIndex(
+          (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
+        ) === index
+    );
+  }, [canonicalOnly, launch, wallet.fundingChainId, walletTokens.tokens]);
+  const [sourceAddress, setSourceAddress] = useState<string>(zeroAddress);
+  const [destinationAddress, setDestinationAddress] = useState<string>(
+    launch?.contracts.statics ?? ""
   );
-  const [sourceAddress, setSourceAddress] = useState<string>(tokens[0]?.address ?? "");
-  const [destinationAddress, setDestinationAddress] = useState<string>(tokens[1]?.address ?? "");
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState<bigint | null>(null);
   const [quote, setQuote] = useState<QuotePayload | null>(null);
@@ -122,11 +190,14 @@ export function EvmSwapPanel() {
     quote?.quote?.aggregatedOutputs?.[0]?.minAmount ??
     quote?.quote?.aggregatedOutputs?.[0]?.amount ??
     outputRaw;
+  const directDirection = canonicalTradeDirection(launch, source, destination);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      setSourceAddress(tokens[0]?.address ?? "");
-      setDestinationAddress(tokens[1]?.address ?? "");
+      setSourceAddress(tokens.find((token) => token.kind === "native")?.address ?? "");
+      setDestinationAddress(
+        tokens.find((token) => token.symbol === "STATICS")?.address ?? tokens[1]?.address ?? ""
+      );
       setAmount("");
       setQuote(null);
       setReviewing(false);
@@ -174,6 +245,49 @@ export function EvmSwapPanel() {
     if (!wallet.address || !source || !destination || parsedAmount <= 0n) {
       throw new Error("Enter an amount and choose two assets.");
     }
+    if (directDirection && launch) {
+      const provider = await wallet.getEthereumProvider();
+      const network = getFundingNetwork(wallet.fundingChainId);
+      if (!provider || !network) throw new Error("The selected wallet is unavailable.");
+      const publicClient = createPublicClient({
+        chain: network.chain,
+        transport: custom(provider),
+      });
+      await verifyLaunchDeployment(publicClient, launch);
+      const result = await publicClient.call({
+        account: getAddress(wallet.address),
+        to: launch.contracts.quoter,
+        data: buildQuoteV4ExactInputSingleCall(
+          poolKeyForLaunch(launch),
+          zeroForTrade(launch, directDirection.input),
+          parsedAmount
+        ),
+      });
+      if (!result.data) throw new Error("The canonical pool returned no quote.");
+      const [amountOut] = decodeFunctionResult({
+        abi: v4QuoterAbi,
+        functionName: "quoteExactInputSingle",
+        data: result.data,
+      });
+      const slippageBps = slippagePercentToBps(slippage);
+      if (slippageBps === null) throw new Error("Choose a valid slippage tolerance.");
+      const minimumOut = minimumWithSlippage(amountOut, slippageBps);
+      return {
+        routing: "STATICS_CANONICAL",
+        quote: {
+          input: { amount: parsedAmount.toString(), token: source.address },
+          output: { amount: amountOut.toString(), token: destination.address },
+          aggregatedOutputs: [
+            {
+              amount: amountOut.toString(),
+              minAmount: minimumOut.toString(),
+              token: destination.address,
+            },
+          ],
+        },
+      };
+    }
+    if (canonicalOnly) throw new Error("The canonical STATICS market is unavailable.");
     const response = await fetch("/api/uniswap/quote", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -284,6 +398,121 @@ export function EvmSwapPanel() {
         setReviewing(false);
         throw new Error("The quote moved below the reviewed minimum. Review the new quote.");
       }
+      if (fresh.routing === "STATICS_CANONICAL" && directDirection && launch) {
+        const provider = await wallet.getEthereumProvider();
+        const network = getFundingNetwork(wallet.fundingChainId);
+        if (!provider || !network) throw new Error("The selected wallet is unavailable.");
+        const account = getAddress(wallet.address);
+        const publicClient = createPublicClient({
+          chain: network.chain,
+          transport: custom(provider),
+        });
+        await verifyLaunchDeployment(publicClient, launch);
+        const [block, pendingBlock] = await Promise.all([
+          publicClient.getBlock(),
+          // Not every node serves a pending block; the fallbacks cover it.
+          publicClient.getBlock({ blockTag: "pending" }).catch(() => null),
+        ]);
+        const deadlineBase = swapDeadlineBase(
+          block.timestamp,
+          pendingBlock?.timestamp ?? null,
+          BigInt(Math.floor(Date.now() / 1_000))
+        );
+        const inputToken = tokenAddress(launch, directDirection.input);
+        if (directDirection.input !== "eth") {
+          const tokenAllowance = await publicClient.readContract({
+            address: inputToken,
+            abi: dopplerStaticsTokenAbi,
+            functionName: "allowance",
+            args: [account, launch.contracts.permit2],
+          });
+          if (tokenAllowance < parsedAmount) {
+            await executeProtocolTransaction({
+              publicClient,
+              wallet: account,
+              chainId: launch.descriptor.chainId,
+              deploymentId: launch.descriptor.deploymentId,
+              kind: "approve-swap",
+              label: `Enable ${source.symbol} swaps`,
+              amount: `Maximum ${source.symbol}`,
+              to: inputToken,
+              data: maximumTokenApproval(launch.contracts.permit2),
+              sendTransaction: wallet.sendEvmTransaction,
+              describeError: (cause) =>
+                cause instanceof Error ? cause.message : "The approval failed.",
+            });
+          }
+          const permit2 = await publicClient.readContract({
+            address: launch.contracts.permit2,
+            abi: permit2AllowanceAbi,
+            functionName: "allowance",
+            args: [account, inputToken, launch.contracts.universalRouter],
+          });
+          if (
+            !hasUsablePermit2Allowance(
+              permit2[0],
+              permit2[1],
+              parsedAmount,
+              // Execution time, not last-block time: a stale latest block makes
+              // an expired Permit2 allowance look usable.
+              Number(deadlineBase)
+            )
+          ) {
+            await executeProtocolTransaction({
+              publicClient,
+              wallet: account,
+              chainId: launch.descriptor.chainId,
+              deploymentId: launch.descriptor.deploymentId,
+              kind: "approve-permit2",
+              label: `Authorize ${source.symbol} swaps`,
+              amount: `Maximum ${source.symbol}`,
+              to: launch.contracts.permit2,
+              data: encodeFunctionData({
+                abi: permit2AllowanceAbi,
+                functionName: "approve",
+                args: [
+                  inputToken,
+                  launch.contracts.universalRouter,
+                  MAX_PERMIT2_ALLOWANCE,
+                  MAX_PERMIT2_EXPIRATION,
+                ],
+              }),
+              sendTransaction: wallet.sendEvmTransaction,
+              describeError: (cause) =>
+                cause instanceof Error ? cause.message : "The authorization failed.",
+            });
+          }
+        }
+        setSubmitState("swapping");
+        const execution = buildV4ExactInputSingleSwap({
+          router: launch.contracts.universalRouter,
+          poolKey: poolKeyForLaunch(launch),
+          zeroForOne: zeroForTrade(launch, directDirection.input),
+          amountIn: parsedAmount,
+          amountOutMinimum: reviewedMinimum,
+          deadline: deadlineBase + PERMIT_TTL,
+          settlement: settlementForTrade(launch, directDirection),
+        });
+        await executeProtocolTransaction({
+          publicClient,
+          wallet: account,
+          chainId: launch.descriptor.chainId,
+          deploymentId: launch.descriptor.deploymentId,
+          kind: "swap",
+          label: `${source.symbol} to ${destination.symbol}`,
+          amount: `${amount} ${source.symbol}`,
+          to: execution.target,
+          data: execution.calldata,
+          value: execution.value,
+          sendTransaction: wallet.sendEvmTransaction,
+          describeError: (cause) =>
+            cause instanceof Error ? cause.message : "The canonical swap failed.",
+        });
+        setAmount("");
+        setQuote(null);
+        setReviewing(false);
+        return;
+      }
       if (source.kind === "erc20") {
         const response = await fetch("/api/uniswap/check-approval", {
           method: "POST",
@@ -374,24 +603,26 @@ export function EvmSwapPanel() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      <label className="portal-field">
-        <span>{t("fundingNetwork")}</span>
-        <select
-          value={wallet.fundingChainId}
-          onChange={(event) => {
-            setQuote(null);
-            setReviewing(false);
-            setError(null);
-            void wallet.selectFundingNetwork(Number(event.target.value));
-          }}
-        >
-          {wallet.fundingNetworks.map((network) => (
-            <option key={network.chainId} value={network.chainId}>
-              {network.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!canonicalOnly && (
+        <label className="portal-field">
+          <span>{t("fundingNetwork")}</span>
+          <select
+            value={wallet.fundingChainId}
+            onChange={(event) => {
+              setQuote(null);
+              setReviewing(false);
+              setError(null);
+              void wallet.selectFundingNetwork(Number(event.target.value));
+            }}
+          >
+            {wallet.fundingNetworks.map((network) => (
+              <option key={network.chainId} value={network.chainId}>
+                {network.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <SwapAssetField
         label={t("youPay")}
         slippage={slippage}
@@ -401,6 +632,16 @@ export function EvmSwapPanel() {
         excluded={destination?.address}
         amount={amount}
         balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
+        onMax={
+          balance === null || balance === 0n || !source || source.kind === "native"
+            ? undefined
+            : () => {
+                setAmount(displayAmount(balance.toString(), source));
+                setQuote(null);
+                setReviewing(false);
+                setError(null);
+              }
+        }
         onAmount={(value) => {
           setAmount(value);
           setQuote(null);
@@ -444,28 +685,31 @@ export function EvmSwapPanel() {
           setError(null);
         }}
       />
-      <dl className="portal-quote-grid">
-        <QuoteDatum
-          label={t("minimumReceived")}
-          value={
-            minimumRaw && destination
-              ? `${displayAmount(minimumRaw, destination)} ${destination.symbol}`
-              : "--"
-          }
-        />
-        <QuoteDatum
-          label={t("priceImpact")}
-          value={
-            quote?.quote?.priceImpact === undefined
-              ? "--"
-              : `${quote.quote.priceImpact.toFixed(2)}%`
-          }
-        />
-        <QuoteDatum
-          label={t("networkCost")}
-          value={quote?.quote?.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
-        />
-      </dl>
+      {quote?.quote && (
+        <dl className="portal-quote-grid">
+          <QuoteDatum
+            label={t("minimumReceived")}
+            value={
+              minimumRaw && destination
+                ? `${displayAmount(minimumRaw, destination)} ${destination.symbol}`
+                : "--"
+            }
+          />
+          <QuoteDatum
+            label={t("priceImpact")}
+            value={
+              quote.quote.priceImpact === undefined
+                ? "--"
+                : `${quote.quote.priceImpact.toFixed(2)}%`
+            }
+            tone={priceImpactTone(quote.quote.priceImpact)}
+          />
+          <QuoteDatum
+            label={t("networkCost")}
+            value={quote.quote.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
+          />
+        </dl>
+      )}
       {error && (
         <p className="portal-error" role="alert">
           {error}
@@ -519,6 +763,7 @@ function SwapAssetField({
   readOnly = false,
   onAmount,
   onToken,
+  onMax,
   slippage,
   onEditSlippage,
 }: {
@@ -531,6 +776,7 @@ function SwapAssetField({
   readOnly?: boolean;
   onAmount?: (value: string) => void;
   onToken: (address: string) => void;
+  onMax?: () => void;
   slippage?: number;
   onEditSlippage?: () => void;
 }) {
@@ -540,7 +786,7 @@ function SwapAssetField({
     // card and a button inside a label would also activate the amount input.
     <div className="portal-field portal-asset-field">
       <div className="portal-asset-field-head">
-        <span>{label}</span>
+        <span className="portal-field-label">{label}</span>
         {slippage !== undefined && onEditSlippage && (
           <SlippageInlineControl value={slippage} onEdit={onEditSlippage} />
         )}
@@ -569,16 +815,44 @@ function SwapAssetField({
             ))}
         </select>
       </div>
-      <small>{readOnly ? "--" : t("balance", { balance })}</small>
+      <div className="portal-asset-field-foot">
+        <small>{readOnly ? "--" : t("balance", { balance })}</small>
+        {onMax && (
+          <button className="portal-asset-max" type="button" onClick={onMax}>
+            {t("max")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function QuoteDatum({ label, value }: { label: string; value: string }) {
+/**
+ * Price impact is the one figure here that carries a warning, so it is the one
+ * that earns colour. Semantic, and separate from the accent.
+ */
+function priceImpactTone(impact: number | undefined): QuoteTone {
+  if (impact === undefined) return "neutral";
+  if (impact >= 5) return "negative";
+  if (impact >= 1) return "warning";
+  return "positive";
+}
+
+type QuoteTone = "neutral" | "positive" | "warning" | "negative";
+
+function QuoteDatum({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: QuoteTone;
+}) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd className={tone === "neutral" ? undefined : `is-${tone}`}>{value}</dd>
     </div>
   );
 }

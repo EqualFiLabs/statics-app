@@ -2,14 +2,14 @@
 
 The public web application for Statics, built with Next.js 16, React 19, Privy, Wagmi, Viem, and
 the vendored Statics SDK. It combines a wallet-independent marketing surface with a route-scoped
-DApp for Statics Dollar, basket tokens, positions, lending, rewards, canonical liquidity, and
+DApp for Statics Dollar, basket tokens, positions, lending, rewards, protocol liquidity, and
 multichain funding.
 
 ## Release status
 
 - **Environment:** Public testnet beta
 - **Network:** Robinhood Chain Testnet (`46630`)
-- **Deployment source:** [`deployments/46630.json`](deployments/46630.json)
+- **Deployment source:** awaiting the Genesis-economy Robinhood Testnet redeployment manifest
 - **Review status:** Internal review
 - **License:** Business Source License 1.1
 
@@ -30,17 +30,21 @@ against that manifest.
 
 ## Routes
 
-- `/app` — Dollar and portfolio overview.
+- `/app` — launch and portfolio overview.
+- `/app/swap` — canonical ETH/WETH/STATICS swaps and Genesis Vault acquisition/redemption.
 - `/app/wallet` — EVM and Solana assets, transfers, Portal access, and testnet fixture controls.
 - `/app/wallet?modal=portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and the
   LayerZero EVE bridge between Base and Robinhood Chain.
 - `/app/dollar` — ETH/WETH deposits, recombination, and Risk Share supply.
 - `/app/dollar?profile=USDG` — pegged Statics Dollar profile.
-- `/app/baskets` — basket discovery, creation, conversion, and canonical swaps.
+- `/app/baskets` — basket discovery, creation, conversion, and protocol swaps.
 - `/app/positions` — PositionNFT custody and collateral management.
+- `/app/genesis` — inspect and activate Genesis NFTs owned by the connected wallet, register them for launch rewards, claim accrued rewards, and borrow against a Genesis after the Epoch.
+- `/app/genesis/recoveries` — recover Genesis NFTs whose secured credit has matured, for the caller incentive.
+- `/app/create` — permissionlessly configure, fund, and launch an index basket.
+- `/app/rewards` — claim Position, Basket, creator, and permissionless partner-distribution rewards.
 - `/app/loans` — proportional self-backed lending.
-- `/app/rewards` — staking, reward selection, and claims.
-- `/app/liquidity` — canonical pools and user LP positions.
+- `/app/liquidity` — protocol pools and user LP positions.
 - `/app/activity` — wallet-scoped EVM, Solana, bridge, and protocol activity.
 
 ## Requirements
@@ -135,6 +139,40 @@ npm run verify:connected:local
 
 These controls accept only chain `31337`, bounded typed inputs, and exact wallet addresses. They
 cannot submit arbitrary targets or calldata.
+
+## Robinhood mainnet launch fork
+
+The launch application can be exercised against a fresh deployment on a persistent local fork of
+Robinhood mainnet. The coordinator starts loopback-only Anvil, deploys the standalone Genesis and
+Doppler market through Robinhood's existing infrastructure, indexes circulating Genesis state,
+and starts Next.js with a generated development-only manifest:
+
+```bash
+export STATICS_PROTOCOL_REPOSITORY=/path/to/statics
+export ROBINHOOD_MAINNET=https://your-server-only-robinhood-rpc.example
+npm run dev:launch-fork
+```
+
+`ROBINHOOD_MAINNET` is relayed through a temporary loopback endpoint so authenticated upstream RPC
+credentials are not exposed in the Anvil process arguments. The generated operator mnemonic and
+private key remain in process memory. Public session metadata, the isolated database, and the
+control socket are ephemeral local state under `.local/launch-fork`; none are written to
+`.env.local` or version control.
+
+While the stack is running:
+
+```bash
+npm run launch-fork:status
+npm run launch-fork:fund-wallet -- 0xYourWallet --eth 10 --statics 100000
+npm run launch-fork:generate-volume -- --eth 1 --cycles 5
+```
+
+These are fork-local balances and transactions. They do not move real ETH or change Robinhood
+mainnet. Deployment runs under Robinhood identity, then the interactive fork changes to Local
+Anvil chain `31337`. The app's existing network selector can therefore move among Local Anvil,
+Robinhood mainnet, and Robinhood testnet without a second deployment control. Canonical
+STATICS/WETH trades still use the real Robinhood V4 contracts copied into the fork. The controls
+accept a fixed set of bounded operations and cannot submit arbitrary calldata.
 
 ## Robinhood testnet build
 

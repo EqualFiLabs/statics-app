@@ -53,6 +53,7 @@ export type DollarActivityKind =
   | "opt-in-reward-assets"
   | "opt-out-reward-assets"
   | "claim-rewards"
+  | "accrue-genesis-rewards"
   | "claim-basket-rewards"
   | "transfer-nft"
   | "create-basket"
@@ -72,7 +73,20 @@ export type DollarActivityKind =
   | "borrow-loan"
   | "repay-loan"
   | "extend-loan"
-  | "recover-loan";
+  | "recover-loan"
+  | "checkpoint-rewards"
+  | "activate-genesis"
+  | "buy-genesis"
+  | "approve-genesis"
+  | "redeem-genesis"
+  | "open-genesis-credit"
+  | "extend-genesis-credit"
+  | "repay-genesis-credit"
+  | "recover-genesis-credit"
+  | "link-genesis"
+  | "unlink-genesis"
+  | "claim-creator-revenue"
+  | "distribute-partner-revenue";
 
 /** Wall clock for an activity record. Impure, so it stays out of components. */
 export function activityTimestamp(): number {
@@ -83,6 +97,7 @@ export type DollarActivity = Readonly<{
   id: string;
   wallet: Address;
   chainId: number;
+  deploymentId?: string;
   kind: DollarActivityKind;
   label: string;
   amount: string;
@@ -96,6 +111,7 @@ export type DollarActivity = Readonly<{
 }>;
 
 const activityEvent = "statics-protocol-activity";
+const DEFAULT_ACTIVITY_DEPLOYMENT_ID = "robinhood-testnet-genesis";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
 const aggregateActivityCache = new Map<
   string,
@@ -113,26 +129,28 @@ const activityStatuses = new Set<DollarActivityStatus>([
   "failed",
 ]);
 
-function storageKey(wallet: Address, chainId: number): string {
-  return `statics:protocol:activity:${chainId}:${wallet.toLowerCase()}`;
+function storageKey(wallet: Address, chainId: number, deploymentId: string): string {
+  return `statics:protocol:activity:${chainId}:${deploymentId}:${wallet.toLowerCase()}`;
 }
 
-function legacyStorageKey(wallet: Address, chainId: number): string {
-  return `statics:dollar:activity:${chainId}:${wallet.toLowerCase()}`;
+export function activeActivityDeploymentId(): string {
+  return DEFAULT_ACTIVITY_DEPLOYMENT_ID;
 }
 
-export function readDollarActivity(wallet: Address, chainId: number): DollarActivity[] {
+export function readDollarActivity(
+  wallet: Address,
+  chainId: number,
+  deploymentId = DEFAULT_ACTIVITY_DEPLOYMENT_ID
+): DollarActivity[] {
   if (typeof window === "undefined") return [];
-  const key = storageKey(wallet, chainId);
+  const key = storageKey(wallet, chainId, deploymentId);
   const protocolRaw = window.localStorage.getItem(key) || "[]";
-  const legacyRaw = window.localStorage.getItem(legacyStorageKey(wallet, chainId)) || "[]";
-  const raw = `${protocolRaw}\n${legacyRaw}`;
+  const raw = protocolRaw;
   const cached = activityCache.get(key);
   if (cached?.raw === raw) return cached.value;
   try {
-    const parsed: unknown[] = [JSON.parse(protocolRaw), JSON.parse(legacyRaw)];
-    const value = parsed
-      .flatMap((items) => (Array.isArray(items) ? items : []))
+    const parsed: unknown = JSON.parse(protocolRaw);
+    const value = (Array.isArray(parsed) ? parsed : [])
       .filter(
         (item): item is DollarActivity =>
           typeof item === "object" &&
@@ -140,6 +158,7 @@ export function readDollarActivity(wallet: Address, chainId: number): DollarActi
           typeof (item as DollarActivity).id === "string" &&
           typeof (item as DollarActivity).wallet === "string" &&
           Number.isInteger((item as DollarActivity).chainId) &&
+          (item as DollarActivity).deploymentId === deploymentId &&
           typeof (item as DollarActivity).kind === "string" &&
           typeof (item as DollarActivity).label === "string" &&
           typeof (item as DollarActivity).amount === "string" &&
@@ -167,23 +186,18 @@ export const writeProtocolActivity = writeDollarActivity;
 export const updateProtocolActivity = updateDollarActivity;
 export const subscribeProtocolActivity = subscribeDollarActivity;
 
-/**
- * Every chain this wallet has a stored record on.
- *
- * Activity is written per chain, so reading it back needs a list of chains to
- * look in. Deriving that list from the wallet's configured networks means a
- * record written on a network that was later removed -- or one the person is
- * simply not connected to right now -- silently disappears. The keys already
- * name the chain, so the honest source of that list is storage itself.
- */
-export function readActivityChainIds(wallet: Address): number[] {
+export function readActivityChainIds(
+  wallet: Address,
+  deploymentId = DEFAULT_ACTIVITY_DEPLOYMENT_ID
+): number[] {
   if (typeof window === "undefined") return [];
   const owner = wallet.toLowerCase();
   const found = new Set<number>();
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
     if (!key || !key.endsWith(`:${owner}`)) continue;
-    const match = /^statics:(?:protocol|dollar):activity:(\d+):/.exec(key);
+    const match = /^statics:protocol:activity:(\d+):([^:]+):/.exec(key);
+    if (!match || match[2] !== deploymentId) continue;
     const chainId = match ? Number(match[1]) : Number.NaN;
     if (Number.isSafeInteger(chainId)) found.add(chainId);
   }
@@ -192,13 +206,16 @@ export function readActivityChainIds(wallet: Address): number[] {
 
 export function readProtocolActivityAcrossChains(
   wallet: Address,
-  chainIds: readonly number[]
+  chainIds: readonly number[],
+  deploymentId = DEFAULT_ACTIVITY_DEPLOYMENT_ID
 ): DollarActivity[] {
   const uniqueChainIds = [...new Set(chainIds.filter(Number.isSafeInteger))].sort(
     (left, right) => left - right
   );
-  const key = `${wallet.toLowerCase()}:${uniqueChainIds.join(",")}`;
-  const sources = uniqueChainIds.map((chainId) => readDollarActivity(wallet, chainId));
+  const key = `${deploymentId}:${wallet.toLowerCase()}:${uniqueChainIds.join(",")}`;
+  const sources = uniqueChainIds.map((chainId) =>
+    readDollarActivity(wallet, chainId, deploymentId)
+  );
   const cached = aggregateActivityCache.get(key);
   if (
     cached &&
@@ -216,9 +233,14 @@ export function readProtocolActivityAcrossChains(
 }
 
 export function writeDollarActivity(activity: DollarActivity): void {
-  const current = readDollarActivity(activity.wallet, activity.chainId);
-  const next = [activity, ...current.filter((item) => item.id !== activity.id)].slice(0, 50);
-  window.localStorage.setItem(storageKey(activity.wallet, activity.chainId), JSON.stringify(next));
+  const deploymentId = activity.deploymentId ?? activeActivityDeploymentId();
+  const normalized = { ...activity, deploymentId };
+  const current = readDollarActivity(activity.wallet, activity.chainId, deploymentId);
+  const next = [normalized, ...current.filter((item) => item.id !== activity.id)].slice(0, 50);
+  window.localStorage.setItem(
+    storageKey(activity.wallet, activity.chainId, deploymentId),
+    JSON.stringify(next)
+  );
   window.dispatchEvent(new CustomEvent(activityEvent));
 }
 
@@ -226,9 +248,10 @@ export function updateDollarActivity(
   wallet: Address,
   chainId: number,
   id: string,
-  update: Partial<DollarActivity>
+  update: Partial<DollarActivity>,
+  deploymentId = activeActivityDeploymentId()
 ): void {
-  const current = readDollarActivity(wallet, chainId);
+  const current = readDollarActivity(wallet, chainId, deploymentId);
   const existing = current.find((item) => item.id === id);
   if (!existing) return;
   writeDollarActivity({ ...existing, ...update });

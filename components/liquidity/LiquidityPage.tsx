@@ -25,13 +25,17 @@ import {
   buildStakeLiquidityPositionCall,
   buildUnstakeLiquidityPositionCall,
   permit2AllowanceAbi,
+  quoteRangeAmounts,
   staticsAbi,
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
 import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import {
   canonicalFullRange,
   canonicalPoolLabel,
@@ -61,7 +65,6 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 
-const deploymentState = readClientDollarDeployment();
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
 
 export function lpStakeEligibility(
@@ -120,6 +123,28 @@ export function formatLiquidityAmount(value: bigint, decimals: number): string {
       .formatToParts(0.1)
       .find((part) => part.type === "decimal")?.value ?? ".";
   return `${formattedWhole}${decimalSeparator}${formattedFraction}`;
+}
+
+function positionPoolSummary(position: LpPositionRecord, pool: CanonicalPoolRecord | undefined) {
+  if (!pool) return null;
+  const tokens = [
+    pool.key.currency0 === pool.basketToken.address ? pool.basketToken : pool.asset,
+    pool.key.currency1 === pool.basketToken.address ? pool.basketToken : pool.asset,
+  ] as const;
+  const amounts =
+    position.liquidity === 0n
+      ? { amount0: 0n, amount1: 0n }
+      : quoteRangeAmounts(
+          pool.sqrtPriceX96,
+          position.tickLower,
+          position.tickUpper,
+          position.liquidity
+        );
+  const eligiblePercent =
+    position.liquidity === 0n
+      ? 0
+      : Number((position.eligibleLiquidity * 10_000n) / position.liquidity) / 100;
+  return { tokens, amounts: [amounts.amount0, amounts.amount1] as const, eligiblePercent };
 }
 
 function inputAmount(value: bigint, decimals: number, locale: string): string {
@@ -266,7 +291,11 @@ export function LiquidityContributionForm({
 export function LiquidityPage() {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
-  return <LiquidityRuntime />;
+  return (
+    <ProtocolActionScope>
+      <LiquidityRuntime />
+    </ProtocolActionScope>
+  );
 }
 
 function LiquidityRuntime() {
@@ -274,6 +303,8 @@ function LiquidityRuntime() {
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<Mode>("create");
@@ -295,6 +326,7 @@ function LiquidityRuntime() {
       wallet,
     ],
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(deploymentState.deployment.liquidity) &&
       Boolean(publicClient) &&
@@ -1048,10 +1080,9 @@ function LiquidityRuntime() {
     }
   };
 
-  const surfaceState =
-    walletState.status === "unconfigured" ||
-    deploymentState.status === "unavailable" ||
-    !deploymentState.deployment.liquidity
+  const surfaceState = !protocol.available
+    ? "empty"
+    : walletState.status === "unconfigured" || !deploymentState.deployment.liquidity
       ? "unconfigured"
       : deriveSurfaceState({
           walletStatus: walletState.status,
@@ -1182,7 +1213,7 @@ function LiquidityRuntime() {
                 </span>
               </button>
               <details>
-                <summary>Pool diagnostics</summary>
+                <summary>Technical details</summary>
                 <dl>
                   <div>
                     <dt>Hook fee</dt>
@@ -1196,17 +1227,43 @@ function LiquidityRuntime() {
                     <dd>{item.decommissioned ? "Exit only" : "Live from creation"}</dd>
                   </div>
                   <div>
-                    <dt>Manager</dt>
-                    <dd>{item.managerSynced ? "Synced" : "Not synced"}</dd>
-                  </div>
-                  <div>
-                    <dt>Pending POL</dt>
+                    <dt>Revenue split</dt>
                     <dd>
-                      {item.pending0.toString()} / {item.pending1.toString()}
+                      {Number(item.hookFees.lockedLiquidityShareBps) / 100}% locked liquidity ·{" "}
+                      {Number(item.hookFees.liquidityProviderShareBps) / 100}% LPs ·{" "}
+                      {Number(item.hookFees.basketStakerShareBps) / 100}% Basket stakers ·{" "}
+                      {Number(item.hookFees.staticsStakerShareBps) / 100}% STATICS stakers ·{" "}
+                      {Number(item.hookFees.stonkBrokersShareBps) / 100}% StonkBrokers ·{" "}
+                      {Number(item.hookFees.indexCreatorShareBps) / 100}% creator ·{" "}
+                      {Number(item.hookFees.treasuryShareBps) / 100}% treasury
                     </dd>
                   </div>
                   <div>
-                    <dt>Locked POL</dt>
+                    <dt>Pending locked liquidity</dt>
+                    <dd>
+                      {formatLiquidityAmount(
+                        item.pending0,
+                        item.key.currency0 === item.basketToken.address
+                          ? item.basketToken.decimals
+                          : item.asset.decimals
+                      )}{" "}
+                      {item.key.currency0 === item.basketToken.address
+                        ? item.basketToken.symbol
+                        : item.asset.symbol}{" "}
+                      /{" "}
+                      {formatLiquidityAmount(
+                        item.pending1,
+                        item.key.currency1 === item.basketToken.address
+                          ? item.basketToken.decimals
+                          : item.asset.decimals
+                      )}{" "}
+                      {item.key.currency1 === item.basketToken.address
+                        ? item.basketToken.symbol
+                        : item.asset.symbol}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Locked liquidity</dt>
                     <dd>{item.lockedLiquidity.toString()}</dd>
                   </div>
                 </dl>
@@ -1231,29 +1288,45 @@ function LiquidityRuntime() {
               }}
             />
           )}
-          {catalog.data?.positions.map((item) => (
-            <button
-              type="button"
-              key={item.tokenId.toString()}
-              className={`lp-position${position?.tokenId === item.tokenId ? " is-selected" : ""}`}
-              onClick={() => {
-                setTokenId(item.tokenId.toString());
-                setMode(recommendedLiquidityAction(item, currentBlock));
-                resetContribution();
-                setError(null);
-              }}
-            >
-              <strong>Liquidity position #{item.tokenId.toString()}</strong>
-              <small>
-                {item.staked ? "Staked" : "Wallet-owned"} · {item.liquidity.toString()} liquidity
-              </small>
-              {item.staked && (
-                <small>
-                  Rewards: {item.claimable0.toString()} / {item.claimable1.toString()}
-                </small>
-              )}
-            </button>
-          ))}
+          {catalog.data?.positions.map((item) => {
+            const itemPool = catalog.data?.pools.find(
+              (candidate) => candidate.poolId === item.poolId
+            );
+            const summary = positionPoolSummary(item, itemPool);
+            return (
+              <button
+                type="button"
+                key={item.tokenId.toString()}
+                className={`lp-position${position?.tokenId === item.tokenId ? " is-selected" : ""}`}
+                onClick={() => {
+                  setTokenId(item.tokenId.toString());
+                  setMode(recommendedLiquidityAction(item, currentBlock));
+                  resetContribution();
+                  setError(null);
+                }}
+              >
+                <strong>Liquidity position #{item.tokenId.toString()}</strong>
+                <small>{item.staked ? "Staked and earning" : "In your wallet"}</small>
+                {summary && (
+                  <small>
+                    Deposited:{" "}
+                    {formatLiquidityAmount(summary.amounts[0], summary.tokens[0].decimals)}{" "}
+                    {summary.tokens[0].symbol} +{" "}
+                    {formatLiquidityAmount(summary.amounts[1], summary.tokens[1].decimals)}{" "}
+                    {summary.tokens[1].symbol}
+                  </small>
+                )}
+                {item.staked && summary && (
+                  <small>
+                    Claimable: {formatLiquidityAmount(item.claimable0, summary.tokens[0].decimals)}{" "}
+                    {summary.tokens[0].symbol} +{" "}
+                    {formatLiquidityAmount(item.claimable1, summary.tokens[1].decimals)}{" "}
+                    {summary.tokens[1].symbol}
+                  </small>
+                )}
+              </button>
+            );
+          })}
         </section>
         <section className="remaining-workspace">
           <div className="liquidity-entry-actions">
@@ -1418,29 +1491,61 @@ function LiquidityRuntime() {
                 </p>
               )}
               {position && (
-                <details className="liquidity-position-diagnostics">
-                  <summary>Position diagnostics</summary>
-                  <dl>
-                    <div>
-                      <dt>Total liquidity</dt>
-                      <dd>{position.liquidity.toString()}</dd>
-                    </div>
-                    <div>
-                      <dt>Eligible</dt>
-                      <dd>{position.eligibleLiquidity.toString()}</dd>
-                    </div>
-                    <div>
-                      <dt>Pending</dt>
-                      <dd>{position.pendingLiquidity.toString()}</dd>
-                    </div>
-                    <div>
-                      <dt>Claimable pair</dt>
-                      <dd>
-                        {position.claimable0.toString()} / {position.claimable1.toString()}
-                      </dd>
-                    </div>
-                  </dl>
-                </details>
+                <>
+                  {(() => {
+                    const summary = positionPoolSummary(position, selectedPool);
+                    if (!summary) return null;
+                    return (
+                      <dl className="remaining-quote">
+                        <div>
+                          <dt>Current deposits</dt>
+                          <dd>
+                            {formatLiquidityAmount(summary.amounts[0], summary.tokens[0].decimals)}{" "}
+                            {summary.tokens[0].symbol} +{" "}
+                            {formatLiquidityAmount(summary.amounts[1], summary.tokens[1].decimals)}{" "}
+                            {summary.tokens[1].symbol}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Reward eligibility</dt>
+                          <dd>{summary.eligiblePercent}% eligible</dd>
+                        </div>
+                        <div>
+                          <dt>Claimable rewards</dt>
+                          <dd>
+                            {formatLiquidityAmount(position.claimable0, summary.tokens[0].decimals)}{" "}
+                            {summary.tokens[0].symbol} +{" "}
+                            {formatLiquidityAmount(position.claimable1, summary.tokens[1].decimals)}{" "}
+                            {summary.tokens[1].symbol}
+                          </dd>
+                        </div>
+                      </dl>
+                    );
+                  })()}
+                  <details className="liquidity-position-diagnostics">
+                    <summary>Technical details</summary>
+                    <dl>
+                      <div>
+                        <dt>Total liquidity</dt>
+                        <dd>{position.liquidity.toString()}</dd>
+                      </div>
+                      <div>
+                        <dt>Eligible</dt>
+                        <dd>{position.eligibleLiquidity.toString()}</dd>
+                      </div>
+                      <div>
+                        <dt>Pending</dt>
+                        <dd>{position.pendingLiquidity.toString()}</dd>
+                      </div>
+                      <div>
+                        <dt>Claimable pair</dt>
+                        <dd>
+                          {position.claimable0.toString()} / {position.claimable1.toString()}
+                        </dd>
+                      </div>
+                    </dl>
+                  </details>
+                </>
               )}
             </>
           )}

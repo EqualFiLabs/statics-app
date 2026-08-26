@@ -6,3 +6,4 @@ test-results
 vendor
 package-lock.json
 *.png
+ponder/.ponder

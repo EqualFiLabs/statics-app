@@ -6,7 +6,7 @@ import { resolveNftImage } from "@/lib/wallet/nft-image";
 const contract = "0x1111111111111111111111111111111111111111" as const;
 
 describe("NFT artwork resolution", () => {
-  it("returns self-contained PositionNFT SVG artwork from onchain metadata", async () => {
+  it("returns self-contained Genesis SVG artwork from onchain metadata", async () => {
     const image = `data:image/svg+xml;base64,${btoa("<svg xmlns='http://www.w3.org/2000/svg'/>")}`;
     const metadata = btoa(JSON.stringify({ name: "Statics Position #7", image }));
     const publicClient = {

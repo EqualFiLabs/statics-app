@@ -53,9 +53,10 @@ export function WalletNftList({
               {nft.carries.length > 0 && (
                 <p className="wallet-nft-carries">Moves with it: {nft.carries.join(", ")}</p>
               )}
+              {nft.transferWarning && <p className="wallet-nft-carries">{nft.transferWarning}</p>}
               {nft.blockedReason && <p className="wallet-nft-blocked">{nft.blockedReason}</p>}
             </div>
-            <NftArtwork nft={nft} chainId={chainId} />
+            <NftArtwork nft={nft} chainId={chainId} expandable />
           </div>
           <button
             className="wallet-nft-send"

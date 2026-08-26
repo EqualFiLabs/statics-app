@@ -10,15 +10,15 @@ import {
   staticsTestnetFaucetAbi,
 } from "@statics-protocol/sdk";
 
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { ProtocolActionScope } from "@/components/protocol/ProtocolAvailability";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import { describeDollarError } from "@/lib/dollar/transactions";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import type { WalletToken } from "@/lib/wallet-tokens";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
-
-const deploymentState = readClientDollarDeployment();
 
 type FaucetAsset = {
   address: Address;
@@ -52,13 +52,22 @@ export function faucetWalletTokens(assets: readonly FaucetAsset[]): WalletToken[
 }
 
 export function TestnetFaucetCard() {
+  return (
+    <ProtocolActionScope>
+      <TestnetFaucetRuntime />
+    </ProtocolActionScope>
+  );
+}
+
+function TestnetFaucetRuntime() {
   const t = useTranslations("faucet");
   const format = useFormatter();
   const wallet = useWalletState();
-  const deployment = deploymentState.status === "configured" ? deploymentState.deployment : null;
+  const { active } = useDeployment();
+  const deployment = active.protocol?.protocol ?? null;
   const faucet = deployment?.faucet;
-  const faucetChainId = deployment?.chainId ?? 46_630;
-  const { tokens, addTokens } = useWalletTokens(faucetChainId);
+  const faucetChainId = deployment?.chainId ?? active.descriptor.chainId;
+  const { tokens, addTokens } = useWalletTokens(faucetChainId, active.protocol ?? active.launch);
   const [snapshot, setSnapshot] = useState<FaucetSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
@@ -263,9 +272,7 @@ export function TestnetFaucetCard() {
           </a>
         </p>
       </div>
-      {!faucet ? (
-        <p className="dollar-action-reason">{t("notRecorded")}</p>
-      ) : !wallet.address ? (
+      {!faucet ? null : !wallet.address ? (
         <p>{t("signInInventory")}</p>
       ) : !onFundingChain ? (
         <p>{t("switchInventory")}</p>

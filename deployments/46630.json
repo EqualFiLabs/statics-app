@@ -1,55 +1,63 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "network": "Robinhood Chain Testnet",
   "chainId": 46630,
-  "deploymentStartBlock": "97383161",
+  "deploymentStartBlock": "101169765",
   "wethProfileId": "1",
-  "protocolCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b",
+  "protocolCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics",
-    "publicCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b",
-    "deploymentArtifact": "deployments/robinhood-testnet-46630-statics.json",
-    "recordedDeploymentCommit": "aeed216abe9d8d08d589b5a66aba637f9a04822b"
+    "publicCommit": "15b278ce4ed5717096966c103abb7d5bc710a7a3",
+    "deploymentArtifact": "deployments/robinhood-testnet-46630-statics-genesis.json",
+    "recordedDeploymentCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16"
   },
-  "generatedAt": "2026-08-07T19:34:26.242Z",
+  "generatedAt": "2026-08-15T11:11:46.831Z",
   "contracts": {
     "diamond": {
-      "address": "0x2340741Ec94dF12678312f564eBc2c776d8FaA6a",
+      "address": "0xd41199E3A980dBcC5D3fB3fbD7B973cf255F474E",
       "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
     },
     "core": {
-      "address": "0x6AB8009073e0e6E0b0458e39E3b547DA31b5724f",
+      "address": "0xe469D218381C68e111557d012Fc6b497c296A7a2",
       "runtimeCodeHash": "0x35c10006ccb33b16c89c2c70508c41c4ff924a31b83f5e5a3f51b2e9856a069c"
     },
     "gateway": {
-      "address": "0x2340741Ec94dF12678312f564eBc2c776d8FaA6a",
+      "address": "0xd41199E3A980dBcC5D3fB3fbD7B973cf255F474E",
       "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
     },
     "dollar": {
-      "address": "0xd1F2DC3Ed9b70a85B6629C04afCEdb43B2Ca25ce",
-      "runtimeCodeHash": "0x5126deb85479a534dd8f21eab7a2600f29d488699dabf20f9bfe64fa8c2a1c8a"
+      "address": "0x7a7aA56dcA62946819803cD770f5DA6a711D2ef0",
+      "runtimeCodeHash": "0x1ad929ed605f5e5450fdeccff4b18605feabd3f7511b69bc15ef946ff8f22301"
     },
     "risk": {
-      "address": "0x5E316e8961C9C5ef4bbd6dc0573dc3cf232eEd6c",
-      "runtimeCodeHash": "0xcd0505047480b23a1faf10e5f9e442dd9a926c32dc45115968368795b4a0814b"
+      "address": "0x4993fC3D4Ce3f095262fe5acD8Afce06550c1979",
+      "runtimeCodeHash": "0x18e687f13fcd534c5c2e0c465e52dec35143db430d4243d8ad57b561debebf0e"
     },
     "weth": {
       "address": "0x33e4191705c386532ba27cBF171Db86919200B94",
       "runtimeCodeHash": "0x55f8ac53c64450f01880d8249fc5cb0c69c064e4bcb097ea80a02fff40485a7c"
     },
     "oracle": {
-      "address": "0x69a88C213eda8db22373Fd9C113bB988231652e2",
-      "runtimeCodeHash": "0xfcee6727ff70617eb82f22935838a9cb000e401dd3e53af39b184ecd4a2d3ba8"
+      "address": "0xF2B56CeEc0Be809486e24Cf31A0b4c0aB6011845",
+      "runtimeCodeHash": "0xfbf5ea96fc311a467a7ba93eee2aa8a6b7e808c2be8585df77ee035d4b78f007"
     }
   },
-  "positionMetadata": {
+  "genesis": {
+    "token": {
+      "address": "0x9b120633B04BD16dB98f346bC709C8e045689A83",
+      "runtimeCodeHash": "0xc704cfeafbfdcdcd004fa0ef4c4d8af86383d54d5610f3e790129a9311a35f27"
+    },
+    "collection": {
+      "address": "0xD07A692076E226D69608F1Ca34024705D9eBBF2d",
+      "runtimeCodeHash": "0x1894614318b9ee18b34cab6ad116ae513c10f99bdddd2119e724699a089545eb"
+    },
     "renderer": {
-      "address": "0x6da774A3B27B267D1926fEf7FFeB71cC80a6700C",
-      "runtimeCodeHash": "0xe2ad21173cfed34b6cde6469ebb29771e313fbada1d5bc73eb1fd8f119452a05"
+      "address": "0xB7a0722ecf5A6EAFA23573D2250DD6a465b7CaB4",
+      "runtimeCodeHash": "0xb3c26a23d91f764ad3f7ac494469e069d4eca3e0fddc6bd247a5272a4823f923"
     },
     "avatarSvg": {
-      "address": "0x4D5513E2e4B0A0f547E850420437D841CFF6Ca8C",
-      "runtimeCodeHash": "0x8124f889e23bf7ce96e188b230e4409b60e0bfca6641e29763a55cb1a5f37ea3"
+      "address": "0x641535d09e6D5a76651d6707AdBe37Cf4656f655",
+      "runtimeCodeHash": "0x0be229cf3ae4d5b5a37bcddf2501e583460729a35f9c80d8de2ffb2120785787"
     }
   },
   "liquidity": {
@@ -66,12 +74,12 @@
       "runtimeCodeHash": "0x0117e0ed818bc3f2a8729ffc336c837e63e965f04b473047b39b35ad86aac259"
     },
     "swapFeeHook": {
-      "address": "0x9718C37742F6650BdD7147e0e4854f5bb0Bd90Cc",
-      "runtimeCodeHash": "0xf3f05eb498f5051637cc1313bddbd948dcba5fc15fa762555c8b7bf8c8408005"
+      "address": "0x120B21978627e2b821d2B91786cB3359703090EC",
+      "runtimeCodeHash": "0x8686a94ff4f85d449b77288ced44c2222b6a599527f93c17d1cf9b423bc00066"
     },
     "liquidityManager": {
-      "address": "0x9E8B33ff86e36fe64ba2f1504fF53bE586F4183A",
-      "runtimeCodeHash": "0xc24a2bdc27399ebf3c2522253151f410b5e99f2b05630dbb58e17c95a7ad34eb"
+      "address": "0xa8484f431F7b48616669b0357125eDEE70234682",
+      "runtimeCodeHash": "0x8e15091bac456625e466e3c0a2f34f2bf80f4c39c179c54b7d8540d9793d5497"
     },
     "stateView": {
       "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
@@ -89,16 +97,16 @@
   "pegged": {
     "profileId": "2",
     "collateral": {
-      "address": "0x3c9dCe3FD17f3FC8A1929B1614b2c99124129Da1",
-      "runtimeCodeHash": "0x9c8f77b351af6eec700c86095467d0fb41f6f7bec159fa00416005decd8a80b6"
+      "address": "0xe46898175ffBdC6788432b2c537eE4033B809A88",
+      "runtimeCodeHash": "0x1628ff1ae48c5fe529343b4786fcfd05b96ac4171c356f6ef12f3ea4656cb679"
     },
     "oracle": {
-      "address": "0x2da7445953d5f3E3128B967c476DF38F1783Fa38",
-      "runtimeCodeHash": "0x19e93806923f0b15cecdf4d715cad7356d1528e942f679e233e88ea9b10c3847"
+      "address": "0x247c3543B7f710311B44735f76ef087ACa242b8e",
+      "runtimeCodeHash": "0xa857db54d9b01b50490fb464d00b35a531d4637ce7b3a2d45e33dfaa10d5e662"
     }
   },
   "faucet": {
-    "address": "0xDc74E592efbe3CE5A86785E89E50b53Fe0F8F04E",
+    "address": "0xC00BE4eC9D2AF217DdD2989695249208CfD459eA",
     "runtimeCodeHash": "0xa0903aaf8ebd61099837a652bbb657ed715196ae265306f05b030b8facf7f103"
   }
 }

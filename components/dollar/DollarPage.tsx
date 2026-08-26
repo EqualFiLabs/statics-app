@@ -31,6 +31,7 @@ import type { DollarActivityKind } from "@/lib/dollar/activity";
 import {
   DOLLAR_PAIRING_FILL_PAUSE,
   deriveDollarActionAvailability,
+  dollarPauseStatuses,
   dollarQuoteQueryKey,
   type DollarActionMode,
   type DollarCollateralChoice,
@@ -47,11 +48,7 @@ import {
   preferredSupplyPosition,
   supplyActionAvailability,
 } from "@/lib/dollar/supply";
-import {
-  readClientDollarDeployment,
-  verifyDollarDeployment,
-  type DollarDeployment,
-} from "@/lib/dollar/deployment";
+import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import {
   describeDollarError,
   WAD,
@@ -64,6 +61,10 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { deriveSurfaceState } from "@/lib/surface-state";
 import { claimablePositionRewards } from "@/lib/positions/positions";
 import { loadLoanCatalog } from "@/lib/loans/loans";
@@ -74,8 +75,9 @@ import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { PeggedDollarPanel } from "@/components/portal/PeggedDollarPanel";
 import type { DollarProfileChoice } from "@/lib/dollar/profile-navigation";
-
-const deploymentState = readClientDollarDeployment();
+import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
+import { applyPercent } from "@/lib/protocol/ux";
 
 /** Supply and withdraw move Risk shares; the other three move Dollar or ETH. */
 const isSupplyMode = (mode: DollarActionMode): mode is "supply" | "unsupply" =>
@@ -158,10 +160,11 @@ function globalHealthLabel(phase: number): string {
   return ["Available", "Impaired", "Recovering", "Health unavailable"][phase] ?? "Restricted";
 }
 
-function useDollarSnapshot(deployment: DollarDeployment, wallet: Address) {
+function useDollarSnapshot(deployment: DollarDeployment, wallet: Address, enabled = true) {
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   return useQuery({
     queryKey: ["dollar-snapshot", deployment.chainId, wallet],
+    enabled,
     refetchInterval: 8_000,
     queryFn: async () => {
       if (!publicClient) throw new Error("The configured public client is unavailable.");
@@ -336,9 +339,7 @@ function DollarOverviewConnected({
       <div>
         <p className="dapp-section-label">{t("staticsDollar")}</p>
         <h2 id="dollar-overview-title">{displayAmount(data.dollarBalance)} Dollar</h2>
-        <p>
-          Series {data.seriesId.toString()} · {displayAmount(data.riskBalance)} active Risk
-        </p>
+        <p>{displayAmount(data.riskBalance)} active Risk shares</p>
       </div>
       <div className="dollar-overview-health">
         <span>{data.solvency.healthy ? "Healthy" : "Impaired"}</span>
@@ -369,20 +370,26 @@ function DollarOverviewConnected({
  * deposited basket accumulates more of the assets it holds -- so it leads, in
  * those assets, rather than being a count of claims buried in a tile.
  */
-function OverviewPortfolio({ wallet }: { wallet: Address }) {
+function OverviewPortfolio({
+  wallet,
+  deployment,
+}: {
+  wallet: Address;
+  deployment: DollarDeployment;
+}) {
   const t = useTranslations("dollar");
   const publicClient = usePublicClient();
 
   // loadLoanCatalog loads the position catalog internally, so one read covers
   // positions, deposited baskets and loans.
   const catalog = useQuery({
-    queryKey: ["overview-portfolio", wallet],
-    enabled: deploymentState.status === "configured" && Boolean(publicClient),
+    queryKey: ["overview-portfolio", deployment.protocolCommit, wallet],
+    enabled: Boolean(publicClient),
     queryFn: () => {
-      if (!publicClient || deploymentState.status !== "configured") {
+      if (!publicClient) {
         throw new Error("No verified Statics deployment is configured.");
       }
-      return loadLoanCatalog(publicClient, deploymentState.deployment, wallet);
+      return loadLoanCatalog(publicClient, deployment, wallet);
     },
   });
 
@@ -391,16 +398,16 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
   const basketRewards = useQuery({
     queryKey: [
       "overview-basket-rewards",
+      deployment.protocolCommit,
       wallet,
       positions.map((position) => `${position.positionId}:${position.collateral.length}`).join(","),
     ],
-    enabled:
-      deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
+    enabled: Boolean(publicClient) && Boolean(catalog.data),
     queryFn: () => {
-      if (!publicClient || deploymentState.status !== "configured") {
+      if (!publicClient) {
         throw new Error("No verified Statics deployment is configured.");
       }
-      return loadBasketRewardSummary(publicClient, deploymentState.deployment, positions);
+      return loadBasketRewardSummary(publicClient, deployment, positions);
     },
   });
 
@@ -471,9 +478,9 @@ function OverviewPortfolio({ wallet }: { wallet: Address }) {
   );
 }
 
-export function DollarOverview() {
+export function DollarOverview({ deployment = null }: { deployment?: DollarDeployment | null }) {
   const wallet = useWalletState();
-  if (deploymentState.status === "unavailable") {
+  if (!deployment) {
     return (
       <SurfaceEmptyState
         state="unconfigured"
@@ -511,11 +518,8 @@ export function DollarOverview() {
   }
   return (
     <>
-      <DollarOverviewConnected
-        deployment={deploymentState.deployment}
-        wallet={getAddress(wallet.address)}
-      />
-      <OverviewPortfolio wallet={getAddress(wallet.address)} />
+      <DollarOverviewConnected deployment={deployment} wallet={getAddress(wallet.address)} />
+      <OverviewPortfolio wallet={getAddress(wallet.address)} deployment={deployment} />
     </>
   );
 }
@@ -524,17 +528,19 @@ function DollarActionPanel({
   deployment,
   wallet,
   initialProfile,
+  available = true,
 }: {
   deployment: DollarDeployment;
   wallet: Address;
   initialProfile: DollarProfileChoice;
+  available?: boolean;
 }) {
   const t = useTranslations("dollar");
   const locale = useAppLocale();
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.chainId });
   const walletClient = useWalletClient({ chainId: deployment.chainId });
-  const snapshot = useDollarSnapshot(deployment, wallet);
+  const snapshot = useDollarSnapshot(deployment, wallet, available);
   const [mode, setMode] = useState<DollarActionMode>("deposit");
   const [asset, setAsset] = useState<DollarCollateralChoice>(
     initialProfile === "WETH" ? "WETH" : "ETH"
@@ -563,7 +569,12 @@ function DollarActionPanel({
     // Supply and withdraw move Risk shares and have no Dollar quote. Without
     // this guard the query fell through to previewRecombine with a share
     // amount, and the failed result made currentQuote permanently null.
-    enabled: amount > 0n && Boolean(publicClient) && Boolean(snapshot.data) && !isSupplyMode(mode),
+    enabled:
+      available &&
+      amount > 0n &&
+      Boolean(publicClient) &&
+      Boolean(snapshot.data) &&
+      !isSupplyMode(mode),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       if (!publicClient || !snapshot.data) throw new Error("Dollar state is not ready.");
@@ -1107,7 +1118,7 @@ function DollarActionPanel({
           <strong>{displayAmount(state.dollarBalance)}</strong>
         </article>
         <article>
-          <span>Risk · series {state.seriesId.toString()}</span>
+          <span>Risk shares</span>
           <strong>{displayAmount(state.riskBalance)}</strong>
         </article>
       </section>
@@ -1131,26 +1142,54 @@ function DollarActionPanel({
           />
           <DollarProfileContent
             profile={peggedSelected ? "USDG" : asset}
-            pegged={<PeggedDollarPanel embedded onPendingChange={setPeggedPending} />}
+            pegged={
+              <PeggedDollarPanel
+                deployment={deployment}
+                embedded
+                onPendingChange={setPeggedPending}
+              />
+            }
             volatile={
               <>
-                <div className="dollar-tabs" aria-label="Dollar action">
-                  {(["deposit", "recombine", "redeem", "supply", "unsupply"] as const).map(
-                    (choice) => (
-                      <button
-                        key={choice}
-                        type="button"
-                        className={mode === choice ? "active" : undefined}
-                        onClick={() => {
-                          setMode(choice);
-                          setActionError(null);
-                        }}
-                        disabled={anyPending}
-                      >
-                        {t(choice)}
-                      </button>
-                    )
-                  )}
+                <div className="dollar-action-groups">
+                  <section>
+                    <span>{t("dollarActions")}</span>
+                    <div className="dollar-tabs" aria-label={t("dollarActions")}>
+                      {(["deposit", "recombine", "redeem"] as const).map((choice) => (
+                        <button
+                          key={choice}
+                          type="button"
+                          className={mode === choice ? "active" : undefined}
+                          onClick={() => {
+                            setMode(choice);
+                            setActionError(null);
+                          }}
+                          disabled={anyPending}
+                        >
+                          {t(choice)}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                  <section>
+                    <span>{t("earnFromRedemptions")}</span>
+                    <div className="dollar-tabs" aria-label={t("earnFromRedemptions")}>
+                      {(["supply", "unsupply"] as const).map((choice) => (
+                        <button
+                          key={choice}
+                          type="button"
+                          className={mode === choice ? "active" : undefined}
+                          onClick={() => {
+                            setMode(choice);
+                            setActionError(null);
+                          }}
+                          disabled={anyPending}
+                        >
+                          {t(choice)}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
                 </div>
                 <div className="dollar-field">
                   <label htmlFor="dollar-amount">{amountUnit} amount</label>
@@ -1166,19 +1205,23 @@ function DollarActionPanel({
                       placeholder="0.00"
                       disabled={anyPending}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAmountInput(formatUnits(balance, 18));
-                        setActionError(null);
-                      }}
-                      disabled={
-                        anyPending || supplyUnavailable || (mode === "deposit" && asset === "ETH")
-                      }
-                    >
-                      {mode === "deposit" && asset === "ETH" ? t("keepGas") : t("max")}
-                    </button>
                   </div>
+                  <AmountPercentageSlider
+                    amount={amount}
+                    maximum={balance}
+                    maximumSelection={
+                      mode === "deposit" && asset === "ETH" ? applyPercent(balance, 99) : balance
+                    }
+                    disabled={anyPending || supplyUnavailable}
+                    label={t("amountShortcuts")}
+                    onSelect={(percent) => {
+                      // Native ETH still needs gas; the Max shortcut reserves 1%.
+                      const safePercent =
+                        mode === "deposit" && asset === "ETH" && percent === 100 ? 99 : percent;
+                      setAmountInput(formatUnits(applyPercent(balance, safePercent), 18));
+                      setActionError(null);
+                    }}
+                  />
                   <small>
                     {supplyUnavailable
                       ? supplyUnavailableReason
@@ -1277,9 +1320,8 @@ function DollarActionPanel({
           )}
           {!peggedSelected && mode === "recombine" && !state.riskApproved && (
             <p className="dollar-warning">
-              ERC-1155 approval covers every Risk series, not only series{" "}
-              {state.seriesId.toString()}. The gateway is fixed by the verified deployment and
-              approval can be revoked below.
+              ERC-1155 approval covers every Risk series. The gateway is fixed by the verified
+              deployment and approval can be revoked below.
             </p>
           )}
           {!peggedSelected && actionAvailability.reason && (
@@ -1307,10 +1349,6 @@ function DollarActionPanel({
             <p className="dapp-section-label">{t("usdgProfile")}</p>
             <dl>
               <div>
-                <dt>{t("profile")}</dt>
-                <dd>#{deployment.pegged?.profileId.toString()}</dd>
-              </div>
-              <div>
                 <dt>{t("collateral")}</dt>
                 <dd>USDG</dd>
               </div>
@@ -1322,17 +1360,29 @@ function DollarActionPanel({
                 <dt>{t("riskShares")}</dt>
                 <dd>{t("none")}</dd>
               </div>
-              <div>
-                <dt>{t("gateway")}</dt>
-                <dd title={deployment.contracts.gateway}>
-                  {shortAddress(deployment.contracts.gateway)}
-                </dd>
-              </div>
             </dl>
             <p>
               USDG enters the pegged profile directly. It mints Statics Dollar without creating an
               ethLEV position.
             </p>
+            <details className="liquidity-position-diagnostics">
+              <summary>{t("technicalDetails")}</summary>
+              <dl>
+                <div>
+                  <dt>{t("profile")}</dt>
+                  <dd>#{deployment.pegged?.profileId.toString()}</dd>
+                </div>
+                <div>
+                  <dt>{t("gateway")}</dt>
+                  <dd>
+                    <AddressDisplay
+                      address={deployment.contracts.gateway}
+                      chainId={deployment.chainId}
+                    />
+                  </dd>
+                </div>
+              </dl>
+            </details>
           </aside>
         )}
         {!peggedSelected && (
@@ -1368,28 +1418,58 @@ function DollarActionPanel({
                 <dd>{displayAmount(state.profile.debtCeiling)} Dollar</dd>
               </div>
               <div>
-                <dt>{t("profileMode")}</dt>
-                <dd>{profileModeLabel(state.profile.mode)}</dd>
-              </div>
-              <div>
-                <dt>{t("seriesState")}</dt>
-                <dd>{seriesStatusLabel(state.series.status)}</dd>
-              </div>
-              <div>
-                <dt>{t("pausedMask")}</dt>
-                <dd>{state.pausedOperations.toString()}</dd>
-              </div>
-              <div>
                 <dt>{t("status")}</dt>
                 <dd>{globalHealthLabel(state.globalHealth[0])}</dd>
               </div>
-              <div>
-                <dt>{t("gateway")}</dt>
-                <dd title={deployment.contracts.gateway}>
-                  {shortAddress(deployment.contracts.gateway)}
-                </dd>
-              </div>
             </dl>
+            <details className="liquidity-position-diagnostics">
+              <summary>{t("technicalDetails")}</summary>
+              <dl>
+                <div>
+                  <dt>{t("profile")}</dt>
+                  <dd>#{deployment.wethProfileId.toString()}</dd>
+                </div>
+                <div>
+                  <dt>{t("series")}</dt>
+                  <dd>#{state.seriesId.toString()}</dd>
+                </div>
+                <div>
+                  <dt>{t("profileMode")}</dt>
+                  <dd>{profileModeLabel(state.profile.mode)}</dd>
+                </div>
+                <div>
+                  <dt>{t("seriesState")}</dt>
+                  <dd>{seriesStatusLabel(state.series.status)}</dd>
+                </div>
+                <div>
+                  <dt>{t("pausedOperations")}</dt>
+                  <dd>
+                    {dollarPauseStatuses(state.pausedOperations)
+                      .map((status) =>
+                        status.kind === "additional"
+                          ? t("pauseAdditional", { mask: status.mask?.toString() ?? "0" })
+                          : t(
+                              status.kind === "none"
+                                ? "pauseNone"
+                                : status.kind === "mint"
+                                  ? "pauseMint"
+                                  : "pauseRedemption"
+                            )
+                      )
+                      .join(" · ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t("gateway")}</dt>
+                  <dd>
+                    <AddressDisplay
+                      address={deployment.contracts.gateway}
+                      chainId={deployment.chainId}
+                    />
+                  </dd>
+                </div>
+              </dl>
+            </details>
             {state.riskApproved && (
               <button type="button" onClick={() => void revokeRisk()} disabled={anyPending}>
                 {pendingAction === "revoke" ? "Revoking…" : "Revoke Risk operator"}
@@ -1417,15 +1497,7 @@ function DollarActionPanel({
 
 export function DollarPage({ initialProfile = "ETH" }: { initialProfile?: DollarProfileChoice }) {
   const wallet = useWalletState();
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject="Dollar"
-        empty={{ title: "Dollar unavailable", description: "No Dollar deployment is configured." }}
-      />
-    );
-  }
+  const protocol = useProtocolSurface();
   const surfaceState = deriveSurfaceState({
     walletStatus: wallet.status,
     isTargetChain: wallet.isTargetChain,
@@ -1447,11 +1519,93 @@ export function DollarPage({ initialProfile = "ETH" }: { initialProfile?: Dollar
       />
     );
   }
+  if (!protocol.available) {
+    return (
+      <ProtocolActionScope>
+        <DollarUnavailablePreview initialProfile={initialProfile} />
+      </ProtocolActionScope>
+    );
+  }
   return (
-    <DollarActionPanel
-      deployment={deploymentState.deployment}
-      wallet={getAddress(wallet.address)}
-      initialProfile={initialProfile}
-    />
+    <ProtocolActionScope>
+      <DollarActionPanel
+        deployment={protocol.deployment}
+        wallet={getAddress(wallet.address)}
+        initialProfile={initialProfile}
+        available={protocol.available}
+      />
+    </ProtocolActionScope>
+  );
+}
+
+function DollarUnavailablePreview({ initialProfile }: { initialProfile: DollarProfileChoice }) {
+  const t = useTranslations("dollar");
+  const asset = initialProfile === "WETH" ? "WETH" : "ETH";
+  return (
+    <>
+      <section className="dollar-metrics" aria-label="Dollar balances and health">
+        {(["ETH", "WETH", "Dollar", "Risk shares"] as const).map((label) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>0</strong>
+          </article>
+        ))}
+      </section>
+      <section className="dollar-workspace">
+        <div className="dollar-action-card">
+          <DollarProfilePills
+            value={asset}
+            peggedAvailable={false}
+            disabled
+            onChange={() => undefined}
+          />
+          <div className="dollar-action-groups">
+            <section>
+              <span>{t("dollarActions")}</span>
+              <div className="dollar-tabs" aria-label={t("dollarActions")}>
+                {(["deposit", "recombine", "redeem"] as const).map((choice) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    className={choice === "deposit" ? "active" : undefined}
+                  >
+                    {t(choice)}
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section>
+              <span>{t("earnFromRedemptions")}</span>
+              <div className="dollar-tabs" aria-label={t("earnFromRedemptions")}>
+                {(["supply", "unsupply"] as const).map((choice) => (
+                  <button key={choice} type="button">
+                    {t(choice)}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+          <div className="dollar-field">
+            <label htmlFor="dollar-unavailable-amount">{asset} amount</label>
+            <input id="dollar-unavailable-amount" inputMode="decimal" placeholder="0.00" />
+            <AmountPercentageSlider
+              amount={0n}
+              maximum={0n}
+              disabled
+              label={t("amountShortcuts")}
+              onSelect={() => undefined}
+            />
+            <small>Available 0 {asset}</small>
+          </div>
+          <div className="dollar-quote">
+            <span>Onchain preview</span>
+            <strong>Enter an amount for an onchain preview</strong>
+          </div>
+          <button className="dollar-submit" type="button">
+            {t("deposit")}
+          </button>
+        </div>
+      </section>
+    </>
   );
 }

@@ -2,9 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Droplets, Image as ImageIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { usePublicClient } from "wagmi";
 
+import { NftArtworkDialog } from "@/components/wallet/NftArtworkDialog";
 import { resolveNftImage } from "@/lib/wallet/nft-image";
 import type { WalletNft } from "@/lib/wallet/nfts";
 
@@ -16,9 +18,22 @@ import type { WalletNft } from "@/lib/wallet/nfts";
  * self-contained artwork, while the placeholder remains the ordinary fallback
  * for collections that do not.
  */
-export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }) {
+export function NftArtwork({
+  nft,
+  chainId,
+  expandable = false,
+  size = "sm",
+}: {
+  nft: WalletNft;
+  chainId: number;
+  expandable?: boolean;
+  /** "sm" is the 48px corner thumbnail; "lg" fills its container. */
+  size?: "sm" | "lg";
+}) {
   const publicClient = usePublicClient({ chainId });
+  const t = useTranslations("nftArtwork");
   const [failed, setFailed] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const image = useQuery({
     queryKey: ["nft-image", chainId, nft.contract, nft.tokenId.toString()],
@@ -31,19 +46,37 @@ export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }
     },
   });
 
+  const sizeClass = size === "lg" ? " is-lg" : "";
+
   if (image.data && !failed) {
-    return (
+    const artwork = (
       /* eslint-disable-next-line @next/next/no-img-element --
          Arbitrary remote hosts: next/image would need every collection's
          domain allow-listed up front, which is impossible for user-added
          contracts. */
       <img
-        className="wallet-nft-art"
+        className={`wallet-nft-art${sizeClass}`}
         src={image.data}
         alt=""
         loading="lazy"
         onError={() => setFailed(true)}
       />
+    );
+    if (!expandable) return artwork;
+    return (
+      <>
+        <button
+          className={`wallet-nft-art-trigger${sizeClass}`}
+          type="button"
+          aria-label={t("viewFullSize", { name: nft.name })}
+          onClick={() => setViewerOpen(true)}
+        >
+          {artwork}
+        </button>
+        {viewerOpen && (
+          <NftArtworkDialog name={nft.name} src={image.data} onClose={() => setViewerOpen(false)} />
+        )}
+      </>
     );
   }
 
@@ -51,8 +84,8 @@ export function NftArtwork({ nft, chainId }: { nft: WalletNft; chainId: number }
     nft.kind === "position" ? Boxes : nft.kind === "liquidity" ? Droplets : ImageIcon;
 
   return (
-    <span className="wallet-nft-art is-placeholder" aria-hidden="true">
-      <Placeholder size={20} />
+    <span className={`wallet-nft-art is-placeholder${sizeClass}`} aria-hidden="true">
+      <Placeholder size={size === "lg" ? 40 : 20} />
     </span>
   );
 }

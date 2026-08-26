@@ -10,7 +10,16 @@
     "skipToApplication": "Skip to application content",
     "close": "Close",
     "planned": "Planned",
-    "comingSoon": "{label} link coming soon"
+    "comingSoon": "{label} link coming soon",
+    "max": "Max",
+    "paste": "Paste",
+    "invalidEvmAddress": "Enter a valid non-zero EVM address.",
+    "recipient": "Recipient"
+  },
+  "nftArtwork": {
+    "viewFullSize": "View {name} full size",
+    "title": "{name} artwork",
+    "alt": "Full-size artwork for {name}"
   },
   "metadata": {
     "title": "Statics Protocol",
@@ -32,6 +41,7 @@
     "mobileMenu": "Application menu. Current route: {route}",
     "groups": {
       "overview": "Overview",
+      "swap": "Swap",
       "earn": "Earn",
       "assets": "Assets",
       "manage": "Manage",
@@ -39,16 +49,20 @@
     },
     "items": {
       "overview": "Overview",
+      "swap": "Swap",
       "earn": "Earn",
+      "genesis": "Operator NFT",
       "liquidity": "Liquidity",
       "baskets": "Baskets",
+      "create": "Create basket",
       "dollar": "Dollar",
-      "positions": "Positions",
+      "positions": "Position NFT",
       "loans": "Loans",
       "wallet": "Wallet",
       "faucet": "Faucet",
       "activity": "Activity",
-      "tools": "Tools"
+      "tools": "Tools",
+      "portal": "Add funds"
     },
     "marketing": {
       "protocol": "Protocol",
@@ -59,12 +73,38 @@
       "dev": "Dev"
     }
   },
+  "launchRoutes": {
+    "overview": {
+      "label": "Overview",
+      "status": "Operators launch",
+      "title": "Statics Operators launch",
+      "description": "Trade STATICS, acquire fully backed Operators NFTs, and follow the Genesis Epoch on Robinhood Chain."
+    },
+    "swap": {
+      "label": "Trade",
+      "status": "STATICS market",
+      "title": "Trade STATICS and Operators NFTs",
+      "description": "Buy or sell STATICS through its canonical market, or acquire a fully backed Operator NFT through the Vault."
+    },
+    "genesis": {
+      "label": "My Operators",
+      "status": "Operators NFTs",
+      "title": "Manage my Operators",
+      "description": "View Operator artwork, activate reward tiers, register for launch rewards, and manage secured credit after the Genesis Epoch."
+    }
+  },
   "routes": {
     "overview": {
       "label": "Overview",
       "status": "Portfolio",
       "title": "Your portfolio",
       "description": "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed."
+    },
+    "swap": {
+      "label": "Swap",
+      "status": "STATICS market",
+      "title": "Swap tokens and Operators NFTs",
+      "description": "Buy or sell STATICS through its official pool, then exchange STATICS for a fully backed Operator NFT."
     },
     "dollar": {
       "label": "Dollar",
@@ -97,9 +137,9 @@
       "description": "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint."
     },
     "positions": {
-      "label": "Positions",
-      "status": "Positions",
-      "title": "Your positions",
+      "label": "Position NFT",
+      "status": "Position NFT",
+      "title": "Your Position NFTs",
       "description": "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here."
     },
     "loans": {
@@ -114,6 +154,18 @@
       "title": "Your rewards",
       "description": "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up."
     },
+    "genesis": {
+      "label": "Operator NFT",
+      "status": "Operator NFT",
+      "title": "Manage your Operators NFTs",
+      "description": "View Operator artwork, activate reward tiers with STATICS payments, and manage each NFT's protocol features."
+    },
+    "genesisRecoveries": {
+      "label": "Recoveries",
+      "status": "Operator recoveries",
+      "title": "Recover matured Genesis credit",
+      "description": "Find Operator NFTs whose secured credit has run past its deadline, and recover one to earn the caller incentive."
+    },
     "liquidity": {
       "label": "Liquidity",
       "status": "Liquidity",
@@ -121,10 +173,10 @@
       "description": "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned."
     },
     "create": {
-      "label": "Launch policy",
-      "status": "Governed",
-      "title": "Basket launch policy",
-      "description": "Public basket creation is closed during the testnet beta. Review how governed launches work and browse the baskets already available."
+      "label": "Create basket",
+      "status": "Create",
+      "title": "Launch an index basket",
+      "description": "Choose a fixed asset bundle, fund its trading pools, and earn the creator share of its swap fees."
     },
     "activity": {
       "label": "Activity",
@@ -185,29 +237,18 @@
     "errorDescription": "Something went wrong reading from the network. Your funds are not affected.",
     "retry": "Try again",
     "unavailable": "{subject} unavailable",
-    "noDeployment": "No deployment is configured."
+    "noDeployment": "No deployment is configured.",
+    "actionUnavailable": "This action will be enabled when Statics Protocol is live on {network}."
   },
   "baskets": {
     "subject": "baskets",
-    "launchPolicy": "Launch policy",
-    "stewardControlled": "Basket launches are steward-controlled",
-    "launchDescription": "Public basket creation is closed during the Robinhood testnet beta. Launches use the same backed basket and canonical-pool flow, but the reviewed transaction is executed through Statics governance.",
-    "governedLaunch": "Governed launch",
-    "meaning": "What this means",
-    "noPublicTransaction": "No public creation transaction is offered",
-    "existingRemainOpen": "Existing baskets remain open to anyone to mint, redeem, trade, and use.",
-    "reviewedParameters": "Each new basket launches with reviewed backing and canonical pool parameters.",
-    "canEnableLater": "Public launches can be enabled later through the protocol creation fee.",
-    "availableNow": "Available now",
-    "useCatalog": "Use the live basket catalog",
-    "inspectDescription": "Inspect each basket's constituents, status, fees, and canonical liquidity.",
     "browse": "Browse baskets",
     "title": "Statics baskets",
     "discovered": "{count} discovered",
     "stale": "Basket data is temporarily unavailable. Showing the last received state.",
     "emptyTitle": "No baskets yet",
-    "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. New launches are currently steward-controlled.",
-    "viewPolicy": "View launch policy",
+    "emptyDescription": "A basket is a fixed bundle of assets you can mint or redeem as one unit. Launch the first index from Create basket.",
+    "viewPolicy": "Create basket",
     "underlyings": "Underlyings",
     "totalSupply": "Total supply",
     "yourBalance": "Your balance",
@@ -240,6 +281,7 @@
     "mintTitle": "Mint basket",
     "redeemTitle": "Redeem basket",
     "amount": "{symbol} amount",
+    "amountShortcuts": "Use available balance",
     "slippage": "Slippage tolerance",
     "slippageHelp": "Allowed range 0–5%. Default 0.50%.",
     "receiveIn": "Receive basket in",
@@ -286,6 +328,91 @@
     "readingQuote": "Reading quote…",
     "insufficient": "Insufficient {symbol}"
   },
+  "creation": {
+    "connectTitle": "Connect your wallet",
+    "connectDescription": "Connect to configure, fund, and launch an index basket.",
+    "stepIdentity": "Identity",
+    "stepAssets": "Assets & composition",
+    "stepPools": "Starting pools",
+    "stepEconomics": "Economics",
+    "stepReview": "Review",
+    "permissionless": "Permissionless launch",
+    "title": "Launch an index basket",
+    "description": "Choose a fixed bundle, seed one permanent pool per asset, and review every immutable setting before signing.",
+    "creationFee": "Creation fee:",
+    "loading": "Loading…",
+    "creatorShare": "creator earns 5% of basket swap fees",
+    "basketName": "Basket name",
+    "basketNameHelp": "The descriptive name shown throughout Statics.",
+    "symbol": "Symbol",
+    "symbolHelp": "2–11 characters, beginning with a letter.",
+    "findToken": "Find a token",
+    "searchPlaceholder": "Search by name or symbol",
+    "customToken": "Advanced: add a custom token",
+    "validateAdd": "Validate and add",
+    "checkingToken": "Checking token…",
+    "unreadableToken": "This address is not a readable ERC-20.",
+    "tokensInBasket": "Tokens in 1 {symbol}",
+    "basketFallback": "basket",
+    "remove": "Remove",
+    "poolsHelp": "Set a human starting price and the asset amount to seed. Statics calculates the BasketToken side and locks the resulting full-range liquidity permanently.",
+    "tokenFallback": "Token",
+    "wallet": "Wallet:",
+    "assetFallback": "asset",
+    "priceLabel": "1 {basket} = X {asset}",
+    "seedLabel": "Seed {asset}",
+    "poolReceives": "Pool receives {basketAmount} {basket} + {assetAmount} {asset}",
+    "standardEconomics": "Standard economics",
+    "balancedDefaults": "Balanced defaults",
+    "feeDefaults": "Mint 0.001 · redeem 0.001 · flash 0.05% · origination 1% · extension 0.25%",
+    "loanDefaults": "Maximum LTV 75% · recovery penalty 5% · duration 30 days",
+    "customizeEconomics": "Customize immutable economics",
+    "mintFee": "Mint fee (BasketToken)",
+    "redemptionFee": "Redemption fee (BasketToken)",
+    "flashFee": "Flash fee",
+    "originationFee": "Loan origination fee",
+    "extensionFee": "Loan extension fee",
+    "maximumLtv": "Maximum loan-to-value",
+    "recoveryPenalty": "Recovery penalty",
+    "loanDuration": "Loan duration (days)",
+    "economicsInvalid": "Enter valid percentages. Maximum LTV plus its recovery penalty must remain fully collateralized.",
+    "immutableBasket": "Immutable basket",
+    "fixedAssets": "{count} fixed constituents",
+    "initialSupply": "Initial supply: {amount} {symbol}",
+    "creatorRevenue": "Creator revenue share: 5% of this basket's swap fees",
+    "approvalsRequired": "{count} token approvals required",
+    "funding": "Funding",
+    "maximumDebit": "Maximum wallet debit",
+    "fundingBreakdown": "pool {pool} · backing {backing} · {status}",
+    "short": "short {amount}",
+    "funded": "funded",
+    "technicalDetails": "Technical details",
+    "economicsSummary": "Flash {flash}% · origination {origination}% · extension {extension}% · LTV {ltv}% · recovery {recovery}% · {days} days",
+    "back": "Back",
+    "continue": "Continue",
+    "launching": "Launching and verifying…",
+    "fundWallet": "Fund wallet to launch",
+    "launch": "Launch basket"
+  },
+  "protocolRevenue": {
+    "sectionLabel": "Protocol revenue",
+    "title": "Creator and partner rewards",
+    "description": "Index creators pull their 5% share. Anyone may distribute StonkBrokers revenue and receive the configured caller tip.",
+    "loading": "Loading revenue…",
+    "creatorCredit": "Creator credit: {amount}",
+    "fullCredit": "The claim requires your wallet to receive the full credited amount.",
+    "advancedTolerance": "Advanced transfer-tax tolerance",
+    "transferFeeToken": "This token charges a transfer fee",
+    "minimumReceived": "Minimum received",
+    "toleranceHelp": "Lower this only for a known transfer-tax token. A failed transfer keeps the credit available.",
+    "claiming": "Claiming…",
+    "claimCreator": "Claim creator revenue",
+    "partnerAccrued": "StonkBrokers accrued: {amount}",
+    "callerTip": "Caller tip: {percent}%",
+    "distributing": "Distributing…",
+    "distribute": "Distribute and earn tip",
+    "empty": "No creator or partner revenue is currently claimable."
+  },
   "portal": {
     "mode": "Portal mode",
     "swap": "Swap",
@@ -323,6 +450,7 @@
     "confirmSwap": "Confirm swap",
     "selectAsset": "Select asset",
     "balance": "Balance {balance}",
+    "max": "MAX",
     "createSolanaWallet": "Create Solana wallet",
     "submitting": "Submitting…",
     "connectWallet": "Connect wallet",
@@ -345,6 +473,7 @@
     "minimumUsdg": "Minimum USDG",
     "protocolFee": "Protocol fee",
     "profile": "Profile",
+    "technicalDetails": "Technical details",
     "origin": "origin",
     "reviewBridge": "Review bridge",
     "from": "From",
@@ -368,7 +497,7 @@
     "confirmBridge": "Confirm bridge"
   },
   "positions": {
-    "subject": "positions",
+    "subject": "Position NFTs",
     "collateralLabel": "BasketTokens held by this position",
     "collateralDescription": "These BasketTokens belong to this PositionNFT. The Diamond holds them in custody while they earn basket fees and support loans.",
     "noCollateral": "No BasketTokens are deposited.",
@@ -382,7 +511,7 @@
     "switchNetwork": "Switch to {network}",
     "walletLoading": "Wallet loading…",
     "creatingPosition": "Creating position…",
-    "title": "Your positions",
+    "title": "Your Position NFTs",
     "description": "A position holds your collateral, staking, rewards, loans, and liquidity together. Move the position and everything inside it moves with it.",
     "creationFee": "Opening a new Position costs {fee} ETH. Reusing one you own is free.",
     "stale": "Position data is temporarily unavailable. Showing the last received state.",
@@ -420,6 +549,7 @@
     "redeemFrom": "Redeem this position's {symbol}",
     "globalStaking": "Global staking",
     "stakeToken": "Stake {symbol}",
+    "amountShortcuts": "Use available balance",
     "stakingAction": "Staking action",
     "stake": "Stake",
     "unstake": "Unstake",
@@ -431,13 +561,18 @@
     "selectedRewards": "Position-selected rewards",
     "chooseAssets": "Choose up to {count} fee assets",
     "selectedCount": "{count} selected",
+    "saveSelections": "Save {count, plural, one {# reward change} other {# reward changes}}",
+    "savingSelections": "Saving reward changes…",
     "token": "Token",
-    "waitingShort": "Waiting…",
     "removeSelection": "Remove selection",
     "selectReward": "Select reward",
+    "pendingSelection": "Will be selected",
+    "pendingRemoval": "Will be removed",
     "customReward": "Custom ERC-20 reward address",
-    "customRewardHelp": "Contract code and ERC-20 metadata are verified before the opt-in transaction.",
-    "selectAddress": "Select address",
+    "customRewardHelp": "Contract code and ERC-20 metadata are verified before the asset is added to this batch.",
+    "stageAddress": "Add to selection",
+    "validatingAddress": "Validating address…",
+    "customSource": "Custom selection",
     "historicalWarning": "Selecting an asset never grants historical rewards. Pending balances are claimed from the Earn page, where every reward source is shown together.",
     "viewRewards": "View and claim rewards",
     "terminalAction": "Terminal action",
@@ -577,6 +712,8 @@
     "sendAsset": "Send asset",
     "asset": "Asset",
     "recipient": "Recipient",
+    "amountShortcuts": "Use available balance",
+    "nativeMaxReserve": "Max keeps 1% for the network fee.",
     "amount": "Amount",
     "sending": "Sending…",
     "confirmSend": "Confirm send",
@@ -616,13 +753,16 @@
     "earnedByBaskets": "Earned by your baskets",
     "basketRewardDescription": "Paid in the assets your baskets hold. Claim it whenever you like.",
     "claim": "Claim",
-    "deposit": "Deposit",
-    "recombine": "Recombine",
-    "redeem": "Redeem",
-    "supply": "Supply Risk",
-    "unsupply": "Withdraw Risk",
+    "deposit": "Mint Dollar and Risk",
+    "recombine": "Withdraw collateral",
+    "redeem": "Redeem Dollar",
+    "supply": "Supply Risk shares",
+    "unsupply": "Withdraw Risk shares",
+    "dollarActions": "Dollar and collateral",
+    "earnFromRedemptions": "Earn from Dollar redemptions",
     "keepGas": "Keep gas",
     "max": "Max",
+    "amountShortcuts": "Use available balance",
     "yourRiskShares": "Your Risk shares",
     "quoteVerified": "Current input verified. Bounds include 0.50% execution tolerance.",
     "quoteRefreshing": "Refreshing for the current input; submission remains disabled.",
@@ -647,6 +787,13 @@
     "profileMode": "Profile mode",
     "seriesState": "Series state",
     "pausedMask": "Paused mask",
+    "pausedOperations": "Paused operations",
+    "pauseNone": "No operations paused",
+    "pauseMint": "Dollar minting paused",
+    "pauseRedemption": "Dollar redemption fills paused",
+    "pauseAdditional": "Additional governed pause flags: {mask}",
+    "series": "Series",
+    "technicalDetails": "Technical details",
     "status": "Status"
   },
   "faucet": {
@@ -689,7 +836,8 @@
     "exportWarning": "Exporting reveals recovery material that controls this wallet and every asset it holds. Never share it or paste it into a website, chat, or cloud note.",
     "openingExport": "Opening secure export…",
     "reviewExport": "Review secure export",
-    "disconnectWallet": "Disconnect wallet"
+    "disconnectWallet": "Disconnect wallet",
+    "walletLink": "Wallet"
   },
   "landing": {
     "eyebrow": "The anchor is fixed. The market is not.",

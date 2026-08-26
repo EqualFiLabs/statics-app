@@ -153,6 +153,9 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             hint={t("ethereumMissing")}
           />
           <CopyableAddress label={t("solana")} address={solanaAddress} hint={t("solanaMissing")} />
+          <a className="account-wallet-link" href="/app/wallet" onClick={onClose}>
+            {t("walletLink")}
+          </a>
 
           {wallet.explorerUrl && (
             <a

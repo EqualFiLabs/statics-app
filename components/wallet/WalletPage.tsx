@@ -10,6 +10,7 @@ import {
   getAddress,
   isAddress,
   parseAbi,
+  parseEther,
   zeroAddress,
   type Address,
   type Hex,
@@ -30,7 +31,6 @@ import {
   verifyNftTransfer,
   type WalletNft,
 } from "@/lib/wallet/nfts";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { portalRequested, walletPortalUrl, withoutWalletPortal } from "@/lib/portal/navigation";
 import { SolanaWalletPanel } from "@/components/wallet/SolanaWalletPanel";
 import { TokenLogo } from "@/components/wallet/TokenLogo";
@@ -44,6 +44,12 @@ import type { WalletToken } from "@/lib/wallet-tokens";
 import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { AddressInput } from "@/components/protocol/AddressInput";
+import { AddressDisplay } from "@/components/protocol/AddressDisplay";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
+import { applyPercent, parseRecipientAddress } from "@/lib/protocol/ux";
+import { useDeployment } from "@/providers/deployment-context";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 
 const erc20Abi = [
   {
@@ -76,8 +82,6 @@ const erc20Abi = [
   },
 ] as const;
 
-const deploymentState = readClientDollarDeployment();
-
 type WalletModal = "send" | "receive" | "portal" | "browse" | "custom" | "nft" | "add-nft" | null;
 /** Tokens and NFTs are both holdings; activity is a route, linked rather than duplicated. */
 type WalletTab = "tokens" | "nfts";
@@ -95,10 +99,12 @@ function displayBalance(value: AssetBalance, decimals: number) {
 export function WalletPage() {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  const deployment = active.protocol ?? active.launch;
+  const protocolDeployment = deployment?.kind === "protocol" ? deployment.protocol : null;
   const network = getFundingNetwork(wallet.fundingChainId);
-  const nftChainId =
-    deploymentState.status === "configured" ? deploymentState.deployment.chainId : null;
-  const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId);
+  const nftChainId = deployment?.descriptor.chainId ?? null;
+  const { tokens, addToken, removeToken } = useWalletTokens(wallet.fundingChainId, deployment);
   const [modal, setModalState] = useState<WalletModal>(null);
   const [walletMode, setWalletMode] = useState<"evm" | "solana">("evm");
   const [tab, setTab] = useState<WalletTab>("tokens");
@@ -171,15 +177,10 @@ export function WalletPage() {
       // Risk shares only exist on the Statics chain, so they are read only
       // while that chain is the one being viewed. Listing a Statics balance
       // under a Base heading would misstate where the money is.
-      if (
-        deploymentState.status === "configured" &&
-        deploymentState.deployment.chainId === wallet.fundingChainId
-      ) {
-        const shares = await loadRiskShareBalances(
-          publicClient,
-          deploymentState.deployment,
-          account
-        ).catch(() => []);
+      if (protocolDeployment && protocolDeployment.chainId === wallet.fundingChainId) {
+        const shares = await loadRiskShareBalances(publicClient, protocolDeployment, account).catch(
+          () => []
+        );
         if (currentRefresh === refreshId.current) setRiskShares(shares);
       } else {
         setRiskShares([]);
@@ -617,7 +618,7 @@ function TokenBrowser({
                 <strong>{token.symbol}</strong>
                 <small>{token.name}</small>
               </span>
-              <code>{`${token.address.slice(0, 6)}…${token.address.slice(-4)}`}</code>
+              <code>{token.address}</code>
             </button>
           ))}
           {available.length === 0 && <p>--</p>}
@@ -761,6 +762,7 @@ type TransferAsset = {
 const erc1155TransferAbi = parseAbi([
   "function safeTransferFrom(address from, address to, uint256 id, uint256 value, bytes data)",
 ]);
+const NATIVE_TRANSFER_FEE_RESERVE = parseEther("0.001");
 
 function SendDialog({
   assets,
@@ -788,11 +790,11 @@ function SendDialog({
     amountRaw = 0n;
   }
   const valid =
-    Boolean(asset && isAddress(recipient) && amountRaw > 0n) &&
+    Boolean(asset && parseRecipientAddress(recipient) && amountRaw > 0n) &&
     (asset?.balance === null || amountRaw <= asset.balance);
 
   const confirm = async () => {
-    if (!asset || !isAddress(recipient) || !wallet.address || !valid || pending) return;
+    if (!asset || !parseRecipientAddress(recipient) || !wallet.address || !valid || pending) return;
     setPending(true);
     setError(null);
     try {
@@ -877,18 +879,17 @@ function SendDialog({
             ))}
           </select>
         </label>
-        <label className="portal-field">
-          <span>{t("recipient")}</span>
-          <input
-            value={recipient}
-            placeholder="0x…"
-            onChange={(event) => {
-              setRecipient(event.target.value);
-              setReviewing(false);
-              setError(null);
-            }}
-          />
-        </label>
+        <AddressInput
+          id="wallet-send-recipient"
+          label={t("recipient")}
+          value={recipient}
+          chainId={wallet.fundingChainId}
+          onChange={(value) => {
+            setRecipient(value);
+            setReviewing(false);
+            setError(null);
+          }}
+        />
         <label className="portal-field">
           <span>{t("amount")}</span>
           <input
@@ -901,6 +902,36 @@ function SendDialog({
               setError(null);
             }}
           />
+          {asset?.balance !== null && asset?.balance !== undefined && (
+            <>
+              <AmountPercentageSlider
+                amount={amountRaw}
+                maximum={asset.balance}
+                maximumSelection={
+                  asset.kind === "native"
+                    ? asset.balance > NATIVE_TRANSFER_FEE_RESERVE
+                      ? asset.balance - NATIVE_TRANSFER_FEE_RESERVE
+                      : 0n
+                    : asset.balance
+                }
+                label={t("amountShortcuts")}
+                disabled={pending}
+                onSelect={(percent) => {
+                  const selected = applyPercent(asset.balance!, percent);
+                  const max =
+                    asset.kind === "native"
+                      ? asset.balance! > NATIVE_TRANSFER_FEE_RESERVE
+                        ? asset.balance! - NATIVE_TRANSFER_FEE_RESERVE
+                        : 0n
+                      : asset.balance!;
+                  setAmount(formatUnits(selected > max ? max : selected, asset.decimals));
+                  setReviewing(false);
+                  setError(null);
+                }}
+              />
+              {asset.kind === "native" && <small>{t("nativeMaxReserve")}</small>}
+            </>
+          )}
         </label>
         {reviewing && asset && (
           <div className="portal-review">
@@ -909,7 +940,12 @@ function SendDialog({
                 {amount} {asset.symbol}
               </span>
               <strong>→</strong>
-              <span>{`${recipient.slice(0, 6)}…${recipient.slice(-4)}`}</span>
+              {parseRecipientAddress(recipient) && (
+                <AddressDisplay
+                  address={parseRecipientAddress(recipient)!}
+                  chainId={wallet.fundingChainId}
+                />
+              )}
             </div>
           </div>
         )}
@@ -967,8 +1003,8 @@ function SendDialog({
 function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }) {
   const t = useTranslations("wallet");
   const wallet = useWalletState();
-  const chainId =
-    deploymentState.status === "configured" ? deploymentState.deployment.chainId : undefined;
+  const { active } = useDeployment();
+  const chainId = active.descriptor.chainId;
   const publicClient = usePublicClient(chainId ? { chainId } : undefined);
   const walletClient = useWalletClient(chainId ? { chainId } : undefined);
   const [recipient, setRecipient] = useState("");
@@ -984,10 +1020,14 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
     setError(null);
     try {
       const to = getAddress(recipient.trim());
+      if (active.launch) {
+        await verifyLaunchDeployment(publicClient, active.launch);
+      }
       await executeProtocolTransaction({
         publicClient,
         wallet: sender,
         chainId,
+        deploymentId: active.descriptor.deploymentId,
         kind: "transfer-nft",
         label: `Send ${nft.name}`,
         amount: nft.name,
@@ -1019,19 +1059,24 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
           <strong>{t("movesMore")}</strong> {t("cannotUndo", { assets: nft.carries.join(", ") })}
         </p>
       )}
-      <label className="basket-field">
-        <span>{t("sendTo")}</span>
-        <input
+      {nft.transferWarning && (
+        <p className="wallet-nft-transfer-warning">
+          <strong>Genesis transfer consequence</strong> {nft.transferWarning}
+        </p>
+      )}
+      {chainId && (
+        <AddressInput
+          id={`nft-recipient-${nft.contract}-${nft.tokenId.toString()}`}
+          label={t("sendTo")}
           value={recipient}
-          onChange={(event) => {
-            setRecipient(event.target.value);
+          chainId={chainId}
+          disabled={pending}
+          onChange={(value) => {
+            setRecipient(value);
             setError(null);
           }}
-          placeholder="0x…"
-          spellCheck={false}
-          disabled={pending}
         />
-      </label>
+      )}
       {error && (
         <p className="dapp-inline-error" role="alert">
           {error}
@@ -1064,7 +1109,8 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
 function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: () => void }) {
   const t = useTranslations("wallet");
   const publicClient = usePublicClient({ chainId });
-  const { addCollection } = useWalletNftCollections(chainId);
+  const { active } = useDeployment();
+  const { addCollection } = useWalletNftCollections(chainId, active.protocol ?? active.launch);
   const [address, setAddress] = useState("");
   const [tokenId, setTokenId] = useState("");
   const [pending, setPending] = useState(false);

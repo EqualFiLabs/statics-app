@@ -10,7 +10,16 @@
     "skipToApplication": "跳到应用内容",
     "close": "关闭",
     "planned": "计划中",
-    "comingSoon": "{label} 链接即将推出"
+    "comingSoon": "{label} 链接即将推出",
+    "max": "最大",
+    "paste": "粘贴",
+    "invalidEvmAddress": "请输入有效且非零的 EVM 地址。",
+    "recipient": "接收方"
+  },
+  "nftArtwork": {
+    "viewFullSize": "查看 {name} 的完整尺寸",
+    "title": "{name} 图像",
+    "alt": "{name} 的完整尺寸图像"
   },
   "metadata": {
     "title": "Statics Protocol",
@@ -32,6 +41,7 @@
     "mobileMenu": "应用菜单。当前页面：{route}",
     "groups": {
       "overview": "概览",
+      "swap": "兑换",
       "earn": "赚取",
       "assets": "资产",
       "manage": "管理",
@@ -39,16 +49,20 @@
     },
     "items": {
       "overview": "概览",
+      "swap": "兑换",
       "earn": "赚取",
+      "genesis": "Operator NFT",
       "liquidity": "流动性",
       "baskets": "篮子",
+      "create": "创建篮子",
       "dollar": "美元",
-      "positions": "头寸",
+      "positions": "Position NFT",
       "loans": "贷款",
       "wallet": "钱包",
       "faucet": "水龙头",
       "activity": "活动",
-      "tools": "工具"
+      "tools": "工具",
+      "portal": "添加资金"
     },
     "marketing": {
       "protocol": "协议",
@@ -59,12 +73,38 @@
       "dev": "开发"
     }
   },
+  "launchRoutes": {
+    "overview": {
+      "label": "概览",
+      "status": "Genesis 启动",
+      "title": "Statics Operators 启动",
+      "description": "在 Robinhood Chain 上交易 STATICS、获取有完全储备支持的 Operator NFT，并关注 Genesis 纪元。"
+    },
+    "swap": {
+      "label": "交易",
+      "status": "STATICS 市场",
+      "title": "交易 STATICS 和 Operator NFT",
+      "description": "通过规范市场买卖 STATICS，或通过金库获取有完全储备支持的 Operator NFT。"
+    },
+    "genesis": {
+      "label": "我的 Genesis",
+      "status": "Operator NFT",
+      "title": "管理我的 Genesis",
+      "description": "查看 Genesis 艺术作品、激活奖励等级、注册以获取启动奖励，并在 Genesis 纪元结束后管理担保信贷。"
+    }
+  },
   "routes": {
     "overview": {
       "label": "概览",
       "status": "资产组合",
       "title": "你的资产组合",
       "description": "在一个地方查看你持有的一切：美元余额、头寸、抵押品以及待领取的奖励。"
+    },
+    "swap": {
+      "label": "兑换",
+      "status": "STATICS 市场",
+      "title": "兑换代币和 Operator NFT",
+      "description": "通过官方池买卖 STATICS，然后用 STATICS 兑换有完全储备支持的 Operator NFT。"
     },
     "dollar": {
       "label": "美元",
@@ -97,9 +137,9 @@
       "description": "将一组固定资产作为一个整体买卖。购买前可查看篮子中包含的确切资产。"
     },
     "positions": {
-      "label": "头寸",
-      "status": "头寸",
-      "title": "你的头寸",
+      "label": "Position NFT",
+      "status": "Position NFT",
+      "title": "你的 Position NFTs",
       "description": "每个头寸汇集你的篮子、贷款和美元。在这里管理抵押品、质押和奖励。"
     },
     "loans": {
@@ -114,6 +154,18 @@
       "title": "你的奖励",
       "description": "质押一个头寸以获得协议费用分成。选择希望赚取的资产并领取累积奖励。"
     },
+    "genesis": {
+      "label": "Operator NFT",
+      "status": "Operator NFT",
+      "title": "管理你的 Operators NFTs",
+      "description": "查看 Genesis 艺术作品，通过支付 STATICS 激活奖励等级，并管理每个 NFT 的协议功能。"
+    },
+    "genesisRecoveries": {
+      "label": "回收",
+      "status": "Genesis 回收",
+      "title": "回收已到期的 Genesis 信贷",
+      "description": "查找担保信贷已超过期限的 Operator NFT，回收其中一个即可获得执行者奖励。"
+    },
     "liquidity": {
       "label": "流动性",
       "status": "流动性",
@@ -121,10 +173,10 @@
       "description": "提供资产供其他用户交易，并赚取一部分交易费。查看你的池子及其收益。"
     },
     "create": {
-      "label": "启动政策",
-      "status": "治理管理",
-      "title": "篮子启动政策",
-      "description": "测试网测试期间不开放公开创建篮子。了解治理启动流程并浏览现有篮子。"
+      "label": "创建篮子",
+      "status": "创建",
+      "title": "发行指数篮子",
+      "description": "选择固定资产组合，为规范池提供资金，并赚取创建者的交换费份额。"
     },
     "activity": {
       "label": "活动",
@@ -185,29 +237,18 @@
     "errorDescription": "读取网络时出现问题。你的资金不受影响。",
     "retry": "重试",
     "unavailable": "{subject}不可用",
-    "noDeployment": "未配置部署。"
+    "noDeployment": "未配置部署。",
+    "actionUnavailable": "Statics Protocol 在 {network} 上线后，此操作将启用。"
   },
   "baskets": {
     "subject": "篮子",
-    "launchPolicy": "启动政策",
-    "stewardControlled": "篮子启动由管理员控制",
-    "launchDescription": "Robinhood 测试网测试期间不开放公开创建篮子。启动仍使用相同的有支持篮子和规范池流程，但经审查的交易由 Statics 治理执行。",
-    "governedLaunch": "治理启动",
-    "meaning": "这意味着什么",
-    "noPublicTransaction": "不提供公开创建交易",
-    "existingRemainOpen": "任何人仍可铸造、赎回、交易和使用现有篮子。",
-    "reviewedParameters": "每个新篮子都使用经审查的支持资产和规范池参数启动。",
-    "canEnableLater": "未来可通过协议创建费用开放公开启动。",
-    "availableNow": "当前可用",
-    "useCatalog": "使用实时篮子目录",
-    "inspectDescription": "查看每个篮子的组成、状态、费用和规范流动性。",
     "browse": "浏览篮子",
     "title": "Statics 篮子",
     "discovered": "已发现 {count} 个",
     "stale": "篮子数据暂时不可用，正在显示最近收到的状态。",
     "emptyTitle": "尚无篮子",
-    "emptyDescription": "篮子是一组固定资产，可以作为一个整体买卖。新篮子目前由管理员控制启动。",
-    "viewPolicy": "查看启动政策",
+    "emptyDescription": "篮子是一组固定资产，可以作为一个整体买卖。可从创建篮子页面发行第一个指数。",
+    "viewPolicy": "创建篮子",
     "underlyings": "底层资产",
     "totalSupply": "总供应量",
     "yourBalance": "你的余额",
@@ -240,6 +281,7 @@
     "mintTitle": "铸造篮子",
     "redeemTitle": "赎回篮子",
     "amount": "{symbol} 数量",
+    "amountShortcuts": "使用可用余额",
     "slippage": "滑点容差",
     "slippageHelp": "允许范围为 0–5%，默认值为 0.50%。",
     "receiveIn": "接收篮子至",
@@ -286,6 +328,91 @@
     "readingQuote": "正在读取报价…",
     "insufficient": "{symbol} 余额不足"
   },
+  "creation": {
+    "connectTitle": "连接钱包",
+    "connectDescription": "连接钱包以配置、注资并发行指数篮子。",
+    "stepIdentity": "身份",
+    "stepAssets": "资产与组成",
+    "stepPools": "初始池",
+    "stepEconomics": "经济参数",
+    "stepReview": "复核",
+    "permissionless": "无需许可的发行",
+    "title": "发行指数篮子",
+    "description": "选择固定资产组合，为每项资产注入一个永久池，并在签名前复核所有不可变设置。",
+    "creationFee": "创建费：",
+    "loading": "正在加载…",
+    "creatorShare": "创建者获得篮子兑换费的 5%",
+    "basketName": "篮子名称",
+    "basketNameHelp": "在 Statics 中显示的描述性名称。",
+    "symbol": "代号",
+    "symbolHelp": "2–11 个字符，必须以字母开头。",
+    "findToken": "查找代币",
+    "searchPlaceholder": "按名称或代号搜索",
+    "customToken": "高级：添加自定义代币",
+    "validateAdd": "验证并添加",
+    "checkingToken": "正在检查代币…",
+    "unreadableToken": "该地址不是可读取的 ERC-20。",
+    "tokensInBasket": "每 1 {symbol} 包含的代币",
+    "basketFallback": "篮子",
+    "remove": "移除",
+    "poolsHelp": "设置易读的初始价格和注入资产数量。Statics 会计算 BasketToken 一侧，并永久锁定所得全范围流动性。",
+    "tokenFallback": "代币",
+    "wallet": "钱包：",
+    "assetFallback": "资产",
+    "priceLabel": "1 {basket} = X {asset}",
+    "seedLabel": "注入 {asset}",
+    "poolReceives": "池将收到 {basketAmount} {basket} + {assetAmount} {asset}",
+    "standardEconomics": "标准经济参数",
+    "balancedDefaults": "均衡默认值",
+    "feeDefaults": "铸造 0.001 · 赎回 0.001 · 闪电 0.05% · 发起 1% · 延期 0.25%",
+    "loanDefaults": "最高 LTV 75% · 回收罚金 5% · 期限 30 天",
+    "customizeEconomics": "自定义不可变经济参数",
+    "mintFee": "铸造费（BasketToken）",
+    "redemptionFee": "赎回费（BasketToken）",
+    "flashFee": "闪电费用",
+    "originationFee": "贷款发起费",
+    "extensionFee": "贷款延期费",
+    "maximumLtv": "最高贷款价值比",
+    "recoveryPenalty": "回收罚金",
+    "loanDuration": "贷款期限（天）",
+    "economicsInvalid": "请输入有效百分比。最高 LTV 加上其回收罚金后仍须完全有抵押。",
+    "immutableBasket": "不可变篮子",
+    "fixedAssets": "{count} 项固定组成资产",
+    "initialSupply": "初始供应量：{amount} {symbol}",
+    "creatorRevenue": "创建者收益份额：该篮子兑换费的 5%",
+    "approvalsRequired": "需要 {count} 项代币授权",
+    "funding": "资金",
+    "maximumDebit": "钱包最大扣款",
+    "fundingBreakdown": "池 {pool} · 储备 {backing} · {status}",
+    "short": "缺少 {amount}",
+    "funded": "资金充足",
+    "technicalDetails": "技术详情",
+    "economicsSummary": "闪电 {flash}% · 发起 {origination}% · 延期 {extension}% · LTV {ltv}% · 回收 {recovery}% · {days} 天",
+    "back": "返回",
+    "continue": "继续",
+    "launching": "正在发行并验证…",
+    "fundWallet": "请为钱包注资后发行",
+    "launch": "发行篮子"
+  },
+  "protocolRevenue": {
+    "sectionLabel": "协议收入",
+    "title": "创建者与合作伙伴奖励",
+    "description": "指数创建者可提取其 5% 份额。任何人都可分发 StonkBrokers 收入并获得配置的调用者小费。",
+    "loading": "正在加载收入…",
+    "creatorCredit": "创建者额度：{amount}",
+    "fullCredit": "领取时要求钱包收到全部记账金额。",
+    "advancedTolerance": "高级转账税容差",
+    "transferFeeToken": "该代币收取转账费",
+    "minimumReceived": "最低收到数量",
+    "toleranceHelp": "仅对已知收取转账税的代币降低此值。转账失败时额度仍会保留。",
+    "claiming": "正在领取…",
+    "claimCreator": "领取创建者收入",
+    "partnerAccrued": "StonkBrokers 已累计：{amount}",
+    "callerTip": "调用者小费：{percent}%",
+    "distributing": "正在分发…",
+    "distribute": "分发并赚取小费",
+    "empty": "当前没有可领取的创建者或合作伙伴收入。"
+  },
   "portal": {
     "mode": "Portal 模式",
     "swap": "兑换",
@@ -323,6 +450,7 @@
     "confirmSwap": "确认兑换",
     "selectAsset": "选择资产",
     "balance": "余额 {balance}",
+    "max": "最大",
     "createSolanaWallet": "创建 Solana 钱包",
     "submitting": "正在提交…",
     "connectWallet": "连接钱包",
@@ -345,6 +473,7 @@
     "minimumUsdg": "最少 USDG",
     "protocolFee": "协议费用",
     "profile": "配置",
+    "technicalDetails": "技术详情",
     "origin": "源网络",
     "reviewBridge": "检查跨链",
     "from": "从",
@@ -368,7 +497,7 @@
     "confirmBridge": "确认跨链"
   },
   "positions": {
-    "subject": "头寸",
+    "subject": "Position NFTs",
     "collateralLabel": "此头寸持有的 BasketTokens",
     "collateralDescription": "这些 BasketTokens 属于此 PositionNFT。Diamond 托管它们，使其赚取篮子费用并支持贷款。",
     "noCollateral": "尚未存入 BasketTokens。",
@@ -382,7 +511,7 @@
     "switchNetwork": "切换到 {network}",
     "walletLoading": "正在加载钱包…",
     "creatingPosition": "正在创建头寸…",
-    "title": "你的头寸",
+    "title": "你的 Position NFTs",
     "description": "一个头寸汇集你的抵押品、质押、奖励、贷款和流动性。转移头寸时，其中的一切都会随之转移。",
     "creationFee": "新建头寸需支付 {fee} ETH。复用已有头寸免费。",
     "stale": "头寸数据暂时不可用，正在显示最近收到的状态。",
@@ -420,6 +549,7 @@
     "redeemFrom": "从此仓位赎回 {symbol}",
     "globalStaking": "全局质押",
     "stakeToken": "质押 {symbol}",
+    "amountShortcuts": "使用可用余额",
     "stakingAction": "质押操作",
     "stake": "质押",
     "unstake": "解除质押",
@@ -431,13 +561,18 @@
     "selectedRewards": "仓位选择的奖励",
     "chooseAssets": "最多选择 {count} 种手续费资产",
     "selectedCount": "已选择 {count} 种",
+    "saveSelections": "保存 {count} 项奖励更改",
+    "savingSelections": "正在保存奖励更改…",
     "token": "代币",
-    "waitingShort": "等待中…",
     "removeSelection": "移除选择",
     "selectReward": "选择奖励",
+    "pendingSelection": "将被选择",
+    "pendingRemoval": "将被移除",
     "customReward": "自定义 ERC-20 奖励地址",
-    "customRewardHelp": "选择前会验证合约代码和 ERC-20 元数据。",
-    "selectAddress": "选择地址",
+    "customRewardHelp": "将资产加入本批次前会验证合约代码和 ERC-20 元数据。",
+    "stageAddress": "加入选择",
+    "validatingAddress": "正在验证地址…",
+    "customSource": "自定义选择",
     "historicalWarning": "选择资产不会获得历史奖励。待领取余额可在收益页面领取，那里会汇总所有奖励来源。",
     "viewRewards": "查看并领取奖励",
     "terminalAction": "终止操作",
@@ -577,6 +712,8 @@
     "sendAsset": "发送资产",
     "asset": "资产",
     "recipient": "接收方",
+    "amountShortcuts": "使用可用余额",
+    "nativeMaxReserve": "最大值会保留 1% 用于网络费用。",
     "amount": "数量",
     "sending": "正在发送…",
     "confirmSend": "确认发送",
@@ -616,13 +753,16 @@
     "earnedByBaskets": "篮子已赚取",
     "basketRewardDescription": "以篮子持有的资产支付，可随时领取。",
     "claim": "领取",
-    "deposit": "存入",
-    "recombine": "重新组合",
-    "redeem": "赎回",
-    "supply": "提供 Risk",
-    "unsupply": "取出 Risk",
+    "deposit": "铸造 Dollar 和 Risk",
+    "recombine": "取回抵押品",
+    "redeem": "赎回 Dollar",
+    "supply": "提供 Risk 份额",
+    "unsupply": "取回 Risk 份额",
+    "dollarActions": "Dollar 与抵押品",
+    "earnFromRedemptions": "从 Dollar 赎回中赚取收益",
     "keepGas": "保留 Gas",
     "max": "最大",
+    "amountShortcuts": "使用可用余额",
     "yourRiskShares": "你的 Risk 份额",
     "quoteVerified": "当前输入已验证。边界包含 0.50% 的执行容差。",
     "quoteRefreshing": "正在刷新当前输入；提交仍处于禁用状态。",
@@ -647,6 +787,13 @@
     "profileMode": "配置模式",
     "seriesState": "系列状态",
     "pausedMask": "暂停掩码",
+    "pausedOperations": "已暂停操作",
+    "pauseNone": "没有暂停的操作",
+    "pauseMint": "Dollar 铸造已暂停",
+    "pauseRedemption": "Dollar 赎回撮合已暂停",
+    "pauseAdditional": "其他治理暂停标志：{mask}",
+    "series": "系列",
+    "technicalDetails": "技术详情",
     "status": "状态"
   },
   "faucet": {
@@ -689,7 +836,8 @@
     "exportWarning": "导出会显示控制此钱包及其中全部资产的恢复材料。切勿分享，也不要粘贴到网站、聊天或云笔记中。",
     "openingExport": "正在打开安全导出…",
     "reviewExport": "查看安全导出",
-    "disconnectWallet": "断开钱包连接"
+    "disconnectWallet": "断开钱包连接",
+    "walletLink": "钱包"
   },
   "landing": {
     "eyebrow": "锚点固定，市场不固定。",
@@ -787,7 +935,11 @@
       "plural": "头寸",
       "plain": "你在 Statics 中持有的一切，汇集在一个可转移项目中。"
     },
-    "basket": { "label": "篮子", "plural": "篮子", "plain": "一组固定资产，可作为一个整体买卖。" },
+    "basket": {
+      "label": "篮子",
+      "plural": "篮子",
+      "plain": "一组固定资产，可作为一个整体买卖。"
+    },
     "underlying": {
       "label": "底层资产",
       "plural": "底层资产",
@@ -848,7 +1000,11 @@
       "plural": "健康度",
       "plain": "你的头寸获得保障的程度。数值越高越安全。"
     },
-    "rewards": { "label": "奖励", "plural": "奖励", "plain": "你已赚取并可领取的费用。" },
+    "rewards": {
+      "label": "奖励",
+      "plural": "奖励",
+      "plain": "你已赚取并可领取的费用。"
+    },
     "staking": {
       "label": "质押",
       "plural": "质押",

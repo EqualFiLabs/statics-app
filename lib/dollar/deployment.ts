@@ -35,9 +35,13 @@ export type LiquidityDeployment = Readonly<{
   >;
 }>;
 
-export type PositionMetadataDeployment = Readonly<{
+export type GenesisDeployment = Readonly<{
+  token: Address;
+  collection: Address;
   renderer: Address;
   avatarSvg: Address;
+  tokenCodeHash: Hex;
+  collectionCodeHash: Hex;
   rendererCodeHash: Hex;
   avatarSvgCodeHash: Hex;
 }>;
@@ -54,7 +58,7 @@ export type DollarDeployment = Readonly<{
   source: "development-environment" | "checked-in-manifest";
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
-  positionMetadata?: PositionMetadataDeployment | null;
+  genesis?: GenesisDeployment | null;
   liquidity?: LiquidityDeployment | null;
   pegged?: Readonly<{
     collateral: Address;
@@ -111,10 +115,14 @@ const liquidityHashVariables: Readonly<Record<LocalLiquidityContractName, string
   stateView: "NEXT_PUBLIC_STATICS_STATE_VIEW_CODE_HASH",
 };
 
-const positionMetadataVariables = {
-  renderer: "NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS",
+const genesisVariables = {
+  token: "NEXT_PUBLIC_STATICS_TOKEN_ADDRESS",
+  collection: "NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS",
+  renderer: "NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS",
   avatarSvg: "NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS",
-  rendererCodeHash: "NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH",
+  tokenCodeHash: "NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH",
+  collectionCodeHash: "NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH",
+  rendererCodeHash: "NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH",
   avatarSvgCodeHash: "NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH",
 } as const;
 
@@ -222,30 +230,35 @@ export function readDollarDeployment(
       ) as Record<LocalLiquidityContractName, Hex>,
     };
   }
-  const positionMetadataValues = Object.values(positionMetadataVariables).map(
-    (variable) => environment[variable]
-  );
-  let positionMetadata: PositionMetadataDeployment | null = null;
-  if (positionMetadataValues.some(Boolean)) {
-    if (!positionMetadataValues.every(Boolean)) {
-      throw new Error("Position metadata deployment configuration must be complete or omitted.");
+  const genesisValues = Object.values(genesisVariables).map((variable) => environment[variable]);
+  let genesis: GenesisDeployment | null = null;
+  if (genesisValues.some(Boolean)) {
+    if (!genesisValues.every(Boolean)) {
+      throw new Error("Genesis deployment configuration must be complete or omitted.");
     }
-    positionMetadata = {
-      renderer: parseAddress(
-        environment[positionMetadataVariables.renderer],
-        positionMetadataVariables.renderer
+    genesis = {
+      token: parseAddress(environment[genesisVariables.token], genesisVariables.token),
+      collection: parseAddress(
+        environment[genesisVariables.collection],
+        genesisVariables.collection
       ),
-      avatarSvg: parseAddress(
-        environment[positionMetadataVariables.avatarSvg],
-        positionMetadataVariables.avatarSvg
+      renderer: parseAddress(environment[genesisVariables.renderer], genesisVariables.renderer),
+      avatarSvg: parseAddress(environment[genesisVariables.avatarSvg], genesisVariables.avatarSvg),
+      tokenCodeHash: parseHash(
+        environment[genesisVariables.tokenCodeHash],
+        genesisVariables.tokenCodeHash
+      ),
+      collectionCodeHash: parseHash(
+        environment[genesisVariables.collectionCodeHash],
+        genesisVariables.collectionCodeHash
       ),
       rendererCodeHash: parseHash(
-        environment[positionMetadataVariables.rendererCodeHash],
-        positionMetadataVariables.rendererCodeHash
+        environment[genesisVariables.rendererCodeHash],
+        genesisVariables.rendererCodeHash
       ),
       avatarSvgCodeHash: parseHash(
-        environment[positionMetadataVariables.avatarSvgCodeHash],
-        positionMetadataVariables.avatarSvgCodeHash
+        environment[genesisVariables.avatarSvgCodeHash],
+        genesisVariables.avatarSvgCodeHash
       ),
     };
   }
@@ -296,15 +309,15 @@ export function readDollarDeployment(
       source: "development-environment",
       contracts,
       runtimeCodeHashes,
-      positionMetadata,
+      genesis,
       liquidity,
       pegged,
     },
   };
 }
 
-export function readClientDollarDeployment(): DollarDeploymentState {
-  return readDollarDeployment({
+export function clientDollarEnvironment(): Record<string, string | undefined> {
+  return {
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_STATICS_CHAIN_ID: process.env.NEXT_PUBLIC_STATICS_CHAIN_ID,
     NEXT_PUBLIC_STATICS_DEPLOYMENT_START_BLOCK:
@@ -332,11 +345,16 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_WETH_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_WETH_CODE_HASH,
     NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_DOLLAR_ORACLE_CODE_HASH,
-    NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS:
-      process.env.NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS,
+    NEXT_PUBLIC_STATICS_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_STATICS_TOKEN_ADDRESS,
+    NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS: process.env.NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS,
+    NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS:
+      process.env.NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS,
-    NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH:
-      process.env.NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH,
+    NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH,
+    NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH:
+      process.env.NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH,
+    NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH:
+      process.env.NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH,
     NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: process.env.NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS,
     NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS:
@@ -363,7 +381,11 @@ export function readClientDollarDeployment(): DollarDeploymentState {
     NEXT_PUBLIC_STATICS_USDG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_USDG_CODE_HASH,
     NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_USDG_ORACLE_CODE_HASH,
-  });
+  };
+}
+
+export function readClientDollarDeployment(): DollarDeploymentState {
+  return readDollarDeployment(clientDollarEnvironment());
 }
 
 const dollarVerificationCache = new WeakMap<PublicClient, Map<string, Promise<void>>>();
@@ -412,42 +434,80 @@ async function verifyDollarDeploymentUncached(
       }
     })
   );
-  if (deployment.positionMetadata) {
-    const positionMetadataAbi = parseAbi([
-      "function positionRenderer() view returns (address)",
+  if (deployment.genesis) {
+    const genesisBindingAbi = parseAbi([
+      "function stakingToken() view returns (address)",
+      "function genesisCollection() view returns (address)",
+      "function renderer() view returns (address)",
       "function avatarSVG() view returns (address)",
     ]);
-    const [rendererCode, avatarSvgCode, configuredRenderer, configuredAvatarSvg] =
-      await Promise.all([
-        publicClient.getCode({ address: deployment.positionMetadata.renderer }),
-        publicClient.getCode({ address: deployment.positionMetadata.avatarSvg }),
-        publicClient.readContract({
-          address: deployment.contracts.diamond,
-          abi: positionMetadataAbi,
-          functionName: "positionRenderer",
-        }),
-        publicClient.readContract({
-          address: deployment.positionMetadata.renderer,
-          abi: positionMetadataAbi,
-          functionName: "avatarSVG",
-        }),
-      ]);
-    if (!rendererCode || rendererCode === "0x" || !avatarSvgCode || avatarSvgCode === "0x") {
-      throw new Error("Position metadata deployment has missing runtime code.");
+    const [
+      tokenCode,
+      collectionCode,
+      rendererCode,
+      avatarSvgCode,
+      configuredToken,
+      configuredCollection,
+      configuredRenderer,
+      configuredAvatarSvg,
+    ] = await Promise.all([
+      publicClient.getCode({ address: deployment.genesis.token }),
+      publicClient.getCode({ address: deployment.genesis.collection }),
+      publicClient.getCode({ address: deployment.genesis.renderer }),
+      publicClient.getCode({ address: deployment.genesis.avatarSvg }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: genesisBindingAbi,
+        functionName: "stakingToken",
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: genesisBindingAbi,
+        functionName: "genesisCollection",
+      }),
+      publicClient.readContract({
+        address: deployment.genesis.collection,
+        abi: genesisBindingAbi,
+        functionName: "renderer",
+      }),
+      publicClient.readContract({
+        address: deployment.genesis.renderer,
+        abi: genesisBindingAbi,
+        functionName: "avatarSVG",
+      }),
+    ]);
+    if (
+      !tokenCode ||
+      tokenCode === "0x" ||
+      !collectionCode ||
+      collectionCode === "0x" ||
+      !rendererCode ||
+      rendererCode === "0x" ||
+      !avatarSvgCode ||
+      avatarSvgCode === "0x"
+    ) {
+      throw new Error("Genesis deployment has missing runtime code.");
     }
     if (
-      keccak256(rendererCode).toLowerCase() !==
-        deployment.positionMetadata.rendererCodeHash.toLowerCase() ||
-      keccak256(avatarSvgCode).toLowerCase() !==
-        deployment.positionMetadata.avatarSvgCodeHash.toLowerCase()
+      keccak256(tokenCode).toLowerCase() !== deployment.genesis.tokenCodeHash.toLowerCase() ||
+      keccak256(collectionCode).toLowerCase() !==
+        deployment.genesis.collectionCodeHash.toLowerCase() ||
+      keccak256(rendererCode).toLowerCase() !== deployment.genesis.rendererCodeHash.toLowerCase() ||
+      keccak256(avatarSvgCode).toLowerCase() !== deployment.genesis.avatarSvgCodeHash.toLowerCase()
     ) {
-      throw new Error("Position metadata runtime code does not match the deployment manifest.");
+      throw new Error("Genesis runtime code does not match the deployment manifest.");
     }
-    if (getAddress(configuredRenderer) !== getAddress(deployment.positionMetadata.renderer)) {
-      throw new Error("Statics is bound to a different Position renderer.");
+    if (getAddress(configuredToken) !== getAddress(deployment.genesis.token)) {
+      throw new Error("Statics is bound to a different STATICS token.");
     }
-    if (getAddress(configuredAvatarSvg) !== getAddress(deployment.positionMetadata.avatarSvg)) {
-      throw new Error("Position renderer is bound to a different Avatar SVG contract.");
+    if (getAddress(configuredCollection) !== getAddress(deployment.genesis.collection)) {
+      throw new Error("Statics is bound to a different Genesis collection.");
+    }
+    if (getAddress(configuredRenderer) !== getAddress(deployment.genesis.renderer)) {
+      throw new Error("Genesis is bound to a different renderer.");
+    }
+    if (getAddress(configuredAvatarSvg) !== getAddress(deployment.genesis.avatarSvg)) {
+      throw new Error("Genesis renderer is bound to a different Avatar SVG contract.");
     }
   }
   if (deployment.pegged) {

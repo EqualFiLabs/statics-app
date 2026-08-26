@@ -18,17 +18,27 @@ import {
   basketTokenAbi,
   buildClaimRewardsCall,
   buildClaimBasketRewardsCall,
+  buildCheckpointRewardAssetsCall,
   buildCreateAndStakeCall,
   buildStakeCall,
   staticsAbi,
 } from "@statics-protocol/sdk";
 
 import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
 import { loadBasketRewardSummary, type BasketRewardEntry } from "@/lib/baskets/rewards";
 import { StakeMaturity } from "@/components/rewards/StakeMaturity";
-import { loadStakingSnapshot } from "@/lib/positions/staking";
+import { ProtocolRevenueCard } from "@/components/rewards/ProtocolRevenueCard";
+import {
+  checkpointRewardAssetBatches,
+  loadStakingSnapshot,
+  rewardAssetsNeedingCheckpoint,
+} from "@/lib/positions/staking";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
 import {
   claimablePositionRewards,
   describePositionError,
@@ -42,8 +52,6 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-
-const deploymentState = readClientDollarDeployment();
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -62,7 +70,11 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
-  return <RewardsRuntime initialPositionId={initialPositionId} />;
+  return (
+    <ProtocolActionScope>
+      <RewardsRuntime initialPositionId={initialPositionId} />
+    </ProtocolActionScope>
+  );
 }
 
 function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | null }) {
@@ -71,6 +83,8 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [amountInput, setAmountInput] = useState("");
@@ -90,6 +104,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
       wallet
     ),
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -116,6 +131,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         .join(","),
     ],
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -156,7 +172,10 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         .join(","),
     ],
     enabled:
-      deploymentState.status === "configured" && Boolean(publicClient) && Boolean(catalog.data),
+      protocol.available &&
+      deploymentState.status === "configured" &&
+      Boolean(publicClient) &&
+      Boolean(catalog.data),
     queryFn: () => {
       if (!publicClient || deploymentState.status !== "configured" || !catalog.data) {
         throw new Error("No verified Statics deployment is configured.");
@@ -225,6 +244,23 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
             args: [diamond, MAX_ERC20_ALLOWANCE],
           }),
         });
+      }
+      if (targetPosition) {
+        const required = await rewardAssetsNeedingCheckpoint(
+          publicClient,
+          deploymentState.deployment,
+          targetPosition.selectedRewardAssets
+        );
+        for (const batch of checkpointRewardAssetBatches(required)) {
+          await executeProtocolTransaction({
+            ...common,
+            kind: "checkpoint-rewards",
+            label: `Checkpoint ${batch.length} reward asset${batch.length === 1 ? "" : "s"}`,
+            amount: `${batch.length} assets`,
+            to: diamond,
+            data: buildCheckpointRewardAssetsCall(batch),
+          });
+        }
       }
       await executeProtocolTransaction({
         ...common,
@@ -441,23 +477,13 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject="rewards"
-        empty={{ title: "Rewards unavailable", description: "No deployment is configured." }}
-      />
-    );
-  }
-
   const surfaceState = deriveSurfaceState({
     walletStatus: walletState.status,
     isTargetChain: walletState.isTargetChain,
-    isLoading: catalog.isPending,
+    isLoading: protocol.available && catalog.isPending,
     isError: catalog.isError,
-    isEmpty: (catalog.data?.positions.length ?? 0) === 0,
-    hasData: Boolean(catalog.data),
+    isEmpty: !protocol.available || (catalog.data?.positions.length ?? 0) === 0,
+    hasData: !protocol.available || Boolean(catalog.data),
   });
   const orderedPositions = focusRewardPositions(catalog.data?.positions ?? [], initialPositionId);
 
@@ -761,6 +787,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
           </Link>
         </div>
       </section>
+      <ProtocolRevenueCard deployment={deploymentState.deployment} available={protocol.available} />
     </div>
   );
 }

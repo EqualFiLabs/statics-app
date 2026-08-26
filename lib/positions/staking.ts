@@ -31,9 +31,12 @@ export type RewardSelection = Readonly<{
   token: TokenMetadata;
   selected: boolean;
   /** Stake already earning this asset. */
-  eligibleStake: bigint;
+  actualEligibleStake: bigint;
   /** Stake waiting to start earning this asset. */
-  pendingStake: bigint;
+  actualPendingStake: bigint;
+  /** Multiplier-adjusted reward weight; never an owned or withdrawable balance. */
+  effectiveEligibleWeight: bigint;
+  effectivePendingWeight: bigint;
   /** When the pending stake starts earning. Zero when nothing is pending. */
   eligibleAt: bigint;
 }>;
@@ -82,8 +85,10 @@ export async function loadStakingSnapshot(
         return {
           token,
           selected: selection.selected,
-          eligibleStake: selection.eligibleStake,
-          pendingStake: selection.pendingStake,
+          actualEligibleStake: selection.actualEligibleStake,
+          actualPendingStake: selection.actualPendingStake,
+          effectiveEligibleWeight: selection.effectiveEligibleWeight,
+          effectivePendingWeight: selection.effectivePendingWeight,
           eligibleAt: BigInt(selection.eligibleAt),
         } satisfies RewardSelection;
       })
@@ -95,8 +100,8 @@ export async function loadStakingSnapshot(
   return {
     stakedBalance: stake.stakedBalance,
     selections,
-    earning: selected.filter((entry) => entry.eligibleStake > 0n),
-    maturing: selected.filter((entry) => entry.pendingStake > 0n),
+    earning: selected.filter((entry) => entry.actualEligibleStake > 0n),
+    maturing: selected.filter((entry) => entry.actualPendingStake > 0n),
   };
 }
 
@@ -111,7 +116,7 @@ export function groupByMaturity(selections: readonly RewardSelection[]): readonl
   const groups = new Map<bigint, { tokens: TokenMetadata[]; pendingStake: bigint }>();
 
   for (const entry of selections) {
-    if (entry.pendingStake <= 0n) continue;
+    if (entry.actualPendingStake <= 0n) continue;
     const group = groups.get(entry.eligibleAt);
     if (group) {
       group.tokens.push(entry.token);
@@ -119,9 +124,14 @@ export function groupByMaturity(selections: readonly RewardSelection[]): readonl
       // asset maturing at this moment. The larger figure is the stake itself,
       // not a sum of them.
       group.pendingStake =
-        entry.pendingStake > group.pendingStake ? entry.pendingStake : group.pendingStake;
+        entry.actualPendingStake > group.pendingStake
+          ? entry.actualPendingStake
+          : group.pendingStake;
     } else {
-      groups.set(entry.eligibleAt, { tokens: [entry.token], pendingStake: entry.pendingStake });
+      groups.set(entry.eligibleAt, {
+        tokens: [entry.token],
+        pendingStake: entry.actualPendingStake,
+      });
     }
   }
 
@@ -179,3 +189,92 @@ export function rankRewardCandidates<T extends { sources: readonly string[] }>(
 
 /** How many reward assets the picker shows before collapsing the rest. */
 export const VISIBLE_REWARD_CANDIDATES = 6;
+
+export const MAX_REWARD_CHECKPOINT_BATCH = 8;
+
+export type RewardSelectionChanges = Readonly<{
+  additions: readonly Address[];
+  removals: readonly Address[];
+}>;
+
+export type RewardSelectionAction = Readonly<{
+  kind: "add" | "remove";
+  assets: readonly Address[];
+}>;
+
+function canonicalRewardAssets(assets: readonly Address[]): Address[] {
+  return [...new Set(assets.map((asset) => getAddress(asset)))];
+}
+
+export function rewardSelectionChanges(
+  confirmed: readonly Address[],
+  draft: readonly Address[]
+): RewardSelectionChanges {
+  const confirmedAssets = canonicalRewardAssets(confirmed);
+  const draftAssets = canonicalRewardAssets(draft);
+  const confirmedSet = new Set(confirmedAssets);
+  const draftSet = new Set(draftAssets);
+  return {
+    additions: draftAssets.filter((asset) => !confirmedSet.has(asset)),
+    removals: confirmedAssets.filter((asset) => !draftSet.has(asset)),
+  };
+}
+
+export function toggleRewardSelection(
+  selected: readonly Address[],
+  asset: Address,
+  maximum: bigint
+): readonly Address[] {
+  const current = canonicalRewardAssets(selected);
+  const canonicalAsset = getAddress(asset);
+  if (current.includes(canonicalAsset)) {
+    return current.filter((candidate) => candidate !== canonicalAsset);
+  }
+  if (BigInt(current.length) >= maximum) {
+    throw new Error(`This position already selected the ${maximum.toString()} asset maximum.`);
+  }
+  return [...current, canonicalAsset];
+}
+
+export function rewardSelectionActionPlan(
+  confirmed: readonly Address[],
+  draft: readonly Address[]
+): readonly RewardSelectionAction[] {
+  const changes = rewardSelectionChanges(confirmed, draft);
+  const actions: RewardSelectionAction[] = [];
+  if (changes.removals.length > 0) actions.push({ kind: "remove", assets: changes.removals });
+  if (changes.additions.length > 0) actions.push({ kind: "add", assets: changes.additions });
+  return actions;
+}
+
+export async function rewardAssetsNeedingCheckpoint(
+  publicClient: PublicClient,
+  deployment: DollarDeployment,
+  assets: readonly Address[]
+): Promise<readonly Address[]> {
+  const unique = [...new Set(assets.map((asset) => getAddress(asset)))];
+  const required = await Promise.all(
+    unique.map(async (asset) => ({
+      asset,
+      required: await publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "rewardBookNeedsCheckpoint",
+        args: [asset],
+      }),
+    }))
+  );
+  return required
+    .filter(({ required: needsCheckpoint }) => needsCheckpoint)
+    .map(({ asset }) => asset);
+}
+
+export function checkpointRewardAssetBatches(
+  assets: readonly Address[]
+): readonly (readonly Address[])[] {
+  const batches: Address[][] = [];
+  for (let index = 0; index < assets.length; index += MAX_REWARD_CHECKPOINT_BATCH) {
+    batches.push(assets.slice(index, index + MAX_REWARD_CHECKPOINT_BATCH));
+  }
+  return batches;
+}

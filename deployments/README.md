@@ -6,10 +6,10 @@ was deployed at it and to the recorded deployment commit. The `source` block
 also names the reachable public Statics commit and canonical deployment artifact
 that preserve the public provenance record without relabeling deployed bytecode.
 
-Robinhood Chain Testnet is recorded in `46630.json`. It binds the unified Statics
-deployment, Position renderer and avatar, USDG profile, and Robinhood Uniswap v4
-dependencies to their runtime code hashes. The faucet entry is optional until
-its separately authorized live deployment is recorded.
+`46630.json` records the clean-break Genesis release. It binds the unified
+Statics deployment, fixed STATICS token, Genesis NFT/renderer/avatar stack,
+USDG profile, and Robinhood Uniswap v4 dependencies to runtime code hashes read
+from the live chain. The obsolete pre-Genesis manifest remains excluded.
 
 ## Generating one
 
@@ -32,10 +32,10 @@ npm run deployment:manifest -- \
 The address input is the operator's current deployment record. The public
 deployment artifact is the reviewed provenance record in the Statics repository;
 it can be either `deployment.md` or a JSON record under `deployments/`. Every
-runtime code hash is read from the chain. The Position renderer is also read from
-the diamond and the avatar contract from the renderer, so a stale or inconsistent
-binding fails generation rather than producing a manifest that points at the
-wrong metadata stack.
+runtime code hash is read from the chain. Generation also records the STATICS
+token, Genesis collection, Genesis renderer, and Avatar SVG contracts. Runtime
+verification checks their Diamond and renderer bindings, so a stale or
+inconsistent metadata stack fails closed.
 
 The recorded deployment commit remains the identity used by the application for
 cache separation. It may predate a public repository snapshot. The public commit

@@ -27,7 +27,7 @@ import type {
 } from "@/lib/dollar/deployment";
 
 /** Bump when the shape changes so an older generator cannot write a newer app. */
-export const MANIFEST_SCHEMA_VERSION = 4;
+export const MANIFEST_SCHEMA_VERSION = 5;
 
 const dollarContractNames: readonly DollarContractName[] = [
   "diamond",
@@ -67,7 +67,9 @@ export type DeploymentManifest = Readonly<{
   }>;
   generatedAt: string;
   contracts: Readonly<Record<string, RawEntry>>;
-  positionMetadata: Readonly<{
+  genesis: Readonly<{
+    token: RawEntry;
+    collection: RawEntry;
     renderer: RawEntry;
     avatarSvg: RawEntry;
   }>;
@@ -160,19 +162,17 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     runtimeCodeHashes[name] = entry.runtimeCodeHash;
   }
 
-  const renderer = readEntry(
-    chainId,
-    "positionMetadata.renderer",
-    manifest.positionMetadata?.renderer
-  );
-  const avatarSvg = readEntry(
-    chainId,
-    "positionMetadata.avatarSvg",
-    manifest.positionMetadata?.avatarSvg
-  );
-  const positionMetadata: NonNullable<DollarDeployment["positionMetadata"]> = {
+  const token = readEntry(chainId, "genesis.token", manifest.genesis?.token);
+  const collection = readEntry(chainId, "genesis.collection", manifest.genesis?.collection);
+  const renderer = readEntry(chainId, "genesis.renderer", manifest.genesis?.renderer);
+  const avatarSvg = readEntry(chainId, "genesis.avatarSvg", manifest.genesis?.avatarSvg);
+  const genesis: NonNullable<DollarDeployment["genesis"]> = {
+    token: token.address,
+    collection: collection.address,
     renderer: renderer.address,
     avatarSvg: avatarSvg.address,
+    tokenCodeHash: token.runtimeCodeHash,
+    collectionCodeHash: collection.runtimeCodeHash,
     rendererCodeHash: renderer.runtimeCodeHash,
     avatarSvgCodeHash: avatarSvg.runtimeCodeHash,
   };
@@ -226,7 +226,7 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     source: "checked-in-manifest",
     contracts: contracts as Record<DollarContractName, Address>,
     runtimeCodeHashes: runtimeCodeHashes as Record<DollarContractName, Hex>,
-    positionMetadata,
+    genesis,
     liquidity,
     pegged,
     faucet,

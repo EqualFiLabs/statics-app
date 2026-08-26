@@ -51,11 +51,15 @@ function liquidityDeploymentEnvironment() {
   };
 }
 
-function positionMetadataEnvironment() {
+function genesisEnvironment() {
   return {
-    NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_TOKEN_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS: address,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: address,
-    NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: hash,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: hash,
   };
 }
@@ -72,7 +76,7 @@ describe("Dollar deployment configuration", () => {
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
       ...liquidityDeploymentEnvironment(),
-      ...positionMetadataEnvironment(),
+      ...genesisEnvironment(),
     });
     expect(state.status).toBe("configured");
     if (state.status === "configured") {
@@ -81,17 +85,17 @@ describe("Dollar deployment configuration", () => {
       expect(state.deployment.wethProfileId).toBe(1n);
       expect(state.deployment.runtimeCodeHashes.gateway).toBe(hash);
       expect(state.deployment.liquidity?.contracts.stateView).toBe(address);
-      expect(state.deployment.positionMetadata?.renderer).toBe(address);
+      expect(state.deployment.genesis?.renderer).toBe(address);
     }
   });
 
-  it("rejects partial Position metadata configuration", () => {
+  it("rejects partial Genesis configuration", () => {
     expect(() =>
       readDollarDeployment({
         ...localDeploymentEnvironment(),
-        NEXT_PUBLIC_STATICS_POSITION_RENDERER_ADDRESS: address,
+        NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS: address,
       })
-    ).toThrow("Position metadata deployment configuration must be complete or omitted.");
+    ).toThrow("Genesis deployment configuration must be complete or omitted.");
   });
 
   it("rejects a partial liquidity deployment", () => {
@@ -140,7 +144,7 @@ describe("Dollar deployment configuration", () => {
     ).rejects.toThrow("runtime code does not match");
   });
 
-  it("verifies Position metadata runtime code and on-chain bindings", async () => {
+  it("verifies Genesis runtime code and on-chain bindings", async () => {
     const runtimeCodeHash = keccak256("0x6000");
     const runtimeHashes = Object.fromEntries(
       Object.keys(localDeploymentEnvironment())
@@ -149,9 +153,11 @@ describe("Dollar deployment configuration", () => {
     );
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
-      ...positionMetadataEnvironment(),
+      ...genesisEnvironment(),
       ...runtimeHashes,
-      NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
     });
     if (state.status !== "configured") throw new Error("expected configured deployment");
@@ -191,7 +197,7 @@ describe("Dollar deployment configuration", () => {
     expect(publicClient.getCode).toHaveBeenCalledTimes(7);
   });
 
-  it("rejects a Position renderer bound to a different avatar contract", async () => {
+  it("rejects a Genesis renderer bound to a different avatar contract", async () => {
     const runtimeCodeHash = keccak256("0x6000");
     const runtimeHashes = Object.fromEntries(
       Object.keys(localDeploymentEnvironment())
@@ -200,9 +206,11 @@ describe("Dollar deployment configuration", () => {
     );
     const state = readDollarDeployment({
       ...localDeploymentEnvironment(),
-      ...positionMetadataEnvironment(),
+      ...genesisEnvironment(),
       ...runtimeHashes,
-      NEXT_PUBLIC_STATICS_POSITION_RENDERER_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
     });
     if (state.status !== "configured") throw new Error("expected configured deployment");

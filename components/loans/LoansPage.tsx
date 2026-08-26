@@ -21,22 +21,31 @@ import {
   buildExtendCall,
   buildRecoverCall,
   buildRepayCall,
-  quoteBorrowAndProvideLiquidity,
   staticsAbi,
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
-import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
-import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
-import { readClientDollarDeployment, verifyDollarDeployment } from "@/lib/dollar/deployment";
+import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
+import { BorrowUtilizationSlider } from "@/components/loans/BorrowUtilizationSlider";
 import {
-  basketLiquiditySnapshot,
+  ProtocolSlippageControl,
+  useProtocolSlippage,
+} from "@/components/protocol/ProtocolSlippage";
+import { SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
+import {
+  ProtocolActionScope,
+  useProtocolSurface,
+} from "@/components/protocol/ProtocolAvailability";
+import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
+import { verifyDollarDeployment } from "@/lib/dollar/deployment";
+import {
   borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
-  canonicalFullRange,
+  calculateBorrowLiquidityPlan,
   loadLiquidityCatalog,
   type CanonicalPoolRecord,
+  type BorrowLiquidityPlan,
 } from "@/lib/liquidity/liquidity";
 import {
   borrowableCollateral,
@@ -65,8 +74,8 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
-
-const deploymentState = readClientDollarDeployment();
+import { applyPercent } from "@/lib/protocol/ux";
+import { slippagePercentToBps } from "@/lib/portal/slippage";
 
 function displayAmount(value: bigint, decimals: number): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -113,7 +122,11 @@ export function LoansPage({
 }) {
   const wallet = useWalletState();
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Loans" />;
-  return <LoansRuntime initialBorrowDestination={initialBorrowDestination} />;
+  return (
+    <ProtocolActionScope>
+      <LoansRuntime initialBorrowDestination={initialBorrowDestination} />
+    </ProtocolActionScope>
+  );
 }
 
 function LoansRuntime({
@@ -125,6 +138,9 @@ function LoansRuntime({
   const walletState = useWalletState();
   const publicClient = usePublicClient();
   const walletClient = useWalletClient();
+  const protocolSlippage = useProtocolSlippage();
+  const protocol = useProtocolSurface();
+  const deploymentState = { status: "configured", deployment: protocol.deployment } as const;
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [mode, setMode] = useState<LoanMode>("borrow");
@@ -134,8 +150,12 @@ function LoansRuntime({
   const [sharesInput, setSharesInput] = useState("");
   const [borrowDestination, setBorrowDestination] =
     useState<BorrowDestination>(initialBorrowDestination);
-  const [borrowPoolLiquidity, setBorrowPoolLiquidity] = useState<Record<string, string>>({});
+  const [borrowLiquidityUtilization, setBorrowLiquidityUtilization] = useState(100);
+  const [borrowPoolWeights, setBorrowPoolWeights] = useState<Record<string, number>>({});
+  const [borrowLiquidityAdvanced, setBorrowLiquidityAdvanced] = useState(false);
   const [grossInputs, setGrossInputs] = useState<Record<string, readonly string[]>>({});
+  const [extensionAdvanced, setExtensionAdvanced] = useState(false);
+  const [extensionExcessAcknowledged, setExtensionExcessAcknowledged] = useState(false);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [verificationBlocked, setVerificationBlocked] = useState(false);
@@ -149,6 +169,7 @@ function LoansRuntime({
       wallet,
     ],
     enabled:
+      protocol.available &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
       Boolean(wallet) &&
@@ -172,6 +193,7 @@ function LoansRuntime({
       wallet,
     ],
     enabled:
+      protocol.available &&
       mode === "borrow" &&
       borrowDestination === "liquidity" &&
       deploymentState.status === "configured" &&
@@ -205,6 +227,18 @@ function LoansRuntime({
         )
       )
       .filter((pool): pool is CanonicalPoolRecord => pool !== undefined) ?? [];
+  const borrowLiquidityPlan =
+    basket && shares > 0n && borrowPools.length === basket.constituents.length
+      ? calculateBorrowLiquidityPlan({
+          basket,
+          sharesIn: shares,
+          pools: borrowPools,
+          weights: borrowPoolWeights,
+          utilizationPercent: borrowLiquidityUtilization,
+          deadline: 1n,
+          slippageBps: BigInt(slippagePercentToBps(protocolSlippage)),
+        })
+      : null;
   const borrowLiquidityReason =
     mode !== "borrow" || borrowDestination !== "liquidity"
       ? null
@@ -214,7 +248,9 @@ function LoansRuntime({
           ? "Canonical pool state is unavailable."
           : !liquidityCatalog.data
             ? "Loading canonical pool state…"
-            : borrowedLiquidityReadiness(basket, borrowPools, borrowPoolLiquidity);
+            : borrowLiquidityUtilization === 0
+              ? "Move the allocation slider above 0 to create liquidity positions."
+              : borrowedLiquidityReadiness(basket, borrowPools, borrowLiquidityPlan);
 
   const ownedLoans = catalog.data?.ownedLoans ?? [];
   const recoveryLoans = [
@@ -228,6 +264,7 @@ function LoansRuntime({
   const borrowQuote = useQuery({
     queryKey: ["loan-borrow-quote", basket?.basketId.toString(), shares.toString()],
     enabled:
+      protocol.available &&
       mode === "borrow" &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -245,6 +282,7 @@ function LoansRuntime({
   const extensionQuote = useQuery({
     queryKey: ["loan-extension-quote", selectedLoan?.loanId.toString()],
     enabled:
+      protocol.available &&
       mode === "extend" &&
       deploymentState.status === "configured" &&
       Boolean(publicClient) &&
@@ -274,7 +312,9 @@ function LoansRuntime({
     : [];
   const parsedGross =
     selectedLoan && currentExtensionQuote
-      ? parseGrossAmounts(grossValues, selectedLoan, currentExtensionQuote, locale)
+      ? extensionAdvanced
+        ? parseGrossAmounts(grossValues, selectedLoan, currentExtensionQuote, locale)
+        : currentExtensionQuote.requiredFees
       : null;
   const grossError =
     mode === "extend" && currentExtensionQuote
@@ -339,7 +379,14 @@ function LoansRuntime({
           reason: borrowLiquidityReason,
           executable: false,
         }
-      : baseAction;
+      : mode === "extend" && extensionAdvanced && !extensionExcessAcknowledged
+        ? {
+            kind: "blocked" as const,
+            label: "Review advanced extension funding",
+            reason: "Acknowledge that gross amounts above the exact quote are not refunded.",
+            executable: false,
+          }
+        : baseAction;
 
   const clearInteractionError = () => {
     if (!verificationBlocked) setActionError(null);
@@ -428,32 +475,17 @@ function LoansRuntime({
     });
     const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
     const deadline = borrowedLiquidityDeadline(latestBlock.timestamp);
-    const poolInputs = basketPools.map((pool) => {
-      const raw = borrowPoolLiquidity[pool.poolId] ?? "";
-      if (!/^\d+$/.test(raw) || BigInt(raw) <= 0n) {
-        throw new Error(`Enter positive raw liquidity for ${pool.asset.symbol}.`);
-      }
-      if (BigInt(raw) > (1n << 128n) - 1n) {
-        throw new Error(`${pool.asset.symbol} liquidity exceeds the uint128 limit.`);
-      }
-      const [tickLower, tickUpper] = canonicalFullRange(pool.key.tickSpacing);
-      return {
-        asset: pool.asset.address,
-        currency0: pool.key.currency0,
-        currency1: pool.key.currency1,
-        sqrtPriceX96: pool.sqrtPriceX96,
-        tickLower,
-        tickUpper,
-        liquidity: BigInt(raw),
-        deadline,
-      };
+    const plan = calculateBorrowLiquidityPlan({
+      basket: liquidityBasket,
+      sharesIn: shares,
+      pools: basketPools,
+      weights: borrowPoolWeights,
+      utilizationPercent: borrowLiquidityUtilization,
+      deadline,
+      slippageBps: BigInt(slippagePercentToBps(protocolSlippage)),
     });
-    const quote = quoteBorrowAndProvideLiquidity(
-      basketLiquiditySnapshot(liquidityBasket),
-      shares,
-      poolInputs,
-      50n
-    );
+    if (!plan) throw new Error("The current loan cannot fund a positive amount in every pool.");
+    const quote = plan.quote;
     if (
       quote.borrow.feeShares !== standardQuote.feeShares ||
       quote.borrow.collateralShares !== standardQuote.collateralShares ||
@@ -940,27 +972,18 @@ function LoansRuntime({
     }
   };
 
-  if (deploymentState.status === "unavailable") {
-    return (
-      <SurfaceEmptyState
-        state="unconfigured"
-        subject="loans"
-        empty={{ title: "Loans unavailable", description: "No deployment is configured." }}
-      />
-    );
-  }
-
   const surfaceState = deriveSurfaceState({
     walletStatus: walletState.status,
     isTargetChain: walletState.isTargetChain,
-    isLoading: catalog.isPending,
+    isLoading: protocol.available && catalog.isPending,
     isError: catalog.isError,
     // Owned loans plus any that are publicly recoverable.
     isEmpty:
+      !protocol.available ||
       (catalog.data?.ownedLoans.length ?? 0) +
         (catalog.data?.publicRecoverableLoans.length ?? 0) ===
-      0,
-    hasData: Boolean(catalog.data),
+        0,
+    hasData: !protocol.available || Boolean(catalog.data),
   });
 
   let primaryLabel = verificationBlocked ? "Refresh protocol state" : action.label;
@@ -1030,10 +1053,9 @@ function LoansRuntime({
         <section className="remaining-list" aria-label="Current loans">
           <div className="remaining-section-heading">
             <div>
-              <p className="dapp-section-label">Onchain loan ledger</p>
+              <p className="dapp-section-label">Your loans</p>
               <h3>Independent obligations</h3>
             </div>
-            <span>Block {catalog.data?.currentBlock.toString() ?? "—"}</span>
           </div>
           {!isSurfaceReady(surfaceState) ? (
             <SurfaceEmptyState
@@ -1119,13 +1141,17 @@ function LoansRuntime({
               positionId={position?.positionId.toString() ?? ""}
               basketId={basket?.basketId.toString() ?? ""}
               sharesInput={sharesInput}
+              shares={shares}
               wallet={wallet}
               chainId={deploymentState.deployment.chainId}
               quote={currentBorrowQuote}
               destination={borrowDestination}
               liquidityAvailable={Boolean(deploymentState.deployment.liquidity)}
               liquidityPools={borrowPools}
-              poolLiquidity={borrowPoolLiquidity}
+              liquidityPlan={borrowLiquidityPlan}
+              utilizationPercent={borrowLiquidityUtilization}
+              advanced={borrowLiquidityAdvanced}
+              weights={borrowPoolWeights}
               onPosition={(value) => {
                 setSelectedPositionId(value);
                 setSelectedBasketId("");
@@ -1143,8 +1169,10 @@ function LoansRuntime({
                 setBorrowDestination(value);
                 clearInteractionError();
               }}
-              onPoolLiquidity={(poolId, value) => {
-                setBorrowPoolLiquidity((current) => ({ ...current, [poolId]: value }));
+              onUtilization={setBorrowLiquidityUtilization}
+              onAdvanced={setBorrowLiquidityAdvanced}
+              onPoolWeight={(poolId, value) => {
+                setBorrowPoolWeights((current) => ({ ...current, [poolId]: value }));
                 clearInteractionError();
               }}
             />
@@ -1155,6 +1183,13 @@ function LoansRuntime({
               extensionQuote={currentExtensionQuote}
               grossValues={grossValues}
               chainId={deploymentState.deployment.chainId}
+              advanced={extensionAdvanced}
+              excessAcknowledged={extensionExcessAcknowledged}
+              onAdvanced={(value) => {
+                setExtensionAdvanced(value);
+                setExtensionExcessAcknowledged(false);
+              }}
+              onExcessAcknowledged={setExtensionExcessAcknowledged}
               onGross={(index, value) => {
                 const next = [...grossValues];
                 next[index] = value;
@@ -1176,6 +1211,7 @@ function LoansRuntime({
             </p>
           )}
           {mode === "extend" &&
+            extensionAdvanced &&
             parsedGross &&
             currentExtensionQuote &&
             hasExtensionExcess(parsedGross, currentExtensionQuote.requiredFees) && (
@@ -1235,35 +1271,47 @@ function BorrowFields({
   positionId,
   basketId,
   sharesInput,
+  shares,
   wallet,
   chainId,
   quote,
   destination,
   liquidityAvailable,
   liquidityPools,
-  poolLiquidity,
+  liquidityPlan,
+  utilizationPercent,
+  advanced,
+  weights,
   onPosition,
   onBasket,
   onShares,
   onDestination,
-  onPoolLiquidity,
+  onUtilization,
+  onAdvanced,
+  onPoolWeight,
 }: {
   catalog: Awaited<ReturnType<typeof loadLoanCatalog>> | undefined;
   positionId: string;
   basketId: string;
   sharesInput: string;
+  shares: bigint;
   wallet: Address | null;
   chainId: number;
   quote: BorrowQuote | undefined;
   destination: BorrowDestination;
   liquidityAvailable: boolean;
   liquidityPools: readonly CanonicalPoolRecord[];
-  poolLiquidity: Readonly<Record<string, string>>;
+  liquidityPlan: BorrowLiquidityPlan | null;
+  utilizationPercent: number;
+  advanced: boolean;
+  weights: Readonly<Record<string, number>>;
   onPosition: (value: string) => void;
   onBasket: (value: string) => void;
   onShares: (value: string) => void;
   onDestination: (value: BorrowDestination) => void;
-  onPoolLiquidity: (poolId: string, value: string) => void;
+  onUtilization: (value: number) => void;
+  onAdvanced: (value: boolean) => void;
+  onPoolWeight: (poolId: string, value: number) => void;
 }) {
   const position = catalog?.positions.find((item) => item.positionId.toString() === positionId);
   const collateral =
@@ -1315,7 +1363,7 @@ function BorrowFields({
           </select>
         </label>
         <label className="basket-field">
-          <span>Basket shares in</span>
+          <span>Use as collateral</span>
           <input
             inputMode="decimal"
             value={sharesInput}
@@ -1331,6 +1379,21 @@ function BorrowFields({
                 )} ${collateral.basket.symbol}`
               : "—"}
           </small>
+          {collateral && (
+            <AmountPercentageSlider
+              amount={shares}
+              maximum={collateral.depositedShares - collateral.lockedShares}
+              label="Use unlocked collateral"
+              onSelect={(percent) =>
+                onShares(
+                  displayAmount(
+                    applyPercent(collateral.depositedShares - collateral.lockedShares, percent),
+                    collateral.basket.token.decimals
+                  )
+                )
+              }
+            />
+          )}
         </label>
         <div className="basket-field">
           <span>{destination === "wallet" ? "Principal receiver" : "LP recipient"}</span>
@@ -1348,18 +1411,71 @@ function BorrowFields({
             canonical full-range liquidity positions atomically. Failed pool creation reverts the
             entire loan.
           </p>
-          <div className="remaining-form-grid">
-            {liquidityPools.map((pool) => (
-              <label className="basket-field" key={pool.poolId}>
-                <span>{pool.asset.symbol} pool raw liquidity</span>
-                <input
-                  inputMode="numeric"
-                  value={poolLiquidity[pool.poolId] ?? ""}
-                  onChange={(event) => onPoolLiquidity(pool.poolId, event.target.value)}
-                  placeholder="0"
-                />
-              </label>
-            ))}
+          <div className="borrow-liquidity-controls">
+            <BorrowUtilizationSlider value={utilizationPercent} onChange={onUtilization} />
+            <label className="protocol-checkbox">
+              <input
+                type="checkbox"
+                checked={advanced}
+                onChange={(event) => onAdvanced(event.target.checked)}
+              />
+              Advanced pool weights
+            </label>
+            {advanced && (
+              <div className="remaining-form-grid">
+                {liquidityPools.map((pool) => (
+                  <label className="basket-field" key={pool.poolId}>
+                    <span>{pool.asset.symbol} allocation weight</span>
+                    <div className="protocol-percent-input">
+                      <input
+                        inputMode="numeric"
+                        value={weights[pool.poolId] ?? 100}
+                        min={1}
+                        max={100}
+                        onChange={(event) =>
+                          onPoolWeight(
+                            pool.poolId,
+                            Math.max(1, Math.min(100, Number(event.target.value) || 1))
+                          )
+                        }
+                      />
+                      <span>%</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            <ProtocolSlippageControl />
+            {liquidityPlan && (
+              <section className="borrow-liquidity-preview" aria-live="polite">
+                <h4>Liquidity preview</h4>
+                <p>
+                  {liquidityPlan.allocations.length} LP NFTs · principal not used is returned to
+                  your wallet.
+                </p>
+                <ul>
+                  {liquidityPlan.allocations.map((allocation) => (
+                    <li key={allocation.poolId}>
+                      <strong>{allocation.asset.symbol} pool</strong>
+                      <span>
+                        Deposit {displayAmount(allocation.assetAmount, allocation.asset.decimals)}{" "}
+                        {allocation.asset.symbol} + {displayAmount(allocation.basketAmount, 18)}{" "}
+                        {collateral?.basket.symbol}
+                      </span>
+                      <small>
+                        Uses{" "}
+                        {displayAmount(
+                          allocation.principal - allocation.refund,
+                          allocation.asset.decimals
+                        )}{" "}
+                        {allocation.asset.symbol}; returns{" "}
+                        {displayAmount(allocation.refund, allocation.asset.decimals)}.
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         </>
       )}
@@ -1400,7 +1516,7 @@ function BorrowFields({
       {quote && collateral && (
         <div className="principal-vector" aria-label="Borrow principal vector">
           <div>
-            <span>Principal vector</span>
+            <span>You receive</span>
             <small>Fresh onchain quote</small>
           </div>
           <ul>
@@ -1418,7 +1534,6 @@ function BorrowFields({
                       ? displayAmount(quote.principals[index] ?? 0n, constituent.token.decimals)
                       : (quote.principals[index] ?? 0n).toString()}
                   </strong>
-                  <small>USD reference unavailable</small>
                 </li>
               );
             })}
@@ -1435,6 +1550,10 @@ function LoanDetails({
   extensionQuote,
   grossValues,
   chainId,
+  advanced,
+  excessAcknowledged,
+  onAdvanced,
+  onExcessAcknowledged,
   onGross,
 }: {
   loan: LoanRecord;
@@ -1442,6 +1561,10 @@ function LoanDetails({
   extensionQuote: ExtensionQuote | undefined;
   grossValues: readonly string[];
   chainId: number;
+  advanced: boolean;
+  excessAcknowledged: boolean;
+  onAdvanced: (value: boolean) => void;
+  onExcessAcknowledged: (value: boolean) => void;
   onGross: (index: number, value: string) => void;
 }) {
   const locale = useAppLocale();
@@ -1472,14 +1595,14 @@ function LoanDetails({
       </dl>
       <div className="principal-vector" aria-label="Loan principal vector">
         <div>
-          <span>{mode === "extend" ? "Extension fee vector" : "Principal vector"}</span>
-          <small>{mode === "extend" ? "Editable gross inputs" : "Exact repayment amounts"}</small>
+          <span>{mode === "extend" ? "Extension cost" : "You repay"}</span>
+          <small>{mode === "extend" ? "Exact current quote" : "Exact repayment amounts"}</small>
         </div>
         <ul>
           {loan.assets.map((asset, index) => (
             <li key={asset.token.address}>
               <span>{asset.token.symbol}</span>
-              {mode === "extend" ? (
+              {mode === "extend" && advanced ? (
                 <label>
                   <span className="sr-only">Gross {asset.token.symbol} amount</span>
                   <input
@@ -1488,6 +1611,10 @@ function LoanDetails({
                     onChange={(event) => onGross(index, event.target.value)}
                   />
                 </label>
+              ) : mode === "extend" && extensionQuote ? (
+                <strong>
+                  {displayAmount(extensionQuote.requiredFees[index] ?? 0n, asset.token.decimals)}
+                </strong>
               ) : (
                 <strong>
                   {asset.token.metadataAvailable
@@ -1495,18 +1622,44 @@ function LoanDetails({
                     : asset.principal.toString()}
                 </strong>
               )}
-              <small>
-                {mode === "extend" && extensionQuote
-                  ? `Required ${displayAmount(
-                      extensionQuote.requiredFees[index] ?? 0n,
-                      asset.token.decimals
-                    )} · no refund above quote`
-                  : "USD reference unavailable"}
-              </small>
+              {mode === "extend" && extensionQuote && (
+                <small>
+                  Required{" "}
+                  {displayAmount(extensionQuote.requiredFees[index] ?? 0n, asset.token.decimals)} ·
+                  no refund above quote
+                </small>
+              )}
             </li>
           ))}
         </ul>
       </div>
+      {mode === "extend" && (
+        <details className="liquidity-position-diagnostics">
+          <summary>Advanced fee-on-transfer funding</summary>
+          <p>
+            Most users should pay the exact quote. Only increase gross inputs when a token takes a
+            transfer fee.
+          </p>
+          <label className="protocol-checkbox">
+            <input
+              type="checkbox"
+              checked={advanced}
+              onChange={(event) => onAdvanced(event.target.checked)}
+            />
+            Enter gross token amounts
+          </label>
+          {advanced && (
+            <label className="protocol-checkbox">
+              <input
+                type="checkbox"
+                checked={excessAcknowledged}
+                onChange={(event) => onExcessAcknowledged(event.target.checked)}
+              />
+              I understand amounts above the exact quote are not refunded.
+            </label>
+          )}
+        </details>
+      )}
     </>
   );
 }

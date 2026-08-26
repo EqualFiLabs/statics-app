@@ -6,7 +6,6 @@ import { usePublicClient } from "wagmi";
 
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { WalletNftList } from "@/components/wallet/WalletNftList";
-import { readClientDollarDeployment } from "@/lib/dollar/deployment";
 import { loadLiquidityCatalog } from "@/lib/liquidity/liquidity";
 import { loadPositionCatalog } from "@/lib/positions/positions";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
@@ -14,8 +13,8 @@ import { collectWalletNfts, describeCollectionNfts, type WalletNft } from "@/lib
 import { readCollectionHoldings } from "@/lib/wallet/nft-contracts";
 import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { useWalletState } from "@/providers/wallet-context";
-
-const deploymentState = readClientDollarDeployment();
+import { useDeployment } from "@/providers/deployment-context";
+import { discoverWalletGenesisIds } from "@/lib/genesis/discovery";
 
 /**
  * The NFTs tab, owning its own reads.
@@ -36,48 +35,82 @@ export function WalletNftPanel({
   onAddCollection: () => void;
 }) {
   const wallet = useWalletState();
-  const publicClient = usePublicClient(
-    deploymentState.status === "configured"
-      ? { chainId: deploymentState.deployment.chainId }
-      : undefined
-  );
+  const { active } = useDeployment();
+  const deployment = active.protocol ?? active.launch;
+  const publicClient = usePublicClient({ chainId: active.descriptor.chainId });
 
   const walletAddress =
     wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
-  const collectionChainId =
-    deploymentState.status === "configured" ? deploymentState.deployment.chainId : null;
-  const { collections, removeCollection } = useWalletNftCollections(collectionChainId);
+  const collectionChainId = deployment ? deployment.descriptor.chainId : null;
+  const canonicalGenesis = deployment
+    ? deployment.kind === "launch"
+      ? deployment.contracts.genesis
+      : deployment.protocol.genesis?.collection
+    : undefined;
+  const { collections, removeCollection } = useWalletNftCollections(collectionChainId, deployment);
 
   const catalog = useQuery({
     queryKey: [
       "wallet-nfts",
+      active.descriptor.deploymentId,
       collectionChainId,
-      deploymentState.status === "configured"
-        ? deploymentState.deployment.protocolCommit
-        : "unconfigured",
+      deployment?.kind === "protocol"
+        ? deployment.protocol.protocolCommit
+        : (deployment?.protocolCommit ?? "unconfigured"),
       walletAddress,
       collections.map((c) => c.address).join(","),
     ],
     enabled:
-      deploymentState.status === "configured" &&
+      Boolean(deployment) &&
       Boolean(publicClient) &&
       Boolean(walletAddress) &&
       wallet.status === "ready" &&
       wallet.isTargetChain,
     queryFn: async () => {
-      if (!publicClient || !walletAddress || deploymentState.status !== "configured") {
+      if (!publicClient || !walletAddress || !deployment) {
         throw new Error("No verified Statics deployment is configured.");
       }
-      const deployment = deploymentState.deployment;
+
+      if (deployment.kind === "launch") {
+        const genesisIds = await discoverWalletGenesisIds(publicClient, deployment, walletAddress);
+        const customCollections = collections.filter(
+          (collection) =>
+            collection.address.toLowerCase() !== deployment.contracts.genesis.toLowerCase()
+        );
+        const collectionResults = await Promise.allSettled(
+          customCollections.map((collection) =>
+            readCollectionHoldings(publicClient, collection, walletAddress)
+          )
+        );
+        const genesisNfts: WalletNft[] = genesisIds.map((tokenId) => ({
+          kind: "collection" as const,
+          tokenId,
+          contract: deployment.contracts.genesis,
+          name: `Genesis #${tokenId.toString()}`,
+          summary: "Statics Operators",
+          carries: [] as readonly string[],
+          transferWarning:
+            "Transferring this Operator NFT resets activation to Tier 0. Rewards earned before transfer remain claimable by the previous owner.",
+          blockedReason: null,
+        }));
+        const collectionNfts: readonly WalletNft[] = collectionResults.flatMap((result) =>
+          result.status === "fulfilled" ? describeCollectionNfts(result.value) : []
+        );
+        return {
+          nfts: [...genesisNfts, ...collectionNfts],
+          liquidityUnavailable: false,
+        };
+      }
+      const protocol = deployment.protocol;
 
       // Settled rather than all: the two sources are independent, and a
       // deployment whose canonical pools are not initialised makes the
       // liquidity read revert. Failing the whole query for that discarded
       // every position the wallet actually held.
       const [positions, liquidity] = await Promise.allSettled([
-        loadPositionCatalog(publicClient, deployment, walletAddress),
-        deployment.liquidity
-          ? loadLiquidityCatalog(publicClient, deployment, walletAddress)
+        loadPositionCatalog(publicClient, protocol, walletAddress),
+        protocol.liquidity
+          ? loadLiquidityCatalog(publicClient, protocol, walletAddress)
           : Promise.resolve(null),
       ]);
 
@@ -100,7 +133,7 @@ export function WalletNftPanel({
           positions: positions.value.positions,
           liquidityPositions:
             liquidity.status === "fulfilled" ? (liquidity.value?.positions ?? []) : [],
-          deployment,
+          deployment: protocol,
           wallet: walletAddress,
         }).concat(collectionNfts),
         liquidityUnavailable: liquidity.status === "rejected",
@@ -123,13 +156,15 @@ export function WalletNftPanel({
         {collections.map((collection) => (
           <span key={collection.address} className="wallet-nft-chip">
             {collection.symbol}
-            <button
-              type="button"
-              aria-label={`Remove ${collection.name}`}
-              onClick={() => removeCollection(collection.address)}
-            >
-              ×
-            </button>
+            {collection.address.toLowerCase() !== canonicalGenesis?.toLowerCase() && (
+              <button
+                type="button"
+                aria-label={`Remove ${collection.name}`}
+                onClick={() => removeCollection(collection.address)}
+              >
+                ×
+              </button>
+            )}
           </span>
         ))}
       </div>

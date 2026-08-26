@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   DOLLAR_MINT_PAUSE,
+  DOLLAR_PAIRING_FILL_PAUSE,
   deriveDollarActionAvailability,
+  dollarPauseStatuses,
   dollarQuoteQueryKey,
   type DeriveDollarActionInput,
   type DollarActionSnapshot,
@@ -111,14 +113,14 @@ describe("Dollar action availability", () => {
     ).toMatchObject({ kind: "approve-weth", label: "Enable WETH deposits", executable: true });
     expect(derive({ asset: "WETH" })).toMatchObject({
       kind: "execute",
-      label: "Deposit WETH",
+      label: "Mint Dollar and Risk with WETH",
     });
     expect(
       derive({
         asset: "WETH",
         snapshot: { ...healthySnapshot, wethAllowance: amount + 1n },
       })
-    ).toMatchObject({ kind: "execute", label: "Deposit WETH" });
+    ).toMatchObject({ kind: "execute", label: "Mint Dollar and Risk with WETH" });
   });
 
   it("uses recombination-specific recovery and balance rules", () => {
@@ -132,7 +134,7 @@ describe("Dollar action availability", () => {
 
     expect(recombine({ profileMode: 2, healthy: false, seriesStatus: 3 })).toMatchObject({
       kind: "execute",
-      label: "Recombine to WETH",
+      label: "Withdraw collateral to WETH",
     });
     expect(recombine({ globalHealthPhase: 2 })).toMatchObject({
       kind: "blocked",
@@ -167,6 +169,15 @@ describe("Dollar action availability", () => {
         snapshot: { ...healthySnapshot, riskApproved: false },
       })
     ).toMatchObject({ kind: "approve-risk" });
+  });
+});
+
+describe("Dollar pause presentation", () => {
+  it("returns semantic statuses and preserves unknown governed flags", () => {
+    expect(dollarPauseStatuses(0n)).toEqual([{ kind: "none" }]);
+    expect(dollarPauseStatuses(DOLLAR_MINT_PAUSE | DOLLAR_PAIRING_FILL_PAUSE | (1n << 7n))).toEqual(
+      [{ kind: "mint" }, { kind: "redemption" }, { kind: "additional", mask: 1n << 7n }]
+    );
   });
 });
 

@@ -8,22 +8,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
-import { getDappRouteId, isDappOverviewPath } from "@/lib/dapp-navigation";
-import { appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import { getDappRouteId } from "@/lib/dapp-navigation";
+import { appNavigationGroupsForStage, appTabNavigationForStage } from "@/lib/site-config";
+import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
-
-const approvalDisclosureRoutes = [
-  "/app/dollar",
-  "/app/baskets",
-  "/app/positions",
-  "/app/loans",
-  "/app/rewards",
-  "/app/liquidity",
-] as const;
 
 function WalletHeaderControls() {
   const wallet = useWalletState();
@@ -127,7 +119,7 @@ function WalletHeaderControls() {
  * rather than by name, because the context does not carry the name of the
  * chain the wallet actually sits on -- only its id.
  */
-function NetworkIndicator() {
+function NetworkIndicator({ label }: { label?: string } = {}) {
   const wallet = useWalletState();
   const t = useTranslations("shell");
 
@@ -135,7 +127,7 @@ function NetworkIndicator() {
     return (
       <div className="dapp-network">
         <span className="dapp-network-dot" aria-hidden="true" />
-        {wallet.networkName}
+        {label ?? wallet.networkName}
       </div>
     );
   }
@@ -152,8 +144,40 @@ function NetworkIndicator() {
   return (
     <div className="dapp-network is-ready">
       <span className="dapp-network-dot" aria-hidden="true" />
-      {wallet.networkName}
+      {label ?? wallet.networkName}
     </div>
+  );
+}
+
+function NetworkSelector({ className = "" }: { className?: string }) {
+  const { active, options } = useDeployment();
+  const wallet = useWalletState();
+  if (active.descriptor.stage === "launch" && process.env.NEXT_PUBLIC_APP_ENV === "production") {
+    return (
+      <div className={className}>
+        <NetworkIndicator label={active.descriptor.network} />
+      </div>
+    );
+  }
+  if (options.length < 2) return null;
+  return (
+    <label className={`dapp-network-selector ${className}`.trim()}>
+      <span className="sr-only">Statics network</span>
+      <select
+        aria-label="Statics network"
+        value={active.networkId}
+        disabled={wallet.busyAction !== null}
+        onChange={(event) =>
+          void wallet.selectNetwork(event.target.value as typeof active.networkId)
+        }
+      >
+        {options.map((option) => (
+          <option key={option.networkId} value={option.networkId}>
+            {option.descriptor.network}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -194,6 +218,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
+  const { active, options } = useDeployment();
+  const navigationGroups = appNavigationGroupsForStage(active.descriptor.stage);
+  const tabNavigation = appTabNavigationForStage(active.descriptor.stage);
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -205,16 +232,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeId = getDappRouteId(currentPath);
+  const useLaunchRouteCopy =
+    active.descriptor.stage === "launch" &&
+    (routeId === "overview" || routeId === "swap" || routeId === "genesis");
+  const tLaunchRoutes = useTranslations("launchRoutes");
   const routeCopy = {
-    label: tRoutes(`${routeId}.label`),
-    title: tRoutes(`${routeId}.title`),
-    description: tRoutes(`${routeId}.description`),
+    label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
+    status: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.status`) : tRoutes(`${routeId}.status`),
+    title: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.title`) : tRoutes(`${routeId}.title`),
+    description: useLaunchRouteCopy
+      ? tLaunchRoutes(`${routeId}.description`)
+      : tRoutes(`${routeId}.description`),
   };
-  const showOverviewSummary = isDappOverviewPath(currentPath);
-  const showApprovalDisclosure = approvalDisclosureRoutes.some(
-    (route) => currentPath === route || currentPath.startsWith(`${route}/`)
-  );
-
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
     if (restoreFocus) {
@@ -260,9 +289,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             priority
           />
         </Link>
-        <NetworkIndicator />
+        {options.length < 2 ? <NetworkIndicator /> : null}
         <div className="dapp-header-actions">
+          <NetworkSelector className="dapp-network-selector--header" />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
+          {active.descriptor.stage === "launch" && (
+            <Link className="dapp-return dapp-add-funds" href="/app/portal">
+              {tItems("portal")}
+            </Link>
+          )}
           <Link className="dapp-return" href="/">
             {tNavigation("site")} <span aria-hidden="true">↗</span>
           </Link>
@@ -287,7 +322,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             {/* One <nav> per group, each labelled, so the grouping is structure
                 rather than styling and assistive tech can jump between them. */}
-            {appNavigationGroups.map((group, groupIndex) => (
+            {navigationGroups.map((group, groupIndex) => (
               <nav
                 key={group.label ?? "home"}
                 className="dapp-nav-group"
@@ -295,7 +330,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 {group.messageKey && <p className="dapp-nav-label">{tGroups(group.messageKey)}</p>}
                 {group.items.map((item, itemIndex) => {
-                  const active =
+                  const currentActive =
                     item.href === currentPath ||
                     (item.href !== "/app" &&
                       Boolean(item.href && currentPath.startsWith(`${item.href}/`)));
@@ -303,12 +338,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <Link
                       ref={groupIndex === 0 && itemIndex === 0 ? firstNavigationLinkRef : undefined}
                       key={item.label}
-                      className={`dapp-nav-item${active ? " active" : ""}`}
+                      className={`dapp-nav-item${currentActive ? " active" : ""}`}
                       href={item.href}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={currentActive ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
-                      {tItems(item.messageKey)}
+                      {active.descriptor.stage === "launch" && item.capability !== "wallet"
+                        ? tLaunchRoutes(`${item.messageKey}.label`)
+                        : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
@@ -322,6 +359,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="dapp-mobile-site-link" href="/" onClick={() => closeNavigation()}>
               {tNavigation("returnSite")} <span aria-hidden="true">↗</span>
             </Link>
+            <NetworkSelector className="dapp-network-selector--mobile" />
             <LocaleSwitcher className="locale-switcher locale-switcher--dapp-mobile" />
           </div>
         </aside>
@@ -329,13 +367,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="dapp-content" className="dapp-content">
           <WrongNetworkBar />
 
-          {showOverviewSummary && (
-            <section className="dapp-intro">
-              <p className="dapp-eyebrow">{tShell("application")}</p>
-              <h1>{routeCopy.title}</h1>
-              <p>{routeCopy.description}</p>
-            </section>
-          )}
+          {/* Every route names itself. This used to be gated to /app, which left
+              every other destination -- Genesis included -- with no <h1> at all
+              and no statement of what the page is for. */}
+          <section className="dapp-intro">
+            <p className="dapp-eyebrow">{routeCopy.status}</p>
+            <h1>{routeCopy.title}</h1>
+            <p>{routeCopy.description}</p>
+          </section>
 
           {wallet.error && (
             <p className="dapp-inline-error" role="alert">
@@ -343,32 +382,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           )}
 
-          {showApprovalDisclosure && (
-            <aside className="dapp-approval-disclosure" aria-label={tShell("approvalsTitle")}>
-              <p>
-                <strong>{tShell("approvalsTitle")}</strong> {tShell("approvalsBody")}
-              </p>
-              <Link href="/app/tools">{tShell("manageApprovals")} →</Link>
-            </aside>
-          )}
-
           {children}
         </main>
       </div>
 
       <nav className="dapp-tabbar" aria-label={tShell("primary")}>
-        {appTabNavigation.map((item) => {
-          const active =
+        {tabNavigation.map((item) => {
+          const currentActive =
             item.href === currentPath ||
             (item.href !== "/app" && currentPath.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.href}
-              className={`dapp-tab${active ? " active" : ""}`}
+              className={`dapp-tab${currentActive ? " active" : ""}`}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={currentActive ? "page" : undefined}
             >
-              {tItems(item.messageKey)}
+              {active.descriptor.stage === "launch" && item.capability !== "wallet"
+                ? tLaunchRoutes(`${item.messageKey}.label`)
+                : tItems(item.messageKey)}
             </Link>
           );
         })}

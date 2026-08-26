@@ -32,7 +32,7 @@ import { createPublicClient, http, getAddress, keccak256 } from "viem";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deploymentsDir = resolve(siteRoot, "deployments");
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const DOLLAR = ["diamond", "core", "gateway", "dollar", "risk", "weth", "oracle"];
 const LIQUIDITY = [
@@ -188,35 +188,17 @@ async function main() {
     contracts[name] = await entryFor(client, name, pick(contractsSource, name));
   }
 
-  const positionMetadataAbi = [
-    {
-      type: "function",
-      name: "positionRenderer",
-      stateMutability: "view",
-      inputs: [],
-      outputs: [{ name: "renderer", type: "address" }],
-    },
-    {
-      type: "function",
-      name: "avatarSVG",
-      stateMutability: "view",
-      inputs: [],
-      outputs: [{ name: "avatarSvg", type: "address" }],
-    },
-  ];
-  const rendererAddress = await client.readContract({
-    address: contracts.diamond.address,
-    abi: positionMetadataAbi,
-    functionName: "positionRenderer",
-  });
-  const avatarSvgAddress = await client.readContract({
-    address: rendererAddress,
-    abi: positionMetadataAbi,
-    functionName: "avatarSVG",
-  });
-  const positionMetadata = {
-    renderer: await entryFor(client, "positionRenderer", rendererAddress),
-    avatarSvg: await entryFor(client, "avatarSvg", avatarSvgAddress),
+  const genesisSource = {
+    token: artifact.contracts?.staticsToken,
+    collection: artifact.contracts?.genesisNFT,
+    renderer: artifact.contracts?.genesisRenderer,
+    avatarSvg: artifact.contracts?.avatarSVG,
+  };
+  const genesis = {
+    token: await entryFor(client, "staticsToken", pick(genesisSource, "token")),
+    collection: await entryFor(client, "genesisNFT", pick(genesisSource, "collection")),
+    renderer: await entryFor(client, "genesisRenderer", pick(genesisSource, "renderer")),
+    avatarSvg: await entryFor(client, "avatarSVG", pick(genesisSource, "avatarSvg")),
   };
 
   const liquiditySource = {
@@ -261,7 +243,7 @@ async function main() {
     },
     generatedAt: new Date().toISOString(),
     contracts,
-    positionMetadata,
+    genesis,
     liquidity,
     pegged,
     faucet,

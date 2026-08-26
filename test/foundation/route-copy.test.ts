@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { getDappRoutePresentation } from "@/lib/dapp-navigation";
-import { appNavigation, appNavigationGroups, appTabNavigation } from "@/lib/site-config";
+import {
+  getDappRouteCapability,
+  getDappRoutePresentation,
+  isDappRouteAllowed,
+} from "@/lib/dapp-navigation";
+import {
+  appNavigation,
+  appNavigationGroups,
+  appNavigationGroupsForStage,
+  appTabNavigation,
+  appTabNavigationForStage,
+} from "@/lib/site-config";
+import english from "@/messages/en.json";
+import spanish from "@/messages/es.json";
+import chinese from "@/messages/zh-CN.json";
 
 /**
  * Guards the consumer-copy rewrite the same way stylelint guards the type
@@ -73,11 +86,55 @@ describe("dapp route copy", () => {
   });
 });
 
+describe("stage-aware dapp navigation", () => {
+  const launch = {
+    deploymentId: "launch",
+    label: "Operators launch",
+    network: "Robinhood Chain",
+    chainId: 4663,
+    stage: "launch" as const,
+    capabilities: [],
+    available: true,
+  };
+
+  it("selects the launch product plus Wallet in the sidebar and three product tabs", () => {
+    const groups = appNavigationGroupsForStage("launch");
+    expect(groups.flatMap((group) => group.items.map((item) => item.href))).toEqual([
+      "/app",
+      "/app/swap",
+      "/app/genesis",
+      "/app/wallet",
+    ]);
+    expect(appTabNavigationForStage("launch").map((item) => item.href)).toEqual([
+      "/app/swap",
+      "/app/genesis",
+      "/app/wallet",
+    ]);
+    expect(groups.every((group) => group.items.every((item) => item.enabled))).toBe(true);
+  });
+
+  it("allows launch contextual utilities but rejects unsupported known routes", () => {
+    expect(getDappRouteCapability("/app/genesis-rewards")).toBeNull();
+    expect(isDappRouteAllowed("/app/wallet", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/activity", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/tools", launch)).toBe(true);
+    expect(isDappRouteAllowed("/app/positions/1042", launch)).toBe(false);
+    expect(isDappRouteAllowed("/app/unknown", launch)).toBe(true);
+    expect(getDappRouteCapability("/app/unknown")).toBeNull();
+    expect(getDappRouteCapability("/app/positions/1042")).toBe("positions");
+  });
+
+  it("leaves the complete catalog unchanged for full protocol", () => {
+    expect(appNavigationGroupsForStage("full-protocol")).toBe(appNavigationGroups);
+    expect(appTabNavigationForStage("full-protocol")).toBe(appTabNavigation);
+  });
+});
+
 describe("dapp navigation grouping", () => {
   it("groups every route under a heading, except the home link", () => {
     const [first, ...rest] = appNavigationGroups;
     expect(first.label).toBeNull();
-    expect(first.items.map((item) => item.href)).toEqual(["/app"]);
+    expect(first.items.map((item) => item.href)).toEqual(["/app", "/app/swap"]);
     for (const group of rest) {
       expect(group.label, JSON.stringify(group.items)).toBeTruthy();
       expect(group.items.length).toBeGreaterThan(0);
@@ -92,7 +149,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(11);
+    expect(hrefs).toHaveLength(14);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -116,11 +173,14 @@ describe("sidebar completeness", () => {
   it("keeps the primary menu focused on destination surfaces", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
+      "Swap",
       "Earn",
       "Liquidity",
       "Baskets",
+      "Create basket",
       "Dollar",
-      "Positions",
+      "Position NFT",
+      "Operator NFT",
       "Loans",
       "Wallet",
       "Faucet",
@@ -131,7 +191,18 @@ describe("sidebar completeness", () => {
 
   it("keeps position management directly discoverable", () => {
     const manage = appNavigationGroups.find((group) => group.label === "Manage");
-    expect(manage?.items.map((item) => item.href)).toEqual(["/app/positions", "/app/loans"]);
+    expect(manage?.items.map((item) => item.href)).toEqual([
+      "/app/positions",
+      "/app/genesis",
+      "/app/loans",
+    ]);
+  });
+
+  it("uses the exact NFT product labels in every locale", () => {
+    for (const messages of [english, spanish, chinese]) {
+      expect(messages.navigation.items.positions).toBe("Position NFT");
+      expect(messages.navigation.items.genesis).toBe("Operator NFT");
+    }
   });
 
   it("keeps account plumbing grouped rather than promoted", () => {

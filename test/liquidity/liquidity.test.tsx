@@ -11,6 +11,7 @@ import {
   basketLiquiditySnapshot,
   borrowedLiquidityDeadline,
   borrowedLiquidityReadiness,
+  calculateBorrowLiquidityPlan,
   canonicalFullRange,
   canonicalPoolLabel,
   liquidityWalletBalances,
@@ -177,25 +178,62 @@ describe("canonical liquidity identifiers", () => {
       poolId: `0x${"22".repeat(32)}`,
     } as CanonicalPoolRecord;
 
-    expect(borrowedLiquidityReadiness(basket, [readyPool], {})).toMatch(/Every basket/);
+    expect(borrowedLiquidityReadiness(basket, [readyPool], null)).toMatch(/Every basket/);
+    expect(borrowedLiquidityReadiness(basket, [readyPool, secondPool], null)).toMatch(
+      /cannot fund a positive amount in every pool/
+    );
     expect(
-      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
-        [readyPool.poolId]: "1",
-        [secondPool.poolId]: "0",
-      })
-    ).toMatch(/positive raw liquidity/);
-    expect(
-      borrowedLiquidityReadiness(basket, [{ ...readyPool, managerSynced: false }, secondPool], {
-        [readyPool.poolId]: "1",
-        [secondPool.poolId]: "1",
-      })
+      borrowedLiquidityReadiness(basket, [{ ...readyPool, managerSynced: false }, secondPool], null)
     ).toMatch(/live and synced/);
-    expect(
-      borrowedLiquidityReadiness(basket, [readyPool, secondPool], {
-        [readyPool.poolId]: "1",
-        [secondPool.poolId]: "2",
-      })
-    ).toBeNull();
+    const plan = { utilizationPercent: 100, allocations: [], quote: {} } as never;
+    expect(borrowedLiquidityReadiness(basket, [readyPool, secondPool], plan)).toBeNull();
+  });
+
+  it("solves a proportional borrow-to-liquidity plan without raw liquidity input", () => {
+    const pool = {
+      ...contributionPool(),
+      decommissioned: false,
+      managerSynced: true,
+    } as CanonicalPoolRecord;
+    const basket = {
+      basketId: 1n,
+      status: 1,
+      totalSupply: 1_000n * unit,
+      token: basketToken,
+      mintFeeTiers: [],
+      redemptionFeeTiers: [],
+      originationFeeBps: 100,
+      extensionFeeBps: 25,
+      ltvBps: 7_500,
+      recoveryPenaltyBps: 500,
+      constituents: [
+        {
+          token: assetToken,
+          bundleAmount: unit,
+          vaultBalance: 1_000n * unit,
+        },
+      ],
+    } as unknown as BasketRecord;
+    const maximum = calculateBorrowLiquidityPlan({
+      basket,
+      sharesIn: 100n * unit,
+      pools: [pool],
+      deadline: 1_000n,
+      utilizationPercent: 100,
+    });
+    const half = calculateBorrowLiquidityPlan({
+      basket,
+      sharesIn: 100n * unit,
+      pools: [pool],
+      deadline: 1_000n,
+      utilizationPercent: 50,
+    });
+
+    expect(maximum).not.toBeNull();
+    expect(maximum!.allocations).toHaveLength(1);
+    expect(maximum!.allocations[0]!.liquidity).toBeGreaterThan(0n);
+    expect(maximum!.allocations[0]!.refund).toBeGreaterThanOrEqual(0n);
+    expect(half!.allocations[0]!.liquidity).toBeLessThan(maximum!.allocations[0]!.liquidity);
   });
 
   it("reveals liquidity actions from the selected NFT state", () => {

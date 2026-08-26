@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/dollar/deployment", () => ({
+  clientDollarEnvironment: () => ({}),
+  readDollarDeployment: () => ({ status: "unavailable", reason: "Not configured" }),
   readClientDollarDeployment: () => ({
     status: "configured",
     deployment: {

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PositionListPage } from "@/components/positions/PositionListPage";
 
 export const metadata: Metadata = {
-  title: "Positions | Statics",
+  title: "Position NFT | Statics",
   description: "Discover and manage wallet-owned Statics PositionNFTs.",
 };
 

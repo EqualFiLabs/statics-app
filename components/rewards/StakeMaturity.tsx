@@ -35,16 +35,37 @@ export function StakeMaturity({
   if (!snapshot) return null;
 
   const maturing = groupByMaturity(snapshot.maturing);
+  const boosted = snapshot.selections.find(
+    (selection) => selection.effectiveEligibleWeight > selection.actualEligibleStake
+  );
 
   if (maturing.length === 0) {
     // Only worth saying when there is something earning to say it about.
     return snapshot.earning.length > 0 ? (
-      <p className="stake-maturity is-earning">{t("allEarning")}</p>
+      <div className="stake-maturity is-earning">
+        <p>{t("allEarning")}</p>
+        {boosted && (
+          <p>
+            {displayAmount(boosted.actualEligibleStake, stakingToken.decimals)}{" "}
+            {stakingToken.symbol} actual stake contributes{" "}
+            {displayAmount(boosted.effectiveEligibleWeight, stakingToken.decimals)}{" "}
+            {stakingToken.symbol} of reward weight through Genesis.
+          </p>
+        )}
+      </div>
     ) : null;
   }
 
   return (
     <div className="stake-maturity">
+      {boosted && (
+        <p>
+          {displayAmount(boosted.actualEligibleStake, stakingToken.decimals)} {stakingToken.symbol}{" "}
+          actual stake contributes{" "}
+          {displayAmount(boosted.effectiveEligibleWeight, stakingToken.decimals)}{" "}
+          {stakingToken.symbol} of reward weight through Genesis.
+        </p>
+      )}
       {maturing.map((group) => (
         <p key={group.eligibleAt.toString()}>
           <strong>
