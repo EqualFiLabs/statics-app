@@ -56,8 +56,18 @@ export const primaryNavigation: readonly SiteNavigationItem[] = [
   { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
   { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
   { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
-  { label: "Docs", messageKey: "docs", kind: "placeholder" },
-  { label: "Dev", messageKey: "dev", kind: "placeholder" },
+  {
+    label: "Docs",
+    messageKey: "docs",
+    kind: "route",
+    href: "https://docs.staticsprotocol.com",
+  },
+  {
+    label: "Dev",
+    messageKey: "dev",
+    kind: "route",
+    href: "https://github.com/EqualFiLabs/statics",
+  },
 ] as const;
 
 export const protocolStatus = {

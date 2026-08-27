@@ -114,15 +114,21 @@ describe("landing page", () => {
     expect(page).not.toMatch(/timelocked/i);
   });
 
-  it("routes launch controls to the app and keeps future destinations visible but inert", async () => {
+  it("routes launch controls, docs, and developer navigation", async () => {
     await renderLanding();
 
     const launchLinks = screen.getAllByRole("link", { name: /launch app/i });
     expect(launchLinks).toHaveLength(2);
     for (const link of launchLinks) expect(link).toHaveAttribute("href", "/app");
 
-    expect(screen.getAllByText("Docs").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("link", { name: "Docs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Docs" })).toHaveAttribute(
+      "href",
+      "https://docs.staticsprotocol.com"
+    );
+    expect(screen.getByRole("link", { name: "Dev" })).toHaveAttribute(
+      "href",
+      "https://github.com/EqualFiLabs/statics"
+    );
     expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
     expect(screen.getByText("GitHub")).toHaveAttribute("aria-disabled", "true");
   });
