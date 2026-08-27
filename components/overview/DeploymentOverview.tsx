@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { getAddress, type Address } from "viem";
 import { usePublicClient } from "wagmi";
@@ -58,24 +59,20 @@ export function formatCanonicalMarketPrice(
 }
 
 export function DeploymentOverview() {
+  const t = useTranslations("launchOverview");
   const { active } = useDeployment();
   if (active.protocol) return <DollarOverview deployment={active.protocol.protocol} />;
   if (!active.launch) {
     return (
       <div className="launch-overview">
         <EmptyState
-          title="Mainnet launch is being prepared"
-          description={
-            active.descriptor.unavailableReason ?? "No reviewed deployment is available."
-          }
+          title={t("mainnetPreparing")}
+          description={active.descriptor.unavailableReason ?? t("noReviewedDeployment")}
         />
         <section className="ui-card launch-overview-actions">
-          <p className="dapp-eyebrow">Selected network</p>
+          <p className="dapp-eyebrow">{t("selectedNetwork")}</p>
           <h2>{active.descriptor.network}</h2>
-          <p>
-            The same Operators launch application will be enabled here after its reviewed manifest
-            is published.
-          </p>
+          <p>{t("enabledAfterManifest")}</p>
         </section>
       </div>
     );
@@ -84,6 +81,7 @@ export function DeploymentOverview() {
 }
 
 function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
+  const t = useTranslations("launchOverview");
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const walletState = useWalletState();
   const wallet =
@@ -209,7 +207,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
 
       <div className="launch-actions">
         <Link className="ui-button ui-button--primary" href="/app/swap?mode=nft">
-          Acquire Operators
+          {t("acquireOperators")}
           <small>
             {metrics.data
               ? `${formatTokenAmountGrouped(metrics.data.purchase.staticsPrice, 18, 0)} STATICS + ${formatTokenAmountGrouped(metrics.data.purchase.requiredNative, 18, 5)} ETH`
@@ -217,39 +215,41 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           </small>
         </Link>
         <Link className="ui-button ui-button--secondary" href="/app/swap">
-          Buy STATICS
+          {t("buyStatics")}
         </Link>
         {genesisHeld > 0 && (
           <Link className="ui-button ui-button--secondary" href="/app/genesis">
-            {`Manage my ${genesisHeld} Genesis`}
+            {t("manageOperators", { count: genesisHeld })}
           </Link>
         )}
         {vault?.epochActive === false && (
           <Link className="ui-button ui-button--secondary" href="/app/genesis/recoveries">
-            Recover matured credit
+            {t("recoverCredit")}
           </Link>
         )}
       </div>
 
       {wallet ? (
-        <section className="ui-card launch-position" aria-label="Your position">
+        <section className="ui-card launch-position" aria-label={t("yourPosition")}>
           <div className="ui-stat">
-            <span className="ui-stat__label">Your STATICS</span>
+            <span className="ui-stat__label">{t("yourStatics")}</span>
             <strong className="ui-stat__value">
               {metrics.data ? formatTokenAmountGrouped(metrics.data.staticsBalance, 18, 2) : "—"}
             </strong>
           </div>
           <div className="ui-stat">
-            <span className="ui-stat__label">Your Operators</span>
+            <span className="ui-stat__label">{t("yourOperators")}</span>
             <strong className="ui-stat__value">{portfolio.isLoading ? "—" : genesisHeld}</strong>
             <small>
               {genesisHeld > 0 && vault
-                ? `${formatTokenAmountGrouped(vault.vaultPrice * BigInt(genesisHeld), 18, 0)} STATICS backing`
-                : "None held"}
+                ? t("staticsBacking", {
+                    amount: formatTokenAmountGrouped(vault.vaultPrice * BigInt(genesisHeld), 18, 0),
+                  })
+                : t("noneHeld")}
             </small>
           </div>
           <div className="ui-stat">
-            <span className="ui-stat__label">Claimable</span>
+            <span className="ui-stat__label">{t("claimable")}</span>
             <strong className="ui-stat__value is-accent">
               {formatTokenAmountGrouped(rewards.claimableStatics, 18, 2)} STATICS
             </strong>
@@ -259,14 +259,14 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               per NFT and asset, and My Operators is where that sequence is priced
               honestly. Revisit when the batch claim entry point lands. */}
           <Link className="ui-button ui-button--secondary" href="/app/genesis">
-            Open My Operators
+            {t("openOperators")}
           </Link>
         </section>
       ) : (
-        <section className="ui-card launch-position is-signed-out" aria-label="Your position">
+        <section className="ui-card launch-position is-signed-out" aria-label={t("yourPosition")}>
           <div>
-            <strong>Connect to see where you stand</strong>
-            <p>Your STATICS, the Genesis you hold, and anything waiting to be claimed.</p>
+            <strong>{t("connectTitle")}</strong>
+            <p>{t("connectDescription")}</p>
           </div>
           <button
             className="ui-button ui-button--primary"
@@ -274,20 +274,20 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             onClick={walletState.status === "signed-out" ? walletState.login : undefined}
             disabled={walletState.status !== "signed-out"}
           >
-            Connect wallet
+            {t("connectWallet")}
           </button>
         </section>
       )}
 
       <div className="launch-duo">
-        <section className="ui-card overview-panel" aria-label="Operators supply">
+        <section className="ui-card overview-panel" aria-label={t("operatorsSupply")}>
           <div className="overview-panel-head">
-            <h3>Supply</h3>
-            <span>Fixed at {count(supply)}</span>
+            <h3>{t("supply")}</h3>
+            <span>{t("fixedAt", { count: count(supply) })}</span>
           </div>
           <p className="overview-figure">
             <b>{count(inventory)}</b>
-            <span>still in the Vault</span>
+            <span>{t("stillInVault")}</span>
           </p>
           <div className="supply-bar" aria-hidden="true">
             <i className="is-treasury" style={{ width: share(TREASURY_GENESIS) }} />
@@ -298,40 +298,44 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             <div>
               <dt>
                 <i className="is-treasury" aria-hidden="true" />
-                Treasury at launch
+                {t("treasuryAtLaunch")}
               </dt>
               <dd>{count(TREASURY_GENESIS)}</dd>
             </div>
             <div>
               <dt>
                 <i className="is-circulating" aria-hidden="true" />
-                Held by the market
+                {t("heldByMarket")}
               </dt>
               <dd>{count(heldByMarket)}</dd>
             </div>
             <div>
               <dt>
                 <i className="is-inventory" aria-hidden="true" />
-                Vault inventory
+                {t("vaultInventory")}
               </dt>
               <dd>{count(inventory)}</dd>
             </div>
           </dl>
         </section>
 
-        <section className="ui-card overview-panel" aria-label="STATICS market">
+        <section className="ui-card overview-panel" aria-label={`STATICS ${t("market")}`}>
           <div className="overview-panel-head">
-            <h3>Market</h3>
-            <span>{metrics.data?.liquidity ? "Liquidity active" : "No active liquidity"}</span>
+            <h3>{t("market")}</h3>
+            <span>{metrics.data?.liquidity ? t("liquidityActive") : t("noActiveLiquidity")}</span>
           </div>
           <p className="overview-figure">
             <b>{marketPrice?.value ?? "—"}</b>
-            <span>{marketPrice?.unit ?? "WETH per STATICS"}</span>
+            <span>
+              {marketPrice?.unit === "STATICS per WETH" ? t("staticsPerWeth") : t("wethPerStatics")}
+            </span>
           </p>
           <dl className="overview-rows">
             <div>
               <dt>
-                {vault ? formatTokenAmountGrouped(vault.vaultPrice, 18, 0) : "—"} STATICS at market
+                {t("staticsAtMarket", {
+                  amount: vault ? formatTokenAmountGrouped(vault.vaultPrice, 18, 0) : "—",
+                })}
               </dt>
               <dd>
                 {backingAtMarket !== null
@@ -340,7 +344,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               </dd>
             </div>
             <div>
-              <dt>Reserve share per Operator</dt>
+              <dt>{t("reservePerOperator")}</dt>
               <dd>
                 {vault
                   ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} WETH`
@@ -348,35 +352,24 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               </dd>
             </div>
             <div>
-              <dt>
-                {vault?.epochActive ? "Buy-in if the Epoch ended now" : "Buy-in charged today"}
-              </dt>
+              <dt>{vault?.epochActive ? t("buyInProjected") : t("buyInToday")}</dt>
               <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} WETH`}</dd>
             </div>
             <div className="is-total">
-              <dt>An Operator costs you, all in (WETH-equivalent)</dt>
+              <dt>{t("allInCost")}</dt>
               <dd>
                 {allInCost !== null
-                  ? `${formatTokenAmountGrouped(allInCost, 18, 4)} WETH-equivalent`
+                  ? t("wethEquivalent", {
+                      amount: formatTokenAmountGrouped(allInCost, 18, 4),
+                    })
                   : "—"}
               </dd>
             </div>
           </dl>
           <p className="overview-note">
-            {vault?.epochActive ? (
-              <>
-                <b>No buy-in is charged yet, but it is already accruing.</b> Every sale adds its
-                acquisition fee to the reserve, so the buy-in owed the moment the Epoch ends rises
-                with each one.
-              </>
-            ) : (
-              <>
-                <b>The reserve compounds.</b> Each acquisition returns its own buy-in to the
-                reserve, so the buy-in climbs with every sale. Redemption pays out over 5,555 while
-                buy-in divides by 5,554, and both round toward the reserve — so the share held by
-                everyone still holding only grows.
-              </>
-            )}
+            {vault?.epochActive
+              ? t.rich("preEpochMarketNote", { strong: (chunks) => <b>{chunks}</b> })
+              : t.rich("postEpochMarketNote", { strong: (chunks) => <b>{chunks}</b> })}
           </p>
         </section>
       </div>
@@ -401,8 +394,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
 
       {metrics.error && (
         <p className="dapp-inline-error" role="alert">
-          Launch metrics are temporarily unavailable. Trading and Vault actions remain independently
-          verifiable onchain.
+          {t("metricsUnavailable")}
         </p>
       )}
     </div>

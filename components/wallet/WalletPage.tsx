@@ -666,7 +666,7 @@ function CustomTokenDialog({
         try {
           const provider = await getEthereumProvider();
           const network = getFundingNetwork(fundingChainId);
-          if (!provider || !network) throw new Error("The selected wallet is unavailable.");
+          if (!provider || !network) throw new Error(t("selectedWalletUnavailable"));
           const client = createPublicClient({ chain: network.chain, transport: custom(provider) });
           const [symbol, decimals] = await Promise.all([
             client.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
@@ -681,7 +681,7 @@ function CustomTokenDialog({
             });
           }
         } catch {
-          if (active) setError("Could not read ERC-20 metadata from this address.");
+          if (active) setError(t("metadataUnavailable"));
         } finally {
           if (active) setReading(false);
         }
@@ -691,7 +691,14 @@ function CustomTokenDialog({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [address, walletAddress, fundingChainId, fundingWalletOnSelectedChain, getEthereumProvider]);
+  }, [
+    address,
+    walletAddress,
+    fundingChainId,
+    fundingWalletOnSelectedChain,
+    getEthereumProvider,
+    t,
+  ]);
 
   const duplicate = Boolean(
     address &&
@@ -800,7 +807,7 @@ function SendDialog({
     try {
       const provider = await wallet.getEthereumProvider();
       const network = getFundingNetwork(wallet.fundingChainId);
-      if (!provider || !network) throw new Error("The selected wallet is unavailable.");
+      if (!provider || !network) throw new Error(t("selectedWalletUnavailable"));
       const account = getAddress(wallet.address);
       const publicClient = createPublicClient({
         chain: network.chain,
@@ -828,18 +835,18 @@ function SendDialog({
         wallet: account,
         chainId: wallet.fundingChainId,
         kind: asset.kind === "erc1155" ? "transfer-nft" : "send",
-        label: `Send ${asset.symbol}`,
+        label: t("sendAssetLabel", { symbol: asset.symbol }),
         amount: `${amount} ${asset.symbol}`,
         to,
         data,
         value: asset.kind === "native" ? amountRaw : 0n,
         sendTransaction: wallet.sendEvmTransaction,
-        describeError: (cause) => (cause instanceof Error ? cause.message : "The transfer failed."),
+        describeError: (cause) => (cause instanceof Error ? cause.message : t("transferFailed")),
       });
       await onConfirmed();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The transfer failed.");
+      setError(cause instanceof Error ? cause.message : t("transferFailed"));
     } finally {
       setPending(false);
     }
@@ -1012,7 +1019,12 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
   const [error, setError] = useState<string | null>(null);
 
   const sender = wallet.status === "ready" && wallet.address ? getAddress(wallet.address) : null;
-  const problem = sender ? validateRecipient(recipient, sender) : "Connect a wallet to continue.";
+  const recipientProblem = sender ? validateRecipient(recipient, sender) : null;
+  const problem = !sender
+    ? t("connectToContinue")
+    : recipientProblem
+      ? t("invalidRecipient")
+      : null;
 
   const submit = async () => {
     if (!sender || !publicClient || !walletClient.data || problem || !chainId) return;
@@ -1029,7 +1041,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
         chainId,
         deploymentId: active.descriptor.deploymentId,
         kind: "transfer-nft",
-        label: `Send ${nft.name}`,
+        label: t("sendNft", { name: nft.name }),
         amount: nft.name,
         to: nft.contract,
         data: encodeFunctionData({
@@ -1039,14 +1051,14 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
         }),
         sendTransaction: wallet.sendEvmTransaction,
         describeError: (cause) =>
-          cause instanceof Error ? cause.message : "The transfer did not complete.",
+          cause instanceof Error ? cause.message : t("transferIncomplete"),
         // Confirms the chain actually reassigned the token, rather than
         // trusting a successful transaction.
         verifyConfirmation: () => verifyNftTransfer(publicClient, nft, to),
       });
       onDone();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The transfer did not complete.");
+      setError(cause instanceof Error ? cause.message : t("transferIncomplete"));
     } finally {
       setPending(false);
     }
@@ -1061,7 +1073,7 @@ function NftTransferForm({ nft, onDone }: { nft: WalletNft; onDone: () => void }
       )}
       {nft.transferWarning && (
         <p className="wallet-nft-transfer-warning">
-          <strong>Genesis transfer consequence</strong> {nft.transferWarning}
+          <strong>{t("operatorTransferConsequence")}</strong> {nft.transferWarning}
         </p>
       )}
       {chainId && (
@@ -1118,7 +1130,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
 
   const submit = async () => {
     if (!publicClient) {
-      setError("No client is available for this network.");
+      setError(t("clientUnavailable"));
       return;
     }
     setPending(true);
@@ -1127,7 +1139,7 @@ function AddNftCollectionForm({ chainId, onDone }: { chainId: number; onDone: ()
       addCollection(await readNftCollection(publicClient, address.trim(), tokenId.trim()));
       onDone();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "That collection could not be added.");
+      setError(cause instanceof Error ? cause.message : t("collectionAddFailed"));
     } finally {
       setPending(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
@@ -34,6 +35,7 @@ export function WalletNftPanel({
   onTransfer: (nft: WalletNft) => void;
   onAddCollection: () => void;
 }) {
+  const t = useTranslations("wallet");
   const wallet = useWalletState();
   const { active } = useDeployment();
   const deployment = active.protocol ?? active.launch;
@@ -68,7 +70,7 @@ export function WalletNftPanel({
       wallet.isTargetChain,
     queryFn: async () => {
       if (!publicClient || !walletAddress || !deployment) {
-        throw new Error("No verified Statics deployment is configured.");
+        throw new Error(t("noDeployment"));
       }
 
       if (deployment.kind === "launch") {
@@ -86,11 +88,10 @@ export function WalletNftPanel({
           kind: "collection" as const,
           tokenId,
           contract: deployment.contracts.genesis,
-          name: `Genesis #${tokenId.toString()}`,
+          name: t("operatorName", { id: tokenId.toString() }),
           summary: "Statics Operators",
           carries: [] as readonly string[],
-          transferWarning:
-            "Transferring this Operator NFT resets activation to Tier 0. Rewards earned before transfer remain claimable by the previous owner.",
+          transferWarning: t("operatorTransferWarning"),
           blockedReason: null,
         }));
         const collectionNfts: readonly WalletNft[] = collectionResults.flatMap((result) =>
@@ -159,7 +160,7 @@ export function WalletNftPanel({
             {collection.address.toLowerCase() !== canonicalGenesis?.toLowerCase() && (
               <button
                 type="button"
-                aria-label={`Remove ${collection.name}`}
+                aria-label={t("removeCollection", { name: collection.name })}
                 onClick={() => removeCollection(collection.address)}
               >
                 ×
@@ -174,7 +175,7 @@ export function WalletNftPanel({
         onClick={onAddCollection}
         disabled={collectionChainId === null}
       >
-        Add collection
+        {t("addCollection")}
       </button>
     </div>
   );
@@ -185,13 +186,12 @@ export function WalletNftPanel({
         {header}
         <SurfaceEmptyState
           state={state}
-          subject="NFTs"
+          subject={t("nfts")}
           onRetry={() => void catalog.refetch()}
           empty={{
-            title: "No NFTs yet",
-            description:
-              "Positions and liquidity positions appear here. Mint a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
-            action: { label: "Browse baskets", href: "/app/baskets" },
+            title: t("noNfts"),
+            description: t("noNftsDescription"),
+            action: { label: t("browseBaskets"), href: "/app/baskets" },
           }}
         />
       </>
@@ -203,7 +203,7 @@ export function WalletNftPanel({
       {header}
       {catalog.data.liquidityUnavailable && (
         <p className="dollar-warning" role="status">
-          Liquidity positions could not be read on this network, so only positions are listed.
+          {t("liquidityUnavailable")}
         </p>
       )}
       <WalletNftList nfts={catalog.data.nfts} chainId={collectionChainId} onTransfer={onTransfer} />

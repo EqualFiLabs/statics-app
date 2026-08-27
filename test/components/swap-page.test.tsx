@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@/test/render";
+import { fireEvent, render, renderWithLocale, screen } from "@/test/render";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
 import { SwapPage } from "@/components/swap/SwapPage";
 import type { DeploymentOption, LaunchDeployment } from "@/lib/deployments/types";
 import { DeploymentContext } from "@/providers/deployment-context";
+import spanish from "@/messages/es.json";
 
 vi.mock("@/components/portal/EvmSwapPanel", () => ({
   EvmSwapPanel: ({ canonicalOnly }: { canonicalOnly?: boolean }) => (
@@ -98,5 +99,21 @@ describe("Swap page", () => {
     expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
     searchParams.delete("mode");
+  });
+
+  it("renders the Genesis trade controls in Spanish", () => {
+    renderWithLocale(
+      <DeploymentContext.Provider
+        value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+      >
+        <SwapPage />
+      </DeploymentContext.Provider>,
+      "es",
+      spanish
+    );
+
+    expect(screen.getByRole("tablist", { name: "Tipo de intercambio" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Token" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "NFT de Operator" })).toBeInTheDocument();
   });
 });

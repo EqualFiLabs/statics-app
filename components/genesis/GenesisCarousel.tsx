@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 
@@ -14,11 +15,11 @@ export type GenesisCarouselItem = Readonly<{
 
 type Filter = "all" | "unregistered" | "pending" | "credit";
 
-const FILTERS: readonly Readonly<{ key: Filter; label: string; flag: string | null }>[] = [
-  { key: "all", label: "All", flag: null },
-  { key: "unregistered", label: "Not registered", flag: "unregistered" },
-  { key: "pending", label: "Rewards pending", flag: "pending" },
-  { key: "credit", label: "Credit active", flag: "credit" },
+const FILTERS: readonly Readonly<{ key: Filter; labelKey: string; flag: string | null }>[] = [
+  { key: "all", labelKey: "all", flag: null },
+  { key: "unregistered", labelKey: "notRegistered", flag: "unregistered" },
+  { key: "pending", labelKey: "rewardsPending", flag: "pending" },
+  { key: "credit", labelKey: "creditActive", flag: "credit" },
 ];
 
 function matches(item: GenesisCarouselItem, filter: Filter): boolean {
@@ -55,6 +56,7 @@ export function GenesisCarousel({
   chainId: number;
   collection: `0x${string}`;
 }>) {
+  const t = useTranslations("operators.carousel");
   const railRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<"carousel" | "grid">("carousel");
   const [filter, setFilter] = useState<Filter>("all");
@@ -119,11 +121,12 @@ export function GenesisCarousel({
   const selected = items.find((item) => item.id === selectedId) ?? null;
 
   return (
-    <section className="genesis-carousel" aria-label="Your Operators NFTs">
+    <section className="genesis-carousel" aria-label={t("aria")}>
       <div className="genesis-carousel-head">
-        <h2 className="ui-section-title">Your Operators</h2>
+        <h2 className="ui-section-title">{t("title")}</h2>
         <span className="genesis-carousel-count">
-          {items.length} held{selected ? ` · #${selected.id} selected` : ""}
+          {t("held", { count: items.length })}
+          {selected ? t("selected", { id: selected.id.toString() }) : ""}
         </span>
         <div className="genesis-carousel-controls">
           {showGridToggle && (
@@ -135,7 +138,7 @@ export function GenesisCarousel({
                 setFilter("all");
               }}
             >
-              {view === "carousel" ? "View all" : "Back to carousel"}
+              {view === "carousel" ? t("viewAll") : t("back")}
             </button>
           )}
           {view === "carousel" && (overflow.start || overflow.end) && (
@@ -144,7 +147,7 @@ export function GenesisCarousel({
                 type="button"
                 onClick={() => page(-1)}
                 disabled={!overflow.start}
-                aria-label="Previous Operators NFTs"
+                aria-label={t("previous")}
               >
                 <span aria-hidden="true">‹</span>
               </button>
@@ -152,7 +155,7 @@ export function GenesisCarousel({
                 type="button"
                 onClick={() => page(1)}
                 disabled={!overflow.end}
-                aria-label="More Operators NFTs"
+                aria-label={t("more")}
               >
                 <span aria-hidden="true">›</span>
               </button>
@@ -177,7 +180,7 @@ export function GenesisCarousel({
                 onClick={() => setFilter(entry.key)}
               >
                 {entry.flag && <i className={`genesis-flag is-${entry.flag}`} aria-hidden="true" />}
-                {entry.label} {count}
+                {t(entry.labelKey)} {count}
               </button>
             );
           })}
@@ -190,7 +193,7 @@ export function GenesisCarousel({
         ref={railRef}
         onScroll={syncOverflow}
         role="tablist"
-        aria-label="Select an Operator NFT"
+        aria-label={t("select")}
       >
         {visible.map((item) => {
           const isSelected = item.id === selectedId;
@@ -226,25 +229,25 @@ export function GenesisCarousel({
                   kind: "collection",
                   tokenId: item.id,
                   contract: collection,
-                  name: `Operator #${item.id}`,
-                  summary: `Tier ${item.tier}`,
+                  name: t("operator", { id: item.id.toString() }),
+                  summary: t("tier", { tier: item.tier }),
                   carries: [],
                   blockedReason: null,
                 }}
               />
               <span className="genesis-carousel-id">
-                Operator #{item.id.toString()}
+                {t("operator", { id: item.id.toString() })}
                 <b>T{item.tier}</b>
               </span>
               <span className="genesis-carousel-flags">
                 {!item.registered && (
-                  <i className="genesis-flag is-unregistered" title="Not registered" />
+                  <i className="genesis-flag is-unregistered" title={t("notRegistered")} />
                 )}
                 {item.hasPendingRewards && (
-                  <i className="genesis-flag is-pending" title="Rewards pending" />
+                  <i className="genesis-flag is-pending" title={t("rewardsPending")} />
                 )}
                 {item.creditActive && (
-                  <i className="genesis-flag is-credit" title="Credit active" />
+                  <i className="genesis-flag is-credit" title={t("creditActive")} />
                 )}
               </span>
             </button>
@@ -255,14 +258,13 @@ export function GenesisCarousel({
       {view === "carousel" && (
         <p className="genesis-carousel-legend">
           <span>
-            <i className="genesis-flag is-unregistered" aria-hidden="true" /> Not registered
+            <i className="genesis-flag is-unregistered" aria-hidden="true" /> {t("notRegistered")}
           </span>
           <span>
-            <i className="genesis-flag is-pending" aria-hidden="true" /> Rewards pending
+            <i className="genesis-flag is-pending" aria-hidden="true" /> {t("rewardsPending")}
           </span>
           <span>
-            <i className="genesis-flag is-credit" aria-hidden="true" /> Credit active — transfer
-            locked
+            <i className="genesis-flag is-credit" aria-hidden="true" /> {t("creditLocked")}
           </span>
         </p>
       )}

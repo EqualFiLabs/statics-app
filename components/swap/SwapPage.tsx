@@ -1,5 +1,6 @@
 "use client";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { useState } from "react";
 
@@ -11,6 +12,7 @@ import { useDeployment } from "@/providers/deployment-context";
 type SwapMode = "token" | "nft";
 
 export function SwapPage() {
+  const t = useTranslations("trade");
   const { active } = useDeployment();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<SwapMode>(() =>
@@ -19,10 +21,10 @@ export function SwapPage() {
   if (!active.launch) {
     return (
       <EmptyState
-        title="Launch market not deployed"
+        title={t("marketUnavailable")}
         description={
           active.descriptor.unavailableReason ??
-          `The Statics launch is not available on ${active.descriptor.network} yet.`
+          t("launchUnavailable", { network: active.descriptor.network })
         }
       />
     );
@@ -30,7 +32,7 @@ export function SwapPage() {
 
   return (
     <div className="swap-page">
-      <div className="portal-direction-tabs" role="tablist" aria-label="Swap type">
+      <div className="portal-direction-tabs" role="tablist" aria-label={t("swapType")}>
         {(["token", "nft"] as const).map((item) => (
           <button
             key={item}
@@ -39,7 +41,7 @@ export function SwapPage() {
             aria-selected={mode === item}
             onClick={() => setMode(item)}
           >
-            {item === "token" ? "Token" : "Operator NFT"}
+            {item === "token" ? t("token") : t("operatorNft")}
           </button>
         ))}
       </div>

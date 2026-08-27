@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
 export type VaultSolvencyFigures = Readonly<{
@@ -35,28 +37,31 @@ type Invariant = Readonly<{
  * that would break them. A failure here means the client is reading a stale or
  * inconsistent view, which is worth surfacing rather than hiding.
  */
-function invariants(figures: VaultSolvencyFigures): readonly Invariant[] {
+function invariants(
+  figures: VaultSolvencyFigures,
+  labels: readonly [string, string, string]
+): readonly Invariant[] {
   const statics = (value: bigint, digits = 0) =>
     `${formatTokenAmountGrouped(value, 18, digits)} STATICS`;
   const eth = (value: bigint) => `${formatTokenAmountGrouped(value, 18, 4)} ETH`;
 
   return [
     {
-      label: "Backing covers every circulating Operators",
+      label: labels[0],
       left: statics(figures.tokenBacking),
       right: statics(figures.requiredBacking),
       holds: figures.tokenBacking >= figures.requiredBacking,
       surplus: statics(figures.tokenBacking - figures.requiredBacking, 2),
     },
     {
-      label: "The Vault holds that STATICS",
+      label: labels[1],
       left: statics(figures.tokenCustody),
       right: statics(figures.tokenBacking),
       holds: figures.tokenCustody >= figures.tokenBacking,
       surplus: statics(figures.tokenCustody - figures.tokenBacking, 2),
     },
     {
-      label: "The Vault holds the ETH reserve",
+      label: labels[2],
       left: eth(figures.nativeCustody),
       right: eth(figures.reserveETH),
       holds: figures.nativeCustody >= figures.reserveETH,
@@ -66,16 +71,17 @@ function invariants(figures: VaultSolvencyFigures): readonly Invariant[] {
 }
 
 export function VaultSolvency({ figures }: { figures: VaultSolvencyFigures | null }) {
+  const t = useTranslations("launchOverview.solvency");
   if (!figures) return null;
-  const checks = invariants(figures);
+  const checks = invariants(figures, [t("backingCovers"), t("holdsStatics"), t("holdsReserve")]);
   const allHold = checks.every((check) => check.holds);
 
   return (
-    <section className="ui-card overview-panel" aria-label="Vault solvency">
+    <section className="ui-card overview-panel" aria-label={t("aria")}>
       <div className="overview-panel-head">
-        <h3>Solvency</h3>
+        <h3>{t("title")}</h3>
         <span className={allHold ? "is-accent" : "is-negative"}>
-          {allHold ? "All three hold" : "Reading is inconsistent"}
+          {allHold ? t("allHold") : t("inconsistent")}
         </span>
       </div>
 
@@ -91,7 +97,9 @@ export function VaultSolvency({ figures }: { figures: VaultSolvencyFigures | nul
                 {check.left} ≥ {check.right}
               </span>
             </span>
-            <span className="solvency-surplus">{check.holds ? `+${check.surplus}` : "short"}</span>
+            <span className="solvency-surplus">
+              {check.holds ? `+${check.surplus}` : t("short")}
+            </span>
           </li>
         ))}
       </ul>
@@ -99,13 +107,15 @@ export function VaultSolvency({ figures }: { figures: VaultSolvencyFigures | nul
       <dl className="solvency-reconcile">
         <div>
           <dt>
-            {formatTokenAmountGrouped(figures.circulatingGenesis, 0, 0)} circulating ×{" "}
-            {formatTokenAmountGrouped(figures.vaultPrice, 18, 0)}
+            {t("circulatingTimesPrice", {
+              count: formatTokenAmountGrouped(figures.circulatingGenesis, 0, 0),
+              price: formatTokenAmountGrouped(figures.vaultPrice, 18, 0),
+            })}
           </dt>
           <dd>{formatTokenAmountGrouped(figures.grossBacking, 18, 0)}</dd>
         </div>
         <div>
-          <dt>less credit drawn against backing</dt>
+          <dt>{t("lessCredit")}</dt>
           <dd>
             {figures.outstandingGenesisCredit > 0n
               ? `−${formatTokenAmountGrouped(figures.outstandingGenesisCredit, 18, 0)}`
@@ -113,15 +123,12 @@ export function VaultSolvency({ figures }: { figures: VaultSolvencyFigures | nul
           </dd>
         </div>
         <div className="is-total">
-          <dt>Backing required</dt>
+          <dt>{t("backingRequired")}</dt>
           <dd>{formatTokenAmountGrouped(figures.requiredBacking, 18, 0)} STATICS</dd>
         </div>
       </dl>
 
-      <p className="overview-note">
-        <b>These are invariants, not targets.</b> The Vault re-checks all three at the end of every
-        purchase, redemption, credit and repayment, and reverts the whole transaction if any fails.
-      </p>
+      <p className="overview-note">{t.rich("note", { strong: (chunks) => <b>{chunks}</b> })}</p>
     </section>
   );
 }

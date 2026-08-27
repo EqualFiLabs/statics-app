@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { DeploymentOverview } from "@/components/overview/DeploymentOverview";
 
-export const metadata: Metadata = {
-  title: "DApp",
-  description: "Sign into the Statics application and manage your wallet connection.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.overview");
+  return { title: t("title"), description: t("description") };
+}
 
 export default function DAppOverviewPage() {
   return <DeploymentOverview />;

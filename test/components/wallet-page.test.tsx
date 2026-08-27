@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from "@/test/render";
+import { fireEvent, render, renderWithLocale, screen, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WalletPage } from "@/components/wallet/WalletPage";
 import { DEFAULT_SOLANA_TOKENS, saveSolanaTokens } from "@/lib/solana-tokens";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
+import spanish from "@/messages/es.json";
 
 describe("wallet interactions", () => {
   beforeEach(() => {
@@ -159,5 +160,13 @@ describe("wallet interactions", () => {
   it("keeps the faucet on its dedicated account route", () => {
     render(<WalletPage />);
     expect(screen.queryByRole("heading", { name: "Testnet asset faucet" })).not.toBeInTheDocument();
+  });
+
+  it("renders the wallet holdings controls in Spanish", () => {
+    renderWithLocale(<WalletPage />, "es", spanish);
+
+    expect(screen.getByRole("tablist", { name: "Activos de la billetera" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tokens" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "NFT" })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
 /**
@@ -50,8 +52,9 @@ export function GenesisTierLadder({
   onSelect: (tier: number) => void;
   disabled: boolean;
 }>) {
+  const t = useTranslations("operators.ladder");
   return (
-    <ol className="genesis-ladder" aria-label="Activation tiers">
+    <ol className="genesis-ladder" aria-label={t("aria")}>
       {Array.from({ length: GENESIS_MAX_TIER + 1 }, (_, tier) => {
         const reached = tier < currentTier;
         const isCurrent = tier === currentTier;
@@ -68,9 +71,9 @@ export function GenesisTierLadder({
               aria-current={isCurrent ? "step" : undefined}
               onClick={() => onSelect(tier)}
             >
-              <span className="genesis-ladder-tier">Tier {tier}</span>
+              <span className="genesis-ladder-tier">{t("tier", { tier })}</span>
               <span className="genesis-ladder-multiplier">
-                {genesisTierMultiplier(tier).toFixed(2)}× reward weight
+                {t("weight", { weight: genesisTierMultiplier(tier).toFixed(2) })}
               </span>
               <span className="genesis-ladder-cost">
                 {tier === 0
@@ -78,7 +81,7 @@ export function GenesisTierLadder({
                   : `${formatTokenAmountGrouped(tierCosts[tier] ?? 0n, 18, 0)} STATICS`}
               </span>
               <span className="genesis-ladder-mark">
-                {reached ? "Reached" : isCurrent ? "You are here" : isTarget ? "Target" : ""}
+                {reached ? t("reached") : isCurrent ? t("current") : isTarget ? t("target") : ""}
               </span>
             </button>
           </li>

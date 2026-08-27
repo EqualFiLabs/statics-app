@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { usePublicClient } from "wagmi";
 
 import { NftArtwork } from "@/components/wallet/NftArtwork";
@@ -35,6 +36,7 @@ export function GenesisIdentityPanel({
   vaultPrice: bigint;
   maximumSupply: bigint;
 }>) {
+  const t = useTranslations("operators.identity");
   const publicClient = usePublicClient({ chainId });
 
   // The traits ride along with the artwork request the card already makes: the
@@ -57,7 +59,7 @@ export function GenesisIdentityPanel({
   );
 
   return (
-    <aside className="genesis-identity ui-card" aria-label={`Operator #${id} details`}>
+    <aside className="genesis-identity ui-card" aria-label={t("details", { id: id.toString() })}>
       <div className="genesis-identity-art">
         <NftArtwork
           chainId={chainId}
@@ -67,18 +69,20 @@ export function GenesisIdentityPanel({
             kind: "collection",
             tokenId: id,
             contract: collection,
-            name: `Operator #${id}`,
-            summary: `Tier ${tier}`,
+            name: t("operator", { id: id.toString() }),
+            summary: t("tier", { tier }),
             carries: [],
-            blockedReason: creditActive ? "Repay secured credit before transfer." : null,
+            blockedReason: creditActive ? t("repayBeforeTransfer") : null,
           }}
         />
       </div>
 
       <div className="genesis-identity-heading">
         <div>
-          <h2 className="ui-section-title">Operator #{id.toString()}</h2>
-          <p className="genesis-identity-sub">1 of {maximumSupply.toString()} · fully backed</p>
+          <h2 className="ui-section-title">{t("operator", { id: id.toString() })}</h2>
+          <p className="genesis-identity-sub">
+            {t("collectionPosition", { supply: maximumSupply.toString() })}
+          </p>
         </div>
         <span className="genesis-tier-badge" data-tier={tier}>
           <b>T{tier}</b>
@@ -88,31 +92,31 @@ export function GenesisIdentityPanel({
 
       <div className="genesis-identity-chips">
         <span className={`ui-pill${registered ? " is-ready" : " is-warning"}`}>
-          {registered ? "Registered for rewards" : "Not registered"}
+          {registered ? t("registered") : t("notRegistered")}
         </span>
         <span className={`ui-pill${creditActive ? " is-error" : ""}`}>
-          {creditActive ? "Transfer locked · credit active" : "Transferable"}
+          {creditActive ? t("creditLocked") : t("transferable")}
         </span>
       </div>
 
       <dl className="genesis-identity-backing">
         <div>
-          <dt>Redeemable for</dt>
+          <dt>{t("redeemableFor")}</dt>
           <dd>{formatTokenAmountGrouped(vaultPrice, 18, 0)} STATICS</dd>
         </div>
         <div>
-          <dt>Reserve share</dt>
-          <dd>1 / {maximumSupply.toString()} of ETH reserve</dd>
+          <dt>{t("reserveShare")}</dt>
+          <dd>{t("reserveFraction", { supply: maximumSupply.toString() })}</dd>
         </div>
         <div>
-          <dt>Reward weight</dt>
+          <dt>{t("rewardWeight")}</dt>
           <dd>{registered ? rewardWeight.toString() : "—"}</dd>
         </div>
       </dl>
 
       {traits.length > 0 && (
         <div className="genesis-identity-traits">
-          <p className="dapp-eyebrow">Onchain traits</p>
+          <p className="dapp-eyebrow">{t("traits")}</p>
           <dl>
             {traits.map((trait) => (
               <div key={trait.label}>
