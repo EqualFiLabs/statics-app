@@ -32,11 +32,20 @@ test.describe("landing foundation", () => {
     await page.goto("/");
   });
 
-  test("reports the public testnet beta without horizontal overflow", async ({ page }) => {
+  test("reports mainnet status and time without horizontal overflow", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeVisible();
-    await expect(page.getByText("Public testnet beta").first()).toBeVisible();
+    const readout = page.getByLabel("System status");
+    await expect(readout.getByText(/system status:/i)).toContainText("Mainnet");
+    await expect(readout.getByText(/time:/i)).toBeVisible();
+    await expect(readout.locator("p")).toHaveCount(2);
+    await expect(readout.getByText(/network:/i)).toHaveCount(0);
+    await expect(readout.getByText(/deployment:/i)).toHaveCount(0);
+    await expect(page.getByText("Public testnet beta")).toHaveCount(0);
+    await expect(page.getByText("Fixed bundles")).toHaveCount(0);
+    await expect(page.getByText("In-kind redemption")).toHaveCount(0);
+    await expect(page.getByText("Open source", { exact: true })).toHaveCount(0);
     await expect(page.getByText("19,482,731")).toHaveCount(0);
     await expect(page.getByText("Online", { exact: true })).toHaveCount(0);
 

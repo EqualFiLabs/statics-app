@@ -57,11 +57,6 @@ export async function LandingPage() {
                 </span>
               </a>
             </div>
-            <div className="build-notes" aria-label={t("foundations")}>
-              <span>{t("fixedBundles")}</span>
-              <span>{t("inKindRedemption")}</span>
-              <span>{t("openSource")}</span>
-            </div>
           </div>
 
           <div className="hero-visual" aria-label={t("heroVisual")}>
@@ -88,20 +83,9 @@ export async function LandingPage() {
                 <span>&gt;</span> {t("systemStatus")}: <strong>{t("status.system")}</strong>
               </p>
               <p>
-                <span>&gt;</span> {t("network")}: {t("status.network")}
-              </p>
-              <p>
-                <span>&gt;</span> {t("deployment")}: {t("status.deployment")}
-              </p>
-              <p>
                 <span>&gt;</span> {t("time")}: <UtcClock suffix />
               </p>
             </div>
-            <p className="version">
-              {t("protocol")}
-              <br />
-              {t("publicBeta")}
-            </p>
           </div>
         </section>
 

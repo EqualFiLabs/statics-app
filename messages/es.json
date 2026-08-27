@@ -1223,18 +1223,10 @@
     "heroLine3": "Mercados dinámicos.",
     "heroDescription": "Cada cesta es un conjunto fijo, siempre canjeable por exactamente lo que contiene. Sin gestor, sin rebalanceos y sin liquidaciones. Los mercados se mueven alrededor de ese ancla; Statics recompensa a quienes la mantienen firme.",
     "whatsFixed": "Qué permanece fijo",
-    "foundations": "Fundamentos del protocolo",
-    "fixedBundles": "Conjuntos fijos",
-    "inKindRedemption": "Canje en especie",
-    "openSource": "Código abierto",
     "heroVisual": "Estatua digital de mármol de Robin Hood",
     "heroAlt": "Una estatua digital fragmentada de mármol de Robin Hood con gorro de plumas y perilla",
     "systemStatus": "Estado del sistema",
-    "network": "Red",
-    "deployment": "Despliegue",
     "time": "Hora",
-    "protocol": "Protocolo Statics",
-    "publicBeta": "Beta pública de prueba",
     "economies": "Economías del protocolo",
     "basketsTitle": "Cestas Statics",
     "basketsHow": "Cómo funcionan las cestas Statics",
@@ -1299,9 +1291,7 @@
     "privacy": "Privacidad",
     "security": "Seguridad",
     "status": {
-      "system": "Beta pública de prueba",
-      "network": "Robinhood Testnet",
-      "deployment": "Activo en testnet"
+      "system": "Mainnet"
     }
   },
   "glossary": {

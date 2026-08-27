@@ -1,4 +1,4 @@
-import { render, screen } from "@/test/render";
+import { render, screen, within } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
@@ -43,15 +43,28 @@ function renderHeader(locale = "en", messages: typeof english = english) {
 }
 
 describe("landing page", () => {
-  it("preserves the approved message while reporting the public testnet beta", async () => {
+  it("keeps the hero status focused on mainnet and current time", async () => {
     const { container } = await renderLanding();
 
     expect(
       screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/system status:/i)).toHaveTextContent("Public testnet beta");
-    expect(screen.getByText(/Network: Robinhood Testnet/i)).toBeInTheDocument();
-    expect(screen.getByText(/Deployment: Testnet live/i)).toBeInTheDocument();
+    const readout = screen.getByLabelText("System status");
+    expect(within(readout).getByText(/system status:/i)).toHaveTextContent("Mainnet");
+    expect(within(readout).getByText(/time:/i)).toBeInTheDocument();
+    expect(readout.querySelectorAll("p")).toHaveLength(2);
+    expect(within(readout).queryByText(/network:/i)).not.toBeInTheDocument();
+    expect(within(readout).queryByText(/deployment:/i)).not.toBeInTheDocument();
+    const hero = screen.getByRole("region", {
+      name: /static assets.*dynamic markets/i,
+    });
+    expect(hero).not.toHaveTextContent("Statics protocol");
+    expect(hero).not.toHaveTextContent("Public testnet beta");
+    expect(hero).not.toHaveTextContent("Fixed bundles");
+    expect(hero).not.toHaveTextContent("In-kind redemption");
+    expect(hero).not.toHaveTextContent("Open source");
+    expect(spanish.landing.status.system).toBe("Mainnet");
+    expect(chinese.landing.status.system).toBe("Mainnet");
     expect(container.querySelector(".deployment-status")).not.toBeInTheDocument();
     expect(screen.queryByText("Internal review")).not.toBeInTheDocument();
     expect(screen.queryByText("19,482,731")).not.toBeInTheDocument();

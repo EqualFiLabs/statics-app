@@ -1223,18 +1223,10 @@
     "heroLine3": "Dynamic markets.",
     "heroDescription": "Every basket is a fixed bundle, always redeemable for exactly what is inside it. No manager, no rebalancing, no liquidations. Markets move around that anchor — Statics pays the people who hold it steady.",
     "whatsFixed": "What's fixed",
-    "foundations": "Protocol foundations",
-    "fixedBundles": "Fixed bundles",
-    "inKindRedemption": "In-kind redemption",
-    "openSource": "Open source",
     "heroVisual": "Digital marble statue of Robin Hood",
     "heroAlt": "A fragmented digital marble statue of Robin Hood wearing a feathered cap and goatee",
     "systemStatus": "System status",
-    "network": "Network",
-    "deployment": "Deployment",
     "time": "Time",
-    "protocol": "Statics protocol",
-    "publicBeta": "Public testnet beta",
     "economies": "Protocol economies",
     "basketsTitle": "Statics baskets",
     "basketsHow": "How Statics baskets work",
@@ -1299,9 +1291,7 @@
     "privacy": "Privacy",
     "security": "Security",
     "status": {
-      "system": "Public testnet beta",
-      "network": "Robinhood Testnet",
-      "deployment": "Testnet live"
+      "system": "Mainnet"
     }
   },
   "glossary": {

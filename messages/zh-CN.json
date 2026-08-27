@@ -1223,18 +1223,10 @@
     "heroLine3": "动态市场。",
     "heroDescription": "每个篮子都是固定组合，始终可以赎回其中完全相同的资产。没有管理人、没有再平衡、没有清算。市场围绕这个锚点波动，Statics 奖励维护锚点的人。",
     "whatsFixed": "哪些保持固定",
-    "foundations": "协议基础",
-    "fixedBundles": "固定组合",
-    "inKindRedemption": "实物赎回",
-    "openSource": "开源",
     "heroVisual": "Robin Hood 数字大理石雕像",
     "heroAlt": "一尊戴羽毛帽、留山羊胡的 Robin Hood 碎片化数字大理石雕像",
     "systemStatus": "系统状态",
-    "network": "网络",
-    "deployment": "部署",
     "time": "时间",
-    "protocol": "Statics 协议",
-    "publicBeta": "公开测试网测试版",
     "economies": "协议经济",
     "basketsTitle": "Statics 篮子",
     "basketsHow": "Statics 篮子的运作方式",
@@ -1299,9 +1291,7 @@
     "privacy": "隐私",
     "security": "安全",
     "status": {
-      "system": "公开测试网测试版",
-      "network": "Robinhood Testnet",
-      "deployment": "测试网已上线"
+      "system": "Mainnet"
     }
   },
   "glossary": {
