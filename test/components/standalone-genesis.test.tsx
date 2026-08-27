@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@/test/render";
+import { render, renderWithLocale, screen } from "@/test/render";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import { GenesisPage } from "@/components/genesis/GenesisPage";
 import type { DeploymentOption, LaunchDeployment } from "@/lib/deployments/types";
 import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
+import chinese from "@/messages/zh-CN.json";
 
 vi.mock("wagmi", () => ({ usePublicClient: () => null }));
 
@@ -78,5 +79,25 @@ describe("standalone Genesis surface", () => {
     expect(screen.getByText("Connect your wallet")).toBeInTheDocument();
     expect(screen.queryByText("Explore the Vault")).not.toBeInTheDocument();
     expect(screen.queryByText("Launch rewards")).not.toBeInTheDocument();
+  });
+
+  it("renders the signed-out My Operators state in Simplified Chinese", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderWithLocale(
+      <QueryClientProvider client={queryClient}>
+        <DeploymentContext.Provider
+          value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+        >
+          <WalletContext.Provider value={{ ...defaultWalletState, status: "signed-out" }}>
+            <GenesisPage />
+          </WalletContext.Provider>
+        </DeploymentContext.Provider>
+      </QueryClientProvider>,
+      "zh-CN",
+      chinese
+    );
+
+    expect(screen.getByText("连接你的钱包")).toBeInTheDocument();
+    expect(screen.getByText("连接钱包以查看和管理你的 Operator NFT。")).toBeInTheDocument();
   });
 });

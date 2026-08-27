@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
@@ -42,19 +43,35 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { useWalletState } from "@/providers/wallet-context";
 
-function describeGenesisError(error: unknown): string {
+type GenesisErrorCopy = Readonly<{
+  walletRejected: string;
+  notOwner: string;
+  alreadyRegistered: string;
+  nothingToClaim: string;
+  transactionFailed: string;
+}>;
+
+function describeGenesisError(error: unknown, copy: GenesisErrorCopy): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/rejected/i.test(message)) return "The wallet request was rejected.";
-  if (message.includes("NotGenesisOwner")) return "This wallet no longer owns that Operator NFT.";
-  if (message.includes("GenesisAlreadyRegistered"))
-    return "That Operator NFT is already registered for rewards.";
-  if (message.includes("NoRewards")) return "There is nothing to claim for that asset yet.";
-  return message || "The Genesis transaction failed.";
+  if (/rejected/i.test(message)) return copy.walletRejected;
+  if (message.includes("NotGenesisOwner")) return copy.notOwner;
+  if (message.includes("GenesisAlreadyRegistered")) return copy.alreadyRegistered;
+  if (message.includes("NoRewards")) return copy.nothingToClaim;
+  return message || copy.transactionFailed;
 }
 
 type ActionTab = "activate" | "rewards" | "credit";
 
 export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
+  const t = useTranslations("operators");
+  const errorCopy: GenesisErrorCopy = {
+    walletRejected: t("walletRejected"),
+    notOwner: t("notOwner"),
+    alreadyRegistered: t("alreadyRegistered"),
+    nothingToClaim: t("nothingToClaim"),
+    transactionFailed: t("transactionFailed"),
+  };
+  const describeTransactionError = (cause: unknown) => describeGenesisError(cause, errorCopy);
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const queryClient = useQueryClient();
@@ -165,7 +182,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       to,
       data,
       sendTransaction: walletState.sendEvmTransaction,
-      describeError: describeGenesisError,
+      describeError: describeTransactionError,
     });
   };
 
@@ -179,7 +196,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       await action();
       await refresh();
     } catch (cause) {
-      setError(describeGenesisError(cause));
+      setError(describeTransactionError(cause));
       await refresh();
     } finally {
       setBusy(null);
@@ -211,7 +228,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       ).then(oneIndexedGenesisTierCosts),
     ]);
     if (Number(currentTier) !== item.tier) {
-      throw new Error("The activation tier changed. Review the refreshed NFT before confirming.");
+      throw new Error(t("tierChanged"));
     }
     const cost = cumulativeGenesisActivationCost(currentCosts, Number(currentTier), targetTier);
     const [balance, allowance] = await Promise.all([
@@ -228,26 +245,26 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         args: [wallet, deployment.contracts.activationRegistry],
       }),
     ]);
-    if (balance < cost) throw new Error("Insufficient STATICS for this activation tier.");
+    if (balance < cost) throw new Error(t("insufficientStatics"));
     if (allowance < cost) {
       await send(
         "approve-staking-token",
-        "Enable Genesis activation",
+        t("enableActivation"),
         deployment.contracts.statics,
         encodeFunctionData({
           abi: dopplerStaticsTokenAbi,
           functionName: "approve",
           args: [deployment.contracts.activationRegistry, MAX_ERC20_ALLOWANCE],
         }),
-        "Maximum STATICS"
+        t("maximumStatics")
       );
     }
     await send(
       "activate-genesis",
-      `Activate Operator #${item.id} to tier ${targetTier}`,
+      t("activateLabel", { id: item.id.toString(), tier: targetTier }),
       deployment.contracts.activationRegistry,
       buildActivateGenesisCall(item.id, targetTier),
-      `${formatEther(cost)} STATICS activation payment`
+      t("activationPayment", { amount: formatEther(cost) })
     );
   };
 
@@ -256,14 +273,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     for (const item of items) {
       if (item.pendingStatics > 0n) {
         jobs.push({
-          label: `Claim Operator #${item.id} STATICS rewards`,
+          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "STATICS" }),
           data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.statics, wallet!),
           amount: `${formatEther(item.pendingStatics)} STATICS`,
         });
       }
       if (item.pendingWeth > 0n) {
         jobs.push({
-          label: `Claim Operator #${item.id} WETH rewards`,
+          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "WETH" }),
           data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.weth, wallet!),
           amount: `${formatEther(item.pendingWeth)} WETH`,
         });
@@ -271,14 +288,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     }
     if (summary.ownerStatics > 0n) {
       jobs.push({
-        label: "Claim previous-owner STATICS rewards",
+        label: t("claimPrevious", { asset: "STATICS" }),
         data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.statics, wallet!),
         amount: `${formatEther(summary.ownerStatics)} STATICS`,
       });
     }
     if (summary.ownerWeth > 0n) {
       jobs.push({
-        label: "Claim previous-owner WETH rewards",
+        label: t("claimPrevious", { asset: "WETH" }),
         data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.weth, wallet!),
         amount: `${formatEther(summary.ownerWeth)} WETH`,
       });
@@ -300,7 +317,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const recoveriesLink =
     vault.data?.epochActive === false ? (
       <Link className="genesis-recoveries-link" href="/app/genesis/recoveries">
-        Recover matured Operator credit <span aria-hidden="true">→</span>
+        {t("recoverOperatorCredit")} <span aria-hidden="true">→</span>
       </Link>
     ) : null;
 
@@ -308,22 +325,16 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     return (
       <div className="genesis-page">
         {recoveriesLink}
-        <EmptyState
-          title="Connect your wallet"
-          description="Connect to view and manage your Operators NFTs."
-        />
+        <EmptyState title={t("connectTitle")} description={t("connectDescription")} />
       </div>
     );
   }
-  if (owned.isLoading) return <p className="dapp-loading">Loading Operators NFTs…</p>;
+  if (owned.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
   if (owned.error) {
     return (
       <div className="genesis-page">
         {recoveriesLink}
-        <EmptyState
-          title="Operators data unavailable"
-          description={describeGenesisError(owned.error)}
-        />
+        <EmptyState title={t("unavailable")} description={describeTransactionError(owned.error)} />
       </div>
     );
   }
@@ -332,25 +343,26 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       <div className="genesis-page">
         {recoveriesLink}
         <EmptyState
-          title="No Operators NFTs yet"
+          title={t("emptyTitle")}
           description={
             vault.data
-              ? `${vault.data.circulatingGenesis} of ${vault.data.maximumSupply} Operators NFTs are in circulation, each backed by ${formatTokenAmountGrouped(vault.data.vaultPrice, 18, 0)} STATICS.`
-              : "Acquire a fully backed Operator NFT through the Vault."
+              ? t("circulationDescription", {
+                  circulating: vault.data.circulatingGenesis.toString(),
+                  supply: vault.data.maximumSupply.toString(),
+                  backing: formatTokenAmountGrouped(vault.data.vaultPrice, 18, 0),
+                })
+              : t("vaultEmptyDescription")
           }
-          action={{ label: "Acquire an Operator NFT", href: "/app/swap?mode=nft" }}
+          action={{ label: t("acquire"), href: "/app/swap?mode=nft" }}
         />
         {/* Rewards earned before a Genesis changed hands stay claimable by the
             previous owner, so a wallet holding none of them still has somewhere
             to collect from. */}
         {(summary.ownerStatics > 0n || summary.ownerWeth > 0n) && (
-          <section className="ui-card genesis-panel" aria-label="Rewards from past ownership">
+          <section className="ui-card genesis-panel" aria-label={t("pastRewardsAria")}>
             <div className="genesis-panel-head">
-              <h3>Rewards from past ownership</h3>
-              <p>
-                These accrued while you held an Operator NFT that has since moved on. They remain
-                yours to claim.
-              </p>
+              <h3>{t("pastRewardsTitle")}</h3>
+              <p>{t("pastRewardsDescription")}</p>
             </div>
             <ul className="genesis-claims">
               {(
@@ -374,7 +386,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       void act(`claim-owner-${symbol}`, () =>
                         send(
                           "claim-rewards",
-                          `Claim previous-owner ${symbol} rewards`,
+                          t("claimPrevious", { asset: symbol }),
                           deployment.contracts.launchDistributor,
                           buildClaimOwnerGenesisLaunchRewardsCall(asset, wallet),
                           symbol
@@ -382,7 +394,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       )
                     }
                   >
-                    {busy === `claim-owner-${symbol}` ? "Claiming…" : "Claim"}
+                    {busy === `claim-owner-${symbol}` ? t("claiming") : t("claim")}
                   </button>
                 </li>
               ))}
@@ -408,48 +420,58 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   return (
     <div className="genesis-page">
       {recoveriesLink}
-      <section className="genesis-summary ui-card" aria-label="Your Operators holdings">
+      <section className="genesis-summary ui-card" aria-label={t("holdingsAria")}>
         <div className="ui-stat">
-          <span className="ui-stat__label">Operators held</span>
+          <span className="ui-stat__label">{t("held")}</span>
           <strong className="ui-stat__value">{items.length}</strong>
           <small>
-            {summary.activated} activated · {summary.unregistered} not registered
+            {t("heldStatus", {
+              activated: summary.activated,
+              unregistered: summary.unregistered,
+            })}
           </small>
         </div>
         <div className="ui-stat">
-          <span className="ui-stat__label">Backed by</span>
+          <span className="ui-stat__label">{t("backedBy")}</span>
           <strong className="ui-stat__value">
             {vault.data
               ? `${formatTokenAmountGrouped(vault.data.vaultPrice * BigInt(items.length), 18, 0)} STATICS`
               : "—"}
           </strong>
           <small>
-            {vault.data ? `+ ${items.length}/${vault.data.maximumSupply} of ETH reserve` : ""}
+            {vault.data
+              ? t("reserveHolding", {
+                  count: items.length,
+                  supply: vault.data.maximumSupply.toString(),
+                })
+              : ""}
           </small>
         </div>
         <div className="ui-stat">
-          <span className="ui-stat__label">Claimable now</span>
+          <span className="ui-stat__label">{t("claimableNow")}</span>
           <strong className="ui-stat__value is-accent">
             {formatTokenAmountGrouped(summary.claimableStatics, 18, 2)} STATICS
           </strong>
           <small>
             {formatTokenAmountGrouped(summary.claimableWeth, 18, 4)} WETH
-            {summary.ownerStatics > 0n || summary.ownerWeth > 0n
-              ? " · includes past ownership"
-              : ""}
+            {summary.ownerStatics > 0n || summary.ownerWeth > 0n ? t("includesPast") : ""}
           </small>
         </div>
         <div className="ui-stat">
-          <span className="ui-stat__label">Credit outstanding</span>
+          <span className="ui-stat__label">{t("creditOutstanding")}</span>
           <strong className={`ui-stat__value${summary.owed > 0n ? " is-warning" : ""}`}>
             {summary.owed > 0n
               ? `${formatTokenAmountGrouped(summary.owed, 18, 0)} STATICS`
-              : "None"}
+              : t("none")}
           </strong>
           <small>
             {summary.soonest
-              ? `${summary.creditCount} open · #${summary.soonest.id} due ${new Date(summary.soonest.creditMaturity * 1_000).toLocaleDateString()}`
-              : "Nothing to repay"}
+              ? t("creditDue", {
+                  count: summary.creditCount,
+                  id: summary.soonest.id.toString(),
+                  date: new Date(summary.soonest.creditMaturity * 1_000).toLocaleDateString(),
+                })
+              : t("nothingToRepay")}
           </small>
         </div>
         <button
@@ -459,10 +481,10 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           onClick={() => void act("claim-all", claimEverything)}
         >
           {busy === "claim-all"
-            ? `Claiming ${claimProgress ?? ""}…`
+            ? t("claimProgress", { progress: claimProgress ?? "" })
             : summary.claimCount > 1
-              ? `Claim all · ${summary.claimCount} transactions`
-              : "Claim all"}
+              ? t("claimAllTransactions", { count: summary.claimCount })
+              : t("claimAllSimple")}
         </button>
       </section>
 
@@ -504,18 +526,18 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           />
 
           <div className="genesis-actions">
-            <div className="genesis-tabs" role="tablist" aria-label="Operator actions">
+            <div className="genesis-tabs" role="tablist" aria-label={t("actionsAria")}>
               <button
                 type="button"
                 role="tab"
                 aria-selected={tab === "activate"}
                 onClick={() => setTab("activate")}
               >
-                <b>Activate</b>
+                <b>{t("activate")}</b>
                 <small>
                   {selected.tier === GENESIS_MAX_TIER
-                    ? "Top tier reached"
-                    : `Tier ${selected.tier} → ${targetTier}`}
+                    ? t("topTier")
+                    : t("tierChange", { current: selected.tier, target: targetTier })}
                 </small>
               </button>
               <button
@@ -529,11 +551,13 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 }
                 onClick={() => setTab("rewards")}
               >
-                <b>Rewards</b>
+                <b>{t("rewards")}</b>
                 <small>
                   {!selected.registered
-                    ? "Not registered"
-                    : `${formatTokenAmountGrouped(selected.pendingStatics, 18, 2)} STATICS pending`}
+                    ? t("notRegistered")
+                    : t("pendingAmount", {
+                        amount: formatTokenAmountGrouped(selected.pendingStatics, 18, 2),
+                      })}
                 </small>
               </button>
               <button
@@ -542,25 +566,24 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 aria-selected={tab === "credit"}
                 onClick={() => setTab("credit")}
               >
-                <b>Credit</b>
+                <b>{t("credit")}</b>
                 <small>
                   {selected.creditActive
-                    ? `${formatTokenAmountGrouped(selected.creditPrincipal, 18, 0)} owed`
+                    ? t("owed", {
+                        amount: formatTokenAmountGrouped(selected.creditPrincipal, 18, 0),
+                      })
                     : vault.data?.epochActive
-                      ? "Opens after the Epoch"
-                      : "Borrow against backing"}
+                      ? t("opensAfterEpoch")
+                      : t("borrowAgainstBacking")}
                 </small>
               </button>
             </div>
 
             {tab === "activate" && (
-              <section className="ui-card genesis-panel" aria-label="Activation tier">
+              <section className="ui-card genesis-panel" aria-label={t("activationAria")}>
                 <div className="genesis-panel-head">
-                  <h3>Activation tier</h3>
-                  <p>
-                    A permanent multiplier on this NFT&apos;s share of launch rewards. Pay once and
-                    keep it, until the NFT changes hands.
-                  </p>
+                  <h3>{t("activationTitle")}</h3>
+                  <p>{t("activationDescription")}</p>
                 </div>
                 <GenesisTierLadder
                   currentTier={selected.tier}
@@ -576,24 +599,22 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   <>
                     <dl className="genesis-figures">
                       <div>
-                        <dt>Reward weight</dt>
+                        <dt>{t("rewardWeight")}</dt>
                         <dd>
                           {genesisTierMultiplier(selected.tier).toFixed(2)}× →{" "}
                           {genesisTierMultiplier(targetTier).toFixed(2)}×
                         </dd>
                       </div>
                       <div className="is-total">
-                        <dt>You pay</dt>
+                        <dt>{t("youPay")}</dt>
                         <dd>{formatTokenAmountGrouped(activationCost, 18, 0)} STATICS</dd>
                       </div>
                     </dl>
                     <p className="genesis-note">
-                      <b>Paid to the Statics treasury.</b> STATICS is never burned — total supply is
-                      unchanged and this NFT&apos;s backing is untouched.
+                      {t.rich("treasuryNote", { strong: (chunks) => <b>{chunks}</b> })}
                     </p>
                     <p className="genesis-note is-warning">
-                      <b>Transferring resets this to Tier 0.</b> The next owner starts at 1.00×.
-                      Rewards you accrued before the transfer stay claimable by you.
+                      {t.rich("transferResetNote", { strong: (chunks) => <b>{chunks}</b> })}
                     </p>
                     <button
                       className="ui-button ui-button--primary ui-button--block"
@@ -604,42 +625,47 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       }
                     >
                       {busy === `activate-${selected.id}`
-                        ? "Confirming…"
-                        : `Activate to Tier ${targetTier} · ${formatTokenAmountGrouped(activationCost, 18, 0)} STATICS`}
+                        ? t("confirming")
+                        : t("activateToTier", {
+                            tier: targetTier,
+                            amount: formatTokenAmountGrouped(activationCost, 18, 0),
+                          })}
                     </button>
                   </>
                 ) : (
                   <p className="genesis-note">
-                    <b>Tier 4 reached.</b> This Operator earns the maximum 1.25× reward weight.
+                    {t.rich("maxTierNote", { strong: (chunks) => <b>{chunks}</b> })}
                   </p>
                 )}
               </section>
             )}
 
             {tab === "rewards" && (
-              <section className="ui-card genesis-panel" aria-label="Launch rewards">
+              <section className="ui-card genesis-panel" aria-label={t("launchRewardsAria")}>
                 <div className="genesis-panel-head">
-                  <h3>Launch rewards</h3>
+                  <h3>{t("launchRewardsTitle")}</h3>
                   <p>
-                    Registered Operators NFTs split {Number(owned.data?.rewardShareBps ?? 0) / 100}%
-                    of market fees, weighted by activation tier.
+                    {t("launchRewardsDescription", {
+                      share: Number(owned.data?.rewardShareBps ?? 0) / 100,
+                    })}
                   </p>
                 </div>
 
                 {!selected.registered ? (
                   <>
                     <p className="genesis-note is-warning">
-                      <b>This Operator is earning nothing.</b> Register it to start taking a share
-                      of market fees at its current{" "}
-                      {genesisTierMultiplier(selected.tier).toFixed(2)}× weight.
+                      {t.rich("earningNothing", {
+                        strong: (chunks) => <b>{chunks}</b>,
+                        weight: genesisTierMultiplier(selected.tier).toFixed(2),
+                      })}
                     </p>
                     <dl className="genesis-figures">
                       <div>
-                        <dt>Weight once registered</dt>
+                        <dt>{t("weightRegistered")}</dt>
                         <dd>{selected.multiplierBps.toString()}</dd>
                       </div>
                       <div>
-                        <dt>Total registered weight</dt>
+                        <dt>{t("totalWeight")}</dt>
                         <dd>{(owned.data?.totalWeight ?? 0n).toString()}</dd>
                       </div>
                     </dl>
@@ -651,28 +677,28 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                         void act(`register-${selected.id}`, () =>
                           send(
                             "claim-rewards",
-                            `Register Operator #${selected.id}`,
+                            t("registerLabel", { id: selected.id.toString() }),
                             deployment.contracts.launchDistributor,
                             buildRegisterGenesisCall(selected.id),
-                            `Operator #${selected.id}`
+                            t("identity.operator", { id: selected.id.toString() })
                           )
                         )
                       }
                     >
                       {busy === `register-${selected.id}`
-                        ? "Registering…"
-                        : `Register Operator #${selected.id} for rewards`}
+                        ? t("registering")
+                        : t("register", { id: selected.id.toString() })}
                     </button>
                   </>
                 ) : (
                   <>
                     <dl className="genesis-figures">
                       <div>
-                        <dt>Your weight</dt>
+                        <dt>{t("yourWeight")}</dt>
                         <dd>{selected.rewardWeight.toString()}</dd>
                       </div>
                       <div>
-                        <dt>Share of the pool</dt>
+                        <dt>{t("poolShare")}</dt>
                         <dd>
                           {owned.data?.totalWeight
                             ? `${((Number(selected.rewardWeight) / Number(owned.data.totalWeight)) * 100).toFixed(4)}%`
@@ -689,7 +715,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       ).map(([asset, symbol, amount, digits]) => (
                         <li key={asset}>
                           <div>
-                            <span>Pending {symbol}</span>
+                            <span>{t("pendingAsset", { asset: symbol })}</span>
                             <strong className={amount === 0n ? "is-muted" : undefined}>
                               {formatTokenAmountGrouped(amount, 18, digits)}
                             </strong>
@@ -702,7 +728,10 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               void act(`claim-${selected.id}-${symbol}`, () =>
                                 send(
                                   "claim-rewards",
-                                  `Claim Operator #${selected.id} ${symbol} rewards`,
+                                  t("claimOperatorAsset", {
+                                    id: selected.id.toString(),
+                                    asset: symbol,
+                                  }),
                                   deployment.contracts.launchDistributor,
                                   buildClaimGenesisLaunchRewardsCall(selected.id, asset, wallet),
                                   symbol
@@ -710,14 +739,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               )
                             }
                           >
-                            {busy === `claim-${selected.id}-${symbol}` ? "Claiming…" : "Claim"}
+                            {busy === `claim-${selected.id}-${symbol}` ? t("claiming") : t("claim")}
                           </button>
                         </li>
                       ))}
                       {(summary.ownerStatics > 0n || summary.ownerWeth > 0n) && (
                         <li>
                           <div>
-                            <span>From Operators you no longer own</span>
+                            <span>{t("previousOperators")}</span>
                             <strong>
                               {formatTokenAmountGrouped(summary.ownerStatics, 18, 2)} STATICS
                             </strong>
@@ -730,7 +759,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               void act("claim-owner-statics", () =>
                                 send(
                                   "claim-rewards",
-                                  "Claim previous-owner STATICS rewards",
+                                  t("claimPrevious", { asset: "STATICS" }),
                                   deployment.contracts.launchDistributor,
                                   buildClaimOwnerGenesisLaunchRewardsCall(
                                     deployment.contracts.statics,
@@ -741,7 +770,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                               )
                             }
                           >
-                            {busy === "claim-owner-statics" ? "Claiming…" : "Claim"}
+                            {busy === "claim-owner-statics" ? t("claiming") : t("claim")}
                           </button>
                         </li>
                       )}
@@ -750,8 +779,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                 )}
 
                 <p className="genesis-note">
-                  <b>Rewards accrue from the moment you register.</b> Fees collected before
-                  registration, or before this NFT changed hands, are not included.
+                  {t.rich("accrualNote", { strong: (chunks) => <b>{chunks}</b> })}
                 </p>
                 <div className="genesis-maintenance">
                   <button
@@ -762,17 +790,17 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       void act("accrue", () =>
                         send(
                           "accrue-genesis-rewards",
-                          "Update Operators launch rewards",
+                          t("updateRewards"),
                           deployment.contracts.launchDistributor,
                           buildAccrueGenesisLaunchRewardsCall(),
-                          "Current market fees"
+                          t("currentFees")
                         )
                       )
                     }
                   >
-                    {busy === "accrue" ? "Updating…" : "Harvest market fees into the reward index"}
+                    {busy === "accrue" ? t("updating") : t("harvest")}
                   </button>
-                  <span>Anyone can run this</span>
+                  <span>{t("anyoneCanRun")}</span>
                 </div>
               </section>
             )}
@@ -793,17 +821,17 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         <AddressDisplay
           address={deployment.contracts.launchDistributor}
           chainId={deployment.descriptor.chainId}
-          label="Rewards distributor"
+          label={t("rewardsDistributor")}
         />
         <AddressDisplay
           address={deployment.contracts.activationRegistry}
           chainId={deployment.descriptor.chainId}
-          label="Activation registry"
+          label={t("activationRegistry")}
         />
         <AddressDisplay
           address={deployment.contracts.vault}
           chainId={deployment.descriptor.chainId}
-          label="Operators Vault"
+          label={t("operatorsVault")}
         />
       </section>
     </div>

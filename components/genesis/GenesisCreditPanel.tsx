@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { encodeFunctionData, formatEther, getAddress, parseEther } from "viem";
 import { useBlock, usePublicClient } from "wagmi";
@@ -26,33 +27,43 @@ const RECOVERY_GRACE_SECONDS = 3_600;
 /** StaticsGenesisVault.CREDIT_TERM. */
 const CREDIT_TERM_SECONDS = 30 * 24 * 60 * 60;
 
-function describeCreditError(error: unknown): string {
+type CreditErrorCopy = Readonly<{
+  walletRejected: string;
+  afterEpoch: string;
+  paused: string;
+  expired: string;
+  notRecoverable: string;
+  transactionFailed: string;
+}>;
+
+function describeCreditError(error: unknown, copy: CreditErrorCopy): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/rejected/i.test(message)) return "The wallet request was rejected.";
-  if (message.includes("CreditUnavailableDuringEpoch"))
-    return "Secured credit opens after the Genesis Epoch.";
-  if (message.includes("CreditOriginationsPaused"))
-    return "New Genesis credit is temporarily paused.";
-  if (message.includes("CreditExpired"))
-    return "This credit has expired and can no longer be extended.";
-  if (message.includes("CreditNotRecoverable")) return "This credit is not recoverable yet.";
-  return message || "The Genesis credit transaction failed.";
+  if (/rejected/i.test(message)) return copy.walletRejected;
+  if (message.includes("CreditUnavailableDuringEpoch")) return copy.afterEpoch;
+  if (message.includes("CreditOriginationsPaused")) return copy.paused;
+  if (message.includes("CreditExpired")) return copy.expired;
+  if (message.includes("CreditNotRecoverable")) return copy.notRecoverable;
+  return message || copy.transactionFailed;
 }
 
-function formatTimestamp(timestamp: number): string {
+function formatTimestamp(timestamp: number, locale: string): string {
   if (timestamp === 0) return "—";
-  return new Date(timestamp * 1000).toLocaleString();
+  return new Date(timestamp * 1000).toLocaleString(locale);
 }
 
 /** "6d 04h", or "1h 12m" once it is close enough that days stop being useful. */
-function formatCountdown(seconds: number): string {
-  if (seconds <= 0) return "now";
+function formatCountdown(
+  seconds: number,
+  labels: Readonly<{ now: string; day: string; hour: string; minute: string }>
+): string {
+  if (seconds <= 0) return labels.now;
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
-  if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}h`;
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-  return `${minutes}m`;
+  if (days > 0) return `${days}${labels.day} ${String(hours).padStart(2, "0")}${labels.hour}`;
+  if (hours > 0)
+    return `${hours}${labels.hour} ${String(minutes).padStart(2, "0")}${labels.minute}`;
+  return `${minutes}${labels.minute}`;
 }
 
 type GenesisCreditState = {
@@ -88,6 +99,8 @@ function RecoveryTimeline({
   recoverableAt: number;
   now: number | null;
 }>) {
+  const t = useTranslations("operators.creditPanel");
+  const locale = useLocale();
   // A tail past the recovery point keeps the danger band visible rather than
   // collapsing it to a hairline at the right edge.
   const tail = Math.round(CREDIT_TERM_SECONDS * 0.18);
@@ -98,15 +111,13 @@ function RecoveryTimeline({
 
   return (
     <div className="genesis-timeline">
-      <p className="dapp-eyebrow">
-        {now === null ? "Before you borrow, know the shape of it" : "If this is not repaid"}
-      </p>
+      <p className="dapp-eyebrow">{now === null ? t("beforeBorrow") : t("ifNotRepaid")}</p>
       <div className="genesis-timeline-track">
         <span
           className="genesis-timeline-segment is-safe"
           style={{ left: 0, width: `${pct(openedAt, maturity)}%` }}
         >
-          30-day term
+          {t("term")}
         </span>
         <span
           className="genesis-timeline-segment is-grace"
@@ -115,7 +126,7 @@ function RecoveryTimeline({
             width: `${pct(maturity, recoverableAt)}%`,
           }}
         >
-          1h grace
+          {t("grace")}
         </span>
         <span
           className="genesis-timeline-segment is-danger"
@@ -124,7 +135,7 @@ function RecoveryTimeline({
             width: `${100 - pct(openedAt, recoverableAt)}%`,
           }}
         >
-          Recoverable
+          {t("recoverable")}
         </span>
         {nowPct !== null && (
           <span
@@ -135,9 +146,11 @@ function RecoveryTimeline({
         )}
       </div>
       <div className="genesis-timeline-marks">
-        <span>{now === null ? "Today" : "Opened"}</span>
-        <span>Matures {new Date(maturity * 1_000).toLocaleDateString()}</span>
-        <span>Anyone can recover</span>
+        <span>{now === null ? t("today") : t("opened")}</span>
+        <span>
+          {t("maturityDate", { date: new Date(maturity * 1_000).toLocaleDateString(locale) })}
+        </span>
+        <span>{t("anyoneRecover")}</span>
       </div>
     </div>
   );
@@ -150,6 +163,23 @@ export function GenesisCreditPanel({
   deployment: LaunchDeployment;
   genesisId: bigint;
 }) {
+  const t = useTranslations("operators.creditPanel");
+  const locale = useLocale();
+  const countdownLabels = {
+    now: t("now"),
+    day: t("dayUnit"),
+    hour: t("hourUnit"),
+    minute: t("minuteUnit"),
+  };
+  const errorCopy: CreditErrorCopy = {
+    walletRejected: t("walletRejected"),
+    afterEpoch: t("afterEpoch"),
+    paused: t("paused"),
+    expired: t("expired"),
+    notRecoverable: t("notRecoverable"),
+    transactionFailed: t("transactionFailed"),
+  };
+  const describeTransactionError = (cause: unknown) => describeCreditError(cause, errorCopy);
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const { data: latestBlock } = useBlock({
@@ -173,7 +203,7 @@ export function GenesisCreditPanel({
     ],
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
-      if (!publicClient || !wallet) throw new Error("Connect a wallet first.");
+      if (!publicClient || !wallet) throw new Error(t("connect"));
       await verifyLaunchDeployment(publicClient, deployment);
       const [vault, originationsPaused, credit, limit] = await Promise.all([
         publicClient.readContract({
@@ -245,7 +275,7 @@ export function GenesisCreditPanel({
       data,
       value,
       sendTransaction: walletState.sendEvmTransaction,
-      describeError: describeCreditError,
+      describeError: describeTransactionError,
     });
   };
 
@@ -258,7 +288,7 @@ export function GenesisCreditPanel({
       await action();
       await refresh();
     } catch (cause) {
-      setError(describeCreditError(cause));
+      setError(describeTransactionError(cause));
       await refresh();
     } finally {
       setBusy(null);
@@ -266,10 +296,10 @@ export function GenesisCreditPanel({
   };
 
   if (!wallet || state.isLoading || now === null) {
-    return <p className="dapp-loading">Loading secured credit…</p>;
+    return <p className="dapp-loading">{t("loading")}</p>;
   }
   if (state.error || !state.data) {
-    return <p className="dapp-inline-error">{describeCreditError(state.error)}</p>;
+    return <p className="dapp-inline-error">{describeTransactionError(state.error)}</p>;
   }
 
   const credit = state.data.credit;
@@ -285,31 +315,28 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Operator #${genesisId} secured credit`}
+        aria-label={t("aria", { id: genesisId.toString() })}
       >
         <div className="genesis-panel-head">
-          <h3>Secured credit — active</h3>
-          <p>
-            You borrowed against this NFT&apos;s backing. It cannot be transferred until the credit
-            is repaid.
-          </p>
+          <h3>{t("active")}</h3>
+          <p>{t("activeDescription")}</p>
         </div>
 
         <dl className="genesis-figures">
           <div>
-            <dt>Principal owed</dt>
+            <dt>{t("principal")}</dt>
             <dd>{formatTokenAmountGrouped(credit.principal, 18, 0)} STATICS</dd>
           </div>
           <div>
-            <dt>Against backing of</dt>
+            <dt>{t("againstBacking")}</dt>
             <dd>
               {formatTokenAmountGrouped(backing, 18, 0)} STATICS
               {backing > 0n ? ` · ${Number((credit.principal * 100n) / backing)}% LTV` : ""}
             </dd>
           </div>
           <div className="is-total">
-            <dt>{overdue ? "Recoverable in" : "Repay within"}</dt>
-            <dd>{formatCountdown(overdue ? untilRecoverable : untilMaturity)}</dd>
+            <dt>{overdue ? t("recoverableIn") : t("repayWithin")}</dt>
+            <dd>{formatCountdown(overdue ? untilRecoverable : untilMaturity, countdownLabels)}</dd>
           </div>
         </dl>
 
@@ -321,19 +348,17 @@ export function GenesisCreditPanel({
         />
 
         <p className={`genesis-note ${overdue ? "is-error" : "is-warning"}`}>
-          <b>After the grace hour, anyone can recover this Genesis.</b> They take the caller
-          incentive, the NFT leaves your wallet, and you keep the residual value rather than the
-          full backing.
+          {t.rich("recoveryWarning", { strong: (chunks) => <b>{chunks}</b> })}
         </p>
 
         <dl className="genesis-figures">
           <div>
-            <dt>Matures</dt>
-            <dd>{formatTimestamp(credit.maturity)}</dd>
+            <dt>{t("matures")}</dt>
+            <dd>{formatTimestamp(credit.maturity, locale)}</dd>
           </div>
           <div>
-            <dt>Recoverable from</dt>
-            <dd>{formatTimestamp(credit.recoverableAt)}</dd>
+            <dt>{t("recoverableFrom")}</dt>
+            <dd>{formatTimestamp(credit.recoverableAt, locale)}</dd>
           </div>
         </dl>
 
@@ -357,15 +382,15 @@ export function GenesisCreditPanel({
                 );
                 await send(
                   "extend-genesis-credit",
-                  `Extend Operator #${genesisId} credit`,
+                  t("extendLabel", { id: genesisId.toString() }),
                   transaction.data,
-                  `${formatEther(quote.totalNativeFee)} ETH fee`,
+                  t("ethFee", { amount: formatEther(quote.totalNativeFee) }),
                   transaction.value
                 );
               })
             }
           >
-            {busy === "extend" ? "Extending…" : "Extend the term"}
+            {busy === "extend" ? t("extending") : t("extend")}
           </button>
           <button
             className="ui-button ui-button--primary"
@@ -387,8 +412,8 @@ export function GenesisCreditPanel({
                     chainId: deployment.descriptor.chainId,
                     deploymentId: deployment.descriptor.deploymentId,
                     kind: "approve-staking-token",
-                    label: "Enable Genesis credit repayment",
-                    amount: "Maximum STATICS",
+                    label: t("enableRepayment"),
+                    amount: t("maximumStatics"),
                     to: deployment.contracts.statics,
                     data: encodeFunctionData({
                       abi: dopplerStaticsTokenAbi,
@@ -396,12 +421,12 @@ export function GenesisCreditPanel({
                       args: [deployment.contracts.vault, MAX_ERC20_ALLOWANCE],
                     }),
                     sendTransaction: walletState.sendEvmTransaction,
-                    describeError: describeCreditError,
+                    describeError: describeTransactionError,
                   });
                 }
                 await send(
                   "repay-genesis-credit",
-                  `Repay Operator #${genesisId} credit`,
+                  t("repayLabel", { id: genesisId.toString() }),
                   buildRepayGenesisCreditCall(genesisId),
                   `${formatEther(credit.principal)} STATICS`
                 );
@@ -409,8 +434,8 @@ export function GenesisCreditPanel({
             }
           >
             {busy === "repay"
-              ? "Repaying…"
-              : `Repay ${formatTokenAmountGrouped(credit.principal, 18, 0)} STATICS`}
+              ? t("repaying")
+              : t("repay", { amount: formatTokenAmountGrouped(credit.principal, 18, 0) })}
           </button>
         </div>
 
@@ -427,18 +452,19 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Operator #${genesisId} secured credit`}
+        aria-label={t("aria", { id: genesisId.toString() })}
       >
         <div className="genesis-panel-head">
-          <h3>Secured credit</h3>
-          <p>Borrowing against an Operator NFT opens once the Genesis Epoch ends.</p>
+          <h3>{t("title")}</h3>
+          <p>{t("opensDescription")}</p>
         </div>
         <div className="genesis-locked">
-          <strong>{formatCountdown(state.data.genesisEpochEnd - now)}</strong>
+          <strong>{formatCountdown(state.data.genesisEpochEnd - now, countdownLabels)}</strong>
           <p>
-            The Epoch ends {formatTimestamp(state.data.genesisEpochEnd)}. You will then be able to
-            borrow up to {formatTokenAmountGrouped(GENESIS_MAX_CREDIT_PRINCIPAL, 18, 0)} STATICS
-            against this NFT.
+            {t("epochEnds", {
+              date: formatTimestamp(state.data.genesisEpochEnd, locale),
+              amount: formatTokenAmountGrouped(GENESIS_MAX_CREDIT_PRINCIPAL, 18, 0),
+            })}
           </p>
         </div>
       </section>
@@ -449,11 +475,11 @@ export function GenesisCreditPanel({
     return (
       <section
         className="ui-card genesis-panel"
-        aria-label={`Operator #${genesisId} secured credit`}
+        aria-label={t("aria", { id: genesisId.toString() })}
       >
         <div className="genesis-panel-head">
-          <h3>Secured credit</h3>
-          <p>New Genesis credit is temporarily paused. Existing credit is unaffected.</p>
+          <h3>{t("title")}</h3>
+          <p>{t("pausedDescription")}</p>
         </div>
       </section>
     );
@@ -472,22 +498,19 @@ export function GenesisCreditPanel({
   const maxLtv = backing > 0n ? Number((maxPrincipal * 10_000n) / backing) / 100 : 0;
 
   return (
-    <section className="ui-card genesis-panel" aria-label={`Operator #${genesisId} secured credit`}>
+    <section className="ui-card genesis-panel" aria-label={t("aria", { id: genesisId.toString() })}>
       <div className="genesis-panel-head">
-        <h3>Borrow against this Genesis</h3>
-        <p>
-          Take STATICS out of this NFT&apos;s backing for 30 days. The NFT stays in your wallet but
-          cannot be transferred until you repay.
-        </p>
+        <h3>{t("borrowTitle")}</h3>
+        <p>{t("borrowDescription")}</p>
       </div>
 
       <div className="genesis-borrow">
         <p className="genesis-borrow-amount">
           <b>{formatTokenAmountGrouped(clamped, 18, 2)}</b>
-          <span>STATICS · {ltv.toFixed(0)}% of backing</span>
+          <span>{t("ltv", { ltv: ltv.toFixed(0) })}</span>
         </p>
         <label className="ui-field">
-          <span className="sr-only">Amount to borrow</span>
+          <span className="sr-only">{t("amount")}</span>
           <input
             type="range"
             min={0}
@@ -501,11 +524,14 @@ export function GenesisCreditPanel({
         <p className="genesis-borrow-scale">
           <span>0</span>
           <span>
-            {formatTokenAmountGrouped(maxPrincipal, 18, 0)} · {maxLtv.toFixed(0)}% max
+            {t("maximum", {
+              amount: formatTokenAmountGrouped(maxPrincipal, 18, 0),
+              ltv: maxLtv.toFixed(0),
+            })}
           </span>
         </p>
         <label className="ui-field">
-          Or enter an exact amount
+          {t("exactAmount")}
           <input
             inputMode="decimal"
             value={amount}
@@ -524,9 +550,10 @@ export function GenesisCreditPanel({
       />
 
       <p className="genesis-note is-warning">
-        <b>Miss the deadline and you lose the NFT.</b> One hour after maturity anyone can recover it
-        for an incentive. You would keep the residual value rather than the{" "}
-        {formatTokenAmountGrouped(backing, 18, 0)} STATICS backing.
+        {t.rich("deadlineWarning", {
+          strong: (chunks) => <b>{chunks}</b>,
+          backing: formatTokenAmountGrouped(backing, 18, 0),
+        })}
       </p>
 
       <button
@@ -537,7 +564,7 @@ export function GenesisCreditPanel({
           void act("open", async () => {
             if (!publicClient) return;
             if (clamped <= 0n || clamped > maxPrincipal) {
-              throw new Error("Choose an amount within this Genesis credit limit.");
+              throw new Error(t("chooseAmount"));
             }
             const quote = (await publicClient.readContract({
               address: deployment.contracts.vault,
@@ -552,7 +579,7 @@ export function GenesisCreditPanel({
             );
             await send(
               "open-genesis-credit",
-              `Borrow against Operator #${genesisId}`,
+              t("borrowLabel", { id: genesisId.toString() }),
               transaction.data,
               `${formatEther(clamped)} STATICS + ${formatEther(quote.totalNativeFee)} ETH fee`,
               transaction.value
@@ -562,8 +589,8 @@ export function GenesisCreditPanel({
         }
       >
         {busy === "open"
-          ? "Borrowing…"
-          : `Borrow ${formatTokenAmountGrouped(clamped, 18, 2)} STATICS`}
+          ? t("borrowing")
+          : t("borrow", { amount: formatTokenAmountGrouped(clamped, 18, 2) })}
       </button>
 
       {error && (

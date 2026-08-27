@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@/test/render";
+import { fireEvent, render, renderWithLocale, screen, waitFor, within } from "@/test/render";
 import { getAddress, parseEther, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,7 @@ import {
 import type { DeploymentOption, LaunchDeployment } from "@/lib/deployments/types";
 import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
+import spanish from "@/messages/es.json";
 
 const readContract = vi.fn();
 const getBlock = vi.fn();
@@ -137,9 +138,9 @@ function redemptionQuote(epochActive: boolean) {
   };
 }
 
-function renderWithProviders(ui: React.ReactNode, signedIn = true) {
+function renderWithProviders(ui: React.ReactElement, signedIn = true, locale = "en") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = (
     <QueryClientProvider client={queryClient}>
       <DeploymentContext.Provider
         value={{ active: option, options: [option], selectNetwork: vi.fn() }}
@@ -159,6 +160,7 @@ function renderWithProviders(ui: React.ReactNode, signedIn = true) {
       </DeploymentContext.Provider>
     </QueryClientProvider>
   );
+  return locale === "es" ? renderWithLocale(tree, locale, spanish) : render(tree);
 }
 
 beforeEach(() => {
@@ -197,6 +199,15 @@ describe("launch overview", () => {
     );
     expect(screen.getByRole("link", { name: "Buy STATICS" })).toHaveAttribute("href", "/app/swap");
     expect(screen.queryByText("Registered reward weight")).not.toBeInTheDocument();
+  });
+
+  it("renders the launch overview in Spanish", async () => {
+    overviewReads(true);
+    renderWithProviders(<DeploymentOverview />, true, "es");
+
+    expect(await screen.findByText("La Época termina en")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Adquirir Operators/ })).toBeInTheDocument();
+    expect(screen.getByText("Tus Operators")).toBeInTheDocument();
   });
 
   it("states what the deadline changes, in both directions", async () => {
@@ -359,7 +370,9 @@ describe("Genesis credit presentation", () => {
     creditReads(false, true);
     renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />);
 
-    expect(await screen.findByText(/New Genesis credit is temporarily paused/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/New Operator credit is temporarily paused/)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Borrow/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Amount to borrow")).not.toBeInTheDocument();
   });

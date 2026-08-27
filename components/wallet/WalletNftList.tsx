@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 
@@ -27,14 +28,12 @@ export function WalletNftList({
   chainId: number;
   onTransfer: (nft: WalletNft) => void;
 }>) {
+  const t = useTranslations("wallet");
   if (nfts.length === 0) {
     return (
       <div className="ui-empty">
-        <h3 className="ui-empty-title">No NFTs yet</h3>
-        <p className="ui-empty-description">
-          Positions and liquidity positions appear here. Mint a basket or supply liquidity and the
-          NFT that represents it shows up in your wallet.
-        </p>
+        <h3 className="ui-empty-title">{t("noNfts")}</h3>
+        <p className="ui-empty-description">{t("noNftsDescription")}</p>
       </div>
     );
   }
@@ -51,7 +50,9 @@ export function WalletNftList({
               <strong>{nft.name}</strong>
               <span>{nft.summary}</span>
               {nft.carries.length > 0 && (
-                <p className="wallet-nft-carries">Moves with it: {nft.carries.join(", ")}</p>
+                <p className="wallet-nft-carries">
+                  {t("movesWithIt", { assets: nft.carries.join(", ") })}
+                </p>
               )}
               {nft.transferWarning && <p className="wallet-nft-carries">{nft.transferWarning}</p>}
               {nft.blockedReason && <p className="wallet-nft-blocked">{nft.blockedReason}</p>}
@@ -65,7 +66,7 @@ export function WalletNftList({
             disabled={nft.blockedReason !== null}
           >
             <ArrowUpRight size={14} aria-hidden="true" />
-            Send
+            {t("send")}
           </button>
         </article>
       ))}

@@ -57,11 +57,6 @@ export async function LandingPage() {
                 </span>
               </a>
             </div>
-            <div className="build-notes" aria-label={t("foundations")}>
-              <span>{t("fixedBundles")}</span>
-              <span>{t("inKindRedemption")}</span>
-              <span>{t("openSource")}</span>
-            </div>
           </div>
 
           <div className="hero-visual" aria-label={t("heroVisual")}>
@@ -88,20 +83,9 @@ export async function LandingPage() {
                 <span>&gt;</span> {t("systemStatus")}: <strong>{t("status.system")}</strong>
               </p>
               <p>
-                <span>&gt;</span> {t("network")}: {t("status.network")}
-              </p>
-              <p>
-                <span>&gt;</span> {t("deployment")}: {t("status.deployment")}
-              </p>
-              <p>
                 <span>&gt;</span> {t("time")}: <UtcClock suffix />
               </p>
             </div>
-            <p className="version">
-              {t("protocol")}
-              <br />
-              {t("publicBeta")}
-            </p>
           </div>
         </section>
 
@@ -149,19 +133,19 @@ export async function LandingPage() {
             <ul className="dollar-modes" aria-label={t("dollarCapabilities")}>
               <li>
                 <strong>USDstx</strong>
-                <span>{t("dollar")}</span>
+                <span>{t("spendableDollars")}</span>
               </li>
               <li>
                 <strong>ethLEV</strong>
-                <span>{t("shares")}</span>
+                <span>{t("leveragedEth")}</span>
               </li>
               <li>
-                <strong>{t("redeem")}</strong>
-                <span>{t("whenHealthy")}</span>
+                <strong>{t("closeOut")}</strong>
+                <span>{t("whenCovered")}</span>
               </li>
               <li>
-                <strong>{t("permit")}</strong>
-                <span>{t("oneSignature")}</span>
+                <strong>{t("signOnce")}</strong>
+                <span>{t("noApprovalTransaction")}</span>
               </li>
             </ul>
           </article>
@@ -195,7 +179,7 @@ export async function LandingPage() {
             </div>
             <div>
               <dt>{t("rewardAssets")}</dt>
-              <dd>{t("upTo64")}</dd>
+              <dd>{t("upTo12")}</dd>
               <dd className="stat-note">{t("perPosition")}</dd>
             </div>
           </dl>
@@ -269,16 +253,6 @@ export async function LandingPage() {
               <UtcClock /> <span>&gt;</span> {t("staticAssets")} <i>|</i> {t("dynamicMarkets")}
             </p>
           </div>
-          <dl className="deployment-status">
-            <div>
-              <dt>{t("auditStatus")}</dt>
-              <dd>{t("status.audit")}</dd>
-            </div>
-            <div>
-              <dt>{t("deployment")}</dt>
-              <dd>{t("status.deployment")}</dd>
-            </div>
-          </dl>
         </section>
       </main>
 

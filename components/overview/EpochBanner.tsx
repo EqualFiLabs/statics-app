@@ -1,6 +1,7 @@
 "use client";
 
 import { useBlock } from "wagmi";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
@@ -43,6 +44,8 @@ function Change({
   other,
   caveat,
   complete,
+  pastLabel,
+  nextLabel,
 }: Readonly<{
   label: string;
   /** What is true while the Epoch runs. */
@@ -51,13 +54,15 @@ function Change({
   other: string;
   caveat?: string;
   complete: boolean;
+  pastLabel: string;
+  nextLabel: string;
 }>) {
   return (
     <div className="epoch-change">
       <span className="dapp-eyebrow">{label}</span>
       <p className="epoch-change-primary">{complete ? other : current}</p>
       <p className="epoch-change-secondary">
-        <span aria-hidden="true">{complete ? "was" : "then"}</span>
+        <span aria-hidden="true">{complete ? pastLabel : nextLabel}</span>
         <b className={complete ? "is-past" : "is-next"}>{complete ? current : other}</b>
       </p>
       {caveat && <p className="epoch-change-caveat">{caveat}</p>}
@@ -84,6 +89,8 @@ export function EpochBanner({
   epochEnd: number;
   quotes: EpochQuotes | null;
 }>) {
+  const t = useTranslations("launchOverview.epoch");
+  const format = useFormatter();
   const { data: block } = useBlock({ chainId, watch: true });
   const now = block ? Number(block.timestamp) : 0;
   const remaining = Math.max(0, epochEnd - now);
@@ -101,65 +108,81 @@ export function EpochBanner({
   const maxCredit = quotes ? formatTokenAmountGrouped(quotes.maxCredit, 18, 0) : "—";
 
   return (
-    <section
-      className={`epoch-banner${epochActive ? "" : " is-complete"}`}
-      aria-label="Genesis Epoch"
-    >
+    <section className={`epoch-banner${epochActive ? "" : " is-complete"}`} aria-label={t("aria")}>
       <div className="epoch-banner-top">
         <div className="epoch-banner-label">
-          <p className="dapp-eyebrow">
-            {epochActive ? "Genesis Epoch · in progress" : "Genesis Epoch · complete"}
-          </p>
-          <h2>{epochActive ? "The Epoch ends in" : "The Epoch has ended"}</h2>
-          <p>
-            {epochActive
-              ? "This date was fixed when the Vault was deployed and cannot be moved. Three things change the moment it passes."
-              : "These three changes took effect the moment it passed, and are permanent."}
-          </p>
+          <p className="dapp-eyebrow">{epochActive ? t("activeStatus") : t("completeStatus")}</p>
+          <h2>{epochActive ? t("endsIn") : t("hasEnded")}</h2>
+          <p>{epochActive ? t("activeDescription") : t("completeDescription")}</p>
         </div>
         <div className="epoch-countdown">
           {epochActive ? (
             <div className="epoch-countdown-figure">
-              <CountdownUnit value={days} label="days" />
-              <CountdownUnit value={hours} label="hrs" />
-              <CountdownUnit value={minutes} label="min" />
-              <CountdownUnit value={seconds} label="sec" />
+              <CountdownUnit value={days} label={t("days")} />
+              <CountdownUnit value={hours} label={t("hours")} />
+              <CountdownUnit value={minutes} label={t("minutes")} />
+              <CountdownUnit value={seconds} label={t("seconds")} />
             </div>
           ) : (
             <div className="epoch-countdown-figure">
               <div>
                 <b>—</b>
-                <span>complete</span>
+                <span>{t("complete")}</span>
               </div>
             </div>
           )}
           <p className="epoch-countdown-when">
-            {epochActive ? "Ends " : "Ended "}
-            {epochEnd > 0 ? new Date(epochEnd * 1_000).toLocaleString() : "—"}
+            {epochActive
+              ? t("ends", {
+                  date:
+                    epochEnd > 0
+                      ? format.dateTime(new Date(epochEnd * 1_000), {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "UTC",
+                        })
+                      : "—",
+                })
+              : t("ended", {
+                  date:
+                    epochEnd > 0
+                      ? format.dateTime(new Date(epochEnd * 1_000), {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "UTC",
+                        })
+                      : "—",
+                })}
           </p>
         </div>
       </div>
 
       <div className="epoch-changes">
         <Change
-          label="Acquiring an Operator"
-          current={`${statics} STATICS + ${feeOnly} ETH`}
-          other={`${statics} STATICS + ${feePlusBuyIn} ETH`}
-          caveat="Buy-in shown at today's reserve. Every acquisition fee accretes to it, so the amount owed rises with each sale."
+          label={t("acquiring")}
+          current={t("acquireCurrent", { statics, native: feeOnly })}
+          other={t("acquireAfter", { statics, native: feePlusBuyIn })}
+          caveat={t("acquireCaveat")}
           complete={!epochActive}
+          pastLabel={t("was")}
+          nextLabel={t("then")}
         />
         <Change
-          label="Redeeming an Operator"
-          current={`${statics} STATICS, no ETH`}
-          other={`${statics} STATICS + ${payout} ETH`}
-          caveat="Reserve share at today's reserve. It rises for the same reason."
+          label={t("redeeming")}
+          current={t("redeemCurrent", { statics })}
+          other={t("redeemAfter", { statics, native: payout })}
+          caveat={t("redeemCaveat")}
           complete={!epochActive}
+          pastLabel={t("was")}
+          nextLabel={t("then")}
         />
         <Change
-          label="Secured credit"
-          current="Closed"
-          other={`Up to ${maxCredit} STATICS`}
+          label={t("securedCredit")}
+          current={t("closed")}
+          other={t("upTo", { amount: maxCredit })}
           complete={!epochActive}
+          pastLabel={t("was")}
+          nextLabel={t("then")}
         />
       </div>
     </section>

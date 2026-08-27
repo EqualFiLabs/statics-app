@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
@@ -30,19 +31,33 @@ type VaultDirection = "acquire" | "redeem";
 /** One owned Genesis, with the credit state that decides whether it can go back. */
 type RedeemableGenesis = Readonly<{ id: bigint; creditActive: boolean }>;
 
-function describeError(error: unknown): string {
+type ErrorCopy = Readonly<{
+  walletRejected: string;
+  justAcquired: string;
+  repayCredit: string;
+  operatorLocked: string;
+  transactionFailed: string;
+}>;
+
+function describeError(error: unknown, copy: ErrorCopy): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/rejected/i.test(message)) return "The wallet request was rejected.";
-  if (message.includes("GenesisNotInVault"))
-    return "That NFT was just acquired. Loading the next one.";
-  if (message.includes("CreditAlreadyActive"))
-    return "Repay or recover this Genesis credit before redeeming.";
-  if (message.includes("GenesisLocked"))
-    return "This Operator is currently locked and cannot be redeemed.";
-  return message || "The Operators Vault transaction failed.";
+  if (/rejected/i.test(message)) return copy.walletRejected;
+  if (message.includes("GenesisNotInVault")) return copy.justAcquired;
+  if (message.includes("CreditAlreadyActive")) return copy.repayCredit;
+  if (message.includes("GenesisLocked")) return copy.operatorLocked;
+  return message || copy.transactionFailed;
 }
 
 export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeployment }) {
+  const t = useTranslations("operatorVault");
+  const errorCopy: ErrorCopy = {
+    walletRejected: t("walletRejected"),
+    justAcquired: t("justAcquired"),
+    repayCredit: t("repayCreditBeforeRedeeming"),
+    operatorLocked: t("operatorLocked"),
+    transactionFailed: t("transactionFailed"),
+  };
+  const describeTransactionError = (cause: unknown) => describeError(cause, errorCopy);
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const queryClient = useQueryClient();
@@ -189,16 +204,15 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         }),
       ]);
       if (!stillAvailable) throw new Error("GenesisNotInVault");
-      if (balance < quote.staticsPrice)
-        throw new Error("Buy STATICS first, then switch back to NFT.");
+      if (balance < quote.staticsPrice) throw new Error(t("buyStaticsFirst"));
       if (allowance < quote.staticsPrice) {
         await transact({
           publicClient,
           wallet,
           chainId: deployment.descriptor.chainId,
           kind: "approve-staking-token",
-          label: "Enable Operator NFT acquisition",
-          amount: "Maximum STATICS",
+          label: t("enableAcquisition"),
+          amount: t("maximumStatics"),
           to: deployment.contracts.statics,
           data: encodeFunctionData({
             abi: dopplerStaticsTokenAbi,
@@ -206,7 +220,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
             args: [deployment.contracts.vault, MAX_ERC20_ALLOWANCE],
           }),
           sendTransaction: walletState.sendEvmTransaction,
-          describeError,
+          describeError: describeTransactionError,
         });
       }
       const purchase = buildBuyGenesisTransaction(id, wallet, quote.requiredNative);
@@ -215,17 +229,17 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         wallet,
         chainId: deployment.descriptor.chainId,
         kind: "buy-genesis",
-        label: `Acquire Operators #${id}`,
+        label: t("acquireOperator", { id: id.toString() }),
         amount: `${formatEther(quote.staticsPrice)} STATICS + ${formatEther(quote.requiredNative)} ETH`,
         to: deployment.contracts.vault,
         data: purchase.data,
         value: purchase.value,
         sendTransaction: walletState.sendEvmTransaction,
-        describeError,
+        describeError: describeTransactionError,
       });
       await refresh();
     } catch (cause) {
-      setError(describeError(cause));
+      setError(describeTransactionError(cause));
       await refresh();
     } finally {
       setBusy(null);
@@ -255,8 +269,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           wallet,
           chainId: deployment.descriptor.chainId,
           kind: "approve-genesis",
-          label: `Approve Operator #${id} redemption`,
-          amount: `Operator #${id}`,
+          label: t("approveRedemption", { id: id.toString() }),
+          amount: t("operatorNumber", { id: id.toString() }),
           to: deployment.contracts.genesis,
           data: encodeFunctionData({
             abi: staticsGenesisAbi,
@@ -264,7 +278,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
             args: [deployment.contracts.vault, id],
           }),
           sendTransaction: walletState.sendEvmTransaction,
-          describeError,
+          describeError: describeTransactionError,
         });
       }
       await transact({
@@ -272,27 +286,27 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         wallet,
         chainId: deployment.descriptor.chainId,
         kind: "redeem-genesis",
-        label: `Redeem Operator #${id}`,
+        label: t("redeemOperator", { id: id.toString() }),
         amount: `${formatEther(redemptionQuote.staticsPayout)} STATICS + ${formatEther(redemptionQuote.reservePayout)} ETH`,
         to: deployment.contracts.vault,
         data: buildRedeemGenesisCall(id, wallet),
         sendTransaction: walletState.sendEvmTransaction,
-        describeError,
+        describeError: describeTransactionError,
       });
       setSelectedOwnedId("");
       await refresh();
     } catch (cause) {
-      setError(describeError(cause));
+      setError(describeTransactionError(cause));
       await refresh();
     } finally {
       setBusy(null);
     }
   };
 
-  if (vault.isLoading) return <p className="dapp-loading">Loading the Operators Vault…</p>;
+  if (vault.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
   if (vault.error)
     return (
-      <EmptyState title="Operators Vault unavailable" description={describeError(vault.error)} />
+      <EmptyState title={t("unavailable")} description={describeTransactionError(vault.error)} />
     );
 
   const nextId = vault.data?.nextId ?? null;
@@ -321,8 +335,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
   return (
     <div className="genesis-vault-swap">
-      <section className="portal-panel" aria-label="Operators Vault">
-        <div className="portal-direction-tabs" role="tablist" aria-label="Vault direction">
+      <section className="portal-panel" aria-label={t("aria")}>
+        <div className="portal-direction-tabs" role="tablist" aria-label={t("direction")}>
           {(["acquire", "redeem"] as const).map((item) => (
             <button
               key={item}
@@ -334,7 +348,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 setError(null);
               }}
             >
-              {item === "acquire" ? "Acquire" : "Redeem"}
+              {item === "acquire" ? t("acquire") : t("redeem")}
             </button>
           ))}
         </div>
@@ -342,8 +356,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         {direction === "acquire" ? (
           nextId === null ? (
             <EmptyState
-              title="Vault inventory is exhausted"
-              description="Every Operator NFT has been acquired. They can still be bought from holders, and redeemed back into the Vault at any time."
+              title={t("inventoryExhausted")}
+              description={t("inventoryExhaustedDescription")}
             />
           ) : (
             <>
@@ -357,49 +371,72 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                     tokenId: nextId,
                     contract: deployment.contracts.genesis,
                     name: `Operator #${nextId}`,
-                    summary: "Next available Operator NFT",
+                    summary: t("nextAvailable"),
                     carries: [],
                     blockedReason: null,
                   }}
                 />
                 <div className="vault-hero-copy">
-                  <h3>Operator #{nextId.toString()}</h3>
-                  <p>Next from the Vault. Redeemable for its full backing at any time.</p>
-                  <span className="ui-pill is-ready">Fully backed</span>
+                  <h3>{t("operatorNumber", { id: nextId.toString() })}</h3>
+                  <p>{t("nextFromVault")}</p>
+                  <span className="ui-pill is-ready">{t("fullyBacked")}</span>
                 </div>
               </div>
 
               <ul className="vault-legs">
                 <li className={staticsShort > 0n ? "is-short" : undefined}>
-                  <span>STATICS backing</span>
+                  <span>{t("staticsBacking")}</span>
                   <strong>{statics(staticsNeeded)}</strong>
                   <small>
                     {wallet
-                      ? `You hold ${formatTokenAmountGrouped(staticsHeld, 18, 2)}${staticsShort > 0n ? ` · short ${formatTokenAmountGrouped(staticsShort, 18, 2)}` : ""}`
-                      : "Connect a wallet to check your balance"}
+                      ? staticsShort > 0n
+                        ? t("walletShort", {
+                            amount: formatTokenAmountGrouped(staticsHeld, 18, 2),
+                            shortfall: formatTokenAmountGrouped(staticsShort, 18, 2),
+                          })
+                        : t("walletBalance", {
+                            amount: formatTokenAmountGrouped(staticsHeld, 18, 2),
+                          })
+                      : t("connectForBalance")}
                   </small>
                 </li>
                 <li className={nativeShort > 0n ? "is-short" : undefined}>
-                  <span>Acquisition fee + reserve buy-in</span>
+                  <span>{t("nativeCost")}</span>
                   <strong>{eth(nativeNeeded)}</strong>
                   <small>
                     {wallet
-                      ? `You hold ${formatTokenAmountGrouped(nativeHeld, 18, 4)} ETH${nativeShort > 0n ? ` · short ${formatTokenAmountGrouped(nativeShort, 18, 5)}` : ""}`
-                      : "Paid in the chain's native asset"}
+                      ? nativeShort > 0n
+                        ? t("walletShort", {
+                            amount: `${formatTokenAmountGrouped(nativeHeld, 18, 4)} ETH`,
+                            shortfall: `${formatTokenAmountGrouped(nativeShort, 18, 5)} ETH`,
+                          })
+                        : t("walletBalance", {
+                            amount: `${formatTokenAmountGrouped(nativeHeld, 18, 4)} ETH`,
+                          })
+                      : t("paidInNative")}
                   </small>
                 </li>
               </ul>
 
               {staticsShort > 0n && (
                 <p className="vault-notice is-error">
-                  <b>You need {formatTokenAmountGrouped(staticsShort, 18, 2)} more STATICS.</b>{" "}
-                  <Link href="/app/swap">Buy STATICS on the Token tab</Link>, then come back.
+                  <b>
+                    {t("needMoreStatics", {
+                      amount: formatTokenAmountGrouped(staticsShort, 18, 2),
+                    })}
+                  </b>{" "}
+                  <Link href="/app/swap">{t("buyOnTokenTab")}</Link>
+                  {t("thenReturn")}
                 </p>
               )}
               {nativeShort > 0n && (
                 <p className="vault-notice is-error">
-                  <b>You need {formatTokenAmountGrouped(nativeShort, 18, 5)} more ETH</b> for the
-                  acquisition fee and reserve buy-in.
+                  <b>
+                    {t("needMoreEth", {
+                      amount: formatTokenAmountGrouped(nativeShort, 18, 5),
+                    })}
+                  </b>{" "}
+                  {t("nativeShortfallReason")}
                 </p>
               )}
 
@@ -410,24 +447,21 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 onClick={() => void buy()}
               >
                 {busy === "buy"
-                  ? "Confirming…"
+                  ? t("confirming")
                   : wallet && cannotAfford
-                    ? "Not enough to acquire"
-                    : `Acquire Operators #${nextId}`}
+                    ? t("notEnough")
+                    : t("acquireOperator", { id: nextId.toString() })}
               </button>
             </>
           )
         ) : (
           <>
             {!wallet || owned.length === 0 ? (
-              <EmptyState
-                title="No Operators NFTs to redeem"
-                description="Redeeming returns a Genesis to the Vault in exchange for its full backing. Connect a wallet holding one to continue."
-              />
+              <EmptyState title={t("noOperators")} description={t("noOperatorsDescription")} />
             ) : (
               <>
-                <p className="portal-field-label">Choose a Genesis to redeem</p>
-                <div className="vault-owned" role="radiogroup" aria-label="Your Operators NFTs">
+                <p className="portal-field-label">{t("chooseOperator")}</p>
+                <div className="vault-owned" role="radiogroup" aria-label={t("yourOperators")}>
                   {owned.map((item) => {
                     const isSelected = selected?.id === item.id;
                     return (
@@ -451,15 +485,13 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                             tokenId: item.id,
                             contract: deployment.contracts.genesis,
                             name: `Operator #${item.id}`,
-                            summary: "Owned Operator NFT",
+                            summary: t("ownedOperator"),
                             carries: [],
-                            blockedReason: item.creditActive
-                              ? "Repay secured credit before redeeming."
-                              : null,
+                            blockedReason: item.creditActive ? t("repayBeforeRedeeming") : null,
                           }}
                         />
                         <span>#{item.id.toString()}</span>
-                        <small>{item.creditActive ? "Credit active" : "Redeemable"}</small>
+                        <small>{item.creditActive ? t("creditActive") : t("redeemable")}</small>
                       </button>
                     );
                   })}
@@ -467,24 +499,25 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
                 {selectedLocked ? (
                   <p className="vault-notice is-error">
-                    <b>Operator #{selected?.id.toString()} has active secured credit.</b> Repay it
-                    in <Link href="/app/genesis">My Operators</Link> before this NFT can be
-                    redeemed.
+                    <b>{t("activeCredit", { id: selected?.id.toString() ?? "" })}</b>{" "}
+                    <Link href="/app/genesis">{t("repayInOperators")}</Link>
                   </p>
                 ) : (
                   <ul className="vault-legs">
                     <li>
-                      <span>You receive</span>
+                      <span>{t("youReceive")}</span>
                       <strong>{statics(redemptionQuote?.staticsPayout)}</strong>
-                      <small>The full fixed backing</small>
+                      <small>{t("fullBacking")}</small>
                     </li>
                     <li>
-                      <span>Reserve share</span>
+                      <span>{t("reserveShare")}</span>
                       <strong>{eth(redemptionQuote?.reservePayout)}</strong>
                       <small>
                         {accounting?.epochActive
-                          ? "No reserve share is paid until the Genesis Epoch ends"
-                          : `1 / ${accounting?.maximumSupply.toString() ?? "5,555"} of the native reserve`}
+                          ? t("noReserveDuringEpoch")
+                          : t("reserveFraction", {
+                              supply: accounting?.maximumSupply.toString() ?? "5,555",
+                            })}
                       </small>
                     </li>
                   </ul>
@@ -497,10 +530,10 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                   onClick={() => void redeem()}
                 >
                   {busy === "redeem"
-                    ? "Confirming…"
+                    ? t("confirming")
                     : selectedLocked
-                      ? "Repay credit first"
-                      : `Redeem Operator #${selected?.id ?? ""}`}
+                      ? t("repayFirst")
+                      : t("redeemOperator", { id: selected?.id.toString() ?? "" })}
                 </button>
               </>
             )}
@@ -515,9 +548,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       </section>
 
       <p className="vault-strip">
-        <b>{accounting?.vaultInventory.toString() ?? "—"}</b> of{" "}
-        {accounting?.maximumSupply.toString() ?? "—"} left in the Vault
-        <Link href="/app">Vault detail →</Link>
+        <b>{accounting?.vaultInventory.toString() ?? "—"}</b>{" "}
+        {t("vaultRemaining", {
+          supply: accounting?.maximumSupply.toString() ?? "—",
+        })}
+        <Link href="/app">{t("vaultDetail")}</Link>
       </p>
     </div>
   );

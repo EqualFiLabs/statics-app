@@ -1,4 +1,4 @@
-import { render, screen } from "@/test/render";
+import { render, screen, within } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { LandingPage } from "@/components/landing/LandingPage";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import english from "@/messages/en.json";
 import spanish from "@/messages/es.json";
+import chinese from "@/messages/zh-CN.json";
 
 vi.mock("next-intl/server", () => ({
   getTranslations: async (namespace: keyof typeof english) => {
@@ -42,16 +43,30 @@ function renderHeader(locale = "en", messages: typeof english = english) {
 }
 
 describe("landing page", () => {
-  it("preserves the approved message while reporting the public testnet beta", async () => {
-    await renderLanding();
+  it("keeps the hero status focused on mainnet and current time", async () => {
+    const { container } = await renderLanding();
 
     expect(
       screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/system status:/i)).toHaveTextContent("Public testnet beta");
-    expect(screen.getByText(/Network: Robinhood Testnet/i)).toBeInTheDocument();
-    expect(screen.getByText(/Deployment: Testnet live/i)).toBeInTheDocument();
-    expect(screen.getByText("Testnet live", { selector: "dd" })).toBeInTheDocument();
+    const readout = screen.getByLabelText("System status");
+    expect(within(readout).getByText(/system status:/i)).toHaveTextContent("Mainnet");
+    expect(within(readout).getByText(/time:/i)).toBeInTheDocument();
+    expect(readout.querySelectorAll("p")).toHaveLength(2);
+    expect(within(readout).queryByText(/network:/i)).not.toBeInTheDocument();
+    expect(within(readout).queryByText(/deployment:/i)).not.toBeInTheDocument();
+    const hero = screen.getByRole("region", {
+      name: /static assets.*dynamic markets/i,
+    });
+    expect(hero).not.toHaveTextContent("Statics protocol");
+    expect(hero).not.toHaveTextContent("Public testnet beta");
+    expect(hero).not.toHaveTextContent("Fixed bundles");
+    expect(hero).not.toHaveTextContent("In-kind redemption");
+    expect(hero).not.toHaveTextContent("Open source");
+    expect(spanish.landing.status.system).toBe("Mainnet");
+    expect(chinese.landing.status.system).toBe("Mainnet");
+    expect(container.querySelector(".deployment-status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Internal review")).not.toBeInTheDocument();
     expect(screen.queryByText("19,482,731")).not.toBeInTheDocument();
     expect(screen.queryByText("Online")).not.toBeInTheDocument();
   });
@@ -67,6 +82,24 @@ describe("landing page", () => {
     expect(screen.getByText("Never")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(screen.queryByText(/total value locked/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the front-page reward limit and tagline normalized across locales", async () => {
+    await renderLanding();
+
+    expect(screen.getByText("Up to 12")).toBeInTheDocument();
+    expect(screen.getByText(/opt into up to 12 reward assets/i)).toBeInTheDocument();
+    expect(screen.getByText("Markets that work for you.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/up to 64 reward assets/i);
+
+    expect(spanish.landing.upTo12).toBe("Hasta 12");
+    expect(spanish.landing.tagline).toBe("Mercados que trabajan para ti.");
+    expect(chinese.landing.upTo12).toBe("最多 12 种");
+    expect(chinese.landing.tagline).toBe("为你服务的市场。");
+    for (const catalog of [english, spanish, chinese]) {
+      expect(catalog.landing.stakeEarnDescription).toContain("12");
+      expect(catalog.landing.stakeEarnDescription).not.toContain("64");
+    }
   });
 
   // Both were on the page and neither was true: an owner still holds
