@@ -109,10 +109,17 @@ describe("deployment registry", () => {
     ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
-  it("keeps mainnet unavailable until a reviewed manifest is checked in", () => {
+  it("loads the reviewed Robinhood mainnet launch without enabling full-protocol surfaces", () => {
     const [mainnet, testnet] = deploymentRegistry({ NEXT_PUBLIC_APP_ENV: "production" });
-    expect(mainnet?.descriptor.available).toBe(false);
-    expect(mainnet?.launch).toBeNull();
+    expect(mainnet?.descriptor.available).toBe(true);
+    expect(mainnet?.descriptor.stage).toBe("launch");
+    expect(mainnet?.launch?.protocolCommit).toBe("43018f109006aa2c2eef2808adc2aa74dfc9a6d4");
+    expect(mainnet?.launch?.market.poolId).toBe(
+      "0xe79228d6cae086a58bf5b22220b454e5d1ca4f13da767ea5bbe032d5a1e82e8a"
+    );
+    expect(mainnet?.protocol).toBeNull();
+    expect(hasCapability(mainnet!.descriptor, "genesis-launch-rewards")).toBe(true);
+    expect(hasCapability(mainnet!.descriptor, "baskets")).toBe(false);
     expect(testnet?.descriptor.chainId).toBe(46_630);
     expect(testnet?.protocol).not.toBeNull();
     expect(hasCapability(testnet!.descriptor, "faucet")).toBe(true);

@@ -1,10 +1,18 @@
 # Statics deployments
 
-Each public network is described by a reviewed manifest in this directory,
-`<chainId>.json`, binding every contract address to the runtime code hash that
-was deployed at it and to the recorded deployment commit. The `source` block
-also names the reachable public Statics commit and canonical deployment artifact
-that preserve the public provenance record without relabeling deployed bytecode.
+`robinhood-genesis.json` records the standalone Robinhood mainnet Genesis
+launch. It is derived from the protocol repository's reviewed
+`deployments/robinhood-mainnet-genesis.json` artifact and binds every contract
+the launch UI can use to its deployed runtime code hash, canonical PoolId, and
+PoolKey. The application rechecks those identities and permanent launch
+bindings onchain before enabling transaction paths.
+
+Full-protocol public networks are described by reviewed `<chainId>.json`
+manifests in this directory. Each one binds every contract address to the
+runtime code hash that was deployed at it and to the recorded deployment
+commit. Its `source` block also names the reachable public Statics commit and
+canonical deployment artifact that preserve the public provenance record
+without relabeling deployed bytecode.
 
 `46630.json` records the clean-break Genesis release. It binds the unified
 Statics deployment, fixed STATICS token, Genesis NFT/renderer/avatar stack,

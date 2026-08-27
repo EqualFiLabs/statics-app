@@ -1,11 +1,14 @@
 import type { LaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
 
+import robinhoodGenesis from "./robinhood-genesis.json";
+
 /**
  * Reviewed standalone Genesis deployments, keyed by stable deployment id.
  *
- * Robinhood mainnet intentionally remains absent until the production Doppler
- * ranges, fee parameters, and deployment are ratified. The registry still
- * exposes the planned mainnet product state, but transaction surfaces fail
- * closed instead of accepting environment-provided production addresses.
+ * Public launch addresses come only from reviewed files in this directory.
+ * Transaction surfaces verify their runtime code and permanent bindings before
+ * use instead of accepting environment-provided production addresses.
  */
-export const launchDeploymentManifests: Readonly<Record<string, LaunchDeploymentManifest>> = {};
+export const launchDeploymentManifests: Readonly<Record<string, LaunchDeploymentManifest>> = {
+  "robinhood-genesis": robinhoodGenesis as LaunchDeploymentManifest,
+};
