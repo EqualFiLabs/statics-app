@@ -133,19 +133,19 @@ export async function LandingPage() {
             <ul className="dollar-modes" aria-label={t("dollarCapabilities")}>
               <li>
                 <strong>USDstx</strong>
-                <span>{t("dollar")}</span>
+                <span>{t("spendableDollars")}</span>
               </li>
               <li>
                 <strong>ethLEV</strong>
-                <span>{t("shares")}</span>
+                <span>{t("leveragedEth")}</span>
               </li>
               <li>
-                <strong>{t("redeem")}</strong>
-                <span>{t("whenHealthy")}</span>
+                <strong>{t("closeOut")}</strong>
+                <span>{t("whenCovered")}</span>
               </li>
               <li>
-                <strong>{t("permit")}</strong>
-                <span>{t("oneSignature")}</span>
+                <strong>{t("signOnce")}</strong>
+                <span>{t("noApprovalTransaction")}</span>
               </li>
             </ul>
           </article>
