@@ -1248,7 +1248,7 @@
     "closeOut": "平仓",
     "whenCovered": "有足额覆盖时",
     "signOnce": "签名一次",
-    "noApprovalTransaction": "无需授权交易",
+    "noApprovalTransaction": "无需授权",
     "assetsPerBasket": "每个篮子的资产数",
     "chosenOnce": "创建时一次确定",
     "redemption": "赎回",
