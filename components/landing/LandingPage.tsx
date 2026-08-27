@@ -269,16 +269,6 @@ export async function LandingPage() {
               <UtcClock /> <span>&gt;</span> {t("staticAssets")} <i>|</i> {t("dynamicMarkets")}
             </p>
           </div>
-          <dl className="deployment-status">
-            <div>
-              <dt>{t("auditStatus")}</dt>
-              <dd>{t("status.audit")}</dd>
-            </div>
-            <div>
-              <dt>{t("deployment")}</dt>
-              <dd>{t("status.deployment")}</dd>
-            </div>
-          </dl>
         </section>
       </main>
 

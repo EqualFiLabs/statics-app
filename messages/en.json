@@ -1289,7 +1289,6 @@
     "noMiddlemen": "No middlemen",
     "staticAssets": "Static assets",
     "dynamicMarkets": "Dynamic markets",
-    "auditStatus": "Audit status",
     "projectLinks": "Project links",
     "legalLinks": "Legal links",
     "docs": "Docs",
@@ -1302,8 +1301,7 @@
     "status": {
       "system": "Public testnet beta",
       "network": "Robinhood Testnet",
-      "deployment": "Testnet live",
-      "audit": "Internal review"
+      "deployment": "Testnet live"
     }
   },
   "glossary": {

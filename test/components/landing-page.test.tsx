@@ -44,7 +44,7 @@ function renderHeader(locale = "en", messages: typeof english = english) {
 
 describe("landing page", () => {
   it("preserves the approved message while reporting the public testnet beta", async () => {
-    await renderLanding();
+    const { container } = await renderLanding();
 
     expect(
       screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
@@ -52,7 +52,8 @@ describe("landing page", () => {
     expect(screen.getByText(/system status:/i)).toHaveTextContent("Public testnet beta");
     expect(screen.getByText(/Network: Robinhood Testnet/i)).toBeInTheDocument();
     expect(screen.getByText(/Deployment: Testnet live/i)).toBeInTheDocument();
-    expect(screen.getByText("Testnet live", { selector: "dd" })).toBeInTheDocument();
+    expect(container.querySelector(".deployment-status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Internal review")).not.toBeInTheDocument();
     expect(screen.queryByText("19,482,731")).not.toBeInTheDocument();
     expect(screen.queryByText("Online")).not.toBeInTheDocument();
   });

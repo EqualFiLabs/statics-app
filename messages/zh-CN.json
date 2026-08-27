@@ -1289,7 +1289,6 @@
     "noMiddlemen": "没有中间人",
     "staticAssets": "静态资产",
     "dynamicMarkets": "动态市场",
-    "auditStatus": "审计状态",
     "projectLinks": "项目链接",
     "legalLinks": "法律链接",
     "docs": "文档",
@@ -1302,8 +1301,7 @@
     "status": {
       "system": "公开测试网测试版",
       "network": "Robinhood Testnet",
-      "deployment": "测试网已上线",
-      "audit": "内部审查"
+      "deployment": "测试网已上线"
     }
   },
   "glossary": {
