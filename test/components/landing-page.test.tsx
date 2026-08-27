@@ -7,6 +7,7 @@ import { LandingPage } from "@/components/landing/LandingPage";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import english from "@/messages/en.json";
 import spanish from "@/messages/es.json";
+import chinese from "@/messages/zh-CN.json";
 
 vi.mock("next-intl/server", () => ({
   getTranslations: async (namespace: keyof typeof english) => {
@@ -67,6 +68,24 @@ describe("landing page", () => {
     expect(screen.getByText("Never")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(screen.queryByText(/total value locked/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the front-page reward limit and tagline normalized across locales", async () => {
+    await renderLanding();
+
+    expect(screen.getByText("Up to 12")).toBeInTheDocument();
+    expect(screen.getByText(/opt into up to 12 reward assets/i)).toBeInTheDocument();
+    expect(screen.getByText("Markets that work for you.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/up to 64 reward assets/i);
+
+    expect(spanish.landing.upTo12).toBe("Hasta 12");
+    expect(spanish.landing.tagline).toBe("Mercados que trabajan para ti.");
+    expect(chinese.landing.upTo12).toBe("最多 12 种");
+    expect(chinese.landing.tagline).toBe("为你服务的市场。");
+    for (const catalog of [english, spanish, chinese]) {
+      expect(catalog.landing.stakeEarnDescription).toContain("12");
+      expect(catalog.landing.stakeEarnDescription).not.toContain("64");
+    }
   });
 
   // Both were on the page and neither was true: an owner still holds

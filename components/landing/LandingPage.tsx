@@ -195,7 +195,7 @@ export async function LandingPage() {
             </div>
             <div>
               <dt>{t("rewardAssets")}</dt>
-              <dd>{t("upTo64")}</dd>
+              <dd>{t("upTo12")}</dd>
               <dd className="stat-note">{t("perPosition")}</dd>
             </div>
           </dl>
