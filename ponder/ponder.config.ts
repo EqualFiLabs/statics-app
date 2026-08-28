@@ -11,7 +11,6 @@ import {
 } from "@statics-protocol/sdk";
 
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
-import { rpcUrlsForChain } from "./src/rpc-config";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -59,7 +58,7 @@ export default createConfig({
   chains: {
     active: {
       id: chainId,
-      rpc: rpcUrlsForChain(chainId),
+      rpc: required(`PONDER_RPC_URL_${chainId}`),
     },
   },
   contracts: {
