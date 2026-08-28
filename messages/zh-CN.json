@@ -289,6 +289,8 @@
     "claimProgress": "正在领取 {progress}…",
     "claimAllSimple": "全部领取",
     "claimAllTransactions": "全部领取 · {count} 笔交易",
+    "claimBatch": "领取 {count} 个 Operator NFT 的奖励",
+    "claimPreviousRewards": "领取过往持有者的奖励",
     "claimPrevious": "领取过往持有者的 {asset} 奖励",
     "holdingsAria": "你的 Operators 持仓",
     "held": "持有的 Operators",

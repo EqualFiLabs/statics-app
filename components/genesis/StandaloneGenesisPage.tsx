@@ -9,6 +9,7 @@ import { usePublicClient } from "wagmi";
 import {
   buildAccrueGenesisLaunchRewardsCall,
   buildActivateGenesisCall,
+  buildClaimAllGenesisLaunchRewardsCall,
   buildClaimGenesisLaunchRewardsCall,
   buildClaimOwnerGenesisLaunchRewardsCall,
   buildRegisterGenesisCall,
@@ -33,6 +34,8 @@ import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   EMPTY_GENESIS_PORTFOLIO,
+  batchGenesisIds,
+  claimableGenesisIds,
   loadOwnedGenesis,
   ownedGenesisQueryKey,
   summariseGenesisRewards,
@@ -269,45 +272,20 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   };
 
   const claimEverything = async () => {
-    const jobs: { label: string; data: `0x${string}`; amount: string }[] = [];
-    for (const item of items) {
-      if (item.pendingStatics > 0n) {
-        jobs.push({
-          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "STATICS" }),
-          data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.statics, wallet!),
-          amount: `${formatEther(item.pendingStatics)} STATICS`,
-        });
-      }
-      if (item.pendingWeth > 0n) {
-        jobs.push({
-          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "WETH" }),
-          data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.weth, wallet!),
-          amount: `${formatEther(item.pendingWeth)} WETH`,
-        });
-      }
+    const batches = batchGenesisIds(claimableGenesisIds(items));
+    if (batches.length === 0 && (summary.ownerStatics > 0n || summary.ownerWeth > 0n)) {
+      batches.push([]);
     }
-    if (summary.ownerStatics > 0n) {
-      jobs.push({
-        label: t("claimPrevious", { asset: "STATICS" }),
-        data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.statics, wallet!),
-        amount: `${formatEther(summary.ownerStatics)} STATICS`,
-      });
-    }
-    if (summary.ownerWeth > 0n) {
-      jobs.push({
-        label: t("claimPrevious", { asset: "WETH" }),
-        data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.weth, wallet!),
-        amount: `${formatEther(summary.ownerWeth)} WETH`,
-      });
-    }
-    for (const [index, job] of jobs.entries()) {
-      setClaimProgress(`${index + 1} of ${jobs.length}`);
+    for (const [index, genesisIds] of batches.entries()) {
+      setClaimProgress(`${index + 1} of ${batches.length}`);
       await send(
         "claim-rewards",
-        job.label,
+        genesisIds.length > 0
+          ? t("claimBatch", { count: genesisIds.length })
+          : t("claimPreviousRewards"),
         deployment.contracts.launchDistributor,
-        job.data,
-        job.amount
+        buildClaimAllGenesisLaunchRewardsCall(genesisIds, wallet!),
+        genesisIds.length > 0 ? `${genesisIds.length} Operator NFTs` : "Previous-owner rewards"
       );
     }
   };
