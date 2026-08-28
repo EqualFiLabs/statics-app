@@ -25,12 +25,20 @@ vi.mock("wagmi", () => ({
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
+  verifyLaunchDeploymentCached: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/indexer/statics", () => ({
   loadRecoverableGenesisCredits: (...args: unknown[]) => loadRecoverableGenesisCredits(...args),
 }));
 vi.mock("@/lib/genesis/discovery", () => ({
   discoverWalletGenesisIds: (...args: unknown[]) => discoverWalletGenesisIds(...args),
+  discoverWalletGenesisSnapshot: async (...args: unknown[]) => ({
+    ids: await discoverWalletGenesisIds(...args),
+    indexed: [],
+    indexedBlock: null,
+    chainHead: null,
+    stale: false,
+  }),
 }));
 vi.mock("@/lib/wallet/nft-image", () => ({
   resolveNftImage: vi.fn().mockResolvedValue("data:image/svg+xml,%3Csvg/%3E"),

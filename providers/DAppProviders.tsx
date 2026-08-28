@@ -523,7 +523,22 @@ function ProtocolQueryReconciler() {
 }
 
 export function DAppProviders({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // Chain state is reconciled after confirmed transactions. A short
+            // stale window avoids refetching every launch query on navigation
+            // and window focus while keeping ordinary market reads fresh.
+            staleTime: 5_000,
+            gcTime: 10 * 60 * 1_000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
+        },
+      })
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -160,4 +160,38 @@ describe("confirmed transaction reconciliation", () => {
       )
     ).toBe(false);
   });
+
+  it("refreshes Genesis inventory and balances only for the confirmed wallet", () => {
+    const wallet = "0x0000000000000000000000000000000000000001" as Address;
+    const detail = {
+      wallet,
+      chainId: 4_663,
+      blockNumber: 100n,
+      kind: "buy-genesis" as const,
+      scopes: protocolQueryScopes("buy-genesis"),
+    };
+
+    expect(
+      queryMatchesProtocolReconciliation(["genesis-vault-swap", "robinhood-genesis"], detail)
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["genesis-vault-wallet", "robinhood-genesis", wallet],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        [
+          "launch-overview-balance",
+          "robinhood-genesis",
+          "0x0000000000000000000000000000000000000002",
+        ],
+        detail
+      )
+    ).toBe(false);
+    expect(queryMatchesProtocolReconciliation(["loan-catalog", "release", wallet], detail)).toBe(
+      false
+    );
+  });
 });

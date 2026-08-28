@@ -18,6 +18,7 @@ vi.mock("wagmi", () => ({
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
+  verifyLaunchDeploymentCached: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/genesis/discovery", () => ({
   discoverNextAvailableGenesisId: (...args: unknown[]) => discoverNextAvailableGenesisId(...args),
