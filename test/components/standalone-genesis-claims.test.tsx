@@ -82,6 +82,31 @@ const option = {
   protocol: null,
 } satisfies DeploymentOption;
 
+function ownedPortfolio(ownerStatics = 0n, ownerWeth = 0n) {
+  return {
+    items: Array.from({ length: 65 }, (_, index) => ({
+      id: BigInt(index + 1),
+      tier: 0,
+      multiplierBps: 10_000,
+      registered: true,
+      rewardWeight: 10_000n,
+      pendingStatics: 1n,
+      pendingWeth: 0n,
+      creditActive: false,
+      creditPrincipal: 0n,
+      creditMaturity: 0,
+    })),
+    tierCosts: [0n, 0n, 0n, 0n, 0n],
+    rewardShareBps: 5_000,
+    totalWeight: 650_000n,
+    ownerStatics,
+    ownerWeth,
+    indexedBlock: 1n,
+    chainHead: 1n,
+    stale: false,
+  };
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -132,44 +157,29 @@ beforeEach(() => {
       }
       throw new Error(`Unexpected read ${functionName}`);
     });
-  mocks.loadOwnedGenesis.mockResolvedValue({
-    items: Array.from({ length: 65 }, (_, index) => ({
-      id: BigInt(index + 1),
-      tier: 0,
-      multiplierBps: 10_000,
-      registered: true,
-      rewardWeight: 10_000n,
-      pendingStatics: 1n,
-      pendingWeth: 0n,
-      creditActive: false,
-      creditPrincipal: 0n,
-      creditMaturity: 0,
-    })),
-    tierCosts: [0n, 0n, 0n, 0n, 0n],
-    rewardShareBps: 5_000,
-    totalWeight: 650_000n,
-    ownerStatics: 0n,
-    ownerWeth: 0n,
-    indexedBlock: 1n,
-    chainHead: 1n,
-    stale: false,
-  });
+  mocks.loadOwnedGenesis.mockResolvedValue(ownedPortfolio());
 });
 
 describe("Standalone Genesis batch claims", () => {
-  it("splits 65 claimable Operators into two sequential transactions", async () => {
+  it("splits 65 Operators and appends the previous-owner claim", async () => {
+    mocks.loadOwnedGenesis.mockResolvedValueOnce(ownedPortfolio(1n, 2n));
     renderPage();
 
-    const claimAll = await screen.findByRole("button", { name: "Claim all · 2 transactions" });
+    const claimAll = await screen.findByRole("button", { name: "Claim all · 3 transactions" });
     fireEvent.click(claimAll);
 
-    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(3));
     const calls = mocks.execute.mock.calls.map(([request]) => request as { data: `0x${string}` });
     const first = decodeFunctionData({ abi: genesisLaunchDistributorAbi, data: calls[0].data });
     const second = decodeFunctionData({ abi: genesisLaunchDistributorAbi, data: calls[1].data });
+    const third = decodeFunctionData({ abi: genesisLaunchDistributorAbi, data: calls[2].data });
 
     expect(first).toMatchObject({ functionName: "claimAllGenesisRewards" });
     expect(second).toMatchObject({ functionName: "claimAllGenesisRewards" });
+    expect(third).toEqual({
+      functionName: "claimAllGenesisTreasuryRewards",
+      args: [wallet],
+    });
     expect(first.args?.[0]).toHaveLength(64);
     expect(second.args?.[0]).toEqual([65n]);
     expect(first.args?.[1]).toBe(wallet);

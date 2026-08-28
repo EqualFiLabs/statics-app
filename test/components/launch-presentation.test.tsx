@@ -459,9 +459,9 @@ describe("consolidated Genesis rewards surface", () => {
     rewardsReads();
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    // Two assets on each of two NFTs, plus both past-ownership assets.
+    // One bounded Operator batch plus one previous-owner treasury claim.
     expect(
-      await screen.findByRole("button", { name: "Claim all · 6 transactions" })
+      await screen.findByRole("button", { name: "Claim all · 2 transactions" })
     ).toBeInTheDocument();
   });
 

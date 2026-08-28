@@ -236,9 +236,9 @@ export type GenesisRewardSummary = Readonly<{
 export function summariseGenesisRewards(portfolio: OwnedGenesisPortfolio): GenesisRewardSummary {
   const pendingStatics = portfolio.items.reduce((total, item) => total + item.pendingStatics, 0n);
   const pendingWeth = portfolio.items.reduce((total, item) => total + item.pendingWeth, 0n);
-  const claimTransactionCount =
-    batchGenesisIds(claimableGenesisIds(portfolio.items)).length ||
-    (portfolio.ownerStatics > 0n || portfolio.ownerWeth > 0n ? 1 : 0);
+  const operatorBatchCount = batchGenesisIds(claimableGenesisIds(portfolio.items)).length;
+  const ownerClaimCount = portfolio.ownerStatics > 0n || portfolio.ownerWeth > 0n ? 1 : 0;
+  const claimTransactionCount = operatorBatchCount + ownerClaimCount;
   return {
     claimableStatics: pendingStatics + portfolio.ownerStatics,
     claimableWeth: pendingWeth + portfolio.ownerWeth,

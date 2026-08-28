@@ -10,6 +10,7 @@ import {
   buildAccrueGenesisLaunchRewardsCall,
   buildActivateGenesisCall,
   buildClaimAllGenesisLaunchRewardsCall,
+  buildClaimAllGenesisLaunchTreasuryRewardsCall,
   buildClaimGenesisLaunchRewardsCall,
   buildClaimOwnerGenesisLaunchRewardsCall,
   buildRegisterGenesisCall,
@@ -273,19 +274,24 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
   const claimEverything = async () => {
     const batches = batchGenesisIds(claimableGenesisIds(items));
-    if (batches.length === 0 && (summary.ownerStatics > 0n || summary.ownerWeth > 0n)) {
-      batches.push([]);
-    }
     for (const [index, genesisIds] of batches.entries()) {
-      setClaimProgress(`${index + 1} of ${batches.length}`);
+      setClaimProgress(`${index + 1} of ${summary.claimCount}`);
       await send(
         "claim-rewards",
-        genesisIds.length > 0
-          ? t("claimBatch", { count: genesisIds.length })
-          : t("claimPreviousRewards"),
+        t("claimBatch", { count: genesisIds.length }),
         deployment.contracts.launchDistributor,
         buildClaimAllGenesisLaunchRewardsCall(genesisIds, wallet!),
-        genesisIds.length > 0 ? `${genesisIds.length} Operator NFTs` : "Previous-owner rewards"
+        `${genesisIds.length} Operator NFTs`
+      );
+    }
+    if (summary.ownerStatics > 0n || summary.ownerWeth > 0n) {
+      setClaimProgress(`${batches.length + 1} of ${summary.claimCount}`);
+      await send(
+        "claim-rewards",
+        t("claimPreviousRewards"),
+        deployment.contracts.launchDistributor,
+        buildClaimAllGenesisLaunchTreasuryRewardsCall(wallet!),
+        "Previous-owner rewards"
       );
     }
   };

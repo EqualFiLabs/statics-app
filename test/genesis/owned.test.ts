@@ -71,6 +71,7 @@ describe("Genesis reward batching", () => {
     expect(summariseGenesisRewards(portfolio(sixtyFour)).claimTransactionCount).toBe(1);
     expect(summariseGenesisRewards(portfolio(sixtyFive)).claimTransactionCount).toBe(2);
     expect(summariseGenesisRewards(portfolio([], 1n)).claimTransactionCount).toBe(1);
+    expect(summariseGenesisRewards(portfolio(sixtyFive, 1n, 1n)).claimTransactionCount).toBe(3);
     expect(summariseGenesisRewards(portfolio([])).claimTransactionCount).toBe(0);
   });
 
