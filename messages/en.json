@@ -274,6 +274,7 @@
     "connectTitle": "Connect your wallet",
     "connectDescription": "Connect to view and manage your Operators NFTs.",
     "loading": "Loading Operators NFTs…",
+    "syncing": "Operator data is syncing. Some values may be briefly out of date.",
     "unavailable": "Operators data unavailable",
     "emptyTitle": "No Operators NFTs yet",
     "emptyDescription": "Acquire a fully backed Operator NFT from the Vault, then return here to activate it and register for rewards.",

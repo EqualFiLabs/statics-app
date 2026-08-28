@@ -274,6 +274,7 @@
     "connectTitle": "Conecta tu billetera",
     "connectDescription": "Conecta tu billetera para ver y gestionar tus NFT de Operators.",
     "loading": "Cargando NFT de Operators…",
+    "syncing": "Los datos de Operators se están sincronizando. Algunos valores pueden tardar unos segundos en actualizarse.",
     "unavailable": "Los datos de Operators no están disponibles",
     "emptyTitle": "Aún no tienes NFT de Operators",
     "emptyDescription": "Adquiere un NFT de Operator con respaldo total en la Bóveda y vuelve aquí para activarlo y registrarlo para recibir recompensas.",

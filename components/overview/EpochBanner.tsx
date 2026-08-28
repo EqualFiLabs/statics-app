@@ -2,6 +2,7 @@
 
 import { useBlock } from "wagmi";
 import { useFormatter, useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
 
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
@@ -91,8 +92,17 @@ export function EpochBanner({
 }>) {
   const t = useTranslations("launchOverview.epoch");
   const format = useFormatter();
-  const { data: block } = useBlock({ chainId, watch: true });
-  const now = block ? Number(block.timestamp) : 0;
+  const { data: block } = useBlock({ chainId, watch: false });
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
+  useEffect(() => {
+    if (!epochActive) return;
+    const offset = block ? Number(block.timestamp) - Math.floor(Date.now() / 1_000) : 0;
+    const timer = globalThis.setInterval(
+      () => setNow(Math.floor(Date.now() / 1_000) + offset),
+      1_000
+    );
+    return () => globalThis.clearInterval(timer);
+  }, [block, epochActive]);
   const remaining = Math.max(0, epochEnd - now);
   const days = Math.floor(remaining / 86_400);
   const hours = Math.floor((remaining % 86_400) / 3_600);

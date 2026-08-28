@@ -1,4 +1,4 @@
-import { defineChain, http, type Chain, type Transport } from "viem";
+import { defineChain, fallback, http, type Chain, type Transport } from "viem";
 
 export type WalletAppEnvironment = "development" | "staging" | "production";
 export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
@@ -94,7 +94,9 @@ export type WalletEnvironment = Readonly<{
   appId: string | null;
   clientId: string | null;
   robinhoodRpcUrl: string;
+  robinhoodRpcFallbackUrl: string | null;
   robinhoodTestnetRpcUrl: string;
+  robinhoodTestnetRpcFallbackUrl: string | null;
   anvilRpcUrl: string;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
@@ -125,6 +127,14 @@ export function readWalletEnvironment(
   const configuredRobinhoodTestnetRpc = parsePublicRpc(
     environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
     "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL"
+  );
+  const robinhoodRpcFallbackUrl = parsePublicRpc(
+    environment.NEXT_PUBLIC_ROBINHOOD_RPC_FALLBACK_URL,
+    "NEXT_PUBLIC_ROBINHOOD_RPC_FALLBACK_URL"
+  );
+  const robinhoodTestnetRpcFallbackUrl = parsePublicRpc(
+    environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_FALLBACK_URL,
+    "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_FALLBACK_URL"
   );
   const configuredAnvilRpc = parsePublicRpc(
     environment.NEXT_PUBLIC_ANVIL_RPC_URL,
@@ -163,7 +173,9 @@ export function readWalletEnvironment(
     appId,
     clientId,
     robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
+    robinhoodRpcFallbackUrl,
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
+    robinhoodTestnetRpcFallbackUrl,
     anvilRpcUrl,
     defaultChain,
     supportedChains: [
@@ -179,9 +191,19 @@ export function readWalletEnvironment(
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
   const batchedHttp = (url: string) => http(url, { batch: { batchSize: 50, wait: 8 } });
+  const resilientHttp = (primary: string, secondary: string | null) =>
+    secondary && secondary !== primary
+      ? fallback([batchedHttp(primary), batchedHttp(secondary)], { retryCount: 0 })
+      : batchedHttp(primary);
   const transports: Record<number, Transport> = {
-    [robinhoodMainnet.id]: batchedHttp(environment.robinhoodRpcUrl),
-    [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),
+    [robinhoodMainnet.id]: resilientHttp(
+      environment.robinhoodRpcUrl,
+      environment.robinhoodRpcFallbackUrl
+    ),
+    [robinhoodTestnet.id]: resilientHttp(
+      environment.robinhoodTestnetRpcUrl,
+      environment.robinhoodTestnetRpcFallbackUrl
+    ),
   };
   if (environment.appEnvironment === "development") {
     transports[anvil.id] = batchedHttp(environment.anvilRpcUrl);

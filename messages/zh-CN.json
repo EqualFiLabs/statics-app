@@ -274,6 +274,7 @@
     "connectTitle": "连接你的钱包",
     "connectDescription": "连接钱包以查看和管理你的 Operator NFT。",
     "loading": "正在加载 Operator NFT…",
+    "syncing": "Operator 数据正在同步，部分数值可能会短暂滞后。",
     "unavailable": "Operators 数据不可用",
     "emptyTitle": "尚未持有 Operator NFT",
     "emptyDescription": "从金库获取有全额储备支持的 Operator NFT，然后返回此处激活并注册奖励。",
