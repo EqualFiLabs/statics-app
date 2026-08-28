@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { formatEther, getAddress } from "viem";
+import { formatEther, getAddress, parseEventLogs, type PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import {
   buildRecoverGenesisCreditCall,
@@ -12,13 +12,55 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { loadRecoverableGenesisCredits } from "@/lib/indexer/statics";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
+
+const RECOVERY_LOG_CHUNK = 50_000n;
+const MAX_RECOVERY_LOG_BLOCKS = 1_000_000n;
+const genesisCreditOpenedEvent = staticsGenesisCreditAbi.find(
+  (entry) => entry.type === "event" && entry.name === "GenesisCreditOpened"
+) as Extract<
+  (typeof staticsGenesisCreditAbi)[number],
+  { type: "event"; name: "GenesisCreditOpened" }
+>;
+
+async function discoverRecoverableGenesisIdsOnchain(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment,
+  latestBlock: bigint
+): Promise<readonly bigint[]> {
+  const from = deployment.deploymentStartBlock;
+  if (latestBlock < from) return [];
+  if (latestBlock - from > MAX_RECOVERY_LOG_BLOCKS) {
+    throw new Error("The onchain recovery fallback is bounded while the indexer is unavailable.");
+  }
+  const ids = new Set<string>();
+  for (let start = from; start <= latestBlock; start += RECOVERY_LOG_CHUNK) {
+    const end = start + RECOVERY_LOG_CHUNK - 1n;
+    const logs = await publicClient.getLogs({
+      address: deployment.contracts.vault,
+      event: genesisCreditOpenedEvent,
+      fromBlock: start,
+      toBlock: end < latestBlock ? end : latestBlock,
+    });
+    for (const log of parseEventLogs({
+      abi: staticsGenesisCreditAbi,
+      logs,
+      eventName: "GenesisCreditOpened",
+    })) {
+      ids.add(String(log.args.genesisId));
+    }
+  }
+  return [...ids].map(BigInt);
+}
 
 type RecoveryCredit = Readonly<{
   genesisId: bigint;
@@ -84,12 +126,19 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
     enabled: Boolean(publicClient && epoch.data === false),
     queryFn: async (): Promise<readonly RecoveryCredit[]> => {
       if (!publicClient) return [];
-      await verifyLaunchDeployment(publicClient, deployment);
+      await verifyLaunchDeploymentCached(publicClient, deployment);
       const block = await publicClient.getBlock({ blockTag: "latest" });
-      const indexed = await loadRecoverableGenesisCredits(
-        block.timestamp,
-        deployment.descriptor.deploymentId
-      );
+      let indexed: readonly { genesisId: bigint }[];
+      try {
+        indexed = await loadRecoverableGenesisCredits(
+          block.timestamp,
+          deployment.descriptor.deploymentId
+        );
+      } catch {
+        indexed = (
+          await discoverRecoverableGenesisIdsOnchain(publicClient, deployment, block.number)
+        ).map((genesisId) => ({ genesisId }));
+      }
       const checked = await Promise.all(
         indexed.map(async (candidate): Promise<RecoveryCredit | null> => {
           const [credit, quote] = await Promise.all([

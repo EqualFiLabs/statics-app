@@ -5,6 +5,7 @@ import {
   loadRecoverableGenesisCredits,
   loadRecoverableLoanIds,
   loadNextAvailableGenesisId,
+  loadWalletLaunchGenesisItems,
   loadWalletLaunchGenesisIds,
   loadWalletGenesis,
   loadWalletV4PositionIds,
@@ -134,6 +135,45 @@ describe("Statics indexer client", () => {
     await expect(
       loadWalletLaunchGenesisIds(wallet, "wrong-deployment", "https://mainnet-indexer.example")
     ).rejects.toThrow("different deployment");
+  });
+
+  it("parses the indexed launch wallet snapshot without losing bigint state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            deploymentId: "robinhood-genesis",
+            items: [
+              {
+                id: "42",
+                tier: 3,
+                multiplierBps: 12_000,
+                linkedPositionId: "9",
+                registered: true,
+                effectiveWeight: "123456789",
+                updatedAtBlock: "9001",
+              },
+            ],
+            nextCursor: null,
+          })
+        )
+      )
+    );
+
+    await expect(
+      loadWalletLaunchGenesisItems(wallet, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual([
+      {
+        id: 42n,
+        tier: 3,
+        multiplierBps: 12_000,
+        linkedPositionId: 9n,
+        registered: true,
+        effectiveWeight: 123_456_789n,
+        updatedAtBlock: 9_001n,
+      },
+    ]);
   });
 
   it("loads deployment-scoped recoverable Genesis credit pages", async () => {

@@ -15,6 +15,17 @@ export type IndexedGenesis = Readonly<{
   linkedPositionId: bigint;
 }>;
 
+/** Indexed launch Genesis state used for a fast, progressive wallet render. */
+export type IndexedLaunchGenesis = Readonly<{
+  id: bigint;
+  tier?: number;
+  multiplierBps?: number;
+  linkedPositionId?: bigint;
+  registered?: boolean;
+  effectiveWeight?: bigint;
+  updatedAtBlock?: bigint;
+}>;
+
 export type IndexedRecoverableGenesisCredit = Readonly<{
   genesisId: bigint;
   owner: Address;
@@ -119,39 +130,6 @@ async function loadIds(path: string, indexerUrl = configuredIndexerUrl()): Promi
   throw new Error("The Statics indexer exceeded its pagination limit.");
 }
 
-async function loadDeploymentIds(
-  path: string,
-  deploymentId: string,
-  indexerUrl = configuredIndexerUrlForDeployment(deploymentId)
-): Promise<bigint[]> {
-  if (!indexerUrl) throw new Error("No indexer is configured for this deployment.");
-  const values: bigint[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const url = new URL(`${indexerUrl}${path}`);
-    url.searchParams.set("limit", String(DEFAULT_PAGE_SIZE));
-    if (cursor) url.searchParams.set("cursor", cursor);
-    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(4_000) });
-    if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
-    const body = (await response.json()) as IdPage & { deploymentId?: string };
-    if (body.deploymentId !== deploymentId) {
-      throw new Error("The Statics indexer returned data for a different deployment.");
-    }
-    if (
-      !Array.isArray(body.items) ||
-      !(body.nextCursor === null || typeof body.nextCursor === "string")
-    ) {
-      throw new Error("The Statics indexer returned an invalid page.");
-    }
-    values.push(...body.items.map((item) => parseId(item.id)));
-    if (!body.nextCursor) return [...new Set(values.map(String))].map(BigInt);
-    if (body.nextCursor === cursor)
-      throw new Error("The Statics indexer returned a stalled cursor.");
-    cursor = body.nextCursor;
-  }
-  throw new Error("The Statics indexer exceeded its pagination limit.");
-}
-
 export async function loadNextAvailableGenesisId(
   deploymentId: string,
   indexerUrl?: string | null
@@ -160,7 +138,7 @@ export async function loadNextAvailableGenesisId(
     indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
   if (!base) throw new Error("No indexer is configured for this deployment.");
   const response = await fetch(`${base}/genesis/next-available`, {
-    cache: "no-store",
+    cache: "default",
     signal: AbortSignal.timeout(4_000),
   });
   if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
@@ -180,11 +158,92 @@ export function loadWalletLaunchGenesisIds(
   deploymentId: string,
   indexerUrl?: string | null
 ): Promise<bigint[]> {
-  return loadDeploymentIds(
-    `/wallets/${getAddress(owner)}/genesis`,
-    deploymentId,
-    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl
+  return loadWalletLaunchGenesisItems(owner, deploymentId, indexerUrl).then((items) =>
+    items.map((item) => item.id)
   );
+}
+
+function optionalNumber(value: unknown, label: string): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Number.isSafeInteger(value) || Number(value) < 0) {
+    throw new Error(`The Statics indexer returned an invalid ${label}.`);
+  }
+  return Number(value);
+}
+
+function optionalBigint(value: unknown, label: string): bigint | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) {
+    throw new Error(`The Statics indexer returned an invalid ${label}.`);
+  }
+  return BigInt(value);
+}
+
+/**
+ * Loads the complete indexed launch wallet snapshot. Older indexers may only
+ * return IDs, so the state fields remain optional and callers can reconcile
+ * those entries onchain without rejecting the whole snapshot.
+ */
+export async function loadWalletLaunchGenesisItems(
+  owner: Address,
+  deploymentId: string,
+  indexerUrl?: string | null
+): Promise<readonly IndexedLaunchGenesis[]> {
+  const base =
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
+  if (!base) throw new Error("No Statics indexer is configured for this deployment.");
+  const values: IndexedLaunchGenesis[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const url = new URL(`${base}/wallets/${getAddress(owner)}/genesis`);
+    url.searchParams.set("limit", String(DEFAULT_PAGE_SIZE));
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const response = await fetch(url, { cache: "default", signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) throw new Error(`Statics indexer request failed (${response.status}).`);
+    const body = (await response.json()) as {
+      deploymentId?: string;
+      items?: readonly Record<string, unknown>[];
+      nextCursor?: string | null;
+    };
+    if (body.deploymentId !== deploymentId) {
+      throw new Error("The Statics indexer returned data for a different deployment.");
+    }
+    if (
+      !Array.isArray(body.items) ||
+      !(body.nextCursor === null || typeof body.nextCursor === "string")
+    ) {
+      throw new Error("The Statics indexer returned an invalid page.");
+    }
+    values.push(
+      ...body.items.map((item) => {
+        if (typeof item.id !== "string" || !/^\d+$/.test(item.id)) {
+          throw new Error("The Statics indexer returned an invalid ID.");
+        }
+        return {
+          id: BigInt(item.id),
+          tier: optionalNumber(item.tier, "Genesis tier"),
+          multiplierBps: optionalNumber(item.multiplierBps, "Genesis multiplier"),
+          linkedPositionId: optionalBigint(item.linkedPositionId, "Genesis position ID"),
+          registered:
+            item.registered === undefined || item.registered === null
+              ? undefined
+              : typeof item.registered === "boolean"
+                ? item.registered
+                : (() => {
+                    throw new Error("The Statics indexer returned an invalid registration flag.");
+                  })(),
+          effectiveWeight: optionalBigint(item.effectiveWeight, "Genesis effective weight"),
+          updatedAtBlock: optionalBigint(item.updatedAtBlock, "Genesis update block"),
+        };
+      })
+    );
+    if (!body.nextCursor) return values;
+    if (body.nextCursor === cursor) {
+      throw new Error("The Statics indexer returned a stalled cursor.");
+    }
+    cursor = body.nextCursor;
+  }
+  throw new Error("The Statics indexer exceeded its pagination limit.");
 }
 
 export async function loadRecoverableLoanIds(

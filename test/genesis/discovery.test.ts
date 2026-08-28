@@ -174,7 +174,26 @@ describe("Genesis discovery", () => {
 
     await expect(discoverWalletGenesisIds(publicClient, deployment, owner)).resolves.toEqual([]);
     expect(getLogs).toHaveBeenCalledWith(
-      expect.objectContaining({ fromBlock: deployment.deploymentStartBlock, toBlock: "latest" })
+      expect.objectContaining({ fromBlock: deployment.deploymentStartBlock, toBlock: 111n })
+    );
+  });
+
+  it("chunks the onchain ownership fallback for RPC providers with bounded log ranges", async () => {
+    const getLogs = vi.fn().mockResolvedValue([]);
+    const publicClient = {
+      getBlockNumber: vi.fn().mockResolvedValue(50_002n),
+      getLogs,
+      readContract: vi.fn(),
+    } as unknown as PublicClient;
+
+    await expect(discoverWalletGenesisIds(publicClient, deployment, owner)).resolves.toEqual([]);
+    expect(getLogs).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ fromBlock: 1n, toBlock: 50_000n })
+    );
+    expect(getLogs).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ fromBlock: 50_001n, toBlock: 50_002n })
     );
   });
 });
