@@ -183,7 +183,8 @@ selects the chain but cannot replace the reviewed public deployment:
 export NEXT_PUBLIC_APP_ENV=production
 export NEXT_PUBLIC_SITE_URL=https://your-statics-site.example
 export NEXT_PUBLIC_APP_NETWORK=robinhood-testnet
-export NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=https://your-browser-safe-rpc.example
+# Server-only upstream RPC used by the same-origin browser read proxy.
+export STATICS_ROBINHOOD_TESTNET_RPC_URL=https://your-server-only-rpc.example
 export NEXT_PUBLIC_PRIVY_APP_ID=your-public-privy-app-id
 export NEXT_PUBLIC_STATICS_CHAIN_ID=46630
 

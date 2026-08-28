@@ -3,19 +3,17 @@ import { defineChain, http, type Chain, type Transport } from "viem";
 export type WalletAppEnvironment = "development" | "staging" | "production";
 export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
 
-const ROBINHOOD_TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com";
-const ROBINHOOD_MAINNET_RPC = "https://rpc.mainnet.chain.robinhood.com";
-const SHARED_ROBINHOOD_RPC_HOSTS = new Set([
-  new URL(ROBINHOOD_TESTNET_RPC).hostname,
-  new URL(ROBINHOOD_MAINNET_RPC).hostname,
-]);
+// Robinhood reads go through the same-origin server proxy. The upstream RPC
+// URL and credentials remain server-only; these paths are safe to expose.
+const ROBINHOOD_MAINNET_RPC_PROXY = "/api/rpc/4663";
+const ROBINHOOD_TESTNET_RPC_PROXY = "/api/rpc/46630";
 
 export const robinhoodMainnet = defineChain({
   id: 4_663,
   name: "Robinhood Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [ROBINHOOD_MAINNET_RPC] },
+    default: { http: [ROBINHOOD_MAINNET_RPC_PROXY] },
   },
   blockExplorers: {
     default: {
@@ -30,7 +28,7 @@ export const robinhoodTestnet = defineChain({
   name: "Robinhood Chain Testnet",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [ROBINHOOD_TESTNET_RPC] },
+    default: { http: [ROBINHOOD_TESTNET_RPC_PROXY] },
   },
   blockExplorers: {
     default: {
@@ -92,19 +90,6 @@ function parsePublicRpc(value: string | undefined, variableName: string): string
   return url.toString();
 }
 
-function requireDedicatedRpc(
-  value: string | null,
-  variableName: string,
-  appEnvironment: WalletAppEnvironment
-): void {
-  if (!value || appEnvironment === "development") return;
-  if (SHARED_ROBINHOOD_RPC_HOSTS.has(new URL(value).hostname)) {
-    throw new Error(
-      `${variableName} must be a dedicated RPC or same-origin proxy outside development.`
-    );
-  }
-}
-
 export type WalletEnvironment = Readonly<{
   appEnvironment: WalletAppEnvironment;
   network: WalletNetwork;
@@ -135,14 +120,6 @@ export function readWalletEnvironment(
   const network = parseNetwork(environment.NEXT_PUBLIC_APP_NETWORK, appEnvironment);
   const appId = environment.NEXT_PUBLIC_PRIVY_APP_ID?.trim() || null;
   const clientId = environment.NEXT_PUBLIC_PRIVY_CLIENT_ID?.trim() || null;
-  const configuredRobinhoodRpc = parsePublicRpc(
-    environment.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
-    "NEXT_PUBLIC_ROBINHOOD_RPC_URL"
-  );
-  const configuredRobinhoodTestnetRpc = parsePublicRpc(
-    environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
-    "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL"
-  );
   const configuredAnvilRpc = parsePublicRpc(
     environment.NEXT_PUBLIC_ANVIL_RPC_URL,
     "NEXT_PUBLIC_ANVIL_RPC_URL"
@@ -151,22 +128,14 @@ export function readWalletEnvironment(
   if (appEnvironment !== "development" && !appId) {
     throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
   }
-  if (appEnvironment !== "development" && network === "robinhood" && !configuredRobinhoodRpc) {
-    throw new Error("NEXT_PUBLIC_ROBINHOOD_RPC_URL is required for Robinhood mainnet.");
-  }
   if (
-    appEnvironment !== "development" &&
-    network === "robinhood-testnet" &&
-    !configuredRobinhoodTestnetRpc
+    environment.NEXT_PUBLIC_ROBINHOOD_RPC_URL ||
+    environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL
   ) {
-    throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required for Robinhood testnet.");
+    throw new Error(
+      "Robinhood RPC URLs must be server-only; use the same-origin /api/rpc proxy instead."
+    );
   }
-  requireDedicatedRpc(configuredRobinhoodRpc, "NEXT_PUBLIC_ROBINHOOD_RPC_URL", appEnvironment);
-  requireDedicatedRpc(
-    configuredRobinhoodTestnetRpc,
-    "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL",
-    appEnvironment
-  );
   if (network === "anvil" && configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
     throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
   }
@@ -185,8 +154,8 @@ export function readWalletEnvironment(
     network,
     appId,
     clientId,
-    robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
-    robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
+    robinhoodRpcUrl: ROBINHOOD_MAINNET_RPC_PROXY,
+    robinhoodTestnetRpcUrl: ROBINHOOD_TESTNET_RPC_PROXY,
     anvilRpcUrl,
     defaultChain,
     supportedChains: [
