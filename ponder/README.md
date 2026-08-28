@@ -13,6 +13,10 @@ config, schema, handlers, and API; `PONDER_DEPLOYMENT_ID`, `PONDER_CHAIN_ID`, ad
 blocks, RPC, and `DATABASE_SCHEMA` provide isolation. Numeric token IDs are never primary keys by
 themselves: every stored entity is qualified by deployment ID.
 
+Production deployments can set `PONDER_RPC_URLS_<chainId>` to a comma-separated provider pool.
+Ponder will balance requests across the configured URLs and fall back between providers. The
+singular `PONDER_RPC_URL_<chainId>` remains supported for local and single-provider deployments.
+
 Copy `.env.example` to a deployment-specific env file, then run:
 
 ```sh
@@ -25,4 +29,8 @@ Point the application at the separate instances with
 `NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL` and `NEXT_PUBLIC_STATICS_INDEXER_URL`. Ponder owns the
 reserved `/health`, `/ready`, and `/status` endpoints. Vault ownership is the implicit initial state;
 the indexer does not materialize 5,555 identical rows. The application treats an unavailable or
-lagging indexer as degraded discovery only; transaction state is always re-read onchain.
+lagging indexer as degraded discovery only; transaction state is always re-read onchain. Operator
+wallet discovery reads `/status` as a checkpoint, rejects snapshots more than 100 blocks behind,
+and reconciles transfers after a healthy checkpoint before checking current `ownerOf` state. The
+trade card discovers the next Operator directly from Vault inventory and withholds cached inventory
+while that authoritative read is refreshing.

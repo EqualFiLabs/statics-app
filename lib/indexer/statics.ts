@@ -23,6 +23,12 @@ export type IndexedRecoverableGenesisCredit = Readonly<{
   recoverableAt: bigint;
 }>;
 
+export type IndexerCheckpoint = Readonly<{
+  chainId: number;
+  blockNumber: bigint;
+  blockTimestamp: bigint;
+}>;
+
 function configuredIndexerUrl(): string | null {
   const value = process.env.NEXT_PUBLIC_STATICS_INDEXER_URL?.trim();
   if (!value) return null;
@@ -51,6 +57,40 @@ export function configuredIndexerUrlForDeployment(deploymentId: string): string 
 function parseId(value: string): bigint {
   if (!/^\d+$/.test(value)) throw new Error("The Statics indexer returned an invalid ID.");
   return BigInt(value);
+}
+
+export async function loadIndexerCheckpoint(
+  chainId: number,
+  deploymentId: string,
+  indexerUrl?: string | null
+): Promise<IndexerCheckpoint> {
+  const base =
+    indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
+  if (!base) throw new Error("No indexer is configured for this deployment.");
+  const response = await fetch(`${base}/status`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok) throw new Error(`Statics indexer status request failed (${response.status}).`);
+  const body = (await response.json()) as Record<
+    string,
+    { id?: unknown; block?: { number?: unknown; timestamp?: unknown } }
+  >;
+  const checkpoint = Object.values(body).find((candidate) => candidate?.id === chainId);
+  if (
+    !checkpoint ||
+    !Number.isSafeInteger(checkpoint.block?.number) ||
+    Number(checkpoint.block?.number) < 0 ||
+    !Number.isSafeInteger(checkpoint.block?.timestamp) ||
+    Number(checkpoint.block?.timestamp) < 0
+  ) {
+    throw new Error("The Statics indexer returned an invalid chain checkpoint.");
+  }
+  return {
+    chainId,
+    blockNumber: BigInt(Number(checkpoint.block!.number)),
+    blockTimestamp: BigInt(Number(checkpoint.block!.timestamp)),
+  };
 }
 
 async function loadIds(path: string, indexerUrl = configuredIndexerUrl()): Promise<bigint[]> {

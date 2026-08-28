@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  loadIndexerCheckpoint,
   loadRecoverableGenesisCredits,
   loadRecoverableLoanIds,
   loadNextAvailableGenesisId,
@@ -41,6 +42,41 @@ describe("Statics indexer client", () => {
 
     await expect(loadWalletV4PositionIds(wallet, "https://indexer.example")).resolves.toEqual([9n]);
     expect(String(fetch.mock.calls[0]?.[0])).toContain(`/wallets/${wallet}/v4-positions`);
+  });
+
+  it("loads the checkpoint for the selected chain", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            testnet: { id: 46_630, block: { number: 100, timestamp: 1_000 } },
+            active: { id: 4_663, block: { number: 42, timestamp: 900 } },
+          })
+        )
+      )
+    );
+
+    await expect(
+      loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual({ chainId: 4_663, blockNumber: 42n, blockTimestamp: 900n });
+  });
+
+  it("rejects a status response without the selected chain", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ active: { id: 46_630, block: { number: 42, timestamp: 900 } } })
+          )
+        )
+    );
+
+    await expect(
+      loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example")
+    ).rejects.toThrow("invalid chain checkpoint");
   });
 
   it("rejects malformed pages", async () => {

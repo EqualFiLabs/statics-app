@@ -303,7 +303,9 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     }
   };
 
-  if (vault.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
+  // Do not render a cached Operator ID or wallet inventory while the authoritative
+  // Vault and ownership reads are still being refreshed.
+  if (vault.isLoading || vault.isFetching) return <p className="dapp-loading">{t("loading")}</p>;
   if (vault.error)
     return (
       <EmptyState title={t("unavailable")} description={describeTransactionError(vault.error)} />
