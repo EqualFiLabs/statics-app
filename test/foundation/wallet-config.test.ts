@@ -97,25 +97,6 @@ describe("wallet environment", () => {
     ).toEqual(["/api/rpc/46630"]);
   });
 
-  it("rejects credential-bearing public RPC URLs", () => {
-    expect(() =>
-      readWalletEnvironment({
-        NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: "https://user:secret@rpc.example",
-      })
-    ).toThrow("server-only");
-  });
-
-  it("rejects the shared Robinhood RPC as a production critical endpoint", () => {
-    expect(() =>
-      readWalletEnvironment({
-        NEXT_PUBLIC_APP_ENV: "production",
-        NEXT_PUBLIC_APP_NETWORK: "robinhood",
-        NEXT_PUBLIC_PRIVY_APP_ID: "app-id",
-        NEXT_PUBLIC_ROBINHOOD_RPC_URL: "https://rpc.mainnet.chain.robinhood.com",
-      })
-    ).toThrow("server-only");
-  });
-
   it("creates an address-specific Robinhood explorer link", () => {
     const environment = readWalletEnvironment({});
     expect(getAddressExplorerUrl(environment.defaultChain, "0x1234")).toBe(

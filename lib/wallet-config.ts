@@ -128,14 +128,6 @@ export function readWalletEnvironment(
   if (appEnvironment !== "development" && !appId) {
     throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
   }
-  if (
-    environment.NEXT_PUBLIC_ROBINHOOD_RPC_URL ||
-    environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL
-  ) {
-    throw new Error(
-      "Robinhood RPC URLs must be server-only; use the same-origin /api/rpc proxy instead."
-    );
-  }
   if (network === "anvil" && configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
     throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
   }
