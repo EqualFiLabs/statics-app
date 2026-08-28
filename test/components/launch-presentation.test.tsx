@@ -302,7 +302,7 @@ describe("Genesis credit presentation", () => {
   function creditReads(epochActive: boolean, paused: boolean) {
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
       if (functionName === "vaultAccounting") return vaultAccounting(epochActive);
-      if (functionName === "creditOriginationsPaused") return paused;
+      if (functionName === "creditIncreasesPaused") return paused;
       if (functionName === "credit") {
         return { owner: zeroAddress, principal: 0n, maturity: 0, recoverableAt: 0, active: false };
       }
@@ -333,7 +333,7 @@ describe("Genesis credit presentation", () => {
     useBlock.mockReturnValue({ data: { timestamp: maturity + 30n * 86_400n + 86_401n } });
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
       if (functionName === "vaultAccounting") return vaultAccounting(false);
-      if (functionName === "creditOriginationsPaused") return false;
+      if (functionName === "creditIncreasesPaused") return false;
       if (functionName === "credit") {
         return {
           owner: wallet,
@@ -414,7 +414,7 @@ describe("consolidated Genesis rewards surface", () => {
     readContract.mockImplementation(
       async ({ functionName, args }: { functionName: string; args: readonly unknown[] }) => {
         if (functionName === "vaultAccounting") return vaultAccounting(true);
-        if (functionName === "creditOriginationsPaused") return false;
+        if (functionName === "creditIncreasesPaused") return false;
         if (functionName === "credit") {
           return {
             owner: zeroAddress,
