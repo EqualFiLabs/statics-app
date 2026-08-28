@@ -37,7 +37,7 @@ function portfolio(
   return {
     items,
     tierCosts: [],
-    rewardShareBps: 5_000,
+    rewardShareBps: 4_000,
     totalWeight: items.reduce((total, entry) => total + entry.rewardWeight, 0n),
     ownerStatics,
     ownerWeth,

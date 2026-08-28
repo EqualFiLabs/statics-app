@@ -97,7 +97,7 @@ function ownedPortfolio(ownerStatics = 0n, ownerWeth = 0n) {
       creditMaturity: 0,
     })),
     tierCosts: [0n, 0n, 0n, 0n, 0n],
-    rewardShareBps: 5_000,
+    rewardShareBps: 4_000,
     totalWeight: 650_000n,
     ownerStatics,
     ownerWeth,
