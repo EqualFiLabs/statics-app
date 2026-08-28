@@ -150,7 +150,13 @@ export async function discoverWalletGenesisSnapshot(
       );
     } catch {
       // An unavailable, invalid, or stale indexer falls through to chain history.
-      stale = true;
+      if (!stale) {
+        // The onchain fallback is authoritative when the indexer failed for a
+        // reason other than freshness. Do not retain partial indexer metadata
+        // or report that authoritative result as stale.
+        indexed = [];
+        indexedBlock = null;
+      }
     }
   }
   if (ids === null) {

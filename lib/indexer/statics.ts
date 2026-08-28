@@ -192,7 +192,7 @@ export async function loadWalletLaunchGenesisItems(
   const base =
     indexerUrl === undefined ? configuredIndexerUrlForDeployment(deploymentId) : indexerUrl;
   if (!base) throw new Error("No Statics indexer is configured for this deployment.");
-  const values: IndexedLaunchGenesis[] = [];
+  const values = new Map<string, IndexedLaunchGenesis>();
   let cursor: string | null = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const url = new URL(`${base}/wallets/${getAddress(owner)}/genesis`);
@@ -214,30 +214,31 @@ export async function loadWalletLaunchGenesisItems(
     ) {
       throw new Error("The Statics indexer returned an invalid page.");
     }
-    values.push(
-      ...body.items.map((item) => {
-        if (typeof item.id !== "string" || !/^\d+$/.test(item.id)) {
-          throw new Error("The Statics indexer returned an invalid ID.");
-        }
-        return {
-          id: BigInt(item.id),
-          tier: optionalNumber(item.tier, "Genesis tier"),
-          multiplierBps: optionalNumber(item.multiplierBps, "Genesis multiplier"),
-          linkedPositionId: optionalBigint(item.linkedPositionId, "Genesis position ID"),
-          registered:
-            item.registered === undefined || item.registered === null
-              ? undefined
-              : typeof item.registered === "boolean"
-                ? item.registered
-                : (() => {
-                    throw new Error("The Statics indexer returned an invalid registration flag.");
-                  })(),
-          effectiveWeight: optionalBigint(item.effectiveWeight, "Genesis effective weight"),
-          updatedAtBlock: optionalBigint(item.updatedAtBlock, "Genesis update block"),
-        };
-      })
-    );
-    if (!body.nextCursor) return values;
+    for (const item of body.items) {
+      if (typeof item.id !== "string" || !/^\d+$/.test(item.id)) {
+        throw new Error("The Statics indexer returned an invalid ID.");
+      }
+      const id = BigInt(item.id);
+      const key = id.toString();
+      if (values.has(key)) continue;
+      values.set(key, {
+        id,
+        tier: optionalNumber(item.tier, "Genesis tier"),
+        multiplierBps: optionalNumber(item.multiplierBps, "Genesis multiplier"),
+        linkedPositionId: optionalBigint(item.linkedPositionId, "Genesis position ID"),
+        registered:
+          item.registered === undefined || item.registered === null
+            ? undefined
+            : typeof item.registered === "boolean"
+              ? item.registered
+              : (() => {
+                  throw new Error("The Statics indexer returned an invalid registration flag.");
+                })(),
+        effectiveWeight: optionalBigint(item.effectiveWeight, "Genesis effective weight"),
+        updatedAtBlock: optionalBigint(item.updatedAtBlock, "Genesis update block"),
+      });
+    }
+    if (!body.nextCursor) return [...values.values()];
     if (body.nextCursor === cursor) {
       throw new Error("The Statics indexer returned a stalled cursor.");
     }

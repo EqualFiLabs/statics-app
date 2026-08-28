@@ -176,6 +176,42 @@ describe("Statics indexer client", () => {
     ]);
   });
 
+  it("deduplicates Genesis IDs across paginated launch snapshots", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              deploymentId: "robinhood-genesis",
+              items: [{ id: "42", tier: 3 }],
+              nextCursor: "next",
+            })
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              deploymentId: "robinhood-genesis",
+              items: [
+                { id: "042", tier: 4 },
+                { id: "43", tier: 2 },
+              ],
+              nextCursor: null,
+            })
+          )
+        )
+    );
+
+    await expect(
+      loadWalletLaunchGenesisItems(wallet, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual([
+      { id: 42n, tier: 3 },
+      { id: 43n, tier: 2 },
+    ]);
+  });
+
   it("loads deployment-scoped recoverable Genesis credit pages", async () => {
     const fetch = vi
       .fn()
