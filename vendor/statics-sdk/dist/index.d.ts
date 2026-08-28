@@ -1113,6 +1113,39 @@ export declare const genesisLaunchDistributorAbi: readonly [{
         readonly name: "amount";
     }];
 }, {
+    readonly name: "claimAllGenesisRewards";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint256[]";
+        readonly name: "genesisIds";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "numeraireAmount";
+    }];
+}, {
+    readonly name: "claimAllGenesisTreasuryRewards";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "staticsAmount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "numeraireAmount";
+    }];
+}, {
     readonly name: "pendingGenesis";
     readonly type: "function";
     readonly stateMutability: "view";
@@ -11260,6 +11293,8 @@ export declare function buildActivateGenesisCall(genesisId: bigint, targetTier: 
 export declare function buildRegisterGenesisCall(genesisId: bigint): Hex;
 export declare function buildClaimGenesisLaunchRewardsCall(genesisId: bigint, asset: Address, receiver: Address): Hex;
 export declare function buildClaimOwnerGenesisLaunchRewardsCall(asset: Address, receiver: Address): Hex;
+export declare function buildClaimAllGenesisLaunchRewardsCall(genesisIds: readonly bigint[], receiver: Address): Hex;
+export declare function buildClaimAllGenesisLaunchTreasuryRewardsCall(receiver: Address): Hex;
 export declare function buildAccrueGenesisLaunchRewardsCall(): Hex;
 export declare function cumulativeGenesisActivationCost(tierCosts: readonly bigint[], currentTier: number, targetTier: number): bigint;
 export declare function buildCreateBasketTransaction(params: CreateBasketParams, pools: readonly PoolLaunchParams[], maxAmountsIn: readonly bigint[], launchDeadline: bigint, creationFee: bigint): PreparedTransaction;

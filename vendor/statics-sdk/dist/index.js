@@ -156,6 +156,8 @@ export const genesisLaunchDistributorAbi = parseAbi([
     "function accrue() returns (uint256 staticsAmount, uint256 numeraireAmount)",
     "function claimGenesis(uint256 genesisId, address asset, address receiver) returns (uint256 amount)",
     "function claimOwnerRewards(address asset, address receiver) returns (uint256 amount)",
+    "function claimAllGenesisRewards(uint256[] genesisIds, address receiver) returns (uint256 staticsAmount, uint256 numeraireAmount)",
+    "function claimAllGenesisTreasuryRewards(address receiver) returns (uint256 staticsAmount, uint256 numeraireAmount)",
     "function pendingGenesis(uint256 genesisId, address asset) view returns (uint256 amount)",
     "function registered(uint256 genesisId) view returns (bool)",
     "function effectiveWeight(uint256 genesisId) view returns (uint256)",
@@ -1296,6 +1298,20 @@ export function buildClaimOwnerGenesisLaunchRewardsCall(asset, receiver) {
         abi: genesisLaunchDistributorAbi,
         functionName: "claimOwnerRewards",
         args: [asset, receiver],
+    });
+}
+export function buildClaimAllGenesisLaunchRewardsCall(genesisIds, receiver) {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "claimAllGenesisRewards",
+        args: [genesisIds, receiver],
+    });
+}
+export function buildClaimAllGenesisLaunchTreasuryRewardsCall(receiver) {
+    return encodeFunctionData({
+        abi: genesisLaunchDistributorAbi,
+        functionName: "claimAllGenesisTreasuryRewards",
+        args: [receiver],
     });
 }
 export function buildAccrueGenesisLaunchRewardsCall() {
