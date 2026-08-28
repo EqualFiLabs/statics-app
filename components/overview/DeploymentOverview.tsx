@@ -28,7 +28,8 @@ import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
 const Q192 = 1n << 192n;
-const PRICE_DECIMALS = 8;
+const WETH_PER_STATICS_DECIMALS = 8;
+const STATICS_PER_WETH_DECIMALS = 4;
 
 /** Genesis held by the treasury at launch, StaticsGenesisVault.INITIAL_TREASURY_GENESIS. */
 const TREASURY_GENESIS = 555n;
@@ -50,11 +51,12 @@ export function formatCanonicalMarketPrice(
   currency0: Address,
   statics: Address
 ): { value: string; unit: "WETH per STATICS" | "STATICS per WETH" } {
-  const scaledPrice = (sqrtPriceX96 * sqrtPriceX96 * 10n ** BigInt(PRICE_DECIMALS)) / Q192;
+  const staticsPerWeth = currency0.toLowerCase() !== statics.toLowerCase();
+  const decimals = staticsPerWeth ? STATICS_PER_WETH_DECIMALS : WETH_PER_STATICS_DECIMALS;
+  const scaledPrice = (sqrtPriceX96 * sqrtPriceX96 * 10n ** BigInt(decimals)) / Q192;
   return {
-    value: decimalFromScaled(scaledPrice, PRICE_DECIMALS),
-    unit:
-      currency0.toLowerCase() === statics.toLowerCase() ? "WETH per STATICS" : "STATICS per WETH",
+    value: decimalFromScaled(scaledPrice, decimals),
+    unit: staticsPerWeth ? "STATICS per WETH" : "WETH per STATICS",
   };
 }
 
@@ -324,7 +326,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             <h3>{t("market")}</h3>
             <span>{metrics.data?.liquidity ? t("liquidityActive") : t("noActiveLiquidity")}</span>
           </div>
-          <p className="overview-figure">
+          <p className="overview-figure overview-figure--market">
             <b>{marketPrice?.value ?? "—"}</b>
             <span>
               {marketPrice?.unit === "STATICS per WETH" ? t("staticsPerWeth") : t("wethPerStatics")}
@@ -347,13 +349,13 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               <dt>{t("reservePerOperator")}</dt>
               <dd>
                 {vault
-                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} WETH`
+                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} ETH`
                   : "—"}
               </dd>
             </div>
             <div>
               <dt>{vault?.epochActive ? t("buyInProjected") : t("buyInToday")}</dt>
-              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} WETH`}</dd>
+              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} ETH`}</dd>
             </div>
             <div className="is-total">
               <dt>{t("allInCost")}</dt>

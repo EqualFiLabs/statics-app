@@ -875,6 +875,15 @@
   font-size: var(--text-sm);
 }
 
+.overview-figure--market {
+  justify-content: space-between;
+}
+
+.overview-figure--market span {
+  margin-left: auto;
+  text-align: right;
+}
+
 .supply-bar {
   display: flex;
   height: 12px;

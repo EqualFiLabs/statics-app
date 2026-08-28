@@ -234,7 +234,7 @@ describe("launch overview", () => {
     // this precision, which is the asymmetry working as designed.
     await screen.findByText("180,000 STATICS, no ETH");
     const row = screen.getByText("Buy-in if the Epoch ended now").closest("div");
-    expect(row).toHaveTextContent("0.0009 WETH");
+    expect(row).toHaveTextContent("0.0009 ETH");
     expect(screen.getByText(/already accruing/)).toBeInTheDocument();
   });
 
