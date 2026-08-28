@@ -1,10 +1,14 @@
-import { defineChain, fallback, http, type Chain, type Transport } from "viem";
+import { defineChain, http, type Chain, type Transport } from "viem";
 
 export type WalletAppEnvironment = "development" | "staging" | "production";
 export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
 
 const ROBINHOOD_TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com";
 const ROBINHOOD_MAINNET_RPC = "https://rpc.mainnet.chain.robinhood.com";
+const SHARED_ROBINHOOD_RPC_HOSTS = new Set([
+  new URL(ROBINHOOD_TESTNET_RPC).hostname,
+  new URL(ROBINHOOD_MAINNET_RPC).hostname,
+]);
 
 export const robinhoodMainnet = defineChain({
   id: 4_663,
@@ -88,15 +92,26 @@ function parsePublicRpc(value: string | undefined, variableName: string): string
   return url.toString();
 }
 
+function requireDedicatedRpc(
+  value: string | null,
+  variableName: string,
+  appEnvironment: WalletAppEnvironment
+): void {
+  if (!value || appEnvironment === "development") return;
+  if (SHARED_ROBINHOOD_RPC_HOSTS.has(new URL(value).hostname)) {
+    throw new Error(
+      `${variableName} must be a dedicated RPC or same-origin proxy outside development.`
+    );
+  }
+}
+
 export type WalletEnvironment = Readonly<{
   appEnvironment: WalletAppEnvironment;
   network: WalletNetwork;
   appId: string | null;
   clientId: string | null;
   robinhoodRpcUrl: string;
-  robinhoodRpcFallbackUrl: string | null;
   robinhoodTestnetRpcUrl: string;
-  robinhoodTestnetRpcFallbackUrl: string | null;
   anvilRpcUrl: string;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
@@ -128,14 +143,6 @@ export function readWalletEnvironment(
     environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
     "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL"
   );
-  const robinhoodRpcFallbackUrl = parsePublicRpc(
-    environment.NEXT_PUBLIC_ROBINHOOD_RPC_FALLBACK_URL,
-    "NEXT_PUBLIC_ROBINHOOD_RPC_FALLBACK_URL"
-  );
-  const robinhoodTestnetRpcFallbackUrl = parsePublicRpc(
-    environment.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_FALLBACK_URL,
-    "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_FALLBACK_URL"
-  );
   const configuredAnvilRpc = parsePublicRpc(
     environment.NEXT_PUBLIC_ANVIL_RPC_URL,
     "NEXT_PUBLIC_ANVIL_RPC_URL"
@@ -154,6 +161,12 @@ export function readWalletEnvironment(
   ) {
     throw new Error("NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL is required for Robinhood testnet.");
   }
+  requireDedicatedRpc(configuredRobinhoodRpc, "NEXT_PUBLIC_ROBINHOOD_RPC_URL", appEnvironment);
+  requireDedicatedRpc(
+    configuredRobinhoodTestnetRpc,
+    "NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL",
+    appEnvironment
+  );
   if (network === "anvil" && configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
     throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
   }
@@ -173,9 +186,7 @@ export function readWalletEnvironment(
     appId,
     clientId,
     robinhoodRpcUrl: configuredRobinhoodRpc ?? ROBINHOOD_MAINNET_RPC,
-    robinhoodRpcFallbackUrl,
     robinhoodTestnetRpcUrl: configuredRobinhoodTestnetRpc ?? ROBINHOOD_TESTNET_RPC,
-    robinhoodTestnetRpcFallbackUrl,
     anvilRpcUrl,
     defaultChain,
     supportedChains: [
@@ -190,20 +201,14 @@ export function readWalletEnvironment(
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
+  // These transports serve authoritative reads, simulations, and wallet
+  // writes. Never fail over critical traffic to a public RPC with unknown
+  // freshness, rate limits, or CORS behavior. Non-critical discovery uses the
+  // Ponder HTTP API and its explicit onchain fallback in the caller.
   const batchedHttp = (url: string) => http(url, { batch: { batchSize: 50, wait: 8 } });
-  const resilientHttp = (primary: string, secondary: string | null) =>
-    secondary && secondary !== primary
-      ? fallback([batchedHttp(primary), batchedHttp(secondary)], { retryCount: 0 })
-      : batchedHttp(primary);
   const transports: Record<number, Transport> = {
-    [robinhoodMainnet.id]: resilientHttp(
-      environment.robinhoodRpcUrl,
-      environment.robinhoodRpcFallbackUrl
-    ),
-    [robinhoodTestnet.id]: resilientHttp(
-      environment.robinhoodTestnetRpcUrl,
-      environment.robinhoodTestnetRpcFallbackUrl
-    ),
+    [robinhoodMainnet.id]: batchedHttp(environment.robinhoodRpcUrl),
+    [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),
   };
   if (environment.appEnvironment === "development") {
     transports[anvil.id] = batchedHttp(environment.anvilRpcUrl);

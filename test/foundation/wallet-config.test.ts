@@ -79,12 +79,10 @@ describe("wallet environment", () => {
       NEXT_PUBLIC_APP_NETWORK: "robinhood",
       NEXT_PUBLIC_PRIVY_APP_ID: "app-id",
       NEXT_PUBLIC_ROBINHOOD_RPC_URL: "https://rpc.example",
-      NEXT_PUBLIC_ROBINHOOD_RPC_FALLBACK_URL: "https://rpc-backup.example",
     });
 
     expect(environment.defaultChain.id).toBe(4_663);
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630]);
-    expect(environment.robinhoodRpcFallbackUrl).toBe("https://rpc-backup.example/");
   });
 
   it("fails closed outside development when Privy or the RPC is absent", () => {
@@ -105,6 +103,17 @@ describe("wallet environment", () => {
         NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: "https://user:secret@rpc.example",
       })
     ).toThrow("credential-free");
+  });
+
+  it("rejects the shared Robinhood RPC as a production critical endpoint", () => {
+    expect(() =>
+      readWalletEnvironment({
+        NEXT_PUBLIC_APP_ENV: "production",
+        NEXT_PUBLIC_APP_NETWORK: "robinhood",
+        NEXT_PUBLIC_PRIVY_APP_ID: "app-id",
+        NEXT_PUBLIC_ROBINHOOD_RPC_URL: "https://rpc.mainnet.chain.robinhood.com",
+      })
+    ).toThrow("dedicated RPC");
   });
 
   it("creates an address-specific Robinhood explorer link", () => {

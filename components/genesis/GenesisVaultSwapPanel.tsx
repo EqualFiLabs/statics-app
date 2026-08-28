@@ -303,10 +303,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   // Keep the last complete snapshot visible during background reconciliation.
   // Only the initial load blocks the panel, so navigation and confirmed writes
   // do not flash an empty state while the RPC catches up.
-  if (
-    vault.isLoading ||
-    (Boolean(wallet) && walletData.isLoading)
-  )
+  if (vault.isLoading || (Boolean(wallet) && walletData.isLoading))
     return <p className="dapp-loading">{t("loading")}</p>;
   if (vault.error && !vault.data)
     return (
