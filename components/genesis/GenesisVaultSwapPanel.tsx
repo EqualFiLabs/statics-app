@@ -23,7 +23,10 @@ import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 import { useWalletState } from "@/providers/wallet-context";
 
 type VaultDirection = "acquire" | "redeem";
@@ -69,20 +72,12 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const [error, setError] = useState<string | null>(null);
 
   const vault = useQuery({
-    queryKey: ["genesis-vault-swap", deployment.descriptor.deploymentId, wallet],
+    queryKey: ["genesis-vault-swap", deployment.descriptor.deploymentId],
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [
-        purchaseQuote,
-        redemptionQuote,
-        accounting,
-        nextId,
-        ownedIds,
-        staticsBalance,
-        nativeBalance,
-      ] = await Promise.all([
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      const [purchaseQuote, redemptionQuote, accounting, nextId] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -99,16 +94,26 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           functionName: "vaultAccounting",
         }),
         discoverNextAvailableGenesisId(publicClient, deployment),
-        wallet ? discoverWalletGenesisIds(publicClient, deployment, wallet) : [],
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.statics,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
-        wallet ? publicClient.getBalance({ address: wallet }) : 0n,
+      ]);
+      return { purchaseQuote, redemptionQuote, accounting, nextId };
+    },
+  });
+
+  const walletData = useQuery({
+    queryKey: ["genesis-vault-wallet", deployment.descriptor.deploymentId, wallet],
+    enabled: Boolean(publicClient && wallet),
+    queryFn: async () => {
+      if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      const [ownedIds, staticsBalance, nativeBalance] = await Promise.all([
+        discoverWalletGenesisIds(publicClient, deployment, wallet),
+        publicClient.readContract({
+          address: deployment.contracts.statics,
+          abi: dopplerStaticsTokenAbi,
+          functionName: "balanceOf",
+          args: [wallet],
+        }),
+        publicClient.getBalance({ address: wallet }),
       ]);
       // Credit locks a Genesis against redemption, and the old panel only found
       // out by reverting. Resolve it with the list so a locked NFT is marked
@@ -124,15 +129,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           return { id, creditActive: credit.active };
         })
       );
-      return {
-        purchaseQuote,
-        redemptionQuote,
-        accounting,
-        nextId,
-        owned,
-        staticsBalance,
-        nativeBalance,
-      };
+      return { owned, staticsBalance, nativeBalance };
     },
   });
 
@@ -303,19 +300,28 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     }
   };
 
-  // Do not render a cached Operator ID or wallet inventory while the authoritative
-  // Vault and ownership reads are still being refreshed.
-  if (vault.isLoading || vault.isFetching) return <p className="dapp-loading">{t("loading")}</p>;
-  if (vault.error)
+  // Keep the last complete snapshot visible during background reconciliation.
+  // Only the initial load blocks the panel, so navigation and confirmed writes
+  // do not flash an empty state while the RPC catches up.
+  if (vault.isLoading || (Boolean(wallet) && walletData.isLoading))
+    return <p className="dapp-loading">{t("loading")}</p>;
+  if (vault.error && !vault.data)
     return (
       <EmptyState title={t("unavailable")} description={describeTransactionError(vault.error)} />
+    );
+  if (walletData.error && !walletData.data)
+    return (
+      <EmptyState
+        title={t("unavailable")}
+        description={describeTransactionError(walletData.error)}
+      />
     );
 
   const nextId = vault.data?.nextId ?? null;
   const purchaseQuote = vault.data?.purchaseQuote;
   const redemptionQuote = vault.data?.redemptionQuote;
   const accounting = vault.data?.accounting;
-  const owned = vault.data?.owned ?? [];
+  const owned = walletData.data?.owned ?? [];
 
   const statics = (value: bigint | undefined, digits = 0) =>
     `${formatTokenAmountGrouped(value ?? 0n, 18, digits)} STATICS`;
@@ -326,8 +332,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   // enabled the button regardless and reported the shortfall as a thrown error.
   const staticsNeeded = purchaseQuote?.staticsPrice ?? 0n;
   const nativeNeeded = purchaseQuote?.requiredNative ?? 0n;
-  const staticsHeld = vault.data?.staticsBalance ?? 0n;
-  const nativeHeld = vault.data?.nativeBalance ?? 0n;
+  const staticsHeld = walletData.data?.staticsBalance ?? 0n;
+  const nativeHeld = walletData.data?.nativeBalance ?? 0n;
   const staticsShort = wallet && staticsHeld < staticsNeeded ? staticsNeeded - staticsHeld : 0n;
   const nativeShort = wallet && nativeHeld < nativeNeeded ? nativeNeeded - nativeHeld : 0n;
   const cannotAfford = staticsShort > 0n || nativeShort > 0n;

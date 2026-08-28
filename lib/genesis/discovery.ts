@@ -6,11 +6,14 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import {
   configuredIndexerUrlForDeployment,
   loadIndexerCheckpoint,
-  loadWalletLaunchGenesisIds,
+  loadNextAvailableGenesisId,
+  loadWalletLaunchGenesisItems,
 } from "@/lib/indexer/statics";
+import type { IndexedLaunchGenesis } from "@/lib/indexer/statics";
 
 const GENESIS_SUPPLY = 5_555n;
 const DISCOVERY_BATCH = 64n;
+const DISCOVERY_LOG_CHUNK = 50_000n;
 const MAX_INDEXER_BLOCK_LAG = 100n;
 
 const genesisTransferEvent = staticsGenesisAbi.find(
@@ -22,29 +25,56 @@ async function loadIncomingGenesisIds(
   deployment: LaunchDeployment,
   owner: Address,
   fromBlock: bigint,
-  toBlock: bigint | "latest"
+  latestBlock: bigint
 ): Promise<bigint[]> {
-  if (typeof toBlock === "bigint" && fromBlock > toBlock) return [];
-  const logs = await publicClient.getLogs({
-    address: deployment.contracts.genesis,
-    event: genesisTransferEvent,
-    args: { to: getAddress(owner) },
-    fromBlock,
-    toBlock,
-  });
-  return [
-    ...new Set(
-      parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" }).map((log) =>
-        String(log.args.tokenId)
-      )
-    ),
-  ].map(BigInt);
+  if (fromBlock > latestBlock) return [];
+  const ids = new Set<string>();
+  for (let start = fromBlock; start <= latestBlock; start += DISCOVERY_LOG_CHUNK) {
+    const end = start + DISCOVERY_LOG_CHUNK - 1n;
+    const logs = await publicClient.getLogs({
+      address: deployment.contracts.genesis,
+      event: genesisTransferEvent,
+      args: { to: getAddress(owner) },
+      fromBlock: start,
+      toBlock: end < latestBlock ? end : latestBlock,
+    });
+    for (const log of parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" })) {
+      ids.add(String(log.args.tokenId));
+    }
+  }
+  return [...ids].map(BigInt);
 }
 
 export async function discoverNextAvailableGenesisId(
   publicClient: PublicClient,
   deployment: LaunchDeployment
 ): Promise<bigint | null> {
+  const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
+  if (indexerUrl) {
+    try {
+      const indexed = await loadNextAvailableGenesisId(
+        deployment.descriptor.deploymentId,
+        indexerUrl
+      );
+      // A null or stale indexer response must never make the UI claim that the
+      // vault is exhausted. Verify the candidate and fall through to the
+      // authoritative scan when the snapshot cannot prove availability.
+      if (
+        indexed !== null &&
+        (await publicClient.readContract({
+          address: deployment.contracts.vault,
+          abi: staticsGenesisVaultAbi,
+          functionName: "isVaultInventory",
+          args: [indexed],
+        }))
+      ) {
+        return indexed;
+      }
+    } catch {
+      // A degraded indexer is a discovery optimization only. The onchain scan
+      // below remains the correctness fallback.
+    }
+  }
   for (let start = 1n; start <= GENESIS_SUPPLY; start += DISCOVERY_BATCH) {
     const end = start + DISCOVERY_BATCH - 1n;
     const ids = Array.from(
@@ -67,12 +97,29 @@ export async function discoverNextAvailableGenesisId(
   return null;
 }
 
-export async function discoverWalletGenesisIds(
+export type GenesisDiscoverySnapshot = Readonly<{
+  ids: readonly bigint[];
+  indexed: readonly IndexedLaunchGenesis[];
+  indexedBlock: bigint | null;
+  chainHead: bigint | null;
+  stale: boolean;
+}>;
+
+/**
+ * Returns the wallet snapshot plus its freshness boundary. IDs are still
+ * checked against current ownerOf state, while indexed fields are retained so
+ * callers do not repeat reads that Ponder already materialized.
+ */
+export async function discoverWalletGenesisSnapshot(
   publicClient: PublicClient,
   deployment: LaunchDeployment,
   owner: Address
-): Promise<bigint[]> {
+): Promise<GenesisDiscoverySnapshot> {
   let ids: bigint[] | null = null;
+  let indexed: readonly IndexedLaunchGenesis[] = [];
+  let indexedBlock: bigint | null = null;
+  let chainHead: bigint | null = null;
+  let stale = false;
   const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
   if (indexerUrl) {
     try {
@@ -81,15 +128,14 @@ export async function discoverWalletGenesisIds(
         deployment.descriptor.deploymentId,
         indexerUrl
       );
-      const chainHead = await publicClient.getBlockNumber();
-      if (
+      chainHead = await publicClient.getBlockNumber();
+      indexedBlock = checkpoint.blockNumber;
+      stale =
         checkpoint.blockNumber > chainHead ||
-        chainHead - checkpoint.blockNumber > MAX_INDEXER_BLOCK_LAG
-      ) {
-        throw new Error("The Statics indexer is too far behind the selected chain.");
-      }
-      const [indexedIds, recentIds] = await Promise.all([
-        loadWalletLaunchGenesisIds(owner, deployment.descriptor.deploymentId, indexerUrl),
+        chainHead - checkpoint.blockNumber > MAX_INDEXER_BLOCK_LAG;
+      if (stale) throw new Error("The Statics indexer is too far behind the selected chain.");
+      const [indexedItems, recentIds] = await Promise.all([
+        loadWalletLaunchGenesisItems(owner, deployment.descriptor.deploymentId, indexerUrl),
         loadIncomingGenesisIds(
           publicClient,
           deployment,
@@ -98,18 +144,29 @@ export async function discoverWalletGenesisIds(
           chainHead
         ),
       ]);
-      ids = [...new Set([...indexedIds, ...recentIds].map(String))].map(BigInt);
+      indexed = indexedItems;
+      ids = [...new Set([...indexedItems.map((item) => item.id), ...recentIds].map(String))].map(
+        BigInt
+      );
     } catch {
       // An unavailable, invalid, or stale indexer falls through to chain history.
+      if (!stale) {
+        // The onchain fallback is authoritative when the indexer failed for a
+        // reason other than freshness. Do not retain partial indexer metadata
+        // or report that authoritative result as stale.
+        indexed = [];
+        indexedBlock = null;
+      }
     }
   }
   if (ids === null) {
+    chainHead ??= await publicClient.getBlockNumber();
     ids = await loadIncomingGenesisIds(
       publicClient,
       deployment,
       owner,
       deployment.deploymentStartBlock,
-      "latest"
+      chainHead
     );
   }
   const current = await Promise.all(
@@ -124,8 +181,24 @@ export async function discoverWalletGenesisIds(
         .catch(() => null)
     )
   );
-  return ids.filter(
+  const ownedIds = ids.filter(
     (_, index) =>
       current[index] !== null && String(current[index]).toLowerCase() === owner.toLowerCase()
   );
+  const ownedSet = new Set(ownedIds.map(String));
+  return {
+    ids: ownedIds,
+    indexed: indexed.filter((item) => ownedSet.has(item.id.toString())),
+    indexedBlock,
+    chainHead,
+    stale,
+  };
+}
+
+export async function discoverWalletGenesisIds(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment,
+  owner: Address
+): Promise<bigint[]> {
+  return [...(await discoverWalletGenesisSnapshot(publicClient, deployment, owner)).ids];
 }

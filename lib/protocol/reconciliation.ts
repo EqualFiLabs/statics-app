@@ -9,7 +9,15 @@ const QUERY_RECONCILIATION_DELAYS_MS = [0, 1_500, 4_000, 8_000] as const;
 export const PROTOCOL_TRANSACTION_CONFIRMED_EVENT = "statics:protocol-transaction-confirmed";
 
 export type ProtocolQueryScope =
-  "basket" | "position" | "loan" | "liquidity" | "reward" | "dollar" | "wallet" | "approval";
+  | "basket"
+  | "position"
+  | "loan"
+  | "liquidity"
+  | "reward"
+  | "dollar"
+  | "wallet"
+  | "approval"
+  | "genesis";
 
 export type ProtocolTransactionConfirmedDetail = Readonly<{
   wallet: Address;
@@ -41,6 +49,16 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "overview-portfolio": "wallet",
   "wallet-nfts": "wallet",
   "approval-tools": "approval",
+  "launch-overview": "genesis",
+  "launch-overview-balance": "genesis",
+  "launch-genesis-owned": "genesis",
+  "genesis-vault-swap": "genesis",
+  "genesis-vault-wallet": "genesis",
+  "genesis-vault-epoch": "genesis",
+  "launch-genesis-credit": "genesis",
+  "launch-genesis-recoveries": "genesis",
+  "nft-image": "genesis",
+  "genesis-traits": "genesis",
 };
 
 const walletScopedRoots = new Set([
@@ -57,9 +75,31 @@ const walletScopedRoots = new Set([
   "overview-portfolio",
   "wallet-nfts",
   "approval-tools",
+  "launch-overview-balance",
+  "launch-genesis-owned",
+  "genesis-vault-swap",
+  "genesis-vault-wallet",
+  "launch-genesis-credit",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
+  if (kind === "buy-genesis" || kind === "redeem-genesis" || kind === "approve-genesis") {
+    return ["genesis", "wallet"];
+  }
+  if (
+    kind === "activate-genesis" ||
+    kind === "link-genesis" ||
+    kind === "unlink-genesis" ||
+    kind === "open-genesis-credit" ||
+    kind === "extend-genesis-credit" ||
+    kind === "repay-genesis-credit" ||
+    kind === "recover-genesis-credit"
+  ) {
+    return ["genesis", "reward", "wallet"];
+  }
+  if (kind === "claim-rewards" || kind === "accrue-genesis-rewards") {
+    return ["genesis", "reward", "wallet"];
+  }
   if (kind === "approve-swap") return ["approval", "basket", "dollar", "wallet"];
   if (kind === "approve-basket-asset") return ["approval", "basket", "position", "wallet"];
   if (kind === "approve-basket-token") return ["approval", "position", "loan", "wallet"];

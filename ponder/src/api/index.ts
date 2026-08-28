@@ -158,6 +158,10 @@ app.get("/wallets/:owner/genesis", async (context) => {
     .orderBy(asc(genesisNft.id))
     .limit(limit + 1);
   const page = rows.slice(0, limit);
+  // Wallet ownership is public chain state. A very short private cache keeps
+  // route changes from refetching the same snapshot while the checkpoint and
+  // frontend reconciliation preserve freshness after writes.
+  context.header("Cache-Control", "private, max-age=2, stale-while-revalidate=5");
   return context.json({
     deploymentId,
     items: page.map((row) => ({
@@ -179,6 +183,9 @@ app.get("/genesis/next-available", async (context) => {
     .from(genesisNft)
     .where(eq(genesisNft.deploymentId, deploymentId));
   const next = nextAvailableGenesisId(rows.map((row) => row.id));
+  // This endpoint is safe to share briefly because the purchase path verifies
+  // the returned ID against Vault inventory before submitting a transaction.
+  context.header("Cache-Control", "public, max-age=1, stale-while-revalidate=2");
   return context.json({
     deploymentId,
     tokenId: next?.toString() ?? null,

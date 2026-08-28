@@ -10,6 +10,8 @@ import {
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
 
+const verificationCache = new Map<string, Promise<void>>();
+
 function same(left: Address, right: Address): boolean {
   return getAddress(left) === getAddress(right);
 }
@@ -199,4 +201,24 @@ export async function verifyLaunchDeployment(
   requireAddress(distributorStatics, deployment.contracts.statics, "Distributor STATICS binding");
   requireAddress(distributorNumeraire, deployment.contracts.weth, "Distributor WETH binding");
   requireAddress(distributorVault, deployment.contracts.vault, "Distributor Vault binding");
+}
+
+/**
+ * Launch bindings and runtime hashes are immutable for a reviewed deployment.
+ * Cache successful verification for the read path, while write paths can keep
+ * calling verifyLaunchDeployment directly immediately before a transaction.
+ */
+export function verifyLaunchDeploymentCached(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment
+): Promise<void> {
+  const key = `${deployment.descriptor.deploymentId}:${deployment.descriptor.chainId}:${deployment.protocolCommit}`;
+  const existing = verificationCache.get(key);
+  if (existing) return existing;
+  const verification = verifyLaunchDeployment(publicClient, deployment).catch((error) => {
+    verificationCache.delete(key);
+    throw error;
+  });
+  verificationCache.set(key, verification);
+  return verification;
 }

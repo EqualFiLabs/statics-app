@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { encodeFunctionData, formatEther, getAddress, parseEther } from "viem";
 import { useBlock, usePublicClient } from "wagmi";
 import { dopplerStaticsTokenAbi } from "@statics-protocol/sdk";
@@ -19,7 +19,10 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 import { useWalletState } from "@/providers/wallet-context";
 
 /** StaticsGenesisVault.RECOVERY_GRACE. */
@@ -184,7 +187,7 @@ export function GenesisCreditPanel({
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const { data: latestBlock } = useBlock({
     chainId: deployment.descriptor.chainId,
-    watch: true,
+    watch: false,
   });
   const queryClient = useQueryClient();
   const wallet =
@@ -192,7 +195,14 @@ export function GenesisCreditPanel({
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const now = latestBlock ? Number(latestBlock.timestamp) : null;
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const offset = latestBlock ? Number(latestBlock.timestamp) - Math.floor(Date.now() / 1_000) : 0;
+    const update = () => setNow(Math.floor(Date.now() / 1_000) + offset);
+    update();
+    const timer = globalThis.setInterval(update, 1_000);
+    return () => globalThis.clearInterval(timer);
+  }, [latestBlock]);
 
   const state = useQuery({
     queryKey: [
@@ -204,7 +214,7 @@ export function GenesisCreditPanel({
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error(t("connect"));
-      await verifyLaunchDeployment(publicClient, deployment);
+      await verifyLaunchDeploymentCached(publicClient, deployment);
       const [vault, originationsPaused, credit, limit] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,

@@ -420,6 +420,11 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   return (
     <div className="genesis-page">
       {recoveriesLink}
+      {owned.data?.stale && (
+        <p className="genesis-note is-warning" role="status">
+          {t("syncing")}
+        </p>
+      )}
       <section className="genesis-summary ui-card" aria-label={t("holdingsAria")}>
         <div className="ui-stat">
           <span className="ui-stat__label">{t("held")}</span>

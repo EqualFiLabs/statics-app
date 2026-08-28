@@ -2,7 +2,11 @@ import { encodeEventTopics, getAddress, zeroAddress, type PublicClient } from "v
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/genesis/discovery";
+import {
+  discoverNextAvailableGenesisId,
+  discoverWalletGenesisIds,
+  discoverWalletGenesisSnapshot,
+} from "@/lib/genesis/discovery";
 
 const deploymentId = "local-anvil-genesis";
 const owner = getAddress("0x1111111111111111111111111111111111111111");
@@ -174,7 +178,50 @@ describe("Genesis discovery", () => {
 
     await expect(discoverWalletGenesisIds(publicClient, deployment, owner)).resolves.toEqual([]);
     expect(getLogs).toHaveBeenCalledWith(
-      expect.objectContaining({ fromBlock: deployment.deploymentStartBlock, toBlock: "latest" })
+      expect.objectContaining({ fromBlock: deployment.deploymentStartBlock, toBlock: 111n })
+    );
+  });
+
+  it("does not mark an onchain fallback stale after an indexer failure", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STATICS_LOCAL_INDEXER_URL", "https://indexer.example");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("indexer unavailable")));
+    const getLogs = vi.fn().mockResolvedValue([]);
+    const publicClient = {
+      getBlockNumber: vi.fn().mockResolvedValue(10n),
+      getLogs,
+      readContract: vi.fn(),
+    } as unknown as PublicClient;
+
+    await expect(
+      discoverWalletGenesisSnapshot(publicClient, deployment, owner)
+    ).resolves.toMatchObject({
+      ids: [],
+      indexed: [],
+      indexedBlock: null,
+      chainHead: 10n,
+      stale: false,
+    });
+    expect(getLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ fromBlock: deployment.deploymentStartBlock, toBlock: 10n })
+    );
+  });
+
+  it("chunks the onchain ownership fallback for RPC providers with bounded log ranges", async () => {
+    const getLogs = vi.fn().mockResolvedValue([]);
+    const publicClient = {
+      getBlockNumber: vi.fn().mockResolvedValue(50_002n),
+      getLogs,
+      readContract: vi.fn(),
+    } as unknown as PublicClient;
+
+    await expect(discoverWalletGenesisIds(publicClient, deployment, owner)).resolves.toEqual([]);
+    expect(getLogs).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ fromBlock: 1n, toBlock: 50_000n })
+    );
+    expect(getLogs).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ fromBlock: 50_001n, toBlock: 50_002n })
     );
   });
 });

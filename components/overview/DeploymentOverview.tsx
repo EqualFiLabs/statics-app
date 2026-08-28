@@ -14,7 +14,7 @@ import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentCached } from "@/lib/deployments/verify-launch";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { genesisAcquisitionCost, genesisBackingInNumeraire } from "@/lib/genesis/market-value";
 import {
@@ -90,12 +90,12 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
 
   const metrics = useQuery({
-    queryKey: ["launch-overview", deployment.descriptor.deploymentId, wallet],
+    queryKey: ["launch-overview", deployment.descriptor.deploymentId],
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [vault, purchase, redemption, slot0, liquidity, staticsBalance] = await Promise.all([
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      const [vault, purchase, redemption, slot0, liquidity] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -123,16 +123,22 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           functionName: "getLiquidity",
           args: [deployment.market.poolId],
         }),
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.statics,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
       ]);
-      return { vault, purchase, redemption, sqrtPriceX96: slot0[0], liquidity, staticsBalance };
+      return { vault, purchase, redemption, sqrtPriceX96: slot0[0], liquidity };
+    },
+  });
+
+  const staticsBalance = useQuery({
+    queryKey: ["launch-overview-balance", deployment.descriptor.deploymentId, wallet],
+    enabled: Boolean(publicClient && wallet),
+    queryFn: async () => {
+      if (!publicClient || !wallet) return 0n;
+      return publicClient.readContract({
+        address: deployment.contracts.statics,
+        abi: dopplerStaticsTokenAbi,
+        functionName: "balanceOf",
+        args: [wallet],
+      });
     },
   });
 
@@ -236,7 +242,9 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           <div className="ui-stat">
             <span className="ui-stat__label">{t("yourStatics")}</span>
             <strong className="ui-stat__value">
-              {metrics.data ? formatTokenAmountGrouped(metrics.data.staticsBalance, 18, 2) : "—"}
+              {staticsBalance.data !== undefined
+                ? formatTokenAmountGrouped(staticsBalance.data, 18, 2)
+                : "—"}
             </strong>
           </div>
           <div className="ui-stat">
