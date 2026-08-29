@@ -10,7 +10,8 @@ import {
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
 
-const verificationCache = new Map<string, Promise<void>>();
+const runtimeVerificationCache = new Map<string, Promise<void>>();
+const bindingVerificationCache = new Map<string, Promise<void>>();
 
 function same(left: Address, right: Address): boolean {
   return getAddress(left) === getAddress(right);
@@ -20,14 +21,16 @@ function requireAddress(actual: Address, expected: Address, label: string): void
   if (!same(actual, expected)) throw new Error(`${label} does not match the reviewed manifest.`);
 }
 
-export async function verifyLaunchDeployment(
-  publicClient: PublicClient,
-  deployment: LaunchDeployment
-): Promise<void> {
+function requireSelectedChain(publicClient: PublicClient, deployment: LaunchDeployment): void {
   if (publicClient.chain && publicClient.chain.id !== deployment.descriptor.chainId) {
     throw new Error("The RPC chain does not match the selected Statics deployment.");
   }
+}
 
+async function verifyLaunchRuntimeCode(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment
+): Promise<void> {
   await Promise.all(
     Object.entries(deployment.runtimeCodeHashes).map(async ([name, expected]) => {
       const address = deployment.contracts[name as keyof typeof deployment.contracts];
@@ -37,7 +40,12 @@ export async function verifyLaunchDeployment(
       }
     })
   );
+}
 
+async function verifyLaunchBindings(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment
+): Promise<void> {
   const [
     genesisVault,
     genesisRegistry,
@@ -203,6 +211,15 @@ export async function verifyLaunchDeployment(
   requireAddress(distributorVault, deployment.contracts.vault, "Distributor Vault binding");
 }
 
+export async function verifyLaunchDeployment(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment
+): Promise<void> {
+  requireSelectedChain(publicClient, deployment);
+  await verifyLaunchRuntimeCode(publicClient, deployment);
+  await verifyLaunchBindings(publicClient, deployment);
+}
+
 /**
  * Launch bindings and runtime hashes are immutable for a reviewed deployment.
  * Cache successful verification for the read path, while write paths can keep
@@ -212,13 +229,35 @@ export function verifyLaunchDeploymentCached(
   publicClient: PublicClient,
   deployment: LaunchDeployment
 ): Promise<void> {
-  const key = `${deployment.descriptor.deploymentId}:${deployment.descriptor.chainId}:${deployment.protocolCommit}`;
-  const existing = verificationCache.get(key);
-  if (existing) return existing;
-  const verification = verifyLaunchDeployment(publicClient, deployment).catch((error) => {
-    verificationCache.delete(key);
-    throw error;
-  });
-  verificationCache.set(key, verification);
-  return verification;
+  requireSelectedChain(publicClient, deployment);
+  const runtimeKey = [
+    deployment.descriptor.chainId,
+    deployment.protocolCommit,
+    ...Object.entries(deployment.runtimeCodeHashes)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, hash]) => {
+        const address = deployment.contracts[name as keyof typeof deployment.contracts];
+        return `${address.toLowerCase()}:${hash!.toLowerCase()}`;
+      }),
+  ].join(":");
+  let runtime = runtimeVerificationCache.get(runtimeKey);
+  if (!runtime) {
+    runtime = verifyLaunchRuntimeCode(publicClient, deployment).catch((error) => {
+      runtimeVerificationCache.delete(runtimeKey);
+      throw error;
+    });
+    runtimeVerificationCache.set(runtimeKey, runtime);
+  }
+
+  const bindingKey = `${deployment.descriptor.deploymentId}:${deployment.descriptor.chainId}:${deployment.protocolCommit}`;
+  const existingBindings = bindingVerificationCache.get(bindingKey);
+  if (existingBindings) return runtime.then(() => existingBindings);
+  const bindings = runtime
+    .then(() => verifyLaunchBindings(publicClient, deployment))
+    .catch((error) => {
+      bindingVerificationCache.delete(bindingKey);
+      throw error;
+    });
+  bindingVerificationCache.set(bindingKey, bindings);
+  return bindings;
 }

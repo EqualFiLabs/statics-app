@@ -91,6 +91,10 @@ export async function POST(request: Request, context: { params: Promise<{ chainI
     );
   }
 
+  const methods = [
+    ...new Set(requests.map((entry) => (entry as { method: string }).method)),
+  ].sort();
+  const startedAt = Date.now();
   try {
     const response = await fetch(upstream, {
       method: "POST",
@@ -98,11 +102,35 @@ export async function POST(request: Request, context: { params: Promise<{ chainI
       body,
       cache: "no-store",
     });
+    const retryAfter = response.headers.get("retry-after");
+    if (!response.ok) {
+      console.warn("Robinhood RPC upstream request failed", {
+        batchSize: requests.length,
+        chainId,
+        durationMs: Date.now() - startedAt,
+        methods,
+        retryAfter: Boolean(retryAfter),
+        status: response.status,
+      });
+    }
+    const headers = new Headers({
+      "cache-control": "no-store",
+      "content-type": response.headers.get("content-type") ?? "application/json",
+    });
+    if (retryAfter) headers.set("retry-after", retryAfter);
     return new Response(await response.text(), {
       status: response.status,
-      headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
+      headers,
     });
   } catch {
+    console.warn("Robinhood RPC upstream request failed", {
+      batchSize: requests.length,
+      chainId,
+      durationMs: Date.now() - startedAt,
+      methods,
+      retryAfter: false,
+      status: 502,
+    });
     return NextResponse.json(
       { error: "The Robinhood RPC upstream is unavailable." },
       { status: 502 }
