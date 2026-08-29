@@ -26,7 +26,20 @@ Point the application at the separate instances with
 reserved `/health`, `/ready`, and `/status` endpoints. Vault ownership is the implicit initial state;
 the indexer does not materialize 5,555 identical rows. The application treats an unavailable or
 lagging indexer as degraded discovery only; transaction state is always re-read onchain. Operator
-wallet discovery reads `/status` as a checkpoint, rejects snapshots more than 100 blocks behind,
-and reconciles transfers after a healthy checkpoint before checking current `ownerOf` state. The
-trade card discovers the next Operator directly from Vault inventory and withholds cached inventory
-while that authoritative read is refreshing.
+wallet discovery reads `/status` as a checkpoint and reconciles no more than 50,000 subsequent
+blocks with one `eth_getLogs` request before checking current `ownerOf` state. Larger gaps retain the
+indexed snapshot as stale instead of replaying deployment history. The trade card accepts next
+inventory only from a checkpoint no more than 100 blocks behind the RPC head and withholds cached
+inventory while that authoritative read is refreshing.
+
+## Production isolation and monitoring
+
+Ponder and the application's same-origin read proxy must use separate authenticated provider
+applications and API keys. They must also use separate Nginx rate-limit zones: browser traffic to
+`/api/rpc/` cannot consume the request budget reserved for `/indexer/`, `/health`, `/ready`, and
+`/status`. Preserve an upstream `Retry-After` header through both proxy layers.
+
+Alert on sustained provider `429` or proxy `502` responses, an unhealthy `/ready` response, and a
+checkpoint that remains more than 100 blocks behind its configured chain. Logs and alerts may
+include status, chain ID, method names, batch size, and duration, but must not include RPC URLs,
+credentials, calldata, wallet addresses, or complete request bodies.
