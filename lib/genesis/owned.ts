@@ -45,6 +45,32 @@ export const EMPTY_GENESIS_PORTFOLIO: OwnedGenesisPortfolio = {
   stale: false,
 };
 
+/** Maximum number of Genesis IDs accepted by one batch claim transaction. */
+export const GENESIS_CLAIM_BATCH_SIZE = 64;
+
+/** IDs with at least one pending reward, in wallet discovery order and without duplicates. */
+export function claimableGenesisIds(items: readonly OwnedGenesis[]): bigint[] {
+  const seen = new Set<string>();
+  const ids: bigint[] = [];
+  for (const item of items) {
+    if (item.pendingStatics === 0n && item.pendingWeth === 0n) continue;
+    const key = item.id.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ids.push(item.id);
+  }
+  return ids;
+}
+
+/** Split claimable Genesis IDs into deterministic, bounded transaction batches. */
+export function batchGenesisIds(ids: readonly bigint[]): bigint[][] {
+  const batches: bigint[][] = [];
+  for (let offset = 0; offset < ids.length; offset += GENESIS_CLAIM_BATCH_SIZE) {
+    batches.push(ids.slice(offset, offset + GENESIS_CLAIM_BATCH_SIZE));
+  }
+  return batches;
+}
+
 /**
  * The query key both My Operators and the Overview mount.
  *
@@ -203,27 +229,16 @@ export type GenesisRewardSummary = Readonly<{
   claimableWeth: bigint;
   ownerStatics: bigint;
   ownerWeth: bigint;
-  /**
-   * How many wallet signatures a full claim currently takes.
-   *
-   * `GenesisLaunchDistributor` exposes `claimGenesis` and `claimOwnerRewards`
-   * one asset at a time, so this is the honest count to put in front of anyone
-   * about to start the sequence. It collapses to 1 when the batch entry point
-   * lands.
-   */
+  /** How many bounded batch transactions a full claim requires. */
   claimTransactionCount: number;
 }>;
 
 export function summariseGenesisRewards(portfolio: OwnedGenesisPortfolio): GenesisRewardSummary {
   const pendingStatics = portfolio.items.reduce((total, item) => total + item.pendingStatics, 0n);
   const pendingWeth = portfolio.items.reduce((total, item) => total + item.pendingWeth, 0n);
-  const claimTransactionCount =
-    portfolio.items.reduce(
-      (total, item) => total + (item.pendingStatics > 0n ? 1 : 0) + (item.pendingWeth > 0n ? 1 : 0),
-      0
-    ) +
-    (portfolio.ownerStatics > 0n ? 1 : 0) +
-    (portfolio.ownerWeth > 0n ? 1 : 0);
+  const operatorBatchCount = batchGenesisIds(claimableGenesisIds(portfolio.items)).length;
+  const ownerClaimCount = portfolio.ownerStatics > 0n || portfolio.ownerWeth > 0n ? 1 : 0;
+  const claimTransactionCount = operatorBatchCount + ownerClaimCount;
   return {
     claimableStatics: pendingStatics + portfolio.ownerStatics,
     claimableWeth: pendingWeth + portfolio.ownerWeth,
