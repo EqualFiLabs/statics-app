@@ -162,11 +162,12 @@ export function readWalletEnvironment(
 }
 
 export function createWalletTransports(environment: WalletEnvironment): Record<number, Transport> {
-  // These transports serve authoritative reads, simulations, and wallet
-  // writes. Never fail over critical traffic to a public RPC with unknown
-  // freshness, rate limits, or CORS behavior. Non-critical discovery uses the
-  // Ponder HTTP API and its explicit onchain fallback in the caller.
-  const batchedHttp = (url: string) => http(url, { batch: { batchSize: 50, wait: 8 } });
+  // These transports serve authoritative reads and simulations. Wallet-driven
+  // writes use the connected wallet provider. Never fail over critical traffic
+  // to a public RPC, and do not multiply a failed batch with transport retries.
+  // Indexer availability has its own single bounded retry policy.
+  const batchedHttp = (url: string) =>
+    http(url, { batch: { batchSize: 50, wait: 8 }, retryCount: 0 });
   const transports: Record<number, Transport> = {
     [robinhoodMainnet.id]: batchedHttp(environment.robinhoodRpcUrl),
     [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),

@@ -113,6 +113,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const owned = useQuery({
     queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
     enabled: Boolean(publicClient && wallet),
+    retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
       return loadOwnedGenesis(publicClient, deployment, wallet);
@@ -318,7 +319,32 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     return (
       <div className="genesis-page">
         {recoveriesLink}
-        <EmptyState title={t("unavailable")} description={describeTransactionError(owned.error)} />
+        <EmptyState
+          tone="error"
+          title={t("unavailable")}
+          description={describeTransactionError(owned.error)}
+          action={{
+            label: t("retry"),
+            onClick: () => void owned.refetch(),
+            disabled: owned.isFetching,
+          }}
+        />
+      </div>
+    );
+  }
+  if (!items.length && owned.data?.stale) {
+    return (
+      <div className="genesis-page">
+        {recoveriesLink}
+        <EmptyState
+          title={t("syncingTitle")}
+          description={t("syncing")}
+          action={{
+            label: t("retry"),
+            onClick: () => void owned.refetch(),
+            disabled: owned.isFetching,
+          }}
+        />
       </div>
     );
   }

@@ -14,7 +14,11 @@ import {
 const wallet = "0x0000000000000000000000000000000000000001" as const;
 
 describe("Statics indexer client", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it("follows opaque cursors and parses bigint IDs", async () => {
     const fetch = vi
@@ -61,6 +65,53 @@ describe("Statics indexer client", () => {
     await expect(
       loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example")
     ).resolves.toEqual({ chainId: 4_663, blockNumber: 42n, blockTimestamp: 900n });
+  });
+
+  it("retries a throttled indexer request once after Retry-After", async () => {
+    vi.useFakeTimers();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("rate limited", { status: 429, headers: { "retry-after": "1" } })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ active: { id: 4_663, block: { number: 42, timestamp: 900 } } })
+        )
+      );
+    vi.stubGlobal("fetch", fetch);
+
+    const checkpoint = loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example");
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(checkpoint).resolves.toEqual({
+      chainId: 4_663,
+      blockNumber: 42n,
+      blockTimestamp: 900n,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a bounded jittered delay for one retry when Retry-After is absent", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ active: { id: 4_663, block: { number: 42, timestamp: 900 } } })
+        )
+      );
+    vi.stubGlobal("fetch", fetch);
+
+    const checkpoint = loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example");
+    await vi.advanceTimersByTimeAsync(749);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(checkpoint).resolves.toMatchObject({ blockNumber: 42n });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("rejects a status response without the selected chain", async () => {

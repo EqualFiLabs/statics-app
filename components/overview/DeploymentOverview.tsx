@@ -147,6 +147,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   const portfolio = useQuery({
     queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
     enabled: Boolean(publicClient && wallet),
+    retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
       return loadOwnedGenesis(publicClient, deployment, wallet);
@@ -236,6 +237,12 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           </Link>
         )}
       </div>
+
+      {wallet && portfolio.data?.stale && (
+        <p className="genesis-note is-warning" role="status">
+          {t("operatorsSyncing")}
+        </p>
+      )}
 
       {wallet ? (
         <section className="ui-card launch-position" aria-label={t("yourPosition")}>
