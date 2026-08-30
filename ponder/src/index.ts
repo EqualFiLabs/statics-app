@@ -3,6 +3,7 @@ import { genesisActivationRegistryAbi, staticsAbi } from "@statics-protocol/sdk"
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 import { getAddress, zeroAddress } from "viem";
 import { activeGenesisCreditMutation } from "./genesis-credit";
+import { genesisTransferMutation, genesisWeightChangedMutation } from "./genesis";
 
 import {
   activeGenesisCredit,
@@ -20,7 +21,8 @@ const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
 const canonicalPoolId = process.env.PONDER_CANONICAL_POOL_ID?.trim().toLowerCase();
-const genesisVault = process.env.PONDER_GENESIS_VAULT_ADDRESS?.trim().toLowerCase();
+const genesisVaultValue = process.env.PONDER_GENESIS_VAULT_ADDRESS?.trim();
+const genesisVault = genesisVaultValue ? getAddress(genesisVaultValue) : undefined;
 
 ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -149,32 +151,18 @@ ponder.on("PositionManager:Transfer", async ({ event, context }) => {
 });
 
 ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
-  const key = entityKey(event.args.tokenId);
-  if (event.args.to === zeroAddress || event.args.to.toLowerCase() === genesisVault) {
-    await context.db.delete(genesisNft, { key });
+  const mutation = genesisTransferMutation({
+    deploymentId,
+    genesisId: event.args.tokenId,
+    to: event.args.to,
+    vault: genesisVault,
+    blockNumber: event.block.number,
+  });
+  if (mutation.type === "delete") {
+    await context.db.delete(genesisNft, { key: mutation.key });
     return;
   }
-  await context.db
-    .insert(genesisNft)
-    .values({
-      key,
-      deploymentId,
-      id: event.args.tokenId,
-      owner: getAddress(event.args.to),
-      tier: 0,
-      multiplierBps: 10_000,
-      linkedPositionId: 0n,
-      registered: false,
-      effectiveWeight: 0n,
-      updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({
-      owner: getAddress(event.args.to),
-      tier: 0,
-      multiplierBps: 10_000,
-      linkedPositionId: 0n,
-      updatedAtBlock: event.block.number,
-    });
+  await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
 });
 
 ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
@@ -240,10 +228,16 @@ ponder.on("GenesisLaunchDistributor:GenesisRegistered", async ({ event, context 
 });
 
 ponder.on("GenesisLaunchDistributor:GenesisWeightChanged", async ({ event, context }) => {
-  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
-    effectiveWeight: event.args.newWeight,
-    updatedAtBlock: event.block.number,
+  if (!genesisVault)
+    throw new Error("PONDER_GENESIS_VAULT_ADDRESS is required for Genesis weights.");
+  const mutation = genesisWeightChangedMutation({
+    deploymentId,
+    genesisId: event.args.genesisId,
+    vault: genesisVault,
+    newWeight: event.args.newWeight,
+    blockNumber: event.block.number,
   });
+  await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
 });
 
 ponder.on("GenesisLaunchDistributor:GenesisRewardsClaimed", async ({ event, context }) => {
