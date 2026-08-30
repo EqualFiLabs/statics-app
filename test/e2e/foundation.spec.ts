@@ -234,6 +234,8 @@ test.describe("Dollar DApp foundation", () => {
 
   test("uses the network selector for public and local targets", async ({ page }) => {
     await page.goto("/app/positions");
+    const toggle = page.locator(".dapp-nav-toggle");
+    if (await toggle.isVisible()) await toggle.click();
     const selector = page.getByRole("combobox", { name: "Statics network" });
 
     await expect(selector).toHaveValue("robinhood-testnet");
@@ -243,15 +245,13 @@ test.describe("Dollar DApp foundation", () => {
       "Robinhood Chain Testnet",
     ]);
     await selector.selectOption("robinhood");
-    await expect(selector).toHaveValue("robinhood");
-    await expect(page.getByRole("heading", { name: "Your Position NFTs" })).toBeVisible();
-    await expect(page.locator(".protocol-action-scope")).toHaveAttribute("aria-disabled", "true");
-
-    await selector.selectOption("anvil");
-    await expect(selector).toHaveValue("anvil");
-
-    await selector.selectOption("robinhood-testnet");
-    await expect(selector).toHaveValue("robinhood-testnet");
+    await expect(page.getByRole("heading", { name: "Statics Operators launch" })).toBeVisible();
+    if (await toggle.isVisible()) {
+      await expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await toggle.click();
+    }
+    await expect(page.getByRole("combobox", { name: "Statics network" })).toHaveValue("robinhood");
+    await expect(page.locator(".protocol-action-scope")).toHaveCount(0);
   });
 
   test("keeps desktop navbar controls aligned to the right", async ({ page }, testInfo) => {

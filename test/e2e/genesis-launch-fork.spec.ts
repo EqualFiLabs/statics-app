@@ -26,6 +26,7 @@ async function selectLocalDeployment(page: Page) {
 test("renders the Operators launch-only surface and contextual utilities on the local fork", async ({
   page,
 }) => {
+  test.skip(!process.env.CONNECTED_DAPP_URL, "Requires the connected Genesis launch fork");
   const expectNoBrowserFailures = monitorBrowserFailures(page);
   await selectLocalDeployment(page);
 
