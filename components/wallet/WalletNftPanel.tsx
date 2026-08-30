@@ -89,6 +89,7 @@ export function WalletNftPanel({
             readCollectionHoldings(publicClient, collection, walletAddress)
           )
         );
+        const tierById = new Map(genesis.indexed.map((item) => [item.id.toString(), item.tier]));
         const genesisNfts: WalletNft[] = genesis.ids.map((tokenId) => ({
           kind: "collection" as const,
           tokenId,
@@ -98,6 +99,7 @@ export function WalletNftPanel({
           carries: [] as readonly string[],
           transferWarning: t("operatorTransferWarning"),
           blockedReason: null,
+          artworkTier: tierById.get(tokenId.toString()) ?? 0,
         }));
         const collectionNfts: readonly WalletNft[] = collectionResults.flatMap((result) =>
           result.status === "fulfilled" ? describeCollectionNfts(result.value) : []

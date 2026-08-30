@@ -13,10 +13,6 @@ export function getNativeTokenLogoURI(symbol: string | undefined) {
 export function allowedTokenLogoURI(value: string | undefined) {
   if (!value) return null;
   if (value.startsWith("/") && !value.startsWith("//")) return value;
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "https:" ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
+  return (tokenLogoAssets.logos as Readonly<Record<string, string>>)[value] ?? null;
 }
+import tokenLogoAssets from "@/lib/generated/token-logo-assets.json";

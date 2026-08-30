@@ -225,7 +225,7 @@ export function GenesisCarousel({
               <NftArtwork
                 chainId={chainId}
                 defer
-                cacheVersion={item.tier}
+                operatorTier={item.tier}
                 size="lg"
                 nft={{
                   kind: "collection",

@@ -24,11 +24,6 @@ vi.mock("@/lib/genesis/discovery", () => ({
   discoverNextAvailableGenesisId: (...args: unknown[]) => discoverNextAvailableGenesisId(...args),
   discoverWalletGenesisSnapshot: (...args: unknown[]) => discoverWalletGenesisSnapshot(...args),
 }));
-vi.mock("@/lib/wallet/nft-image", () => ({
-  resolveNftImage: vi.fn().mockResolvedValue(null),
-  resolveNftMetadata: vi.fn().mockResolvedValue({ image: null, traits: [] }),
-}));
-
 const statics = getAddress("0x1111111111111111111111111111111111111111");
 const weth = getAddress("0x7777777777777777777777777777777777777777");
 const wallet = getAddress("0x2222222222222222222222222222222222222222");

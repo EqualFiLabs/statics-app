@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "chainId": 4663,
+  "protocolCommit": "43018f109006aa2c2eef2808adc2aa74dfc9a6d4",
+  "collection": {
+    "address": "0xad5E9F96A91D1A6F550580b157af2068A0e8F0BE",
+    "runtimeCodeHash": "0x4999fbcee14596c8105be151c80a8f7f2ae2c75e48d869cd8f4003a59f7f8085",
+    "maximumSupply": 5555
+  },
+  "renderer": {
+    "address": "0xBbF960f837166ab687FA5d69b605c2E70a83a017",
+    "runtimeCodeHash": "0x3ae699e07a0b5ba972410b2198c2a30f1cb551b2a834a55f64c17d4997573987"
+  }
+}

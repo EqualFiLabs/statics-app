@@ -2,11 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { usePublicClient } from "wagmi";
 
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import { genesisTierMultiplier } from "@/components/genesis/GenesisTierLadder";
-import { resolveNftMetadata } from "@/lib/wallet/nft-image";
+import { loadOperatorTraits } from "@/lib/wallet/local-nft-art";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
 
 /**
@@ -37,33 +36,26 @@ export function GenesisIdentityPanel({
   maximumSupply: bigint;
 }>) {
   const t = useTranslations("operators.identity");
-  const publicClient = usePublicClient({ chainId });
 
-  // The traits ride along with the artwork request the card already makes: the
-  // tokenURI document is decoded either way, so this costs no extra RPC.
+  // Immutable traits are embedded in the checked-in SVG, so identity never
+  // needs a tokenURI RPC even when the indexer is catching up.
   const metadata = useQuery({
     queryKey: ["genesis-traits", chainId, collection, id.toString()],
-    enabled: Boolean(publicClient),
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     retry: false,
-    queryFn: ({ signal }) => {
-      if (!publicClient) return null;
-      return resolveNftMetadata(publicClient, collection, id, signal);
-    },
+    queryFn: ({ signal }) => loadOperatorTraits(chainId, collection, id, signal),
   });
 
   // The tier is already stated by the badge above, and the registry is a more
   // current source for it than cached metadata.
-  const traits = (metadata.data?.traits ?? []).filter(
-    (trait) => trait.label.toLowerCase() !== "activation tier"
-  );
+  const traits = metadata.data ?? [];
 
   return (
     <aside className="genesis-identity ui-card" aria-label={t("details", { id: id.toString() })}>
       <div className="genesis-identity-art">
         <NftArtwork
           chainId={chainId}
-          cacheVersion={tier}
+          operatorTier={tier}
           expandable
           size="lg"
           nft={{

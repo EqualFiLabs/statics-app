@@ -40,16 +40,6 @@ vi.mock("@/lib/genesis/discovery", () => ({
     stale: false,
   }),
 }));
-vi.mock("@/lib/wallet/nft-image", () => ({
-  resolveNftImage: vi.fn().mockResolvedValue("data:image/svg+xml,%3Csvg/%3E"),
-  resolveNftMetadata: vi.fn().mockResolvedValue({
-    image: "data:image/svg+xml,%3Csvg/%3E",
-    traits: [
-      { label: "Field", value: "Quiescent", max: null },
-      { label: "Activation Tier", value: "2", max: 4 },
-    ],
-  }),
-}));
 const discoverWalletGenesisIds = vi.fn();
 
 const statics = getAddress("0x1111111111111111111111111111111111111111");

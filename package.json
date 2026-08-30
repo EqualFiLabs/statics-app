@@ -32,6 +32,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "sdk:sync": "node scripts/vendor-statics-sdk.mjs",
+    "assets:operators": "node scripts/generate-operator-assets.mjs",
+    "assets:operators:verify": "node scripts/generate-operator-assets.mjs --verify",
+    "assets:token-logos": "node scripts/generate-token-logo-assets.mjs",
+    "assets:token-logos:verify": "node scripts/generate-token-logo-assets.mjs --verify",
+    "verify:assets": "npm run assets:operators:verify && npm run assets:token-logos:verify",
     "deployment:manifest": "node scripts/generate-deployment-manifest.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
@@ -39,7 +44,7 @@
     "test:e2e": "node scripts/without-statics-env.mjs npm run build && playwright test",
     "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
-    "verify": "npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
+    "verify": "npm run verify:assets && npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
   },
   "dependencies": {
     "@privy-io/react-auth": "3.38.0",

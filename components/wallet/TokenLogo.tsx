@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Token catalogs use allowlisted remote icon hosts. */
+/* eslint-disable @next/next/no-img-element -- Token catalogs resolve to generated local assets. */
 
 import { useState } from "react";
 
@@ -16,7 +16,7 @@ export function TokenLogo({
   const [failed, setFailed] = useState(false);
   const uri = allowedTokenLogoURI(token.logoURI);
   if (uri && !failed) {
-    // Catalog icons can be hosted by multiple verified token-list sources.
+    // Remote catalog sources are normalized into checked-in local WebP files.
     return (
       <img
         src={uri}
