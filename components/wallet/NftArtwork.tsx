@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Droplets, Image as ImageIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePublicClient } from "wagmi";
 
 import { NftArtworkDialog } from "@/components/wallet/NftArtworkDialog";
@@ -22,11 +22,17 @@ export function NftArtwork({
   nft,
   chainId,
   expandable = false,
+  defer = false,
+  cacheVersion,
   size = "sm",
 }: {
   nft: WalletNft;
   chainId: number;
   expandable?: boolean;
+  /** Defer the metadata RPC until the card enters the viewport. */
+  defer?: boolean;
+  /** Optional collection-specific metadata version, such as an activation tier. */
+  cacheVersion?: string | number;
   /** "sm" is the 48px corner thumbnail; "lg" fills its container. */
   size?: "sm" | "lg";
 }) {
@@ -34,10 +40,29 @@ export function NftArtwork({
   const t = useTranslations("nftArtwork");
   const [failed, setFailed] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [visible, setVisible] = useState(
+    () => !defer || typeof IntersectionObserver === "undefined"
+  );
+  const observerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!defer || !observerRef.current || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "160px" }
+    );
+    observer.observe(observerRef.current);
+    return () => observer.disconnect();
+  }, [defer]);
 
   const image = useQuery({
-    queryKey: ["nft-image", chainId, nft.contract, nft.tokenId.toString()],
-    enabled: Boolean(publicClient),
+    queryKey: ["nft-image", chainId, nft.contract, nft.tokenId.toString(), cacheVersion ?? null],
+    enabled: Boolean(publicClient && visible),
     staleTime: 5 * 60 * 1000,
     retry: false,
     queryFn: ({ signal }) => {
@@ -63,7 +88,7 @@ export function NftArtwork({
       />
     );
     if (!expandable) return artwork;
-    return (
+    const content = (
       <>
         <button
           className={`wallet-nft-art-trigger${sizeClass}`}
@@ -78,14 +103,20 @@ export function NftArtwork({
         )}
       </>
     );
+    return content;
   }
 
   const Placeholder =
     nft.kind === "position" ? Boxes : nft.kind === "liquidity" ? Droplets : ImageIcon;
 
-  return (
-    <span className={`wallet-nft-art is-placeholder${sizeClass}`} aria-hidden="true">
+  const placeholder = (
+    <span
+      ref={defer ? observerRef : undefined}
+      className={`wallet-nft-art is-placeholder${sizeClass}`}
+      aria-hidden="true"
+    >
       <Placeholder size={size === "lg" ? 40 : 20} />
     </span>
   );
+  return placeholder;
 }

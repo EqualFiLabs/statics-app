@@ -90,9 +90,15 @@ Server-only configuration:
 - `ACROSS_INTEGRATOR_ID`
 - `EVE_BASE_RPC_URL`
 - `EVE_ROBINHOOD_RPC_URL`
+- `STATICS_ROBINHOOD_TESTNET_RPC_URL`
+- `STATICS_ROBINHOOD_MAINNET_RPC_URL`
 
 The server integrations read these values only from their process environment. They are never
 copied into browser configuration.
+
+The `STATICS_ROBINHOOD_*` values back the same-origin, read-only browser RPC proxy. Use a dedicated
+authenticated provider application/key for them. Ponder must use a different provider key so
+browser request bursts cannot consume the indexer's quota.
 
 The EVE RPCs verify the destination `OFTReceived` receipt before a LayerZero bridge is displayed as
 filled. They must point to authenticated, production-capable Base and Robinhood Chain RPC services;
@@ -183,7 +189,8 @@ selects the chain but cannot replace the reviewed public deployment:
 export NEXT_PUBLIC_APP_ENV=production
 export NEXT_PUBLIC_SITE_URL=https://your-statics-site.example
 export NEXT_PUBLIC_APP_NETWORK=robinhood-testnet
-export NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL=https://your-browser-safe-rpc.example
+# Server-only upstream RPC used by the same-origin browser read proxy.
+export STATICS_ROBINHOOD_TESTNET_RPC_URL=https://your-server-only-rpc.example
 export NEXT_PUBLIC_PRIVY_APP_ID=your-public-privy-app-id
 export NEXT_PUBLIC_STATICS_CHAIN_ID=46630
 

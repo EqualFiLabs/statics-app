@@ -25,12 +25,20 @@ vi.mock("wagmi", () => ({
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
+  verifyLaunchDeploymentCached: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/indexer/statics", () => ({
   loadRecoverableGenesisCredits: (...args: unknown[]) => loadRecoverableGenesisCredits(...args),
 }));
 vi.mock("@/lib/genesis/discovery", () => ({
   discoverWalletGenesisIds: (...args: unknown[]) => discoverWalletGenesisIds(...args),
+  discoverWalletGenesisSnapshot: async (...args: unknown[]) => ({
+    ids: await discoverWalletGenesisIds(...args),
+    indexed: [],
+    indexedBlock: null,
+    chainHead: null,
+    stale: false,
+  }),
 }));
 vi.mock("@/lib/wallet/nft-image", () => ({
   resolveNftImage: vi.fn().mockResolvedValue("data:image/svg+xml,%3Csvg/%3E"),
@@ -234,7 +242,7 @@ describe("launch overview", () => {
     // this precision, which is the asymmetry working as designed.
     await screen.findByText("180,000 STATICS, no ETH");
     const row = screen.getByText("Buy-in if the Epoch ended now").closest("div");
-    expect(row).toHaveTextContent("0.0009 WETH");
+    expect(row).toHaveTextContent("0.0009 ETH");
     expect(screen.getByText(/already accruing/)).toBeInTheDocument();
   });
 
@@ -294,7 +302,7 @@ describe("Genesis credit presentation", () => {
   function creditReads(epochActive: boolean, paused: boolean) {
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
       if (functionName === "vaultAccounting") return vaultAccounting(epochActive);
-      if (functionName === "creditOriginationsPaused") return paused;
+      if (functionName === "creditIncreasesPaused") return paused;
       if (functionName === "credit") {
         return { owner: zeroAddress, principal: 0n, maturity: 0, recoverableAt: 0, active: false };
       }
@@ -325,7 +333,7 @@ describe("Genesis credit presentation", () => {
     useBlock.mockReturnValue({ data: { timestamp: maturity + 30n * 86_400n + 86_401n } });
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
       if (functionName === "vaultAccounting") return vaultAccounting(false);
-      if (functionName === "creditOriginationsPaused") return false;
+      if (functionName === "creditIncreasesPaused") return false;
       if (functionName === "credit") {
         return {
           owner: wallet,
@@ -406,7 +414,7 @@ describe("consolidated Genesis rewards surface", () => {
     readContract.mockImplementation(
       async ({ functionName, args }: { functionName: string; args: readonly unknown[] }) => {
         if (functionName === "vaultAccounting") return vaultAccounting(true);
-        if (functionName === "creditOriginationsPaused") return false;
+        if (functionName === "creditIncreasesPaused") return false;
         if (functionName === "credit") {
           return {
             owner: zeroAddress,
@@ -451,9 +459,9 @@ describe("consolidated Genesis rewards surface", () => {
     rewardsReads();
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
 
-    // Two assets on each of two NFTs, plus both past-ownership assets.
+    // One bounded Operator batch plus one previous-owner treasury claim.
     expect(
-      await screen.findByRole("button", { name: "Claim all · 6 transactions" })
+      await screen.findByRole("button", { name: "Claim all · 2 transactions" })
     ).toBeInTheDocument();
   });
 

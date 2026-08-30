@@ -14,7 +14,7 @@ import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentCached } from "@/lib/deployments/verify-launch";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { genesisAcquisitionCost, genesisBackingInNumeraire } from "@/lib/genesis/market-value";
 import {
@@ -28,7 +28,8 @@ import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
 const Q192 = 1n << 192n;
-const PRICE_DECIMALS = 8;
+const WETH_PER_STATICS_DECIMALS = 8;
+const STATICS_PER_WETH_DECIMALS = 4;
 
 /** Genesis held by the treasury at launch, StaticsGenesisVault.INITIAL_TREASURY_GENESIS. */
 const TREASURY_GENESIS = 555n;
@@ -50,11 +51,12 @@ export function formatCanonicalMarketPrice(
   currency0: Address,
   statics: Address
 ): { value: string; unit: "WETH per STATICS" | "STATICS per WETH" } {
-  const scaledPrice = (sqrtPriceX96 * sqrtPriceX96 * 10n ** BigInt(PRICE_DECIMALS)) / Q192;
+  const staticsPerWeth = currency0.toLowerCase() !== statics.toLowerCase();
+  const decimals = staticsPerWeth ? STATICS_PER_WETH_DECIMALS : WETH_PER_STATICS_DECIMALS;
+  const scaledPrice = (sqrtPriceX96 * sqrtPriceX96 * 10n ** BigInt(decimals)) / Q192;
   return {
-    value: decimalFromScaled(scaledPrice, PRICE_DECIMALS),
-    unit:
-      currency0.toLowerCase() === statics.toLowerCase() ? "WETH per STATICS" : "STATICS per WETH",
+    value: decimalFromScaled(scaledPrice, decimals),
+    unit: staticsPerWeth ? "STATICS per WETH" : "WETH per STATICS",
   };
 }
 
@@ -88,12 +90,12 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
 
   const metrics = useQuery({
-    queryKey: ["launch-overview", deployment.descriptor.deploymentId, wallet],
+    queryKey: ["launch-overview", deployment.descriptor.deploymentId],
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [vault, purchase, redemption, slot0, liquidity, staticsBalance] = await Promise.all([
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      const [vault, purchase, redemption, slot0, liquidity] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -121,16 +123,22 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           functionName: "getLiquidity",
           args: [deployment.market.poolId],
         }),
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.statics,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
       ]);
-      return { vault, purchase, redemption, sqrtPriceX96: slot0[0], liquidity, staticsBalance };
+      return { vault, purchase, redemption, sqrtPriceX96: slot0[0], liquidity };
+    },
+  });
+
+  const staticsBalance = useQuery({
+    queryKey: ["launch-overview-balance", deployment.descriptor.deploymentId, wallet],
+    enabled: Boolean(publicClient && wallet),
+    queryFn: async () => {
+      if (!publicClient || !wallet) return 0n;
+      return publicClient.readContract({
+        address: deployment.contracts.statics,
+        abi: dopplerStaticsTokenAbi,
+        functionName: "balanceOf",
+        args: [wallet],
+      });
     },
   });
 
@@ -139,6 +147,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   const portfolio = useQuery({
     queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
     enabled: Boolean(publicClient && wallet),
+    retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
       return loadOwnedGenesis(publicClient, deployment, wallet);
@@ -229,12 +238,20 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
         )}
       </div>
 
+      {wallet && portfolio.data?.stale && (
+        <p className="genesis-note is-warning" role="status">
+          {t("operatorsSyncing")}
+        </p>
+      )}
+
       {wallet ? (
         <section className="ui-card launch-position" aria-label={t("yourPosition")}>
           <div className="ui-stat">
             <span className="ui-stat__label">{t("yourStatics")}</span>
             <strong className="ui-stat__value">
-              {metrics.data ? formatTokenAmountGrouped(metrics.data.staticsBalance, 18, 2) : "—"}
+              {staticsBalance.data !== undefined
+                ? formatTokenAmountGrouped(staticsBalance.data, 18, 2)
+                : "—"}
             </strong>
           </div>
           <div className="ui-stat">
@@ -324,7 +341,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
             <h3>{t("market")}</h3>
             <span>{metrics.data?.liquidity ? t("liquidityActive") : t("noActiveLiquidity")}</span>
           </div>
-          <p className="overview-figure">
+          <p className="overview-figure overview-figure--market">
             <b>{marketPrice?.value ?? "—"}</b>
             <span>
               {marketPrice?.unit === "STATICS per WETH" ? t("staticsPerWeth") : t("wethPerStatics")}
@@ -347,13 +364,13 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
               <dt>{t("reservePerOperator")}</dt>
               <dd>
                 {vault
-                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} WETH`
+                  ? `${formatTokenAmountGrouped(vault.reserveBackingPerGenesis, 18, 6)} ETH`
                   : "—"}
               </dd>
             </div>
             <div>
               <dt>{vault?.epochActive ? t("buyInProjected") : t("buyInToday")}</dt>
-              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} WETH`}</dd>
+              <dd>{`${formatTokenAmountGrouped(projectedBuyIn, 18, 5)} ETH`}</dd>
             </div>
             <div className="is-total">
               <dt>{t("allInCost")}</dt>

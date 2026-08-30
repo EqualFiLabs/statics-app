@@ -5,55 +5,164 @@ import { staticsGenesisAbi, staticsGenesisVaultAbi } from "@statics-protocol/sdk
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import {
   configuredIndexerUrlForDeployment,
+  loadIndexerCheckpoint,
   loadNextAvailableGenesisId,
-  loadWalletLaunchGenesisIds,
+  loadWalletLaunchGenesisItems,
 } from "@/lib/indexer/statics";
+import type { IndexedLaunchGenesis } from "@/lib/indexer/statics";
 
-const GENESIS_SUPPLY = 5_555n;
-const DISCOVERY_BATCH = 64n;
+const MAX_INDEXER_BLOCK_LAG = 100n;
+export const MAX_GENESIS_RECONCILIATION_BLOCKS = 50_000n;
+
+const genesisTransferEvent = staticsGenesisAbi.find(
+  (entry) => entry.type === "event" && entry.name === "Transfer"
+) as Extract<(typeof staticsGenesisAbi)[number], { type: "event"; name: "Transfer" }>;
+
+async function loadIncomingGenesisIds(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment,
+  owner: Address,
+  fromBlock: bigint,
+  latestBlock: bigint
+): Promise<bigint[]> {
+  if (fromBlock > latestBlock) return [];
+  if (latestBlock - fromBlock + 1n > MAX_GENESIS_RECONCILIATION_BLOCKS) {
+    throw new Error("The Genesis reconciliation range exceeds its browser RPC bound.");
+  }
+  const ids = new Set<string>();
+  const logs = await publicClient.getLogs({
+    address: deployment.contracts.genesis,
+    event: genesisTransferEvent,
+    args: { to: getAddress(owner) },
+    fromBlock,
+    toBlock: latestBlock,
+  });
+  for (const log of parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" })) {
+    ids.add(String(log.args.tokenId));
+  }
+  return [...ids].map(BigInt);
+}
 
 export async function discoverNextAvailableGenesisId(
   publicClient: PublicClient,
   deployment: LaunchDeployment
 ): Promise<bigint | null> {
-  if (configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId)) {
-    try {
-      const indexed = await loadNextAvailableGenesisId(deployment.descriptor.deploymentId);
-      if (indexed === null) return null;
-      const available = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: staticsGenesisVaultAbi,
-        functionName: "isVaultInventory",
-        args: [indexed],
-      });
-      if (available) return indexed;
-    } catch {
-      // A missing/stale indexer falls through to bounded authoritative reads.
+  const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
+  if (!indexerUrl) throw new Error("Operator inventory indexing is unavailable.");
+  const [indexed, checkpoint, chainHead] = await Promise.all([
+    loadNextAvailableGenesisId(deployment.descriptor.deploymentId, indexerUrl),
+    loadIndexerCheckpoint(
+      deployment.descriptor.chainId,
+      deployment.descriptor.deploymentId,
+      indexerUrl
+    ),
+    publicClient.getBlockNumber(),
+  ]);
+  if (
+    checkpoint.blockNumber > chainHead ||
+    chainHead - checkpoint.blockNumber > MAX_INDEXER_BLOCK_LAG
+  ) {
+    throw new Error("Operator inventory data is still syncing.");
+  }
+  if (indexed === null) return null;
+  const available = await publicClient.readContract({
+    address: deployment.contracts.vault,
+    abi: staticsGenesisVaultAbi,
+    functionName: "isVaultInventory",
+    args: [indexed],
+  });
+  if (!available) throw new Error("The indexed Operator inventory changed. Try again shortly.");
+  return indexed;
+}
+
+export type GenesisDiscoverySnapshot = Readonly<{
+  ids: readonly bigint[];
+  indexed: readonly IndexedLaunchGenesis[];
+  indexedBlock: bigint | null;
+  chainHead: bigint | null;
+  stale: boolean;
+}>;
+
+/**
+ * Returns the wallet snapshot plus its freshness boundary. IDs are still
+ * checked against current ownerOf state, while indexed fields are retained so
+ * callers do not repeat reads that Ponder already materialized.
+ */
+export async function discoverWalletGenesisSnapshot(
+  publicClient: PublicClient,
+  deployment: LaunchDeployment,
+  owner: Address
+): Promise<GenesisDiscoverySnapshot> {
+  let recentIds: readonly bigint[] = [];
+  let indexedBlock: bigint | null = null;
+  const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
+  if (!indexerUrl) throw new Error("Operator ownership indexing is unavailable.");
+
+  const [indexedResult, checkpointResult, chainHeadResult] = await Promise.allSettled([
+    loadWalletLaunchGenesisItems(owner, deployment.descriptor.deploymentId, indexerUrl),
+    loadIndexerCheckpoint(
+      deployment.descriptor.chainId,
+      deployment.descriptor.deploymentId,
+      indexerUrl
+    ),
+    publicClient.getBlockNumber(),
+  ]);
+  if (indexedResult.status === "rejected") throw indexedResult.reason;
+  if (chainHeadResult.status === "rejected") throw chainHeadResult.reason;
+
+  const indexed = indexedResult.value;
+  const chainHead = chainHeadResult.value;
+  let stale = checkpointResult.status === "rejected";
+  if (checkpointResult.status === "fulfilled") {
+    const checkpoint = checkpointResult.value;
+    indexedBlock = checkpoint.blockNumber;
+    if (checkpoint.blockNumber > chainHead) {
+      stale = true;
+    } else {
+      const lag = chainHead - checkpoint.blockNumber;
+      stale = lag > MAX_INDEXER_BLOCK_LAG;
+      if (lag > 0n && lag <= MAX_GENESIS_RECONCILIATION_BLOCKS) {
+        try {
+          recentIds = await loadIncomingGenesisIds(
+            publicClient,
+            deployment,
+            owner,
+            checkpoint.blockNumber + 1n,
+            chainHead
+          );
+        } catch {
+          // Keep the last indexed snapshot visible. The stale marker tells the
+          // UI it may not include transfers that occurred after the checkpoint.
+          stale = true;
+        }
+      }
     }
   }
 
-  for (let start = 1n; start <= GENESIS_SUPPLY; start += DISCOVERY_BATCH) {
-    const end = start + DISCOVERY_BATCH - 1n;
-    const ids = Array.from(
-      { length: Number((end < GENESIS_SUPPLY ? end : GENESIS_SUPPLY) - start + 1n) },
-      (_, index) => start + BigInt(index)
-    );
-    const results = await Promise.all(
-      ids.map((id) =>
-        publicClient
-          .readContract({
-            address: deployment.contracts.vault,
-            abi: staticsGenesisVaultAbi,
-            functionName: "isVaultInventory",
-            args: [id],
-          })
-          .catch(() => false)
-      )
-    );
-    const availableIndex = results.findIndex(Boolean);
-    if (availableIndex >= 0) return ids[availableIndex]!;
-  }
-  return null;
+  const ids = [...new Set([...indexed.map((item) => item.id), ...recentIds].map(String))].map(
+    BigInt
+  );
+  const current = await Promise.all(
+    ids.map((id) =>
+      publicClient.readContract({
+        address: deployment.contracts.genesis,
+        abi: staticsGenesisAbi,
+        functionName: "ownerOf",
+        args: [id],
+      })
+    )
+  );
+  const ownedIds = ids.filter(
+    (_, index) => String(current[index]).toLowerCase() === owner.toLowerCase()
+  );
+  const ownedSet = new Set(ownedIds.map(String));
+  return {
+    ids: ownedIds,
+    indexed: indexed.filter((item) => ownedSet.has(item.id.toString())),
+    indexedBlock,
+    chainHead,
+    stale,
+  };
 }
 
 export async function discoverWalletGenesisIds(
@@ -61,46 +170,5 @@ export async function discoverWalletGenesisIds(
   deployment: LaunchDeployment,
   owner: Address
 ): Promise<bigint[]> {
-  let ids: bigint[] | null = null;
-  if (configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId)) {
-    try {
-      ids = await loadWalletLaunchGenesisIds(owner, deployment.descriptor.deploymentId);
-    } catch {
-      // A failed indexer request falls through to the direct event-log path.
-    }
-  }
-  if (ids === null) {
-    const logs = await publicClient.getLogs({
-      address: deployment.contracts.genesis,
-      event: staticsGenesisAbi.find(
-        (entry) => entry.type === "event" && entry.name === "Transfer"
-      ) as Extract<(typeof staticsGenesisAbi)[number], { type: "event"; name: "Transfer" }>,
-      args: { to: getAddress(owner) },
-      fromBlock: deployment.deploymentStartBlock,
-      toBlock: "latest",
-    });
-    ids = [
-      ...new Set(
-        parseEventLogs({ abi: staticsGenesisAbi, logs, eventName: "Transfer" }).map((log) =>
-          String(log.args.tokenId)
-        )
-      ),
-    ].map(BigInt);
-  }
-  const current = await Promise.all(
-    ids.map((id) =>
-      publicClient
-        .readContract({
-          address: deployment.contracts.genesis,
-          abi: staticsGenesisAbi,
-          functionName: "ownerOf",
-          args: [id],
-        })
-        .catch(() => null)
-    )
-  );
-  return ids.filter(
-    (_, index) =>
-      current[index] !== null && String(current[index]).toLowerCase() === owner.toLowerCase()
-  );
+  return [...(await discoverWalletGenesisSnapshot(publicClient, deployment, owner)).ids];
 }

@@ -19,11 +19,17 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
-import { discoverNextAvailableGenesisId, discoverWalletGenesisIds } from "@/lib/genesis/discovery";
+import {
+  discoverNextAvailableGenesisId,
+  discoverWalletGenesisSnapshot,
+} from "@/lib/genesis/discovery";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 import { useWalletState } from "@/providers/wallet-context";
 
 type VaultDirection = "acquire" | "redeem";
@@ -68,21 +74,30 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const [busy, setBusy] = useState<"buy" | "redeem" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const vault = useQuery({
-    queryKey: ["genesis-vault-swap", deployment.descriptor.deploymentId, wallet],
+  const verification = useQuery({
+    queryKey: [
+      "launch-deployment-verification",
+      deployment.descriptor.deploymentId,
+      deployment.protocolCommit,
+    ],
     enabled: Boolean(publicClient),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    retry: false,
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [
-        purchaseQuote,
-        redemptionQuote,
-        accounting,
-        nextId,
-        ownedIds,
-        staticsBalance,
-        nativeBalance,
-      ] = await Promise.all([
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      return true;
+    },
+  });
+
+  const vault = useQuery({
+    queryKey: ["genesis-vault-swap", deployment.descriptor.deploymentId],
+    enabled: Boolean(publicClient && verification.data),
+    retry: false,
+    queryFn: async () => {
+      if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
+      const [purchaseQuote, redemptionQuote, accounting] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -98,23 +113,52 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           abi: currentGenesisVaultAbi,
           functionName: "vaultAccounting",
         }),
-        discoverNextAvailableGenesisId(publicClient, deployment),
-        wallet ? discoverWalletGenesisIds(publicClient, deployment, wallet) : [],
-        wallet
-          ? publicClient.readContract({
-              address: deployment.contracts.statics,
-              abi: dopplerStaticsTokenAbi,
-              functionName: "balanceOf",
-              args: [wallet],
-            })
-          : 0n,
-        wallet ? publicClient.getBalance({ address: wallet }) : 0n,
       ]);
+      return { purchaseQuote, redemptionQuote, accounting };
+    },
+  });
+
+  const nextAvailable = useQuery({
+    queryKey: ["genesis-vault-next", deployment.descriptor.deploymentId],
+    enabled: Boolean(publicClient && verification.data),
+    retry: false,
+    queryFn: async () => {
+      if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
+      return discoverNextAvailableGenesisId(publicClient, deployment);
+    },
+  });
+
+  const walletBalances = useQuery({
+    queryKey: ["genesis-vault-balances", deployment.descriptor.deploymentId, wallet],
+    enabled: Boolean(publicClient && wallet && verification.data),
+    retry: false,
+    queryFn: async () => {
+      if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
+      const [staticsBalance, nativeBalance] = await Promise.all([
+        publicClient.readContract({
+          address: deployment.contracts.statics,
+          abi: dopplerStaticsTokenAbi,
+          functionName: "balanceOf",
+          args: [wallet],
+        }),
+        publicClient.getBalance({ address: wallet }),
+      ]);
+      return { staticsBalance, nativeBalance };
+    },
+  });
+
+  const walletOperators = useQuery({
+    queryKey: ["genesis-vault-wallet", deployment.descriptor.deploymentId, wallet],
+    enabled: Boolean(publicClient && wallet && verification.data),
+    retry: false,
+    queryFn: async () => {
+      if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
+      const discovery = await discoverWalletGenesisSnapshot(publicClient, deployment, wallet);
       // Credit locks a Genesis against redemption, and the old panel only found
       // out by reverting. Resolve it with the list so a locked NFT is marked
       // before anyone selects it.
       const owned = await Promise.all(
-        ownedIds.map(async (id): Promise<RedeemableGenesis> => {
+        discovery.ids.map(async (id): Promise<RedeemableGenesis> => {
           const credit = await publicClient.readContract({
             address: deployment.contracts.vault,
             abi: staticsGenesisCreditAbi,
@@ -124,15 +168,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           return { id, creditActive: credit.active };
         })
       );
-      return {
-        purchaseQuote,
-        redemptionQuote,
-        accounting,
-        nextId,
-        owned,
-        staticsBalance,
-        nativeBalance,
-      };
+      return { owned, stale: discovery.stale };
     },
   });
 
@@ -173,11 +209,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   };
 
   const buy = async () => {
-    if (!requireWallet() || !wallet || !publicClient || !vault.data?.nextId) return;
+    if (!requireWallet() || !wallet || !publicClient || !nextAvailable.data) return;
     setBusy("buy");
     setError(null);
     try {
-      const id = vault.data.nextId;
+      const id = nextAvailable.data;
       const [quote, balance, allowance, stillAvailable] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
@@ -303,17 +339,42 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     }
   };
 
-  if (vault.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
-  if (vault.error)
+  // Keep the last complete snapshot visible during background reconciliation.
+  // Only the initial load blocks the panel, so navigation and confirmed writes
+  // do not flash an empty state while the RPC catches up.
+  if (verification.isLoading || vault.isLoading)
+    return <p className="dapp-loading">{t("loading")}</p>;
+  if (verification.error && !verification.data)
     return (
-      <EmptyState title={t("unavailable")} description={describeTransactionError(vault.error)} />
+      <EmptyState
+        tone="error"
+        title={t("unavailable")}
+        description={describeTransactionError(verification.error)}
+        action={{
+          label: t("retry"),
+          onClick: () => void verification.refetch(),
+          disabled: verification.isFetching,
+        }}
+      />
     );
-
-  const nextId = vault.data?.nextId ?? null;
+  if (vault.error && !vault.data)
+    return (
+      <EmptyState
+        tone="error"
+        title={t("unavailable")}
+        description={describeTransactionError(vault.error)}
+        action={{
+          label: t("retry"),
+          onClick: () => void vault.refetch(),
+          disabled: vault.isFetching,
+        }}
+      />
+    );
+  const nextId = nextAvailable.data ?? null;
   const purchaseQuote = vault.data?.purchaseQuote;
   const redemptionQuote = vault.data?.redemptionQuote;
   const accounting = vault.data?.accounting;
-  const owned = vault.data?.owned ?? [];
+  const owned = walletOperators.data?.owned ?? [];
 
   const statics = (value: bigint | undefined, digits = 0) =>
     `${formatTokenAmountGrouped(value ?? 0n, 18, digits)} STATICS`;
@@ -324,8 +385,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   // enabled the button regardless and reported the shortfall as a thrown error.
   const staticsNeeded = purchaseQuote?.staticsPrice ?? 0n;
   const nativeNeeded = purchaseQuote?.requiredNative ?? 0n;
-  const staticsHeld = vault.data?.staticsBalance ?? 0n;
-  const nativeHeld = vault.data?.nativeBalance ?? 0n;
+  const staticsHeld = walletBalances.data?.staticsBalance ?? 0n;
+  const nativeHeld = walletBalances.data?.nativeBalance ?? 0n;
   const staticsShort = wallet && staticsHeld < staticsNeeded ? staticsNeeded - staticsHeld : 0n;
   const nativeShort = wallet && nativeHeld < nativeNeeded ? nativeNeeded - nativeHeld : 0n;
   const cannotAfford = staticsShort > 0n || nativeShort > 0n;
@@ -354,7 +415,34 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         </div>
 
         {direction === "acquire" ? (
-          nextId === null ? (
+          nextAvailable.isLoading || (Boolean(wallet) && walletBalances.isLoading) ? (
+            <EmptyState
+              title={t("inventoryLoading")}
+              description={t("inventoryLoadingDescription")}
+            />
+          ) : nextAvailable.error ? (
+            <EmptyState
+              tone="error"
+              title={t("inventoryUnavailable")}
+              description={t("inventoryUnavailableDescription")}
+              action={{
+                label: t("retry"),
+                onClick: () => void nextAvailable.refetch(),
+                disabled: nextAvailable.isFetching,
+              }}
+            />
+          ) : wallet && walletBalances.error ? (
+            <EmptyState
+              tone="error"
+              title={t("walletDataUnavailable")}
+              description={t("walletDataUnavailableDescription")}
+              action={{
+                label: t("retry"),
+                onClick: () => void walletBalances.refetch(),
+                disabled: walletBalances.isFetching,
+              }}
+            />
+          ) : nextId === null ? (
             <EmptyState
               title={t("inventoryExhausted")}
               description={t("inventoryExhaustedDescription")}
@@ -456,10 +544,38 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
           )
         ) : (
           <>
-            {!wallet || owned.length === 0 ? (
+            {wallet && walletOperators.isLoading ? (
+              <EmptyState title={t("ownedLoading")} description={t("ownedLoadingDescription")} />
+            ) : wallet && walletOperators.error ? (
+              <EmptyState
+                tone="error"
+                title={t("walletDataUnavailable")}
+                description={t("walletDataUnavailableDescription")}
+                action={{
+                  label: t("retry"),
+                  onClick: () => void walletOperators.refetch(),
+                  disabled: walletOperators.isFetching,
+                }}
+              />
+            ) : wallet && walletOperators.data?.stale && owned.length === 0 ? (
+              <EmptyState
+                title={t("ownedSyncing")}
+                description={t("ownedSyncingDescription")}
+                action={{
+                  label: t("retry"),
+                  onClick: () => void walletOperators.refetch(),
+                  disabled: walletOperators.isFetching,
+                }}
+              />
+            ) : !wallet || owned.length === 0 ? (
               <EmptyState title={t("noOperators")} description={t("noOperatorsDescription")} />
             ) : (
               <>
+                {walletOperators.data?.stale && (
+                  <p className="vault-notice" role="status">
+                    {t("ownedSyncingDescription")}
+                  </p>
+                )}
                 <p className="portal-field-label">{t("chooseOperator")}</p>
                 <div className="vault-owned" role="radiogroup" aria-label={t("yourOperators")}>
                   {owned.map((item) => {

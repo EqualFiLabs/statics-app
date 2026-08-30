@@ -87,8 +87,18 @@ ownership as the implicit initial state and does not expand the ERC-2309 `Consec
 
 Ponder stores circulating ownership changes plus activation, registration, fee, and reward events.
 A transfer back to the Vault removes the circulating ownership row. The next available token ID is
-derived from the bounded collection and circulating exceptions, then rechecked against
-`isVaultInventory(tokenId)` before acquisition.
+derived from the bounded collection and circulating exceptions. It is authoritative only while the
+Ponder checkpoint is within 100 blocks of the RPC head, and the returned candidate is rechecked
+against `isVaultInventory(tokenId)` before acquisition. A fresh `null` response means the Vault is
+exhausted. An unavailable or stale response means inventory is syncing and must never be presented
+as exhaustion. The application does not scan all 5,555 IDs as a fallback.
+
+Wallet discovery starts from Ponder's ownership snapshot. When its checkpoint is healthy enough to
+reconcile, the application requests `Transfer` logs once for at most the next 50,000 blocks and then
+rechecks every resulting candidate with `ownerOf`. If the checkpoint is unavailable, is ahead of the
+RPC, or trails by more than 50,000 blocks, the indexed snapshot remains visible but is marked stale;
+the application does not replay the collection's full history. A stale empty snapshot is presented
+as syncing rather than as proof that the wallet owns no Operators.
 
 ### Local fork
 
@@ -123,6 +133,8 @@ create a user-visible deployment mode, replace pages, or disable canonical swaps
 7. Launch primary navigation is Overview, Trade, and My Genesis; contextual Wallet, Activity, Approval Tools, and Genesis recoveries remain reachable; unsupported known full-protocol URLs replace to `/app`, unknown paths remain 404s, and full-protocol stage restores the complete catalog.
 8. Every dapp route states its own name and purpose; the route header is not reserved for the overview.
 9. Local-fork support cannot be enabled outside development or against a non-loopback RPC.
+10. Ponder is authoritative for Genesis discovery; bounded RPC reconciliation can confirm recent
+    wallet changes but cannot replace a missing or stale index.
 
 ## Consequences
 

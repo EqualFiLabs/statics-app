@@ -109,10 +109,19 @@ describe("deployment registry", () => {
     ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
-  it("keeps mainnet unavailable until a reviewed manifest is checked in", () => {
+  it("publishes the reviewed mainnet Genesis launch manifest", () => {
     const [mainnet, testnet] = deploymentRegistry({ NEXT_PUBLIC_APP_ENV: "production" });
-    expect(mainnet?.descriptor.available).toBe(false);
-    expect(mainnet?.launch).toBeNull();
+    expect(mainnet?.descriptor.available).toBe(true);
+    expect(mainnet?.descriptor.chainId).toBe(4_663);
+    expect(mainnet?.launch?.descriptor.deploymentId).toBe(ROBINHOOD_GENESIS_DEPLOYMENT_ID);
+    expect(mainnet?.launch?.deploymentStartBlock).toBe(47_688_979n);
+    expect(mainnet?.launch?.contracts.genesis).toBe(
+      getAddress("0xad5E9F96A91D1A6F550580b157af2068A0e8F0BE")
+    );
+    expect(mainnet?.launch?.market.poolId).toBe(
+      "0xe79228d6cae086a58bf5b22220b454e5d1ca4f13da767ea5bbe032d5a1e82e8a"
+    );
+    expect(hasCapability(mainnet!.descriptor, "genesis-launch-rewards")).toBe(true);
     expect(testnet?.descriptor.chainId).toBe(46_630);
     expect(testnet?.protocol).not.toBeNull();
     expect(hasCapability(testnet!.descriptor, "faucet")).toBe(true);

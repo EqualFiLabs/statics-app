@@ -9,6 +9,8 @@ import { usePublicClient } from "wagmi";
 import {
   buildAccrueGenesisLaunchRewardsCall,
   buildActivateGenesisCall,
+  buildClaimAllGenesisLaunchRewardsCall,
+  buildClaimAllGenesisLaunchTreasuryRewardsCall,
   buildClaimGenesisLaunchRewardsCall,
   buildClaimOwnerGenesisLaunchRewardsCall,
   buildRegisterGenesisCall,
@@ -33,6 +35,8 @@ import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   EMPTY_GENESIS_PORTFOLIO,
+  batchGenesisIds,
+  claimableGenesisIds,
   loadOwnedGenesis,
   ownedGenesisQueryKey,
   summariseGenesisRewards,
@@ -109,6 +113,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const owned = useQuery({
     queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
     enabled: Boolean(publicClient && wallet),
+    retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
       return loadOwnedGenesis(publicClient, deployment, wallet);
@@ -269,45 +274,25 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   };
 
   const claimEverything = async () => {
-    const jobs: { label: string; data: `0x${string}`; amount: string }[] = [];
-    for (const item of items) {
-      if (item.pendingStatics > 0n) {
-        jobs.push({
-          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "STATICS" }),
-          data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.statics, wallet!),
-          amount: `${formatEther(item.pendingStatics)} STATICS`,
-        });
-      }
-      if (item.pendingWeth > 0n) {
-        jobs.push({
-          label: t("claimOperatorAsset", { id: item.id.toString(), asset: "WETH" }),
-          data: buildClaimGenesisLaunchRewardsCall(item.id, deployment.contracts.weth, wallet!),
-          amount: `${formatEther(item.pendingWeth)} WETH`,
-        });
-      }
-    }
-    if (summary.ownerStatics > 0n) {
-      jobs.push({
-        label: t("claimPrevious", { asset: "STATICS" }),
-        data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.statics, wallet!),
-        amount: `${formatEther(summary.ownerStatics)} STATICS`,
-      });
-    }
-    if (summary.ownerWeth > 0n) {
-      jobs.push({
-        label: t("claimPrevious", { asset: "WETH" }),
-        data: buildClaimOwnerGenesisLaunchRewardsCall(deployment.contracts.weth, wallet!),
-        amount: `${formatEther(summary.ownerWeth)} WETH`,
-      });
-    }
-    for (const [index, job] of jobs.entries()) {
-      setClaimProgress(`${index + 1} of ${jobs.length}`);
+    const batches = batchGenesisIds(claimableGenesisIds(items));
+    for (const [index, genesisIds] of batches.entries()) {
+      setClaimProgress(`${index + 1} of ${summary.claimCount}`);
       await send(
         "claim-rewards",
-        job.label,
+        t("claimBatch", { count: genesisIds.length }),
         deployment.contracts.launchDistributor,
-        job.data,
-        job.amount
+        buildClaimAllGenesisLaunchRewardsCall(genesisIds, wallet!),
+        `${genesisIds.length} Operator NFTs`
+      );
+    }
+    if (summary.ownerStatics > 0n || summary.ownerWeth > 0n) {
+      setClaimProgress(`${batches.length + 1} of ${summary.claimCount}`);
+      await send(
+        "claim-rewards",
+        t("claimPreviousRewards"),
+        deployment.contracts.launchDistributor,
+        buildClaimAllGenesisLaunchTreasuryRewardsCall(wallet!),
+        "Previous-owner rewards"
       );
     }
   };
@@ -334,7 +319,32 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     return (
       <div className="genesis-page">
         {recoveriesLink}
-        <EmptyState title={t("unavailable")} description={describeTransactionError(owned.error)} />
+        <EmptyState
+          tone="error"
+          title={t("unavailable")}
+          description={describeTransactionError(owned.error)}
+          action={{
+            label: t("retry"),
+            onClick: () => void owned.refetch(),
+            disabled: owned.isFetching,
+          }}
+        />
+      </div>
+    );
+  }
+  if (!items.length && owned.data?.stale) {
+    return (
+      <div className="genesis-page">
+        {recoveriesLink}
+        <EmptyState
+          title={t("syncingTitle")}
+          description={t("syncing")}
+          action={{
+            label: t("retry"),
+            onClick: () => void owned.refetch(),
+            disabled: owned.isFetching,
+          }}
+        />
       </div>
     );
   }
@@ -420,6 +430,11 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   return (
     <div className="genesis-page">
       {recoveriesLink}
+      {owned.data?.stale && (
+        <p className="genesis-note is-warning" role="status">
+          {t("syncing")}
+        </p>
+      )}
       <section className="genesis-summary ui-card" aria-label={t("holdingsAria")}>
         <div className="ui-stat">
           <span className="ui-stat__label">{t("held")}</span>

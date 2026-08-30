@@ -63,6 +63,7 @@ export function GenesisIdentityPanel({
       <div className="genesis-identity-art">
         <NftArtwork
           chainId={chainId}
+          cacheVersion={tier}
           expandable
           size="lg"
           nft={{

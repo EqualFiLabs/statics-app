@@ -58,7 +58,10 @@ export const genesisNft = onchainTable(
     effectiveWeight: table.bigint().notNull(),
     updatedAtBlock: table.bigint().notNull(),
   }),
-  (table) => ({ owner: index().on(table.deploymentId, table.owner, table.id) })
+  (table) => ({
+    owner: index().on(table.deploymentId, table.owner, table.id),
+    inventory: index().on(table.deploymentId, table.id),
+  })
 );
 
 export const genesisRewardClaim = onchainTable(

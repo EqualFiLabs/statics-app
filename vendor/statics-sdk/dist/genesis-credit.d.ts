@@ -16,6 +16,18 @@ export declare const staticsGenesisCreditAbi: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
+    readonly name: "drawGenesisCredit";
+    readonly type: "function";
+    readonly stateMutability: "payable";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+    readonly outputs: readonly [];
+}, {
     readonly name: "extendGenesisCredit";
     readonly type: "function";
     readonly stateMutability: "payable";
@@ -31,6 +43,9 @@ export declare const staticsGenesisCreditAbi: readonly [{
     readonly inputs: readonly [{
         readonly type: "uint256";
         readonly name: "genesisId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
     }];
     readonly outputs: readonly [];
 }, {
@@ -52,6 +67,17 @@ export declare const staticsGenesisCreditAbi: readonly [{
     }];
 }, {
     readonly name: "creditLimit";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+    }];
+}, {
+    readonly name: "creditAvailable";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -244,12 +270,28 @@ export declare const staticsGenesisCreditAbi: readonly [{
         readonly type: "uint16";
     }];
 }, {
-    readonly name: "creditOriginationsPaused";
+    readonly name: "creditIncreasesPaused";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [];
     readonly outputs: readonly [{
         readonly type: "bool";
+    }];
+}, {
+    readonly name: "setCreditIncreasesPaused";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "bool";
+        readonly name: "paused";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "CreditIncreasesPausedSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "bool";
+        readonly name: "paused";
     }];
 }, {
     readonly name: "GenesisCreditOpened";
@@ -294,6 +336,27 @@ export declare const staticsGenesisCreditAbi: readonly [{
         readonly name: "nativeFee";
     }];
 }, {
+    readonly name: "GenesisCreditDrawn";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "genesisId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "owner";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPrincipal";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nativeFee";
+    }];
+}, {
     readonly name: "GenesisCreditRepaid";
     readonly type: "event";
     readonly inputs: readonly [{
@@ -310,7 +373,10 @@ export declare const staticsGenesisCreditAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "principal";
+        readonly name: "amount";
+    }, {
+        readonly type: "uint256";
+        readonly name: "remainingPrincipal";
     }];
 }, {
     readonly name: "GenesisCreditRecovered";
@@ -346,7 +412,8 @@ export type GenesisCreditTransaction = Readonly<{
     value: bigint;
 }>;
 export declare function buildOpenGenesisCreditTransaction(genesisId: bigint, principal: bigint, nativeFee: bigint): GenesisCreditTransaction;
+export declare function buildDrawGenesisCreditTransaction(genesisId: bigint, amount: bigint, nativeFee: bigint): GenesisCreditTransaction;
 export declare function buildExtendGenesisCreditTransaction(genesisId: bigint, nativeFee: bigint): GenesisCreditTransaction;
-export declare function buildRepayGenesisCreditCall(genesisId: bigint): Hex;
+export declare function buildRepayGenesisCreditCall(genesisId: bigint, amount: bigint): Hex;
 export declare function buildRecoverGenesisCreditCall(genesisId: bigint): Hex;
 export type GenesisCreditContract = Address;

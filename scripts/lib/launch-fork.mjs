@@ -100,7 +100,7 @@ export async function deployLaunchFork({ protocolRoot, rpcUrl, privateKey, publi
         WETH_ADDRESS: dependencies.weth,
         STATICS_DOPPLER_SALT: salt,
         STATICS_DOPPLER_FEE: String(fee),
-        STATICS_GENESIS_REWARD_SHARE_BPS: "5000",
+        STATICS_GENESIS_REWARD_SHARE_BPS: "4000",
         ETH_RPC_TIMEOUT: process.env.ETH_RPC_TIMEOUT?.trim() || "300",
       },
       maxBuffer: 32 * 1024 * 1024,

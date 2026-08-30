@@ -1,8 +1,11 @@
-import { getAddress, type PublicClient } from "viem";
+import { getAddress, keccak256, type PublicClient } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 const contracts = {
@@ -91,5 +94,29 @@ describe("standalone launch verification", () => {
     await expect(verifyLaunchDeployment(client(address("f")), deployment)).rejects.toThrow(
       "Registry consumer binding"
     );
+  });
+
+  it("keeps successful runtime verification cached while retrying failed bindings", async () => {
+    const runtimeCode = "0x6000" as const;
+    const cachedDeployment = {
+      ...deployment,
+      descriptor: { ...deployment.descriptor, deploymentId: "launch-cache-retry" },
+      protocolCommit: "cache-retry-fixture",
+      runtimeCodeHashes: { statics: keccak256(runtimeCode) },
+    } satisfies LaunchDeployment;
+    const firstClient = client(address("f"));
+    const secondClient = client();
+    firstClient.getCode = vi.fn().mockResolvedValue(runtimeCode);
+    secondClient.getCode = vi.fn().mockResolvedValue(runtimeCode);
+
+    await expect(verifyLaunchDeploymentCached(firstClient, cachedDeployment)).rejects.toThrow(
+      "Registry consumer binding"
+    );
+    await expect(
+      verifyLaunchDeploymentCached(secondClient, cachedDeployment)
+    ).resolves.toBeUndefined();
+
+    expect(firstClient.getCode).toHaveBeenCalledTimes(1);
+    expect(secondClient.getCode).not.toHaveBeenCalled();
   });
 });

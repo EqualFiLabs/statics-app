@@ -11,17 +11,18 @@ import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 const readContract = vi.fn();
 const getBalance = vi.fn();
 const discoverNextAvailableGenesisId = vi.fn();
-const discoverWalletGenesisIds = vi.fn();
+const discoverWalletGenesisSnapshot = vi.fn();
 
 vi.mock("wagmi", () => ({
   usePublicClient: () => ({ readContract, getBalance }),
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
+  verifyLaunchDeploymentCached: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/genesis/discovery", () => ({
   discoverNextAvailableGenesisId: (...args: unknown[]) => discoverNextAvailableGenesisId(...args),
-  discoverWalletGenesisIds: (...args: unknown[]) => discoverWalletGenesisIds(...args),
+  discoverWalletGenesisSnapshot: (...args: unknown[]) => discoverWalletGenesisSnapshot(...args),
 }));
 vi.mock("@/lib/wallet/nft-image", () => ({
   resolveNftImage: vi.fn().mockResolvedValue(null),
@@ -116,7 +117,13 @@ function reads({ credits = new Map<string, boolean>() }: { credits?: Map<string,
   );
   getBalance.mockResolvedValue(parseEther("2.418"));
   discoverNextAvailableGenesisId.mockResolvedValue(4_913n);
-  discoverWalletGenesisIds.mockResolvedValue([]);
+  discoverWalletGenesisSnapshot.mockResolvedValue({
+    ids: [],
+    indexed: [],
+    indexedBlock: 1n,
+    chainHead: 1n,
+    stale: false,
+  });
 }
 
 function renderPanel() {
@@ -147,7 +154,7 @@ beforeEach(() => {
   readContract.mockReset();
   getBalance.mockReset();
   discoverNextAvailableGenesisId.mockReset();
-  discoverWalletGenesisIds.mockReset();
+  discoverWalletGenesisSnapshot.mockReset();
 });
 
 describe("Genesis Vault trade card", () => {
@@ -206,7 +213,13 @@ describe("Genesis Vault trade card", () => {
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {
     reads({ credits: new Map([["4419", true]]) });
-    discoverWalletGenesisIds.mockResolvedValue([1204n, 4419n]);
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n, 4419n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
     renderPanel();
 
     fireEvent.click(await screen.findByRole("tab", { name: "Redeem" }));
@@ -218,7 +231,13 @@ describe("Genesis Vault trade card", () => {
 
   it("states what redemption returns", async () => {
     reads();
-    discoverWalletGenesisIds.mockResolvedValue([1204n]);
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
     renderPanel();
 
     fireEvent.click(await screen.findByRole("tab", { name: "Redeem" }));
@@ -238,5 +257,33 @@ describe("Genesis Vault trade card", () => {
     expect(await screen.findByText(/left in the Vault/)).toBeInTheDocument();
     expect(screen.queryByText("Outstanding credit")).not.toBeInTheDocument();
     expect(screen.queryByText("Native reserve")).not.toBeInTheDocument();
+  });
+
+  it("shows unavailable inventory instead of claiming the Vault is exhausted", async () => {
+    reads();
+    discoverNextAvailableGenesisId.mockRejectedValue(new Error("Indexer checkpoint is stale"));
+    renderPanel();
+
+    expect(await screen.findByText("Operator inventory is syncing")).toBeInTheDocument();
+    expect(screen.queryByText("Vault inventory is exhausted")).not.toBeInTheDocument();
+    expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a stale empty wallet snapshot as no Operators", async () => {
+    reads();
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 60_002n,
+      stale: true,
+    });
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Redeem" }));
+
+    expect(await screen.findByText("Your Operators are syncing")).toBeInTheDocument();
+    expect(screen.queryByText("No Operator NFTs to redeem")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });

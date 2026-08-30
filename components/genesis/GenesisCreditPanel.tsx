@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { encodeFunctionData, formatEther, getAddress, parseEther } from "viem";
 import { useBlock, usePublicClient } from "wagmi";
 import { dopplerStaticsTokenAbi } from "@statics-protocol/sdk";
@@ -19,7 +19,10 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import {
+  verifyLaunchDeployment,
+  verifyLaunchDeploymentCached,
+} from "@/lib/deployments/verify-launch";
 import { useWalletState } from "@/providers/wallet-context";
 
 /** StaticsGenesisVault.RECOVERY_GRACE. */
@@ -40,7 +43,7 @@ function describeCreditError(error: unknown, copy: CreditErrorCopy): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/rejected/i.test(message)) return copy.walletRejected;
   if (message.includes("CreditUnavailableDuringEpoch")) return copy.afterEpoch;
-  if (message.includes("CreditOriginationsPaused")) return copy.paused;
+  if (message.includes("CreditIncreasesPaused")) return copy.paused;
   if (message.includes("CreditExpired")) return copy.expired;
   if (message.includes("CreditNotRecoverable")) return copy.notRecoverable;
   return message || copy.transactionFailed;
@@ -184,7 +187,7 @@ export function GenesisCreditPanel({
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const { data: latestBlock } = useBlock({
     chainId: deployment.descriptor.chainId,
-    watch: true,
+    watch: false,
   });
   const queryClient = useQueryClient();
   const wallet =
@@ -192,7 +195,14 @@ export function GenesisCreditPanel({
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const now = latestBlock ? Number(latestBlock.timestamp) : null;
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const offset = latestBlock ? Number(latestBlock.timestamp) - Math.floor(Date.now() / 1_000) : 0;
+    const update = () => setNow(Math.floor(Date.now() / 1_000) + offset);
+    update();
+    const timer = globalThis.setInterval(update, 1_000);
+    return () => globalThis.clearInterval(timer);
+  }, [latestBlock]);
 
   const state = useQuery({
     queryKey: [
@@ -204,8 +214,8 @@ export function GenesisCreditPanel({
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error(t("connect"));
-      await verifyLaunchDeployment(publicClient, deployment);
-      const [vault, originationsPaused, credit, limit] = await Promise.all([
+      await verifyLaunchDeploymentCached(publicClient, deployment);
+      const [vault, creditIncreasesPaused, credit, limit] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: currentGenesisVaultAbi,
@@ -214,7 +224,7 @@ export function GenesisCreditPanel({
         publicClient.readContract({
           address: deployment.contracts.vault,
           abi: staticsGenesisCreditAbi,
-          functionName: "creditOriginationsPaused",
+          functionName: "creditIncreasesPaused",
         }) as Promise<boolean>,
         publicClient.readContract({
           address: deployment.contracts.vault,
@@ -233,7 +243,7 @@ export function GenesisCreditPanel({
         epochActive: vault.epochActive,
         genesisEpochEnd: Number(vault.genesisEpochEnd),
         vaultPrice: vault.vaultPrice,
-        originationsPaused,
+        creditIncreasesPaused,
         credit,
         limit,
       };
@@ -427,7 +437,7 @@ export function GenesisCreditPanel({
                 await send(
                   "repay-genesis-credit",
                   t("repayLabel", { id: genesisId.toString() }),
-                  buildRepayGenesisCreditCall(genesisId),
+                  buildRepayGenesisCreditCall(genesisId, credit.principal),
                   `${formatEther(credit.principal)} STATICS`
                 );
               })
@@ -471,7 +481,7 @@ export function GenesisCreditPanel({
     );
   }
 
-  if (state.data.originationsPaused) {
+  if (state.data.creditIncreasesPaused) {
     return (
       <section
         className="ui-card genesis-panel"

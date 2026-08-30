@@ -50,8 +50,6 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_APP_NETWORK: process.env.NEXT_PUBLIC_APP_NETWORK,
   NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
-  NEXT_PUBLIC_ROBINHOOD_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
-  NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_ROBINHOOD_TESTNET_RPC_URL,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
 });
 const transports = createWalletTransports(walletEnvironment);
@@ -523,7 +521,22 @@ function ProtocolQueryReconciler() {
 }
 
 export function DAppProviders({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // Chain state is reconciled after confirmed transactions. A short
+            // stale window avoids refetching every launch query on navigation
+            // and window focus while keeping ordinary market reads fresh.
+            staleTime: 5_000,
+            gcTime: 10 * 60 * 1_000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
+        },
+      })
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

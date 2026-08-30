@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
-import { SurfaceEmptyState } from "@/components/common/EmptyState";
+import { EmptyState, SurfaceEmptyState } from "@/components/common/EmptyState";
 import { WalletNftList } from "@/components/wallet/WalletNftList";
 import { loadLiquidityCatalog } from "@/lib/liquidity/liquidity";
 import { loadPositionCatalog } from "@/lib/positions/positions";
@@ -15,7 +15,7 @@ import { readCollectionHoldings } from "@/lib/wallet/nft-contracts";
 import { useWalletNftCollections } from "@/hooks/useWalletNftCollections";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
-import { discoverWalletGenesisIds } from "@/lib/genesis/discovery";
+import { discoverWalletGenesisSnapshot } from "@/lib/genesis/discovery";
 
 /**
  * The NFTs tab, owning its own reads.
@@ -68,13 +68,18 @@ export function WalletNftPanel({
       Boolean(walletAddress) &&
       wallet.status === "ready" &&
       wallet.isTargetChain,
+    retry: false,
     queryFn: async () => {
       if (!publicClient || !walletAddress || !deployment) {
         throw new Error(t("noDeployment"));
       }
 
       if (deployment.kind === "launch") {
-        const genesisIds = await discoverWalletGenesisIds(publicClient, deployment, walletAddress);
+        const genesis = await discoverWalletGenesisSnapshot(
+          publicClient,
+          deployment,
+          walletAddress
+        );
         const customCollections = collections.filter(
           (collection) =>
             collection.address.toLowerCase() !== deployment.contracts.genesis.toLowerCase()
@@ -84,7 +89,7 @@ export function WalletNftPanel({
             readCollectionHoldings(publicClient, collection, walletAddress)
           )
         );
-        const genesisNfts: WalletNft[] = genesisIds.map((tokenId) => ({
+        const genesisNfts: WalletNft[] = genesis.ids.map((tokenId) => ({
           kind: "collection" as const,
           tokenId,
           contract: deployment.contracts.genesis,
@@ -100,6 +105,7 @@ export function WalletNftPanel({
         return {
           nfts: [...genesisNfts, ...collectionNfts],
           liquidityUnavailable: false,
+          stale: genesis.stale,
         };
       }
       const protocol = deployment.protocol;
@@ -138,6 +144,7 @@ export function WalletNftPanel({
           wallet: walletAddress,
         }).concat(collectionNfts),
         liquidityUnavailable: liquidity.status === "rejected",
+        stale: false,
       };
     },
   });
@@ -180,6 +187,23 @@ export function WalletNftPanel({
     </div>
   );
 
+  if (deployment?.kind === "launch" && catalog.data?.stale && catalog.data.nfts.length === 0) {
+    return (
+      <>
+        {header}
+        <EmptyState
+          title={t("operatorNftsSyncing")}
+          description={t("operatorNftsSyncingDescription")}
+          action={{
+            label: t("refresh"),
+            onClick: () => void catalog.refetch(),
+            disabled: catalog.isFetching,
+          }}
+        />
+      </>
+    );
+  }
+
   if (collectionChainId === null || !catalog.data || !isSurfaceReady(state)) {
     return (
       <>
@@ -204,6 +228,11 @@ export function WalletNftPanel({
       {catalog.data.liquidityUnavailable && (
         <p className="dollar-warning" role="status">
           {t("liquidityUnavailable")}
+        </p>
+      )}
+      {catalog.data.stale && (
+        <p className="dollar-warning" role="status">
+          {t("operatorNftsSyncingDescription")}
         </p>
       )}
       <WalletNftList nfts={catalog.data.nfts} chainId={collectionChainId} onTransfer={onTransfer} />

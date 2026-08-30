@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  loadIndexerCheckpoint,
   loadRecoverableGenesisCredits,
   loadRecoverableLoanIds,
   loadNextAvailableGenesisId,
+  loadWalletLaunchGenesisItems,
   loadWalletLaunchGenesisIds,
   loadWalletGenesis,
   loadWalletV4PositionIds,
@@ -12,7 +14,11 @@ import {
 const wallet = "0x0000000000000000000000000000000000000001" as const;
 
 describe("Statics indexer client", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it("follows opaque cursors and parses bigint IDs", async () => {
     const fetch = vi
@@ -41,6 +47,88 @@ describe("Statics indexer client", () => {
 
     await expect(loadWalletV4PositionIds(wallet, "https://indexer.example")).resolves.toEqual([9n]);
     expect(String(fetch.mock.calls[0]?.[0])).toContain(`/wallets/${wallet}/v4-positions`);
+  });
+
+  it("loads the checkpoint for the selected chain", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            testnet: { id: 46_630, block: { number: 100, timestamp: 1_000 } },
+            active: { id: 4_663, block: { number: 42, timestamp: 900 } },
+          })
+        )
+      )
+    );
+
+    await expect(
+      loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual({ chainId: 4_663, blockNumber: 42n, blockTimestamp: 900n });
+  });
+
+  it("retries a throttled indexer request once after Retry-After", async () => {
+    vi.useFakeTimers();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("rate limited", { status: 429, headers: { "retry-after": "1" } })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ active: { id: 4_663, block: { number: 42, timestamp: 900 } } })
+        )
+      );
+    vi.stubGlobal("fetch", fetch);
+
+    const checkpoint = loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example");
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(checkpoint).resolves.toEqual({
+      chainId: 4_663,
+      blockNumber: 42n,
+      blockTimestamp: 900n,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a bounded jittered delay for one retry when Retry-After is absent", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ active: { id: 4_663, block: { number: 42, timestamp: 900 } } })
+        )
+      );
+    vi.stubGlobal("fetch", fetch);
+
+    const checkpoint = loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example");
+    await vi.advanceTimersByTimeAsync(749);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(checkpoint).resolves.toMatchObject({ blockNumber: 42n });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a status response without the selected chain", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ active: { id: 46_630, block: { number: 42, timestamp: 900 } } })
+          )
+        )
+    );
+
+    await expect(
+      loadIndexerCheckpoint(4_663, "robinhood-genesis", "https://indexer.example")
+    ).rejects.toThrow("invalid chain checkpoint");
   });
 
   it("rejects malformed pages", async () => {
@@ -98,6 +186,81 @@ describe("Statics indexer client", () => {
     await expect(
       loadWalletLaunchGenesisIds(wallet, "wrong-deployment", "https://mainnet-indexer.example")
     ).rejects.toThrow("different deployment");
+  });
+
+  it("parses the indexed launch wallet snapshot without losing bigint state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            deploymentId: "robinhood-genesis",
+            items: [
+              {
+                id: "42",
+                tier: 3,
+                multiplierBps: 12_000,
+                linkedPositionId: "9",
+                registered: true,
+                effectiveWeight: "123456789",
+                updatedAtBlock: "9001",
+              },
+            ],
+            nextCursor: null,
+          })
+        )
+      )
+    );
+
+    await expect(
+      loadWalletLaunchGenesisItems(wallet, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual([
+      {
+        id: 42n,
+        tier: 3,
+        multiplierBps: 12_000,
+        linkedPositionId: 9n,
+        registered: true,
+        effectiveWeight: 123_456_789n,
+        updatedAtBlock: 9_001n,
+      },
+    ]);
+  });
+
+  it("deduplicates Genesis IDs across paginated launch snapshots", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              deploymentId: "robinhood-genesis",
+              items: [{ id: "42", tier: 3 }],
+              nextCursor: "next",
+            })
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              deploymentId: "robinhood-genesis",
+              items: [
+                { id: "042", tier: 4 },
+                { id: "43", tier: 2 },
+              ],
+              nextCursor: null,
+            })
+          )
+        )
+    );
+
+    await expect(
+      loadWalletLaunchGenesisItems(wallet, "robinhood-genesis", "https://indexer.example")
+    ).resolves.toEqual([
+      { id: 42n, tier: 3 },
+      { id: 43n, tier: 2 },
+    ]);
   });
 
   it("loads deployment-scoped recoverable Genesis credit pages", async () => {
