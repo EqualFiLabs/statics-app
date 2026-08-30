@@ -1980,6 +1980,7 @@
 
 .operator-tier-overlay {
   position: absolute;
+  z-index: 1;
   bottom: 3.9%;
   left: 37.5%;
   display: flex;
@@ -2014,11 +2015,16 @@
   height: 100%;
 }
 
-.wallet-nft-art-trigger .operator-artwork-frame,
 .operator-artwork-frame.is-lg {
   width: 100%;
-  height: 100%;
+  height: auto;
   aspect-ratio: 1;
+}
+
+.operator-artwork-frame > .wallet-nft-art {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .wallet-nft-art.is-placeholder {
