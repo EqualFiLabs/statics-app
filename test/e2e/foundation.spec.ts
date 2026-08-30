@@ -104,6 +104,21 @@ test.describe("landing foundation", () => {
     expect(response.headers()["x-frame-options"]).toBe("DENY");
     expect(response.headers()["x-content-type-options"]).toBe("nosniff");
     expect(response.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(response.headers()["x-powered-by"]).toBeUndefined();
+    expect(response.headers()["content-security-policy"]).toBeUndefined();
+    expect(response.headers()["content-security-policy-report-only"]).toContain(
+      "report-uri /api/security/csp-report"
+    );
+
+    const second = await request.get("/");
+    const nonce = (value: string) => value.match(/'nonce-([^']+)'/)?.[1];
+    expect(nonce(response.headers()["content-security-policy-report-only"] ?? "")).not.toBe(
+      nonce(second.headers()["content-security-policy-report-only"] ?? "")
+    );
+
+    const artwork = await request.get("/assets/operators/3ae699e07a0b5ba9/1.svg");
+    expect(artwork.ok()).toBe(true);
+    expect(artwork.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
   });
 });
 
