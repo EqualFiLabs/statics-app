@@ -6,7 +6,8 @@ This Ponder service indexes discovery data that the UI cannot enumerate cheaply:
 - circulating Genesis ownership, next available Vault inventory, activation, registration, and effective weight;
 - Genesis and previous-owner launch reward claims; and
 - standalone launch fees harvested into the permanent fee receiver; and
-- canonical STATICS/WETH swap history from the selected PoolManager and PoolId.
+- canonical STATICS/WETH swap history from the selected PoolManager and PoolId; and
+- reorg-safe one-minute STATICS/WETH candles aggregated from those swaps.
 
 The PoolManager source requires `PONDER_CANONICAL_POOL_ID` and filters the indexed `id` topic at
 the RPC boundary. Never run the source without this filter: Robinhood Chain produces many unrelated
@@ -36,6 +37,12 @@ blocks with one `eth_getLogs` request before checking current `ownerOf` state. L
 indexed snapshot as stale instead of replaying deployment history. The trade card accepts next
 inventory only from a checkpoint no more than 100 blocks behind the RPC head and withholds cached
 inventory while that authoritative read is refreshing.
+
+Robinhood mainnet polls every two seconds. This keeps ordinary indexer lag inside the application's
+100-block freshness boundary while halving the fixed provider cost of Ponder's latest-block poll.
+The `/market/candles` route accepts `1`, `5`, `15`, `60`, `240`, and `1440` minute resolutions and
+an ordered Unix-second range of at most 31 days. It aggregates larger resolutions from reorg-safe
+one-minute rows and never scans historical RPC logs in response to an API request.
 
 ## Production isolation and monitoring
 

@@ -72,6 +72,7 @@ export default createConfig({
     active: {
       id: chainId,
       rpc: required(`PONDER_RPC_URL_${chainId}`),
+      pollingInterval: chainId === 4_663 ? 2_000 : undefined,
     },
   },
   contracts: activeContracts({

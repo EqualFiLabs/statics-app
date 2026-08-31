@@ -12,9 +12,11 @@ import {
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
+  marketCandle,
   marketSwap,
   v4Position,
 } from "ponder:schema";
+import { absoluteAmount, candleBucket, marketCandleKey } from "./market";
 
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim();
 if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
@@ -304,4 +306,39 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
   });
+
+  const bucketTimestamp = candleBucket(event.block.timestamp);
+  const sqrtPriceX96 = event.args.sqrtPriceX96;
+  await context.db
+    .insert(marketCandle)
+    .values({
+      key: marketCandleKey(deploymentId, event.args.id, event.block.timestamp),
+      deploymentId,
+      poolId: event.args.id,
+      bucketTimestamp,
+      openSqrtPriceX96: sqrtPriceX96,
+      highSqrtPriceX96: sqrtPriceX96,
+      lowSqrtPriceX96: sqrtPriceX96,
+      closeSqrtPriceX96: sqrtPriceX96,
+      volume0: absoluteAmount(event.args.amount0),
+      volume1: absoluteAmount(event.args.amount1),
+      zeroForOneCount: event.args.amount0 > 0n ? 1 : 0,
+      oneForZeroCount: event.args.amount0 > 0n ? 0 : 1,
+      swapCount: 1,
+      firstBlock: event.block.number,
+      lastBlock: event.block.number,
+    })
+    .onConflictDoUpdate((row) => ({
+      highSqrtPriceX96:
+        row.highSqrtPriceX96 > sqrtPriceX96 ? row.highSqrtPriceX96 : sqrtPriceX96,
+      lowSqrtPriceX96:
+        row.lowSqrtPriceX96 < sqrtPriceX96 ? row.lowSqrtPriceX96 : sqrtPriceX96,
+      closeSqrtPriceX96: sqrtPriceX96,
+      volume0: row.volume0 + absoluteAmount(event.args.amount0),
+      volume1: row.volume1 + absoluteAmount(event.args.amount1),
+      zeroForOneCount: row.zeroForOneCount + (event.args.amount0 > 0n ? 1 : 0),
+      oneForZeroCount: row.oneForZeroCount + (event.args.amount0 > 0n ? 0 : 1),
+      swapCount: row.swapCount + 1,
+      lastBlock: event.block.number,
+    }));
 });

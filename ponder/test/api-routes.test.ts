@@ -8,6 +8,7 @@ vi.mock("ponder:schema", () => ({
   genesisNft: {},
   genesisRewardClaim: {},
   harvestedFee: {},
+  marketCandle: {},
   marketSwap: {},
 }));
 
@@ -33,6 +34,16 @@ describe("indexer API routes", () => {
     "/genesis/credits/recoverable?asOf=100&limit=101",
     "/genesis/credits/recoverable?asOf=100&cursor=not-a-cursor",
   ])("rejects invalid recoverable Genesis credit query %s", async (path) => {
+    const response = await app.request(path);
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    "/market/candles",
+    "/market/candles?from=1&to=2&resolution=2",
+    "/market/candles?from=2&to=1&resolution=1",
+    "/market/candles?from=0&to=2678401&resolution=60",
+  ])("rejects invalid candle query %s", async (path) => {
     const response = await app.request(path);
     expect(response.status).toBe(400);
   });
