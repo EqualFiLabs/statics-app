@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { authorizeMarketRequest } from "@/lib/server/market-api-auth";
+import { staticsMainnetIndexerUrl } from "@/lib/server/statics-indexer-url";
 
 export function marketApiAuthorization(request: Request): NextResponse | null {
   const result = authorizeMarketRequest(request);
@@ -17,13 +18,7 @@ export function marketApiAuthorization(request: Request): NextResponse | null {
 }
 
 export function marketIndexerUrl(path: "market/candles" | "market/swaps"): URL {
-  const raw = process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL?.trim();
-  if (!raw) throw new Error("NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL is not configured.");
-  const base = new URL(raw);
-  if (base.protocol !== "http:" && base.protocol !== "https:") {
-    throw new Error("The Statics indexer URL must use HTTP(S).");
-  }
-  return new URL(path, base);
+  return staticsMainnetIndexerUrl(path);
 }
 
 export async function proxyMarketIndexer(url: URL): Promise<NextResponse> {

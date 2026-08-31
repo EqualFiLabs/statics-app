@@ -14,13 +14,13 @@ import {
   staticsUsdPriceWad,
   strictLiquidFloat,
   usdValueWad,
-  WAD,
 } from "@/lib/market/analytics";
 import type { MarketDepthLevel, StaticsMarketOverview } from "@/lib/market/types";
 import { poolKeyForLaunch } from "@/lib/trade/canonical-market";
 import { loadEthUsd } from "@/lib/server/eth-usd";
 import { verifyLaunchDeploymentOnServer } from "@/lib/server/launch-verification";
 import { robinhoodRpcUrl } from "@/lib/server/robinhood-rpc";
+import { staticsMainnetIndexerUrl } from "@/lib/server/statics-indexer-url";
 
 const reservesLensAbi = parseAbi([
   "function getPoolTVL(address manager, (address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key) view returns ((uint256 coreAmount0,uint256 coreAmount1,uint256 hookReserves0,uint256 hookReserves1,uint256 hookEffective0,uint256 hookEffective1,uint160 sqrtPriceX96,int24 tick,uint128 activeLiquidity,uint256 blockNumber,address statsProvider,uint16 hookPermissions,bool hasCustomAccounting,uint8 statsStatus) tvl)",
@@ -77,16 +77,6 @@ function mainnetLaunch(): LaunchDeployment {
   return deployment;
 }
 
-function indexerUrl(environment: Record<string, string | undefined> = process.env): URL {
-  const raw = environment.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL?.trim();
-  if (!raw) throw new Error("NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL is not configured.");
-  const url = new URL(raw);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("The Statics indexer URL must use HTTP(S).");
-  }
-  return url;
-}
-
 function validCandle(value: unknown): value is Candle {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
@@ -102,7 +92,7 @@ function validCandle(value: unknown): value is Candle {
 
 async function loadActivity(deployment: LaunchDeployment, now: number): Promise<Activity | null> {
   try {
-    const url = new URL("market/candles", indexerUrl());
+    const url = staticsMainnetIndexerUrl("market/candles");
     url.searchParams.set("from", String(Math.floor(now / 1_000) - 24 * 60 * 60));
     url.searchParams.set("to", String(Math.floor(now / 1_000)));
     url.searchParams.set("resolution", "60");

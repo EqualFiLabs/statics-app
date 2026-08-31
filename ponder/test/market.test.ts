@@ -75,5 +75,7 @@ describe("canonical market candles", () => {
   it("accepts only supported TradingView resolutions", () => {
     expect(readMarketResolution("240")).toBe(240);
     expect(readMarketResolution("2")).toBeNull();
+    expect(readMarketResolution(undefined)).toBeNull();
+    expect(readMarketResolution("1.0")).toBeNull();
   });
 });

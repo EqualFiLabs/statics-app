@@ -40,6 +40,7 @@ describe("indexer API routes", () => {
 
   it.each([
     "/market/candles",
+    "/market/candles?from=1&to=2",
     "/market/candles?from=1&to=2&resolution=2",
     "/market/candles?from=2&to=1&resolution=1",
     "/market/candles?from=0&to=2678401&resolution=60",

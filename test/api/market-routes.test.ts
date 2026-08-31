@@ -33,7 +33,7 @@ beforeEach(() => {
   resetMarketRateLimitsForTest();
   mocks.loadOverview.mockResolvedValue(overview);
   process.env.STATICS_MARKET_API_KEYS = `partner:${createHash("sha256").update(secret).digest("hex")}`;
-  process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL = "https://indexer.example/api/";
+  process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL = "https://indexer.example/api";
 });
 
 afterEach(() => {

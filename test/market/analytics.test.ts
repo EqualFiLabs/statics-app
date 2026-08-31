@@ -28,6 +28,12 @@ describe("market analytics", () => {
     });
   });
 
+  it("fails closed when an inverse price underflows", () => {
+    expect(() => canonicalPrices(1n << 192n, statics, statics)).toThrow(
+      "Canonical pool inverse price underflowed."
+    );
+  });
+
   it("keeps distributed and strict liquid supply definitions distinct", () => {
     expect(publicDistributedSupply(300_000_000n * WAD)).toBe(500_000_000n * WAD);
     expect(

@@ -74,7 +74,8 @@ export function aggregateMarketCandles(
 }
 
 export function readMarketResolution(value: string | undefined): MarketResolution | null {
-  const resolution = Number(value ?? "1");
+  if (!value || !/^\d+$/.test(value)) return null;
+  const resolution = Number(value);
   return MARKET_RESOLUTIONS.includes(resolution as MarketResolution)
     ? (resolution as MarketResolution)
     : null;

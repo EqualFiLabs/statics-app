@@ -22,6 +22,7 @@ export function canonicalPrices(
   const staticsPerWethWad = staticsIsCurrency0
     ? (WAD * WAD) / currency1PerCurrency0Wad
     : currency1PerCurrency0Wad;
+  if (staticsPerWethWad === 0n) throw new Error("Canonical pool inverse price underflowed.");
   return {
     staticsPerWethWad,
     wethPerStaticsWad: (WAD * WAD) / staticsPerWethWad,
