@@ -1,42 +1,40 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { Boxes, Droplets, Image as ImageIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import { usePublicClient } from "wagmi";
 
 import { NftArtworkDialog } from "@/components/wallet/NftArtworkDialog";
-import { resolveNftImage } from "@/lib/wallet/nft-image";
+import { OperatorArtwork } from "@/components/wallet/OperatorArtwork";
+import { operatorArtwork, positionArtworkDataUri } from "@/lib/wallet/local-nft-art";
 import type { WalletNft } from "@/lib/wallet/nfts";
 
 /**
- * The artwork in the corner of an NFT card.
+ * Renders only deterministic Statics artwork.
  *
- * Resolves per card rather than in the list query, so a slow gateway or a
- * collection with no metadata delays nothing else. Statics PositionNFTs expose
- * self-contained artwork, while the placeholder remains the ordinary fallback
- * for collections that do not.
+ * Operators use checked-in renderer output plus a local activation overlay;
+ * PositionNFTs use the exact local port of their pure renderer. Arbitrary
+ * collection and liquidity artwork deliberately falls back to a typed mark so
+ * the browser never fetches an attacker-selected media origin.
  */
 export function NftArtwork({
   nft,
   chainId,
   expandable = false,
   defer = false,
-  cacheVersion,
+  operatorTier,
   size = "sm",
 }: {
   nft: WalletNft;
   chainId: number;
   expandable?: boolean;
-  /** Defer the metadata RPC until the card enters the viewport. */
+  /** Defer the local image request until the card enters the viewport. */
   defer?: boolean;
-  /** Optional collection-specific metadata version, such as an activation tier. */
-  cacheVersion?: string | number;
+  /** Current activation tier for a known Statics Operator. */
+  operatorTier?: number;
   /** "sm" is the 48px corner thumbnail; "lg" fills its container. */
   size?: "sm" | "lg";
 }) {
-  const publicClient = usePublicClient({ chainId });
   const t = useTranslations("nftArtwork");
   const [failed, setFailed] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -60,35 +58,37 @@ export function NftArtwork({
     return () => observer.disconnect();
   }, [defer]);
 
-  const image = useQuery({
-    queryKey: ["nft-image", chainId, nft.contract, nft.tokenId.toString(), cacheVersion ?? null],
-    enabled: Boolean(publicClient && visible),
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-    queryFn: ({ signal }) => {
-      if (!publicClient) return null;
-      return resolveNftImage(publicClient, nft.contract, nft.tokenId, signal);
-    },
-  });
-
+  const operator = visible ? operatorArtwork(chainId, nft.contract, nft.tokenId) : null;
+  const positionSrc =
+    visible && nft.kind === "position" ? positionArtworkDataUri(nft.tokenId) : null;
+  const src = operator?.src ?? positionSrc;
+  const tier = operatorTier ?? nft.artworkTier ?? 0;
   const sizeClass = size === "lg" ? " is-lg" : "";
 
-  if (image.data && !failed) {
-    const artwork = (
-      /* eslint-disable-next-line @next/next/no-img-element --
-         Arbitrary remote hosts: next/image would need every collection's
-         domain allow-listed up front, which is impossible for user-added
-         contracts. */
+  if (src && !failed) {
+    const imageClassName = `wallet-nft-art${sizeClass}`;
+    const artwork = operator ? (
+      <OperatorArtwork
+        src={operator.src}
+        tier={tier}
+        accent={operator.accent}
+        imageClassName={imageClassName}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element -- Generated data URI.
       <img
-        className={`wallet-nft-art${sizeClass}`}
-        src={image.data}
+        className={imageClassName}
+        src={src}
         alt=""
         loading="lazy"
         onError={() => setFailed(true)}
       />
     );
     if (!expandable) return artwork;
-    const content = (
+    return (
       <>
         <button
           className={`wallet-nft-art-trigger${sizeClass}`}
@@ -99,17 +99,20 @@ export function NftArtwork({
           {artwork}
         </button>
         {viewerOpen && (
-          <NftArtworkDialog name={nft.name} src={image.data} onClose={() => setViewerOpen(false)} />
+          <NftArtworkDialog
+            name={nft.name}
+            src={src}
+            operator={operator ? { tier, accent: operator.accent } : undefined}
+            onClose={() => setViewerOpen(false)}
+          />
         )}
       </>
     );
-    return content;
   }
 
   const Placeholder =
     nft.kind === "position" ? Boxes : nft.kind === "liquidity" ? Droplets : ImageIcon;
-
-  const placeholder = (
+  return (
     <span
       ref={defer ? observerRef : undefined}
       className={`wallet-nft-art is-placeholder${sizeClass}`}
@@ -118,5 +121,4 @@ export function NftArtwork({
       <Placeholder size={size === "lg" ? 40 : 20} />
     </span>
   );
-  return placeholder;
 }

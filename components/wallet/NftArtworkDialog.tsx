@@ -4,13 +4,17 @@ import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import { OperatorArtwork } from "@/components/wallet/OperatorArtwork";
+
 export function NftArtworkDialog({
   name,
   src,
+  operator,
   onClose,
 }: Readonly<{
   name: string;
   src: string;
+  operator?: Readonly<{ tier: number; accent: string }>;
   onClose: () => void;
 }>) {
   const t = useTranslations("nftArtwork");
@@ -73,10 +77,18 @@ export function NftArtworkDialog({
         </button>
         <div className="wallet-dialog-content nft-artwork-dialog-content">
           <h2 id={titleId}>{t("title", { name })}</h2>
-          {/* eslint-disable-next-line @next/next/no-img-element -- the same
-              arbitrary, already-resolved URI used by the NFT thumbnail is
-              reused here without imposing a remote-host allow list. */}
-          <img className="nft-artwork-full" src={src} alt={t("alt", { name })} />
+          {operator ? (
+            <OperatorArtwork
+              src={src}
+              tier={operator.tier}
+              accent={operator.accent}
+              imageClassName="nft-artwork-full"
+              alt={t("alt", { name })}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- Generated local data URI.
+            <img className="nft-artwork-full" src={src} alt={t("alt", { name })} />
+          )}
         </div>
       </section>
     </div>,

@@ -201,6 +201,28 @@ npm start
 Rebuild after changing a `NEXT_PUBLIC_*` value because Next.js embeds public configuration at build
 time. Use a browser-safe, origin-restricted RPC credential where the provider supports it.
 
+### Browser security policy
+
+Production builds default to a nonce-based CSP in report-only mode. The application owns this
+header; do not add a second CSP in Nginx. Configure the server process with:
+
+```bash
+STATICS_CSP_MODE=report-only
+STATICS_CSP_CAPTCHA_PROVIDER=none
+STATICS_RELEASE=<release-commit>
+```
+
+`STATICS_CSP_MODE` accepts `off`, `report-only`, or `enforce`. Change it to `enforce` only after
+the exact release has passed wallet-flow validation and its structured `csp_violation` service
+logs contain no unexplained application violations. Set `STATICS_CSP_CAPTCHA_PROVIDER` to
+`turnstile` or `hcaptcha` only when the matching provider is enabled in Privy. If Privy provisions
+a custom authentication domain, set its credential-free HTTPS origin in
+`STATICS_PRIVY_AUTH_ORIGIN`.
+
+Operator and PositionNFT artwork is deterministic and served locally. Token-list logos are
+checked-in local WebP assets. Arbitrary third-party NFT media intentionally renders as a
+placeholder rather than opening a browser or server fetch to an untrusted origin.
+
 ## Verification
 
 Run focused tests while changing behavior:

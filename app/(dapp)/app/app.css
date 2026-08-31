@@ -1926,9 +1926,8 @@
   background: var(--app-surface);
 }
 
-/* Artwork sits top-right of the card. Statics positions carry no tokenURI, so
- * the placeholder is the ordinary state and reads as a typed mark rather than
- * as a failed image. */
+/* Artwork sits top-right of the card. Deterministic Statics images are local;
+ * untrusted third-party media uses the typed placeholder. */
 .wallet-nft-top {
   display: flex;
   gap: 0.875rem;
@@ -1969,6 +1968,41 @@
   display: block;
 }
 
+.operator-artwork-frame {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.operator-tier-overlay {
+  position: absolute;
+  z-index: 1;
+  bottom: 3.9%;
+  left: 37.5%;
+  display: flex;
+  gap: 2.35%;
+  align-items: center;
+  width: 25%;
+  height: 7.8%;
+  padding: 2.35% 3.1%;
+  border: 1px solid var(--operator-accent);
+  border-radius: 8%;
+  background: var(--app-surface);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.operator-tier-overlay i {
+  display: block;
+  width: 12.5%;
+  aspect-ratio: 1;
+  background: var(--operator-accent);
+}
+
 .wallet-nft-art.is-lg,
 .wallet-nft-art-trigger.is-lg {
   width: 100%;
@@ -1977,6 +2011,18 @@
 }
 
 .wallet-nft-art-trigger.is-lg .wallet-nft-art {
+  width: 100%;
+  height: 100%;
+}
+
+.operator-artwork-frame.is-lg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.operator-artwork-frame > .wallet-nft-art {
+  display: block;
   width: 100%;
   height: 100%;
 }
@@ -2789,6 +2835,13 @@
   object-fit: contain;
   background: var(--app-raised);
   border-radius: var(--radius-md);
+}
+
+.nft-artwork-dialog-content > .operator-artwork-frame {
+  width: min(100%, calc(100vh - 8rem));
+  max-height: calc(100vh - 8rem);
+  aspect-ratio: 1;
+  justify-self: center;
 }
 
 .wallet-dialog-close {

@@ -49,6 +49,8 @@ export type WalletNft = Readonly<{
   transferWarning?: string;
   /** Set when the token cannot be moved, with the reason. */
   blockedReason: string | null;
+  /** Dynamic tier used only to layer the local Operator activation marks. */
+  artworkTier?: number;
 }>;
 
 function plural(count: number | bigint, one: string, many = `${one}s`): string {

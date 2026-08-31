@@ -35,7 +35,7 @@ import { useWalletState } from "@/providers/wallet-context";
 type VaultDirection = "acquire" | "redeem";
 
 /** One owned Genesis, with the credit state that decides whether it can go back. */
-type RedeemableGenesis = Readonly<{ id: bigint; creditActive: boolean }>;
+type RedeemableGenesis = Readonly<{ id: bigint; creditActive: boolean; tier: number }>;
 
 type ErrorCopy = Readonly<{
   walletRejected: string;
@@ -154,6 +154,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
       const discovery = await discoverWalletGenesisSnapshot(publicClient, deployment, wallet);
+      const tierById = new Map(discovery.indexed.map((item) => [item.id.toString(), item.tier]));
       // Credit locks a Genesis against redemption, and the old panel only found
       // out by reverting. Resolve it with the list so a locked NFT is marked
       // before anyone selects it.
@@ -165,7 +166,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
             functionName: "credit",
             args: [id],
           });
-          return { id, creditActive: credit.active };
+          return { id, creditActive: credit.active, tier: tierById.get(id.toString()) ?? 0 };
         })
       );
       return { owned, stale: discovery.stale };
@@ -453,6 +454,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 <NftArtwork
                   chainId={deployment.descriptor.chainId}
                   expandable
+                  operatorTier={0}
                   size="lg"
                   nft={{
                     kind: "collection",
@@ -596,6 +598,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                         <NftArtwork
                           chainId={deployment.descriptor.chainId}
                           size="lg"
+                          operatorTier={item.tier}
                           nft={{
                             kind: "collection",
                             tokenId: item.id,

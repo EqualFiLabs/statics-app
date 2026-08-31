@@ -1,93 +1,62 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@/test/render";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 
-const mocks = vi.hoisted(() => ({
-  resolveNftImage: vi.fn(),
-}));
-
-vi.mock("wagmi", () => ({
-  usePublicClient: () => ({}),
-}));
-
-vi.mock("@/lib/wallet/nft-image", () => ({
-  resolveNftImage: mocks.resolveNftImage,
-}));
-
-const nft = {
+const operator = {
   kind: "collection" as const,
   tokenId: 4n,
-  contract: "0x0000000000000000000000000000000000000004" as const,
-  name: "Genesis #4",
+  contract: "0xad5E9F96A91D1A6F550580b157af2068A0e8F0BE" as const,
+  name: "Operator #4",
   summary: "Tier 2",
   carries: [],
   blockedReason: null,
 };
 
-function renderArtwork(expandable = true) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <NftArtwork nft={nft} chainId={46630} expandable={expandable} />
-    </QueryClientProvider>
-  );
-}
-
-describe("NFT artwork viewer", () => {
-  beforeEach(() => {
-    mocks.resolveNftImage.mockReset();
-    mocks.resolveNftImage.mockResolvedValue(
-      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
+describe("local NFT artwork", () => {
+  it("opens local Operator artwork with its current tier and restores focus", async () => {
+    render(<NftArtwork nft={operator} chainId={4663} operatorTier={2} expandable />);
+    const trigger = screen.getByRole("button", { name: "View Operator #4 full size" });
+    expect(trigger.querySelector("img")).toHaveAttribute(
+      "src",
+      "/assets/operators/3ae699e07a0b5ba9/4.svg"
     );
-  });
-
-  it("opens the resolved artwork, traps focus, and restores it after Escape", async () => {
-    renderArtwork();
-    const trigger = await screen.findByRole("button", {
-      name: "View Genesis #4 full size",
-    });
+    expect(trigger.querySelectorAll(".operator-tier-overlay i")).toHaveLength(2);
 
     trigger.focus();
     fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Genesis #4 artwork" });
-    expect(dialog).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "Full-size artwork for Genesis #4" })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
-    expect(document.body.style.overflow).toBe("hidden");
-
-    fireEvent.keyDown(window, { key: "Tab" });
+    expect(screen.getByRole("dialog", { name: "Operator #4 artwork" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
     fireEvent.keyDown(window, { key: "Escape" });
-
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
-    expect(document.body.style.overflow).toBe("");
   });
 
-  it("closes when the backdrop is pressed", async () => {
-    renderArtwork();
-    fireEvent.click(await screen.findByRole("button", { name: "View Genesis #4 full size" }));
-    fireEvent.mouseDown(document.querySelector(".wallet-dialog-backdrop")!);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("leaves ordinary thumbnails and missing artwork noninteractive", async () => {
-    const first = renderArtwork(false);
-    await waitFor(() =>
-      expect(first.container.querySelector("img.wallet-nft-art")).toBeInTheDocument()
+  it("renders PositionNFT artwork locally without a metadata request", () => {
+    render(
+      <NftArtwork
+        chainId={46630}
+        nft={{ ...operator, kind: "position", tokenId: 42n, name: "Position #42" }}
+      />
     );
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    first.unmount();
+    const image = document.querySelector("img.wallet-nft-art");
+    expect(image?.getAttribute("src")).toContain("POSITION%20%2342");
+  });
 
-    mocks.resolveNftImage.mockResolvedValueOnce(null);
-    renderArtwork();
-    await waitFor(() => expect(mocks.resolveNftImage).toHaveBeenCalled());
+  it("uses a noninteractive placeholder for arbitrary collection media", () => {
+    render(
+      <NftArtwork
+        chainId={1}
+        expandable
+        nft={{
+          ...operator,
+          contract: "0x0000000000000000000000000000000000000004",
+          name: "Third-party NFT",
+        }}
+      />
+    );
+    expect(document.querySelector("img")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(document.querySelector(".wallet-nft-art.is-placeholder")).toBeInTheDocument();
   });
 });

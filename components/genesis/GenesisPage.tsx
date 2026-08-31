@@ -271,6 +271,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                 <NftArtwork
                   chainId={deployment.chainId}
                   expandable
+                  operatorTier={currentTier}
                   nft={{
                     kind: "collection",
                     tokenId: id,
