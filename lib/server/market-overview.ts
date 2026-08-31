@@ -8,6 +8,7 @@ import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   canonicalPrices,
   feeAdjustedImpactBps,
+  findMaximumDepthInput,
   priceChangeBps,
   publicDistributedSupply,
   staticsUsdPriceWad,
@@ -32,7 +33,6 @@ const SNAPSHOT_TTL_MS = 60_000;
 const DEPTH_TTL_MS = 5 * 60_000;
 const DEPTH_MAX_STALE_MS = 15 * 60_000;
 const DEPTH_TARGETS = [100, 200, 500] as const;
-const BINARY_SEARCH_STEPS = 10;
 
 type Candle = Readonly<{
   timestamp: string;
@@ -196,45 +196,33 @@ async function depthLevel(
   inputUsdWad: bigint | null,
   blockNumber: bigint
 ): Promise<MarketDepthLevel> {
-  let low = 0n;
-  let upper = high;
-  let amountOut = 0n;
-  let actualImpactBps = 0;
-  for (let step = 0; step < BINARY_SEARCH_STEPS; step += 1) {
-    const candidate = (low + upper + 1n) / 2n;
+  const result = await findMaximumDepthInput(high, targetImpactBps, async (candidate) => {
     const output = await quote(client, deployment, zeroForOne, candidate, blockNumber);
-    const impact = output
-      ? feeAdjustedImpactBps(candidate, output, outputPerInputWad, deployment.market.poolKey.fee)
-      : 10_000;
-    if (output && impact <= targetImpactBps) {
-      low = candidate;
-      amountOut = output;
-      actualImpactBps = impact;
-    } else {
-      upper = candidate - 1n;
-    }
-  }
-  if (low > 0n && amountOut === 0n) {
-    amountOut = (await quote(client, deployment, zeroForOne, low, blockNumber)) ?? 0n;
-    actualImpactBps = feeAdjustedImpactBps(
-      low,
-      amountOut,
-      outputPerInputWad,
-      deployment.market.poolKey.fee
-    );
-  }
+    return output
+      ? {
+          amountOut: output,
+          impactBps: feeAdjustedImpactBps(
+            candidate,
+            output,
+            outputPerInputWad,
+            deployment.market.poolKey.fee
+          ),
+        }
+      : null;
+  });
+  if (!result) throw new Error("Canonical Quoter depth is unavailable.");
   const staticsIsCurrency0 =
     deployment.market.poolKey.currency0.toLowerCase() ===
     deployment.contracts.statics.toLowerCase();
   const inputIsStatics = zeroForOne === staticsIsCurrency0;
   return {
     targetImpactBps,
-    actualImpactBps,
+    actualImpactBps: result.impactBps,
     inputToken: inputIsStatics ? "STATICS" : "WETH",
     outputToken: inputIsStatics ? "WETH" : "STATICS",
-    amountIn: low.toString(),
-    amountOut: amountOut.toString(),
-    inputUsdWad: inputUsdWad === null ? null : usdValueWad(low, inputUsdWad).toString(),
+    amountIn: result.amountIn.toString(),
+    amountOut: result.amountOut.toString(),
+    inputUsdWad: inputUsdWad === null ? null : usdValueWad(result.amountIn, inputUsdWad).toString(),
   };
 }
 
@@ -354,7 +342,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
       blockNumber,
     }),
     client.readContract({
-      address: analytics.treasuryVesting.address,
+      address: deployment.contracts.statics,
       abi: vestingAbi,
       functionName: "vestingOf",
       args: [analytics.treasuryBeneficiary, 0n],

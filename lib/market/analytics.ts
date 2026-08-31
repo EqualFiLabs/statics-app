@@ -79,3 +79,31 @@ export function priceChangeBps(
     ((closeWethPerStaticsWad - openWethPerStaticsWad) * 10_000n) / openWethPerStaticsWad
   );
 }
+
+export type DepthQuote = Readonly<{ amountOut: bigint; impactBps: number }>;
+
+export async function findMaximumDepthInput(
+  high: bigint,
+  targetImpactBps: number,
+  quote: (amountIn: bigint) => Promise<DepthQuote | null>,
+  steps = 10
+): Promise<Readonly<{ amountIn: bigint; amountOut: bigint; impactBps: number }> | null> {
+  let low = 0n;
+  let upper = high;
+  let accepted: DepthQuote | null = null;
+  for (let step = 0; step < steps && low < upper; step += 1) {
+    const candidate = (low + upper + 1n) / 2n;
+    const result = await quote(candidate);
+    if (result && result.amountOut > 0n && result.impactBps <= targetImpactBps) {
+      low = candidate;
+      accepted = result;
+    } else {
+      upper = candidate - 1n;
+    }
+  }
+  if (low === 0n) return null;
+  const finalQuote = accepted ?? (await quote(low));
+  if (!finalQuote || finalQuote.amountOut <= 0n || finalQuote.impactBps > targetImpactBps)
+    return null;
+  return { amountIn: low, amountOut: finalQuote.amountOut, impactBps: finalQuote.impactBps };
+}

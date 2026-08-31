@@ -7,6 +7,7 @@ import {
   WAD,
   canonicalPrices,
   feeAdjustedImpactBps,
+  findMaximumDepthInput,
   priceChangeBps,
   publicDistributedSupply,
   strictLiquidFloat,
@@ -50,5 +51,15 @@ describe("market analytics", () => {
   it("reports signed price changes", () => {
     expect(priceChangeBps(WAD, (WAD * 11n) / 10n)).toBe(1_000);
     expect(priceChangeBps(WAD, (WAD * 9n) / 10n)).toBe(-1_000);
+  });
+
+  it("finds bounded depth and fails closed when quotes are unavailable", async () => {
+    const found = await findMaximumDepthInput(1_000n, 200, async (amountIn) => ({
+      amountOut: amountIn * 2n,
+      impactBps: Number(amountIn / 5n),
+    }));
+    expect(found?.amountIn).toBeGreaterThanOrEqual(995n);
+    expect(found?.impactBps).toBeLessThanOrEqual(200);
+    await expect(findMaximumDepthInput(1_000n, 200, async () => null)).resolves.toBeNull();
   });
 });
