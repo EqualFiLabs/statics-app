@@ -65,7 +65,11 @@ export function aggregateMarketCandles(
     });
   }
   return [...aggregated.values()].sort((left, right) =>
-    left.bucketTimestamp < right.bucketTimestamp ? -1 : left.bucketTimestamp > right.bucketTimestamp ? 1 : 0
+    left.bucketTimestamp < right.bucketTimestamp
+      ? -1
+      : left.bucketTimestamp > right.bucketTimestamp
+        ? 1
+        : 0
   );
 }
 

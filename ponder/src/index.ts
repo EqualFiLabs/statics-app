@@ -329,10 +329,8 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
       lastBlock: event.block.number,
     })
     .onConflictDoUpdate((row) => ({
-      highSqrtPriceX96:
-        row.highSqrtPriceX96 > sqrtPriceX96 ? row.highSqrtPriceX96 : sqrtPriceX96,
-      lowSqrtPriceX96:
-        row.lowSqrtPriceX96 < sqrtPriceX96 ? row.lowSqrtPriceX96 : sqrtPriceX96,
+      highSqrtPriceX96: row.highSqrtPriceX96 > sqrtPriceX96 ? row.highSqrtPriceX96 : sqrtPriceX96,
+      lowSqrtPriceX96: row.lowSqrtPriceX96 < sqrtPriceX96 ? row.lowSqrtPriceX96 : sqrtPriceX96,
       closeSqrtPriceX96: sqrtPriceX96,
       volume0: row.volume0 + absoluteAmount(event.args.amount0),
       volume1: row.volume1 + absoluteAmount(event.args.amount1),
