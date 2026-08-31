@@ -19,6 +19,11 @@ export type LaunchDeploymentManifest = Readonly<{
   deploymentStartBlock: string;
   protocolCommit: string;
   contracts: Readonly<Record<LaunchContractName, ManifestContract>>;
+  analytics?: Readonly<{
+    treasuryBeneficiary: string;
+    treasuryVesting: ManifestContract;
+    reservesLens: ManifestContract;
+  }>;
   market: Readonly<{
     poolId: string;
     poolKey: Readonly<{
@@ -125,6 +130,34 @@ export function parseLaunchDeploymentManifest(
     capabilities: launchCapabilities,
     available: true,
   };
+  const analytics = manifest.analytics
+    ? {
+        treasuryBeneficiary: address(
+          manifest.analytics.treasuryBeneficiary,
+          "analytics.treasuryBeneficiary"
+        ),
+        treasuryVesting: {
+          address: address(
+            manifest.analytics.treasuryVesting.address,
+            "analytics.treasuryVesting.address"
+          ),
+          runtimeCodeHash: hash(
+            manifest.analytics.treasuryVesting.runtimeCodeHash ?? "",
+            "analytics.treasuryVesting.runtimeCodeHash"
+          ),
+        },
+        reservesLens: {
+          address: address(
+            manifest.analytics.reservesLens.address,
+            "analytics.reservesLens.address"
+          ),
+          runtimeCodeHash: hash(
+            manifest.analytics.reservesLens.runtimeCodeHash ?? "",
+            "analytics.reservesLens.runtimeCodeHash"
+          ),
+        },
+      }
+    : undefined;
   return {
     kind: "launch",
     descriptor,
@@ -133,6 +166,7 @@ export function parseLaunchDeploymentManifest(
     source,
     contracts,
     runtimeCodeHashes,
+    analytics,
     market: { poolId, poolKey },
   };
 }

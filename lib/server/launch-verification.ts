@@ -19,6 +19,15 @@ function cacheKey(deployment: LaunchDeployment): string {
     ...Object.entries(deployment.runtimeCodeHashes)
       .sort(([left], [right]) => left.localeCompare(right))
       .flatMap(([name, hash]) => (hash ? [`${name}:${hash.toLowerCase()}`] : [])),
+    ...(deployment.analytics
+      ? [
+          `treasuryBeneficiary:${deployment.analytics.treasuryBeneficiary.toLowerCase()}`,
+          `treasuryVesting:${deployment.analytics.treasuryVesting.address.toLowerCase()}`,
+          `treasuryVestingHash:${deployment.analytics.treasuryVesting.runtimeCodeHash.toLowerCase()}`,
+          `reservesLens:${deployment.analytics.reservesLens.address.toLowerCase()}`,
+          `reservesLensHash:${deployment.analytics.reservesLens.runtimeCodeHash.toLowerCase()}`,
+        ]
+      : []),
   ].join(":");
 }
 

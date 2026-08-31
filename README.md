@@ -92,6 +92,7 @@ Server-only configuration:
 - `EVE_ROBINHOOD_RPC_URL`
 - `STATICS_ROBINHOOD_TESTNET_RPC_URL`
 - `STATICS_ROBINHOOD_MAINNET_RPC_URL`
+- `STATICS_MARKET_API_KEYS`
 
 The server integrations read these values only from their process environment. They are never
 copied into browser configuration.
@@ -103,6 +104,37 @@ browser request bursts cannot consume the indexer's quota.
 The EVE RPCs verify the destination `OFTReceived` receipt before a LayerZero bridge is displayed as
 filled. They must point to authenticated, production-capable Base and Robinhood Chain RPC services;
 the app does not fall back to rate-limited public RPCs for this check.
+
+### Market analytics API
+
+The Overview page reads a centrally cached market snapshot from `/api/market/overview`. The same
+canonical data is available to approved integrations under `/api/market/v1`:
+
+- `GET /overview` returns spot prices, explicit supply definitions, valuations, pool principal,
+  24-hour activity, and fee-adjusted 1%, 2%, and 5% depth in both directions.
+- `GET /candles?from=<unix>&to=<unix>&resolution=<minutes>` returns at most 31 days of Ponder
+  candles at `1`, `5`, `15`, `60`, `240`, or `1440` minute resolution.
+- `GET /swaps?limit=<1-100>` returns recent canonical-pool swaps.
+- `GET /status` returns the snapshot state and freshness timestamps.
+
+External routes require `Authorization: Bearer stx_live_<id>_<secret>`. Generate a separate random
+secret per integration, give the complete bearer token to that integration once, and configure only
+its SHA-256 hash on the server:
+
+```bash
+secret="$(openssl rand -hex 32)"
+printf 'client token: stx_live_partner_%s\n' "$secret"
+printf 'server entry: partner:%s\n' "$(printf '%s' "$secret" | sha256sum | cut -d' ' -f1)"
+```
+
+`STATICS_MARKET_API_KEYS` accepts comma-separated server entries, so deleting an entry revokes that
+client. Each key has a process-local burst allowance of 30 requests and refills at 120 requests per
+minute. Deploy behind a shared edge rate limit when multiple application instances are used.
+
+The snapshot is shared for 60 seconds; Uniswap quote-derived depth is shared for five minutes.
+Coinbase ETH/USD may use its last good value for no more than 15 minutes and then USD fields become
+`null`. Ponder supplies activity and history; onchain reads remain authoritative for reserves,
+supply, vesting, backing, and spot price.
 
 ## Connected local environment
 
