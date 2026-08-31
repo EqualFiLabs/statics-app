@@ -111,13 +111,16 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { active } = useDeployment();
+  const selectedChainId =
+    canonicalOnly && active.launch ? active.launch.descriptor.chainId : wallet.fundingChainId;
+  const selectedNetworkName =
+    canonicalOnly && active.launch ? active.launch.descriptor.network : wallet.fundingNetworkName;
+  const walletOnSelectedChain = wallet.chainId === selectedChainId;
   const launch =
-    active.launch && active.launch.descriptor.chainId === wallet.fundingChainId
-      ? active.launch
-      : null;
-  const walletTokens = useWalletTokens(wallet.fundingChainId, active.protocol ?? active.launch);
+    active.launch && active.launch.descriptor.chainId === selectedChainId ? active.launch : null;
+  const walletTokens = useWalletTokens(selectedChainId, active.protocol ?? active.launch);
   const tokens = useMemo(() => {
-    const native = getDefaultEvmSwapTokens(wallet.fundingChainId).filter(
+    const native = getDefaultEvmSwapTokens(selectedChainId).filter(
       (token) => token.kind === "native"
     );
     const canonical: EvmSwapToken[] = launch
@@ -153,7 +156,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
         ) === index
     );
-  }, [canonicalOnly, launch, wallet.fundingChainId, walletTokens.tokens]);
+  }, [canonicalOnly, launch, selectedChainId, walletTokens.tokens]);
   const [sourceAddress, setSourceAddress] = useState<string>(zeroAddress);
   const [destinationAddress, setDestinationAddress] = useState<string>(
     launch?.contracts.statics ?? ""
@@ -165,12 +168,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   const [error, setError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
-  const {
-    address: walletAddress,
-    fundingChainId,
-    fundingWalletOnSelectedChain,
-    getEthereumProvider,
-  } = wallet;
+  const { address: walletAddress, getEthereumProvider } = wallet;
   const source = tokens.find((token) => token.address === sourceAddress) ?? tokens[0];
   const destination =
     tokens.find(
@@ -211,11 +209,11 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     const reset = window.setTimeout(() => {
       if (active) setBalance(null);
     }, 0);
-    if (!walletAddress || !source || !fundingWalletOnSelectedChain) return;
+    if (!walletAddress || !source || !walletOnSelectedChain) return;
     void (async () => {
       try {
         const provider = await getEthereumProvider();
-        const network = getFundingNetwork(fundingChainId);
+        const network = getFundingNetwork(selectedChainId);
         if (!provider || !network) return;
         const publicClient = createPublicClient({
           chain: network.chain,
@@ -239,7 +237,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       active = false;
       window.clearTimeout(reset);
     };
-  }, [source, walletAddress, fundingChainId, fundingWalletOnSelectedChain, getEthereumProvider]);
+  }, [source, walletAddress, selectedChainId, walletOnSelectedChain, getEthereumProvider]);
 
   const requestQuote = async (): Promise<QuotePayload> => {
     if (!wallet.address || !source || !destination || parsedAmount <= 0n) {
@@ -247,7 +245,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     }
     if (directDirection && launch) {
       const provider = await wallet.getEthereumProvider();
-      const network = getFundingNetwork(wallet.fundingChainId);
+      const network = getFundingNetwork(selectedChainId);
       if (!provider || !network) throw new Error("The selected wallet is unavailable.");
       const publicClient = createPublicClient({
         chain: network.chain,
@@ -292,7 +290,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        chainId: wallet.fundingChainId,
+        chainId: selectedChainId,
         tokenIn: source.address,
         tokenOut: destination.address,
         amount: parsedAmount.toString(),
@@ -310,7 +308,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   useEffect(() => {
     const canQuote =
       wallet.status === "ready" &&
-      wallet.fundingWalletOnSelectedChain &&
+      walletOnSelectedChain &&
       parsedAmount > 0n &&
       !insufficient &&
       Boolean(source && destination);
@@ -348,8 +346,8 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   }, [
     wallet.address,
     wallet.status,
-    wallet.fundingChainId,
-    wallet.fundingWalletOnSelectedChain,
+    selectedChainId,
+    walletOnSelectedChain,
     source?.address,
     destination?.address,
     parsedAmount,
@@ -359,11 +357,11 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   const sendTransaction = async (raw: unknown, kind: "approve-swap" | "swap", label: string) => {
     if (!wallet.address) throw new Error("Connect a wallet first.");
     const provider = await wallet.getEthereumProvider();
-    const network = getFundingNetwork(wallet.fundingChainId);
+    const network = getFundingNetwork(selectedChainId);
     if (!provider || !network) throw new Error("The selected wallet is unavailable.");
     const account = getAddress(wallet.address);
     const transaction = normalizeUniswapTransaction(raw, {
-      chainId: wallet.fundingChainId,
+      chainId: selectedChainId,
       wallet: account,
     });
     const publicClient = createPublicClient({
@@ -373,7 +371,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     return executeProtocolTransaction({
       publicClient,
       wallet: account,
-      chainId: wallet.fundingChainId,
+      chainId: selectedChainId,
       kind,
       label,
       amount: `${amount} ${source?.symbol ?? ""}`.trim(),
@@ -400,7 +398,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       }
       if (fresh.routing === "STATICS_CANONICAL" && directDirection && launch) {
         const provider = await wallet.getEthereumProvider();
-        const network = getFundingNetwork(wallet.fundingChainId);
+        const network = getFundingNetwork(selectedChainId);
         if (!provider || !network) throw new Error("The selected wallet is unavailable.");
         const account = getAddress(wallet.address);
         const publicClient = createPublicClient({
@@ -518,7 +516,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            chainId: wallet.fundingChainId,
+            chainId: selectedChainId,
             token: source.address,
             tokenOut: destination.address,
             amount: parsedAmount.toString(),
@@ -567,8 +565,10 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     if (walletRecovery === "login") return wallet.login();
     if (walletRecovery === "create-wallet") return void wallet.createWallet();
     if (wallet.status !== "ready") return;
-    if (wallet.address && !wallet.fundingWalletOnSelectedChain) {
-      return void wallet.selectFundingNetwork(wallet.fundingChainId);
+    if (wallet.address && !walletOnSelectedChain) {
+      return canonicalOnly
+        ? void wallet.switchNetwork()
+        : void wallet.selectFundingNetwork(selectedChainId);
     }
     if (quote?.quote) setReviewing(true);
   };
@@ -578,8 +578,8 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       ? t("connectWallet")
       : walletRecovery === "create-wallet"
         ? t("createEmbeddedWallet")
-        : wallet.address && !wallet.fundingWalletOnSelectedChain
-          ? t("switchTo", { network: wallet.fundingNetworkName })
+        : wallet.address && !walletOnSelectedChain
+          ? t("switchTo", { network: selectedNetworkName })
           : quoteLoading
             ? t("findingRoute")
             : insufficient
@@ -590,9 +590,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     wallet.status === "loading" ||
     submitting ||
     quoteLoading ||
-    (wallet.status === "ready" &&
-      wallet.fundingWalletOnSelectedChain &&
-      (!quote?.quote || insufficient));
+    (wallet.status === "ready" && walletOnSelectedChain && (!quote?.quote || insufficient));
 
   return (
     <div className="portal-panel" role="tabpanel">
