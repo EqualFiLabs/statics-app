@@ -14,7 +14,7 @@ import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeploymentCached } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { genesisAcquisitionCost, genesisBackingInNumeraire } from "@/lib/genesis/market-value";
 import {
@@ -94,7 +94,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      await verifyLaunchDeploymentCached(publicClient, deployment);
+      await verifyLaunchDeploymentForRead(publicClient, deployment);
       const [vault, purchase, redemption, slot0, liquidity] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,

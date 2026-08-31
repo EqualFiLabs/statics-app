@@ -19,10 +19,8 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import {
-  verifyLaunchDeployment,
-  verifyLaunchDeploymentCached,
-} from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { useWalletState } from "@/providers/wallet-context";
 
 /** StaticsGenesisVault.RECOVERY_GRACE. */
@@ -214,7 +212,7 @@ export function GenesisCreditPanel({
     enabled: Boolean(publicClient && wallet),
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error(t("connect"));
-      await verifyLaunchDeploymentCached(publicClient, deployment);
+      await verifyLaunchDeploymentForRead(publicClient, deployment);
       const [vault, creditIncreasesPaused, credit, limit] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,

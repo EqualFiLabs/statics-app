@@ -12,10 +12,8 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import {
-  verifyLaunchDeployment,
-  verifyLaunchDeploymentCached,
-} from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { loadRecoverableGenesisCredits } from "@/lib/indexer/statics";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -126,7 +124,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
     enabled: Boolean(publicClient && epoch.data === false),
     queryFn: async (): Promise<readonly RecoveryCredit[]> => {
       if (!publicClient) return [];
-      await verifyLaunchDeploymentCached(publicClient, deployment);
+      await verifyLaunchDeploymentForRead(publicClient, deployment);
       const block = await publicClient.getBlock({ blockTag: "latest" });
       let indexed: readonly { genesisId: bigint }[];
       try {
