@@ -26,10 +26,8 @@ import {
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import {
-  verifyLaunchDeployment,
-  verifyLaunchDeploymentCached,
-} from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { useWalletState } from "@/providers/wallet-context";
 
 type VaultDirection = "acquire" | "redeem";
@@ -86,7 +84,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     retry: false,
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
-      await verifyLaunchDeploymentCached(publicClient, deployment);
+      await verifyLaunchDeploymentForRead(publicClient, deployment);
       return true;
     },
   });

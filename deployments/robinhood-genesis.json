@@ -55,6 +55,17 @@
       "runtimeCodeHash": "0x5208783f52488f7d3493e5e38311ab707c1d75457fe472a19b0b4d57d66a7fca"
     }
   },
+  "analytics": {
+    "treasuryBeneficiary": "0x0Ce4140f3Ab03024623a75F248D467912C7E1725",
+    "treasuryVesting": {
+      "address": "0xBcf0e357c359858aB166aEBb74f0E527aAb3d6ee",
+      "runtimeCodeHash": "0x9664a61194930ea499bad99bffd0c69c218953888b5f707b47be52eb1bfbe603"
+    },
+    "reservesLens": {
+      "address": "0x0000001b173C3bbF3984D417d8614E3eed34865B",
+      "runtimeCodeHash": "0x157a3174cbad65b8ff57b8fbf94253b58be07398593d7d677e4fd6051e16ca91"
+    }
+  },
   "market": {
     "poolId": "0xe79228d6cae086a58bf5b22220b454e5d1ca4f13da767ea5bbe032d5a1e82e8a",
     "poolKey": {

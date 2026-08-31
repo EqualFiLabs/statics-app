@@ -40,6 +40,21 @@ async function verifyLaunchRuntimeCode(
       }
     })
   );
+  if (deployment.analytics) {
+    await Promise.all(
+      (["treasuryVesting", "reservesLens"] as const).map(async (name) => {
+        const contract = deployment.analytics![name];
+        const code = await publicClient.getCode({ address: contract.address });
+        if (
+          !code ||
+          code === "0x" ||
+          keccak256(code).toLowerCase() !== contract.runtimeCodeHash.toLowerCase()
+        ) {
+          throw new Error(`${name} runtime code does not match the reviewed launch manifest.`);
+        }
+      })
+    );
+  }
 }
 
 async function verifyLaunchBindings(

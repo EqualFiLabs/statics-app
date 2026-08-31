@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { getAddress, type Address } from "viem";
+import { formatUnits, getAddress, type Address } from "viem";
 import { usePublicClient } from "wagmi";
 
 import { dopplerStaticsTokenAbi, v4StateViewReadAbi } from "@statics-protocol/sdk";
@@ -14,7 +14,7 @@ import { DollarOverview } from "@/components/dollar/DollarPage";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeploymentCached } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { genesisAcquisitionCost, genesisBackingInNumeraire } from "@/lib/genesis/market-value";
 import {
@@ -24,6 +24,9 @@ import {
   summariseGenesisRewards,
 } from "@/lib/genesis/owned";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
+import { loadMarketOverview } from "@/lib/market/client";
+import type { StaticsMarketOverview } from "@/lib/market/types";
+import { ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -44,6 +47,154 @@ function decimalFromScaled(value: bigint, decimals: number): string {
   const whole = value / base;
   const fraction = (value % base).toString().padStart(decimals, "0").replace(/0+$/, "");
   return fraction ? `${whole}.${fraction}` : whole.toString();
+}
+
+function compactWad(value: string): string {
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 2 }).format(
+    Number(formatUnits(BigInt(value), 18))
+  );
+}
+
+function usdWad(value: string | null, price = false): string {
+  if (value === null) return "—";
+  const amount = Number(formatUnits(BigInt(value), 18));
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    notation: price ? "standard" : "compact",
+    minimumFractionDigits: price && amount >= 0.01 ? 2 : 0,
+    maximumFractionDigits: price ? (amount < 0.01 ? 8 : 4) : 2,
+  }).format(amount);
+}
+
+function volumeUsd(data: StaticsMarketOverview): string | null {
+  if (data.price.ethUsdWad === null) return null;
+  return (
+    (BigInt(data.activity24h.wethVolume) * BigInt(data.price.ethUsdWad)) /
+    10n ** 18n
+  ).toString();
+}
+
+export function MarketAnalyticsPanel({
+  analytics,
+  loading,
+  error,
+}: {
+  analytics: StaticsMarketOverview | null;
+  loading: boolean;
+  error: boolean;
+}) {
+  const t = useTranslations("launchOverview");
+  if (error && !analytics) {
+    return (
+      <section className="ui-card market-analytics" aria-label={t("analyticsTitle")}>
+        <div className="overview-panel-head">
+          <h3>{t("analyticsTitle")}</h3>
+        </div>
+        <p className="overview-note is-warning">{t("analyticsUnavailable")}</p>
+      </section>
+    );
+  }
+
+  const change = analytics?.activity24h.priceChangeBps ?? 0;
+  return (
+    <section className="ui-card market-analytics" aria-label={t("analyticsTitle")}>
+      <div className="overview-panel-head">
+        <h3>{t("analyticsTitle")}</h3>
+        <span
+          className={
+            analytics?.status === "fresh"
+              ? "is-accent"
+              : analytics?.status === "stale" || analytics?.status === "partial"
+                ? "is-warning"
+                : undefined
+          }
+        >
+          {analytics ? t(`analyticsStatus.${analytics.status}`) : t("analyticsLoading")}
+        </span>
+      </div>
+
+      <div className="market-analytics__headline" aria-busy={loading}>
+        <article>
+          <span>{t("staticsPrice")}</span>
+          <strong>{analytics ? usdWad(analytics.price.staticsUsdWad, true) : "—"}</strong>
+          <small className={change < 0 ? "is-negative" : change > 0 ? "is-positive" : undefined}>
+            {analytics
+              ? `${change > 0 ? "+" : ""}${(change / 100).toFixed(2)}% ${t("last24h")}`
+              : "—"}
+          </small>
+        </article>
+        <article>
+          <span>{t("publicMarketCap")}</span>
+          <strong>{analytics ? usdWad(analytics.valuation.publicMarketCapUsdWad) : "—"}</strong>
+          <small>{t("publicMarketCapHint")}</small>
+        </article>
+        <article>
+          <span>{t("poolLiquidity")}</span>
+          <strong>{analytics ? usdWad(analytics.liquidity.tvlUsdWad) : "—"}</strong>
+          <small>{t("poolPrincipalOnly")}</small>
+        </article>
+        <article>
+          <span>{t("volume24h")}</span>
+          <strong>{analytics ? usdWad(volumeUsd(analytics)) : "—"}</strong>
+          <small>{analytics ? t("swapCount", { count: analytics.activity24h.swaps }) : "—"}</small>
+        </article>
+      </div>
+
+      {analytics && (
+        <div className="market-analytics__details">
+          <div>
+            <h4>{t("supplyDefinitions")}</h4>
+            <dl className="overview-rows">
+              <div>
+                <dt>{t("totalSupply")}</dt>
+                <dd>{compactWad(analytics.supply.total)} STATICS</dd>
+              </div>
+              <div>
+                <dt>{t("publicDistributed")}</dt>
+                <dd>{compactWad(analytics.supply.publicDistributed)} STATICS</dd>
+              </div>
+              <div>
+                <dt>{t("strictLiquidFloat")}</dt>
+                <dd>{compactWad(analytics.supply.strictLiquidFloat)} STATICS</dd>
+              </div>
+              <div>
+                <dt>{t("fullyDilutedValue")}</dt>
+                <dd>{usdWad(analytics.valuation.fdvUsdWad)}</dd>
+              </div>
+            </dl>
+            <p className="overview-note">{t("supplyDefinitionsNote")}</p>
+          </div>
+
+          <div>
+            <h4>{t("marketDepth")}</h4>
+            {analytics.depth ? (
+              <div className="market-depth">
+                <div className="market-depth__head" aria-hidden="true">
+                  <span>{t("priceImpact")}</span>
+                  <span>{t("buyDepth")}</span>
+                  <span>{t("sellDepth")}</span>
+                </div>
+                {analytics.depth.buyStatics.map((buy, index) => {
+                  const sell = analytics.depth!.sellStatics[index];
+                  return (
+                    <div className="market-depth__row" key={buy.targetImpactBps}>
+                      <b>{buy.targetImpactBps / 100}%</b>
+                      <span>{usdWad(buy.inputUsdWad)}</span>
+                      <span>{sell ? usdWad(sell.inputUsdWad) : "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="overview-note is-warning">{t("depthUnavailable")}</p>
+            )}
+            <p className="overview-note">{t("depthNote")}</p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function formatCanonicalMarketPrice(
@@ -94,7 +245,7 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
     enabled: Boolean(publicClient),
     queryFn: async () => {
       if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      await verifyLaunchDeploymentCached(publicClient, deployment);
+      await verifyLaunchDeploymentForRead(publicClient, deployment);
       const [vault, purchase, redemption, slot0, liquidity] = await Promise.all([
         publicClient.readContract({
           address: deployment.contracts.vault,
@@ -152,6 +303,15 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
       if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
       return loadOwnedGenesis(publicClient, deployment, wallet);
     },
+  });
+
+  const marketAnalytics = useQuery({
+    queryKey: ["market-overview", deployment.descriptor.deploymentId],
+    enabled: deployment.descriptor.deploymentId === ROBINHOOD_GENESIS_DEPLOYMENT_ID,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: 1,
+    queryFn: ({ signal }) => loadMarketOverview(signal),
   });
 
   const vault = metrics.data?.vault ?? null;
@@ -390,6 +550,14 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           </p>
         </section>
       </div>
+
+      {deployment.descriptor.deploymentId === ROBINHOOD_GENESIS_DEPLOYMENT_ID && (
+        <MarketAnalyticsPanel
+          analytics={marketAnalytics.data ?? null}
+          loading={marketAnalytics.isLoading || marketAnalytics.isFetching}
+          error={Boolean(marketAnalytics.error)}
+        />
+      )}
 
       <VaultSolvency
         figures={

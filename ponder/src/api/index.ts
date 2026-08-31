@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt } from "ponder";
+import { and, asc, desc, eq, gt, gte, lt, lte } from "ponder";
 import { db } from "ponder:api";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -10,12 +10,14 @@ import {
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
+  marketCandle,
   marketSwap,
   v4Position,
 } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
 import { nextAvailableGenesisId } from "../genesis";
+import { aggregateMarketCandles, readMarketResolution } from "../market";
 
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
@@ -284,6 +286,73 @@ app.get("/market/swaps", async (context) => {
       transactionHash: row.transactionHash,
       blockNumber: row.blockNumber.toString(),
       blockTimestamp: row.blockTimestamp.toString(),
+    })),
+  });
+});
+
+const MAX_CANDLE_RANGE_SECONDS = 31n * 24n * 60n * 60n;
+
+app.get("/market/candles", async (context) => {
+  const fromValue = context.req.query("from");
+  const toValue = context.req.query("to");
+  const resolution = readMarketResolution(context.req.query("resolution"));
+  if (
+    !fromValue ||
+    !toValue ||
+    !/^\d+$/.test(fromValue) ||
+    !/^\d+$/.test(toValue) ||
+    resolution === null
+  ) {
+    return context.json({ error: "Invalid candle range or resolution." }, 400);
+  }
+  const from = BigInt(fromValue);
+  const to = BigInt(toValue);
+  if (to < from || to - from > MAX_CANDLE_RANGE_SECONDS) {
+    return context.json({ error: "Candle range must be ordered and no longer than 31 days." }, 400);
+  }
+  const rows = await db
+    .select({
+      bucketTimestamp: marketCandle.bucketTimestamp,
+      openSqrtPriceX96: marketCandle.openSqrtPriceX96,
+      highSqrtPriceX96: marketCandle.highSqrtPriceX96,
+      lowSqrtPriceX96: marketCandle.lowSqrtPriceX96,
+      closeSqrtPriceX96: marketCandle.closeSqrtPriceX96,
+      volume0: marketCandle.volume0,
+      volume1: marketCandle.volume1,
+      zeroForOneCount: marketCandle.zeroForOneCount,
+      oneForZeroCount: marketCandle.oneForZeroCount,
+      swapCount: marketCandle.swapCount,
+      firstBlock: marketCandle.firstBlock,
+      lastBlock: marketCandle.lastBlock,
+    })
+    .from(marketCandle)
+    .where(
+      and(
+        eq(marketCandle.deploymentId, deploymentId),
+        gte(marketCandle.bucketTimestamp, from),
+        lte(marketCandle.bucketTimestamp, to)
+      )
+    )
+    .orderBy(asc(marketCandle.bucketTimestamp))
+    .limit(44_641);
+  const items = aggregateMarketCandles(rows, resolution);
+  context.header("Cache-Control", "public, max-age=5, stale-while-revalidate=30");
+  return context.json({
+    deploymentId,
+    resolution,
+    items: items.map((row) => ({
+      timestamp: row.bucketTimestamp.toString(),
+      openSqrtPriceX96: row.openSqrtPriceX96.toString(),
+      highSqrtPriceX96: row.highSqrtPriceX96.toString(),
+      lowSqrtPriceX96: row.lowSqrtPriceX96.toString(),
+      closeSqrtPriceX96: row.closeSqrtPriceX96.toString(),
+      volume0: row.volume0.toString(),
+      volume1: row.volume1.toString(),
+      zeroForOneCount: row.zeroForOneCount,
+      oneForZeroCount: row.oneForZeroCount,
+      swapCount: row.swapCount,
+      firstBlock: row.firstBlock.toString(),
+      lastBlock: row.lastBlock.toString(),
     })),
   });
 });

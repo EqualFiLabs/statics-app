@@ -4,6 +4,7 @@ import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 import { getAddress, zeroAddress } from "viem";
 import { activeGenesisCreditMutation } from "./genesis-credit";
 import { genesisTransferMutation, genesisWeightChangedMutation } from "./genesis";
+import { configuredAddress } from "./source-config";
 
 import {
   activeGenesisCredit,
@@ -11,20 +12,31 @@ import {
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
+  marketCandle,
   marketSwap,
   v4Position,
 } from "ponder:schema";
+import { absoluteAmount, candleBucket, marketCandleKey } from "./market";
 
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim();
 if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
 const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
-const canonicalPoolId = process.env.PONDER_CANONICAL_POOL_ID?.trim().toLowerCase();
 const genesisVaultValue = process.env.PONDER_GENESIS_VAULT_ADDRESS?.trim();
 const genesisVault = genesisVaultValue ? getAddress(genesisVaultValue) : undefined;
 
-ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
+function sourceHandler(enabled: boolean): typeof ponder.on {
+  return enabled ? (ponder.on.bind(ponder) as typeof ponder.on) : () => undefined;
+}
+
+const onStatics = sourceHandler(Boolean(configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS")));
+const onPositionManager = sourceHandler(
+  Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
+);
+const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
+
+onStatics("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
@@ -44,7 +56,7 @@ ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:LoanExtended", async ({ event, context }) => {
+onStatics("Statics:LoanExtended", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
@@ -59,11 +71,11 @@ ponder.on("Statics:LoanExtended", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:LoanRepaid", async ({ event, context }) => {
+onStatics("Statics:LoanRepaid", async ({ event, context }) => {
   await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
-ponder.on("Statics:LoanRecovered", async ({ event, context }) => {
+onStatics("Statics:LoanRecovered", async ({ event, context }) => {
   await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
@@ -129,7 +141,7 @@ ponder.on("GenesisVault:GenesisCreditRecovered", async ({ event, context }) => {
     await context.db.delete(activeGenesisCredit, { key: mutation.key });
 });
 
-ponder.on("PositionManager:Transfer", async ({ event, context }) => {
+onPositionManager("PositionManager:Transfer", async ({ event, context }) => {
   const key = entityKey(event.args.tokenId);
   if (event.args.to === zeroAddress) {
     await context.db.delete(v4Position, { key });
@@ -165,7 +177,7 @@ ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
   await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
 });
 
-ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
+onStatics("Statics:GenesisActivated", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: Number(event.args.newTier),
     multiplierBps: Number(event.args.multiplierBps),
@@ -173,21 +185,21 @@ ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:GenesisLinked", async ({ event, context }) => {
+onStatics("Statics:GenesisLinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: event.args.positionId,
     updatedAtBlock: event.block.number,
   });
 });
 
-ponder.on("Statics:GenesisUnlinked", async ({ event, context }) => {
+onStatics("Statics:GenesisUnlinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: 0n,
     updatedAtBlock: event.block.number,
   });
 });
 
-ponder.on("Statics:GenesisActivationReset", async ({ event, context }) => {
+onStatics("Statics:GenesisActivationReset", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: 0,
     multiplierBps: 10_000,
@@ -278,8 +290,7 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
   });
 });
 
-ponder.on("PoolManager:Swap", async ({ event, context }) => {
-  if (!canonicalPoolId || event.args.id.toLowerCase() !== canonicalPoolId) return;
+onPoolManager("PoolManager:Swap", async ({ event, context }) => {
   await context.db.insert(marketSwap).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
     deploymentId,
@@ -295,4 +306,37 @@ ponder.on("PoolManager:Swap", async ({ event, context }) => {
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
   });
+
+  const bucketTimestamp = candleBucket(event.block.timestamp);
+  const sqrtPriceX96 = event.args.sqrtPriceX96;
+  await context.db
+    .insert(marketCandle)
+    .values({
+      key: marketCandleKey(deploymentId, event.args.id, event.block.timestamp),
+      deploymentId,
+      poolId: event.args.id,
+      bucketTimestamp,
+      openSqrtPriceX96: sqrtPriceX96,
+      highSqrtPriceX96: sqrtPriceX96,
+      lowSqrtPriceX96: sqrtPriceX96,
+      closeSqrtPriceX96: sqrtPriceX96,
+      volume0: absoluteAmount(event.args.amount0),
+      volume1: absoluteAmount(event.args.amount1),
+      zeroForOneCount: event.args.amount0 > 0n ? 1 : 0,
+      oneForZeroCount: event.args.amount0 > 0n ? 0 : 1,
+      swapCount: 1,
+      firstBlock: event.block.number,
+      lastBlock: event.block.number,
+    })
+    .onConflictDoUpdate((row) => ({
+      highSqrtPriceX96: row.highSqrtPriceX96 > sqrtPriceX96 ? row.highSqrtPriceX96 : sqrtPriceX96,
+      lowSqrtPriceX96: row.lowSqrtPriceX96 < sqrtPriceX96 ? row.lowSqrtPriceX96 : sqrtPriceX96,
+      closeSqrtPriceX96: sqrtPriceX96,
+      volume0: row.volume0 + absoluteAmount(event.args.amount0),
+      volume1: row.volume1 + absoluteAmount(event.args.amount1),
+      zeroForOneCount: row.zeroForOneCount + (event.args.amount0 > 0n ? 1 : 0),
+      oneForZeroCount: row.oneForZeroCount + (event.args.amount0 > 0n ? 0 : 1),
+      swapCount: row.swapCount + 1,
+      lastBlock: event.block.number,
+    }));
 });

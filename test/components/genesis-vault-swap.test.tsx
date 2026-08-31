@@ -20,6 +20,9 @@ vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
   verifyLaunchDeploymentCached: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("@/lib/deployments/verify-launch-read", () => ({
+  verifyLaunchDeploymentForRead: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/genesis/discovery", () => ({
   discoverNextAvailableGenesisId: (...args: unknown[]) => discoverNextAvailableGenesisId(...args),
   discoverWalletGenesisSnapshot: (...args: unknown[]) => discoverWalletGenesisSnapshot(...args),

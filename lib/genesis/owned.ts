@@ -3,7 +3,7 @@ import { genesisActivationRegistryAbi, genesisLaunchDistributorAbi } from "@stat
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeploymentCached } from "@/lib/deployments/verify-launch";
+import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 import { discoverWalletGenesisSnapshot } from "@/lib/genesis/discovery";
 
@@ -88,7 +88,7 @@ export async function loadOwnedGenesis(
   deployment: LaunchDeployment,
   wallet: `0x${string}`
 ): Promise<OwnedGenesisPortfolio> {
-  await verifyLaunchDeploymentCached(publicClient, deployment);
+  await verifyLaunchDeploymentForRead(publicClient, deployment);
   const [discovery, tierCosts, rewardShareBps, totalWeight, ownerStatics, ownerWeth] =
     await Promise.all([
       discoverWalletGenesisSnapshot(publicClient, deployment, wallet),
