@@ -94,4 +94,16 @@ describe("launch verification route", () => {
     expect(response.status).toBe(403);
     expect(mocks.verify).not.toHaveBeenCalled();
   });
+
+  it("rejects requests without origin validation headers", async () => {
+    const response = await POST(
+      new Request("https://staticsprotocol.com/api/deployments/launch-verification", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chainId: 4_663, deploymentId: "robinhood-genesis" }),
+      })
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
 });

@@ -30,6 +30,7 @@ import {
 const deployment = {
   descriptor: { deploymentId: "launch", chainId: 4_663 },
   protocolCommit: "commit",
+  contracts: { statics: "0x1111111111111111111111111111111111111111" },
   runtimeCodeHashes: { statics: "0x1234" },
 } as unknown as LaunchDeployment;
 
@@ -59,6 +60,20 @@ describe("server launch verification cache", () => {
     const retry = verifyLaunchDeploymentOnServer(deployment);
     expect(retry.status).toBe("miss");
     await expect(retry.verification).resolves.toBeUndefined();
+    expect(mocks.verify).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not share verification across different contract addresses", async () => {
+    const changed = {
+      ...deployment,
+      contracts: { statics: "0x2222222222222222222222222222222222222222" },
+    } as unknown as LaunchDeployment;
+
+    await verifyLaunchDeploymentOnServer(deployment).verification;
+    const second = verifyLaunchDeploymentOnServer(changed);
+
+    expect(second.status).toBe("miss");
+    await second.verification;
     expect(mocks.verify).toHaveBeenCalledTimes(2);
   });
 

@@ -13,9 +13,12 @@ function cacheKey(deployment: LaunchDeployment): string {
     deployment.descriptor.deploymentId,
     deployment.descriptor.chainId,
     deployment.protocolCommit,
+    ...Object.entries(deployment.contracts)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, address]) => `${name}:${address.toLowerCase()}`),
     ...Object.entries(deployment.runtimeCodeHashes)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([name, hash]) => `${name}:${hash}`),
+      .flatMap(([name, hash]) => (hash ? [`${name}:${hash.toLowerCase()}`] : [])),
   ].join(":");
 }
 
