@@ -4,6 +4,7 @@ import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 import { getAddress, zeroAddress } from "viem";
 import { activeGenesisCreditMutation } from "./genesis-credit";
 import { genesisTransferMutation, genesisWeightChangedMutation } from "./genesis";
+import { configuredAddress } from "./source-config";
 
 import {
   activeGenesisCredit,
@@ -20,11 +21,20 @@ if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
 const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
-const canonicalPoolId = process.env.PONDER_CANONICAL_POOL_ID?.trim().toLowerCase();
 const genesisVaultValue = process.env.PONDER_GENESIS_VAULT_ADDRESS?.trim();
 const genesisVault = genesisVaultValue ? getAddress(genesisVaultValue) : undefined;
 
-ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
+function sourceHandler(enabled: boolean): typeof ponder.on {
+  return enabled ? (ponder.on.bind(ponder) as typeof ponder.on) : () => undefined;
+}
+
+const onStatics = sourceHandler(Boolean(configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS")));
+const onPositionManager = sourceHandler(
+  Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
+);
+const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
+
+onStatics("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
@@ -44,7 +54,7 @@ ponder.on("Statics:LoanOriginated", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:LoanExtended", async ({ event, context }) => {
+onStatics("Statics:LoanExtended", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
@@ -59,11 +69,11 @@ ponder.on("Statics:LoanExtended", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:LoanRepaid", async ({ event, context }) => {
+onStatics("Statics:LoanRepaid", async ({ event, context }) => {
   await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
-ponder.on("Statics:LoanRecovered", async ({ event, context }) => {
+onStatics("Statics:LoanRecovered", async ({ event, context }) => {
   await context.db.delete(activeLoan, { key: entityKey(event.args.loanId) });
 });
 
@@ -129,7 +139,7 @@ ponder.on("GenesisVault:GenesisCreditRecovered", async ({ event, context }) => {
     await context.db.delete(activeGenesisCredit, { key: mutation.key });
 });
 
-ponder.on("PositionManager:Transfer", async ({ event, context }) => {
+onPositionManager("PositionManager:Transfer", async ({ event, context }) => {
   const key = entityKey(event.args.tokenId);
   if (event.args.to === zeroAddress) {
     await context.db.delete(v4Position, { key });
@@ -165,7 +175,7 @@ ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
   await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
 });
 
-ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
+onStatics("Statics:GenesisActivated", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: Number(event.args.newTier),
     multiplierBps: Number(event.args.multiplierBps),
@@ -173,21 +183,21 @@ ponder.on("Statics:GenesisActivated", async ({ event, context }) => {
   });
 });
 
-ponder.on("Statics:GenesisLinked", async ({ event, context }) => {
+onStatics("Statics:GenesisLinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: event.args.positionId,
     updatedAtBlock: event.block.number,
   });
 });
 
-ponder.on("Statics:GenesisUnlinked", async ({ event, context }) => {
+onStatics("Statics:GenesisUnlinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: 0n,
     updatedAtBlock: event.block.number,
   });
 });
 
-ponder.on("Statics:GenesisActivationReset", async ({ event, context }) => {
+onStatics("Statics:GenesisActivationReset", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     tier: 0,
     multiplierBps: 10_000,
@@ -278,8 +288,7 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
   });
 });
 
-ponder.on("PoolManager:Swap", async ({ event, context }) => {
-  if (!canonicalPoolId || event.args.id.toLowerCase() !== canonicalPoolId) return;
+onPoolManager("PoolManager:Swap", async ({ event, context }) => {
   await context.db.insert(marketSwap).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
     deploymentId,
