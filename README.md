@@ -136,6 +136,43 @@ Coinbase ETH/USD may use its last good value for no more than 15 minutes and the
 `null`. Ponder supplies activity and history; onchain reads remain authoritative for reserves,
 supply, vesting, backing, and spot price.
 
+### Public CoinGecko API
+
+The following HTTPS JSON routes are anonymous and do not accept or require an API key:
+
+- `GET /api/coingecko/v1/supply/total` returns `{"result":"1000000000"}` in decimal token
+  units.
+- `GET /api/coingecko/v1/supply/circulating` returns the strict liquid float as
+  `{"result":"<decimal token units>"}`.
+- `GET /api/coingecko/v1/supply` discloses both supplies, all exclusions, the source block,
+  timestamp, and methodology.
+- `GET /api/coingecko/v1/pairs` returns the canonical `STATICS_WETH` pair and contract metadata.
+- `GET /api/coingecko/v1/ticker` returns spot price, 24-hour base/target/USD volume, liquidity,
+  24-hour change, and two-percent executable costs in both directions.
+
+Circulating supply is the onchain total supply minus canonical pool inventory, unreleased treasury
+vesting, and Operator Vault token backing. These fundamentals are read at one block and shared with
+the Overview dashboard. Supply responses cache for five minutes and may use the last successful
+onchain snapshot for at most 30 minutes during an RPC interruption. Ticker responses cache for one
+minute; pair metadata caches for one day. An unavailable indexer or USD feed returns `503` instead
+of publishing synthetic zero activity. Quoter-derived depth may be `null` without suppressing an
+otherwise healthy ticker.
+
+All routes allow read-only cross-origin requests. Configure the public reverse proxy or CDN for a
+limit of 60 requests per minute per source IP with a burst of 20. If Cloudflare protects these
+paths, prefer an explicit CoinGecko IP allowlist. Where an IP allowlist is unavailable, skip bot
+challenges only for the exact `/api/coingecko/v1/*` paths when both of these headers are present,
+while retaining the WAF and rate limit:
+
+```text
+X-Requested-With: com.coingecko
+User-Agent: CoinGecko +https://coingecko.com/
+```
+
+The protocol is an AMM, so orderbook, open-interest, and funding-rate fields do not apply. The
+Overview page is the corresponding public interface for price, USD volume, liquidity, supply, and
+executable depth.
+
 ## Connected local environment
 
 The complete local workflow requires a separate clean clone of the public Statics protocol
