@@ -62,6 +62,7 @@ export function isStaticsMarketOverview(value: unknown): value is StaticsMarketO
     unsigned(liquidity.principalStatics) &&
     nullableUnsigned(liquidity.tvlUsdWad) &&
     activity &&
+    typeof activity.available === "boolean" &&
     unsigned(activity.wethVolume) &&
     unsigned(activity.staticsVolume) &&
     ["swaps", "buys", "sells", "priceChangeBps"].every(

@@ -42,6 +42,7 @@ export type StaticsMarketOverview = Readonly<{
     tvlUsdWad: string | null;
   }>;
   activity24h: Readonly<{
+    available: boolean;
     wethVolume: string;
     staticsVolume: string;
     swaps: number;
@@ -60,4 +61,20 @@ export type StaticsMarketOverview = Readonly<{
     usdPriceAt: string | null;
     usdPriceStale: boolean;
   }>;
+}>;
+
+export type MarketSupplySnapshot = Readonly<{
+  status: "fresh" | "stale";
+  chainId: number;
+  deploymentId: string;
+  tokenAddress: string;
+  decimals: 18;
+  asOfBlock: string;
+  snapshotAt: string;
+  total: string;
+  poolInventory: string;
+  publicDistributed: string;
+  unreleasedTreasury: string;
+  vaultBacking: string;
+  strictLiquidFloat: string;
 }>;

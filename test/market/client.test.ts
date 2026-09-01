@@ -30,6 +30,7 @@ const fixture = {
   },
   liquidity: { principalWeth: "4", principalStatics: "5", tvlUsdWad: "6" },
   activity24h: {
+    available: true,
     wethVolume: "7",
     staticsVolume: "8",
     swaps: 9,
