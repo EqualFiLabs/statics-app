@@ -15,7 +15,11 @@ import {
   strictLiquidFloat,
   usdValueWad,
 } from "@/lib/market/analytics";
-import type { MarketDepthLevel, StaticsMarketOverview } from "@/lib/market/types";
+import type {
+  MarketDepthLevel,
+  MarketSupplySnapshot,
+  StaticsMarketOverview,
+} from "@/lib/market/types";
 import { poolKeyForLaunch } from "@/lib/trade/canonical-market";
 import { loadEthUsd } from "@/lib/server/eth-usd";
 import { verifyLaunchDeploymentOnServer } from "@/lib/server/launch-verification";
@@ -30,6 +34,7 @@ const vestingAbi = parseAbi([
 ]);
 
 const SNAPSHOT_TTL_MS = 60_000;
+const SUPPLY_MAX_STALE_MS = 30 * 60_000;
 const DEPTH_TTL_MS = 5 * 60_000;
 const DEPTH_MAX_STALE_MS = 15 * 60_000;
 const DEPTH_TARGETS = [100, 200, 500] as const;
@@ -62,8 +67,29 @@ type DepthCache = Readonly<{
   stale: boolean;
 }>;
 
+type MarketFundamentals = Readonly<{
+  deployment: LaunchDeployment;
+  client: PublicClient;
+  blockNumber: bigint;
+  poolStatics: bigint;
+  poolWeth: bigint;
+  prices: ReturnType<typeof canonicalPrices>;
+  totalSupply: bigint;
+  unreleasedTreasury: bigint;
+  vaultBacking: bigint;
+  publicDistributed: bigint;
+  liquidFloat: bigint;
+}>;
+
+type FundamentalsCache = Readonly<{
+  value: MarketFundamentals;
+  fetchedAt: number;
+}>;
+
 let snapshotCache: Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null = null;
 let snapshotInFlight: Promise<StaticsMarketOverview> | null = null;
+let fundamentalsCache: FundamentalsCache | null = null;
+let fundamentalsInFlight: Promise<FundamentalsCache> | null = null;
 let depthCache: DepthCache | null = null;
 let depthInFlight: Promise<DepthCache | null> | null = null;
 
@@ -302,7 +328,7 @@ async function loadDepth(
   return depthInFlight;
 }
 
-async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
+async function refreshFundamentals(now: number): Promise<FundamentalsCache> {
   const deployment = mainnetLaunch();
   const analytics = deployment.analytics!;
   await verifyLaunchDeploymentOnServer(deployment).verification;
@@ -311,7 +337,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
   });
   const blockNumber = await client.getBlockNumber();
   const poolKey = poolKeyForLaunch(deployment);
-  const [pool, accounting, totalSupply, vesting, ethUsd, activity] = await Promise.all([
+  const [pool, accounting, totalSupply, vesting] = await Promise.all([
     client.readContract({
       address: analytics.reservesLens.address,
       abi: reservesLensAbi,
@@ -338,8 +364,6 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
       args: [analytics.treasuryBeneficiary, 0n],
       blockNumber,
     }),
-    loadEthUsd(now),
-    loadActivity(deployment, now),
   ]);
   const staticsIsCurrency0 =
     deployment.market.poolKey.currency0.toLowerCase() ===
@@ -351,17 +375,100 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
     deployment.market.poolKey.currency0,
     deployment.contracts.statics
   );
+  const unreleasedTreasury = vesting[0] > vesting[1] ? vesting[0] - vesting[1] : 0n;
+  return {
+    fetchedAt: now,
+    value: {
+      deployment,
+      client,
+      blockNumber,
+      poolStatics,
+      poolWeth,
+      prices,
+      totalSupply,
+      unreleasedTreasury,
+      vaultBacking: accounting.tokenBacking,
+      publicDistributed: publicDistributedSupply(poolStatics),
+      liquidFloat: strictLiquidFloat(
+        totalSupply,
+        poolStatics,
+        unreleasedTreasury,
+        accounting.tokenBacking
+      ),
+    },
+  };
+}
+
+async function loadFundamentals(now: number, allowStale: boolean): Promise<FundamentalsCache> {
+  if (fundamentalsCache && now - fundamentalsCache.fetchedAt <= SNAPSHOT_TTL_MS) {
+    return fundamentalsCache;
+  }
+  if (!fundamentalsInFlight) {
+    fundamentalsInFlight = refreshFundamentals(now)
+      .then((value) => {
+        fundamentalsCache = value;
+        return value;
+      })
+      .finally(() => {
+        fundamentalsInFlight = null;
+      });
+  }
+  try {
+    return await fundamentalsInFlight;
+  } catch (error) {
+    if (
+      allowStale &&
+      fundamentalsCache &&
+      now - fundamentalsCache.fetchedAt <= SUPPLY_MAX_STALE_MS
+    ) {
+      return fundamentalsCache;
+    }
+    throw error;
+  }
+}
+
+export async function loadMarketSupplySnapshot(now = Date.now()): Promise<MarketSupplySnapshot> {
+  const fundamentals = await loadFundamentals(now, true);
+  const { value } = fundamentals;
+  return {
+    status: now - fundamentals.fetchedAt <= SNAPSHOT_TTL_MS ? "fresh" : "stale",
+    chainId: value.deployment.descriptor.chainId,
+    deploymentId: value.deployment.descriptor.deploymentId,
+    tokenAddress: value.deployment.contracts.statics,
+    decimals: 18,
+    asOfBlock: value.blockNumber.toString(),
+    snapshotAt: new Date(fundamentals.fetchedAt).toISOString(),
+    total: value.totalSupply.toString(),
+    poolInventory: value.poolStatics.toString(),
+    publicDistributed: value.publicDistributed.toString(),
+    unreleasedTreasury: value.unreleasedTreasury.toString(),
+    vaultBacking: value.vaultBacking.toString(),
+    strictLiquidFloat: value.liquidFloat.toString(),
+  };
+}
+
+async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
+  const deployment = mainnetLaunch();
+  const [fundamentals, ethUsd, activity] = await Promise.all([
+    loadFundamentals(now, false),
+    loadEthUsd(now),
+    loadActivity(deployment, now),
+  ]);
+  const {
+    client,
+    blockNumber,
+    poolStatics,
+    poolWeth,
+    prices,
+    totalSupply,
+    unreleasedTreasury,
+    vaultBacking,
+    publicDistributed,
+    liquidFloat,
+  } = fundamentals.value;
   const ethUsdWad = ethUsd?.valueWad ?? null;
   const staticsUsdWad =
     ethUsdWad === null ? null : staticsUsdPriceWad(prices.wethPerStaticsWad, ethUsdWad);
-  const unreleasedTreasury = vesting[0] > vesting[1] ? vesting[0] - vesting[1] : 0n;
-  const publicDistributed = publicDistributedSupply(poolStatics);
-  const liquidFloat = strictLiquidFloat(
-    totalSupply,
-    poolStatics,
-    unreleasedTreasury,
-    accounting.tokenBacking
-  );
   const depth = await loadDepth(
     client,
     deployment,
@@ -393,7 +500,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
       poolInventory: poolStatics.toString(),
       publicDistributed: publicDistributed.toString(),
       unreleasedTreasury: unreleasedTreasury.toString(),
-      vaultBacking: accounting.tokenBacking.toString(),
+      vaultBacking: vaultBacking.toString(),
       strictLiquidFloat: liquidFloat.toString(),
     },
     valuation: {
@@ -413,6 +520,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
     },
     activity24h: activity
       ? {
+          available: true,
           wethVolume: activity.wethVolume.toString(),
           staticsVolume: activity.staticsVolume.toString(),
           swaps: activity.swaps,
@@ -421,6 +529,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
           priceChangeBps: activity.priceChangeBps,
         }
       : {
+          available: false,
           wethVolume: "0",
           staticsVolume: "0",
           swaps: 0,
@@ -457,6 +566,8 @@ export async function loadMarketOverview(now = Date.now()): Promise<StaticsMarke
 export function resetMarketOverviewCacheForTest(): void {
   snapshotCache = null;
   snapshotInFlight = null;
+  fundamentalsCache = null;
+  fundamentalsInFlight = null;
   depthCache = null;
   depthInFlight = null;
 }

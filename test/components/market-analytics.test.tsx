@@ -37,6 +37,7 @@ const analytics = {
     tvlUsdWad: (2_000_000n * WAD).toString(),
   },
   activity24h: {
+    available: true,
     wethVolume: (40n * WAD).toString(),
     staticsVolume: (10_000_000n * WAD).toString(),
     swaps: 12,
@@ -77,6 +78,8 @@ describe("market analytics panel", () => {
   it("separates valuation, supply, pool principal, and executable depth", () => {
     render(<MarketAnalyticsPanel analytics={analytics} loading={false} error={false} />);
     expect(screen.getByText("Public market cap")).toBeInTheDocument();
+    expect(screen.getByText("STATICS price")).toBeInTheDocument();
+    expect(screen.getByText("24h volume")).toBeInTheDocument();
     expect(screen.getByText("Public distributed supply")).toBeInTheDocument();
     expect(screen.getByText("Strict liquid float")).toBeInTheDocument();
     expect(screen.getByText("Canonical pool principal")).toBeInTheDocument();
