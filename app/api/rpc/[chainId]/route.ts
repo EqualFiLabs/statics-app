@@ -1,46 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { isRobinhoodReadRequest } from "@/lib/server/robinhood-rpc-methods";
 import { robinhoodRpcUrl } from "@/lib/server/robinhood-rpc";
 
 export const runtime = "nodejs";
-
-const READ_METHODS = new Set([
-  "eth_blobBaseFee",
-  "eth_blockNumber",
-  "eth_call",
-  "eth_chainId",
-  "eth_estimateGas",
-  "eth_feeHistory",
-  "eth_gasPrice",
-  "eth_getBalance",
-  "eth_getBlockByHash",
-  "eth_getBlockByNumber",
-  "eth_getBlockReceipts",
-  "eth_getBlockTransactionCountByHash",
-  "eth_getBlockTransactionCountByNumber",
-  "eth_getCode",
-  "eth_getLogs",
-  "eth_getProof",
-  "eth_getStorageAt",
-  "eth_getTransactionByBlockHashAndIndex",
-  "eth_getTransactionByBlockNumberAndIndex",
-  "eth_getTransactionByHash",
-  "eth_getTransactionCount",
-  "eth_getTransactionReceipt",
-  "eth_maxPriorityFeePerGas",
-  "eth_syncing",
-  "net_version",
-  "web3_clientVersion",
-]);
-
-function isReadRequest(value: unknown): boolean {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    READ_METHODS.has((value as { method?: unknown }).method as string)
-  );
-}
 
 export async function POST(request: Request, context: { params: Promise<{ chainId: string }> }) {
   const origin = request.headers.get("origin");
@@ -84,7 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ chainI
     return NextResponse.json({ error: "Invalid JSON-RPC request." }, { status: 400 });
   }
   const requests = Array.isArray(payload) ? payload : [payload];
-  if (requests.length === 0 || requests.length > 50 || !requests.every(isReadRequest)) {
+  if (requests.length === 0 || requests.length > 50 || !requests.every(isRobinhoodReadRequest)) {
     return NextResponse.json(
       { error: "Only bounded, read-only JSON-RPC requests are allowed." },
       { status: 403 }

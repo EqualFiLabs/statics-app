@@ -92,6 +92,8 @@ Server-only configuration:
 - `EVE_ROBINHOOD_RPC_URL`
 - `STATICS_ROBINHOOD_TESTNET_RPC_URL`
 - `STATICS_ROBINHOOD_MAINNET_RPC_URL`
+- `STATICS_ROBINHOOD_TESTNET_WALLET_RPC_URL`
+- `STATICS_ROBINHOOD_MAINNET_WALLET_RPC_URL`
 - `STATICS_MARKET_API_KEYS`
 
 The server integrations read these values only from their process environment. They are never
@@ -100,6 +102,13 @@ copied into browser configuration.
 The `STATICS_ROBINHOOD_*` values back the same-origin, read-only browser RPC proxy. Use a dedicated
 authenticated provider application/key for them. Ponder must use a different provider key so
 browser request bursts cannot consume the indexer's quota.
+
+The `STATICS_ROBINHOOD_*_WALLET_RPC_URL` values back a separate same-origin path used only by Privy
+embedded wallets. That path permits bounded transaction-preparation reads and one signed raw
+transaction broadcast; it does not accept unsigned sends or arbitrary JSON-RPC methods. Configure
+the wallet upstreams explicitly with write-capable provider URLs. They do not fall back to the read
+upstreams, and their credentials remain server-only. External wallets continue to submit through
+their own providers.
 
 The EVE RPCs verify the destination `OFTReceived` receipt before a LayerZero bridge is displayed as
 filled. They must point to authenticated, production-capable Base and Robinhood Chain RPC services;

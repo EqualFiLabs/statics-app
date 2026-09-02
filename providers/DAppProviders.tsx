@@ -58,7 +58,7 @@ const wagmiConfig = createConfig({
   transports,
 });
 const privySupportedChains = [
-  ...walletEnvironment.supportedChains,
+  ...walletEnvironment.privySupportedChains,
   ...fundingNetworks.map((network) => network.chain),
 ].filter(
   (chain, index, chains) => chains.findIndex((candidate) => candidate.id === chain.id) === index
@@ -430,7 +430,7 @@ function ConfiguredWalletProviders({ children }: { children: React.ReactNode }) 
       config={{
         loginMethods: ["wallet", "email"],
         supportedChains: privySupportedChains,
-        defaultChain: walletEnvironment.defaultChain,
+        defaultChain: walletEnvironment.privyDefaultChain,
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
           solana: { createOnLogin: "off" },

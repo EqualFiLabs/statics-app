@@ -3,11 +3,17 @@ const RPC_ENV_BY_CHAIN: Record<number, string> = {
   46_630: "STATICS_ROBINHOOD_TESTNET_RPC_URL",
 };
 
-export function robinhoodRpcUrl(
+const WALLET_RPC_ENV_BY_CHAIN: Record<number, string> = {
+  4_663: "STATICS_ROBINHOOD_MAINNET_WALLET_RPC_URL",
+  46_630: "STATICS_ROBINHOOD_TESTNET_WALLET_RPC_URL",
+};
+
+function configuredRpcUrl(
   chainId: number,
-  environment: Record<string, string | undefined> = process.env
+  variablesByChain: Record<number, string>,
+  environment: Record<string, string | undefined>
 ): string {
-  const variableName = RPC_ENV_BY_CHAIN[chainId];
+  const variableName = variablesByChain[chainId];
   if (!variableName) throw new Error("Unsupported Robinhood chain.");
   const value = environment[variableName]?.trim();
   if (!value) throw new Error(`${variableName} is not configured on the server.`);
@@ -21,4 +27,18 @@ export function robinhoodRpcUrl(
     throw new Error(`${variableName} must be an HTTP(S) URL.`);
   }
   return url.toString();
+}
+
+export function robinhoodRpcUrl(
+  chainId: number,
+  environment: Record<string, string | undefined> = process.env
+): string {
+  return configuredRpcUrl(chainId, RPC_ENV_BY_CHAIN, environment);
+}
+
+export function robinhoodWalletRpcUrl(
+  chainId: number,
+  environment: Record<string, string | undefined> = process.env
+): string {
+  return configuredRpcUrl(chainId, WALLET_RPC_ENV_BY_CHAIN, environment);
 }

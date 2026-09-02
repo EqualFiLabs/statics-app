@@ -7,6 +7,8 @@ export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
 // URL and credentials remain server-only; these paths are safe to expose.
 const ROBINHOOD_MAINNET_RPC_PROXY = "/api/rpc/4663";
 const ROBINHOOD_TESTNET_RPC_PROXY = "/api/rpc/46630";
+const ROBINHOOD_MAINNET_WALLET_RPC_PROXY = "/api/wallet-rpc/4663";
+const ROBINHOOD_TESTNET_WALLET_RPC_PROXY = "/api/wallet-rpc/46630";
 
 export const robinhoodMainnet = defineChain({
   id: 4_663,
@@ -100,6 +102,8 @@ export type WalletEnvironment = Readonly<{
   anvilRpcUrl: string;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
+  privyDefaultChain: Chain;
+  privySupportedChains: readonly [Chain, ...Chain[]];
   configured: boolean;
 }>;
 
@@ -109,6 +113,16 @@ function chainWithRpc(chain: Chain, rpcUrl: string): Chain {
     rpcUrls: {
       ...chain.rpcUrls,
       default: { http: [rpcUrl] },
+    },
+  };
+}
+
+function chainWithPrivyWalletRpc(chain: Chain, rpcUrl: string): Chain {
+  return {
+    ...chain,
+    rpcUrls: {
+      ...chain.rpcUrls,
+      privyWalletOverride: { http: [rpcUrl] },
     },
   };
 }
@@ -141,6 +155,14 @@ export function readWalletEnvironment(
         ? robinhoodMainnet
         : robinhoodTestnet;
   const publicRobinhoodChains = [robinhoodMainnet, robinhoodTestnet];
+  const privyRobinhoodChains = [
+    chainWithPrivyWalletRpc(robinhoodMainnet, ROBINHOOD_MAINNET_WALLET_RPC_PROXY),
+    chainWithPrivyWalletRpc(robinhoodTestnet, ROBINHOOD_TESTNET_WALLET_RPC_PROXY),
+  ];
+  const privyDefaultChain =
+    network === "anvil"
+      ? configuredAnvil
+      : privyRobinhoodChains.find((chain) => chain.id === defaultChain.id)!;
   return {
     appEnvironment,
     network,
@@ -154,6 +176,14 @@ export function readWalletEnvironment(
       defaultChain,
       ...publicRobinhoodChains.filter((chain) => chain.id !== defaultChain.id),
       ...(appEnvironment === "development" && defaultChain.id !== anvil.id
+        ? [configuredAnvil]
+        : []),
+    ] as [Chain, ...Chain[]],
+    privyDefaultChain,
+    privySupportedChains: [
+      privyDefaultChain,
+      ...privyRobinhoodChains.filter((chain) => chain.id !== privyDefaultChain.id),
+      ...(appEnvironment === "development" && privyDefaultChain.id !== anvil.id
         ? [configuredAnvil]
         : []),
     ] as [Chain, ...Chain[]],

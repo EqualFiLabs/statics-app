@@ -23,6 +23,20 @@ afterEach(() => {
 });
 
 describe("Robinhood RPC read proxy", () => {
+  it("continues to reject signed transaction broadcasts", async () => {
+    vi.stubEnv("STATICS_ROBINHOOD_MAINNET_RPC_URL", upstream);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await POST(
+      request({ id: 1, jsonrpc: "2.0", method: "eth_sendRawTransaction", params: ["0x01"] }),
+      { params: Promise.resolve({ chainId: "4663" }) }
+    );
+
+    expect(response.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("forwards Retry-After and logs only sanitized request metadata", async () => {
     vi.stubEnv("STATICS_ROBINHOOD_MAINNET_RPC_URL", upstream);
     const fetch = vi.fn().mockResolvedValue(

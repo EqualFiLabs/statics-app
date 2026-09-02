@@ -17,6 +17,17 @@ describe("wallet environment", () => {
     expect(environment.configured).toBe(false);
     expect(environment.defaultChain.rpcUrls.default.http).toEqual(["/api/rpc/46630"]);
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([46_630, 4_663, 31_337]);
+    expect(environment.privyDefaultChain.rpcUrls.default.http).toEqual(["/api/rpc/46630"]);
+    expect(environment.privyDefaultChain.rpcUrls.privyWalletOverride?.http).toEqual([
+      "/api/wallet-rpc/46630",
+    ]);
+    expect(environment.privySupportedChains.map((chain) => chain.id)).toEqual([
+      46_630, 4_663, 31_337,
+    ]);
+    expect(
+      environment.privySupportedChains.find((chain) => chain.id === 4_663)?.rpcUrls
+        .privyWalletOverride?.http
+    ).toEqual(["/api/wallet-rpc/4663"]);
   });
 
   it("accepts Anvil only for local development", () => {
@@ -42,6 +53,8 @@ describe("wallet environment", () => {
     expect(environment.defaultChain.name).toBe("Local Anvil");
     expect(environment.defaultChain.blockExplorers).toBeUndefined();
     expect(environment.defaultChain.rpcUrls.default.http).toEqual(["http://127.0.0.1:8546/"]);
+    expect(environment.privyDefaultChain.rpcUrls.default.http).toEqual(["http://127.0.0.1:8546/"]);
+    expect(environment.privyDefaultChain.rpcUrls.privyWalletOverride).toBeUndefined();
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([31_337, 4_663, 46_630]);
   });
 
