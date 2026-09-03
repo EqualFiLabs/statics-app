@@ -55,6 +55,7 @@ describe("indexer API routes", () => {
     "/market/trades?limit=1.5",
     "/market/trades?from=nope",
     "/market/trades?from=2&to=1",
+    "/market/trades?amount0Sign=zero",
   ])("rejects invalid market trade query %s", async (path) => {
     const response = await app.request(path);
     expect(response.status).toBe(400);

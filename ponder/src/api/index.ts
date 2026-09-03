@@ -325,7 +325,14 @@ app.get("/market/swaps", async (context) => {
 app.get("/market/trades", async (context) => {
   const limit = readMarketTradeLimit(context.req.query("limit"));
   const range = marketRange(context.req.query("from"), context.req.query("to"));
-  if (limit === 0 || range === null) return context.json({ error: "Invalid trade query." }, 400);
+  const amount0Sign = context.req.query("amount0Sign");
+  if (
+    limit === 0 ||
+    range === null ||
+    (amount0Sign !== undefined && amount0Sign !== "positive" && amount0Sign !== "negative")
+  ) {
+    return context.json({ error: "Invalid trade query." }, 400);
+  }
   const rows = await db
     .select({
       poolId: marketSwap.poolId,
@@ -340,7 +347,16 @@ app.get("/market/trades", async (context) => {
       logIndex: marketSwap.logIndex,
     })
     .from(marketSwap)
-    .where(marketRangeWhere(range.from, range.to))
+    .where(
+      and(
+        marketRangeWhere(range.from, range.to),
+        amount0Sign === "positive"
+          ? gt(marketSwap.amount0, 0n)
+          : amount0Sign === "negative"
+            ? lt(marketSwap.amount0, 0n)
+            : undefined
+      )
+    )
     .orderBy(
       desc(marketSwap.blockTimestamp),
       desc(marketSwap.blockNumber),
