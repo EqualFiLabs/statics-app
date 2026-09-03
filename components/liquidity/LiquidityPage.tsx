@@ -1229,12 +1229,10 @@ function LiquidityRuntime() {
                   <div>
                     <dt>Revenue split</dt>
                     <dd>
-                      {Number(item.hookFees.lockedLiquidityShareBps) / 100}% locked liquidity ·{" "}
+                      {Number(item.hookFees.polShareBps) / 100}% protocol-owned liquidity ·{" "}
                       {Number(item.hookFees.liquidityProviderShareBps) / 100}% LPs ·{" "}
                       {Number(item.hookFees.basketStakerShareBps) / 100}% Basket stakers ·{" "}
                       {Number(item.hookFees.staticsStakerShareBps) / 100}% STATICS stakers ·{" "}
-                      {Number(item.hookFees.stonkBrokersShareBps) / 100}% StonkBrokers ·{" "}
-                      {Number(item.hookFees.indexCreatorShareBps) / 100}% creator ·{" "}
                       {Number(item.hookFees.treasuryShareBps) / 100}% treasury
                     </dd>
                   </div>

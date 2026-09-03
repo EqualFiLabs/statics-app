@@ -1,63 +1,68 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
+  "deploymentId": "robinhood-testnet-20260903-a37016d1",
   "network": "Robinhood Chain Testnet",
   "chainId": 46630,
-  "deploymentStartBlock": "101169765",
+  "deploymentStartBlock": "112077962",
   "wethProfileId": "1",
-  "protocolCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16",
+  "protocolCommit": "0be136bd43b7ae94c776857e0cfa0bee3752c9f7",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics",
-    "publicCommit": "15b278ce4ed5717096966c103abb7d5bc710a7a3",
-    "deploymentArtifact": "deployments/robinhood-testnet-46630-statics-genesis.json",
-    "recordedDeploymentCommit": "e69baaba8b21994a5cd6ccceb3ccd922c6d95c16"
+    "publicCommit": "31e870900615197277bcccef6bfdb06dba452930",
+    "deploymentArtifact": "deployments/robinhood-testnet-46630-rehearsal-20260903T033729Z.json",
+    "recordedDeploymentCommit": "0be136bd43b7ae94c776857e0cfa0bee3752c9f7"
   },
-  "generatedAt": "2026-08-15T11:11:46.831Z",
+  "generatedAt": "2026-09-03T05:00:53.678Z",
   "contracts": {
     "diamond": {
-      "address": "0xd41199E3A980dBcC5D3fB3fbD7B973cf255F474E",
-      "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
+      "address": "0xA37016d1d5daA516c2E9cE32d335048D11FeA395",
+      "runtimeCodeHash": "0x08cbb2c91a8234ea0230b30a485dbf9b8bc8ce76a39cec8c939a89d12036262f"
     },
     "core": {
-      "address": "0xe469D218381C68e111557d012Fc6b497c296A7a2",
-      "runtimeCodeHash": "0x35c10006ccb33b16c89c2c70508c41c4ff924a31b83f5e5a3f51b2e9856a069c"
+      "address": "0x800dd1E86595575Cd0938a08ceF51244Db39eceB",
+      "runtimeCodeHash": "0x72810196580906ac0fc8d16b411950723966d1df291936c60b0ce445470efd4e"
     },
     "gateway": {
-      "address": "0xd41199E3A980dBcC5D3fB3fbD7B973cf255F474E",
-      "runtimeCodeHash": "0xbf27d1322cbc853cbe80b153af2bffb465dc882cf187bdc1aeba19a90bb281db"
+      "address": "0xA37016d1d5daA516c2E9cE32d335048D11FeA395",
+      "runtimeCodeHash": "0x08cbb2c91a8234ea0230b30a485dbf9b8bc8ce76a39cec8c939a89d12036262f"
     },
     "dollar": {
-      "address": "0x7a7aA56dcA62946819803cD770f5DA6a711D2ef0",
-      "runtimeCodeHash": "0x1ad929ed605f5e5450fdeccff4b18605feabd3f7511b69bc15ef946ff8f22301"
+      "address": "0x1d86aA03bC74eE3582Cc23e0818f3c2f8f533491",
+      "runtimeCodeHash": "0xab27fb3f1aca8cefba7c8838cdaab717341d7effcf4d134ef1afec5827d005d4"
     },
     "risk": {
-      "address": "0x4993fC3D4Ce3f095262fe5acD8Afce06550c1979",
-      "runtimeCodeHash": "0x18e687f13fcd534c5c2e0c465e52dec35143db430d4243d8ad57b561debebf0e"
+      "address": "0x054Ce0D82A7178a0Cf4b63901B98c91337419973",
+      "runtimeCodeHash": "0xbb5c52553ab79747d9424b24802c18b7382a7248b094e1469ec68ed087e0d152"
     },
     "weth": {
       "address": "0x33e4191705c386532ba27cBF171Db86919200B94",
       "runtimeCodeHash": "0x55f8ac53c64450f01880d8249fc5cb0c69c064e4bcb097ea80a02fff40485a7c"
     },
     "oracle": {
-      "address": "0xF2B56CeEc0Be809486e24Cf31A0b4c0aB6011845",
-      "runtimeCodeHash": "0xfbf5ea96fc311a467a7ba93eee2aa8a6b7e808c2be8585df77ee035d4b78f007"
+      "address": "0x01aE5d9555109129d2235ed0Eeea3C22f3D25849",
+      "runtimeCodeHash": "0x3615e36339a97d92f2d95d7ce5a8f79ce856629408af0b3bdb2876b9e86ea047"
     }
   },
   "genesis": {
     "token": {
-      "address": "0x9b120633B04BD16dB98f346bC709C8e045689A83",
-      "runtimeCodeHash": "0xc704cfeafbfdcdcd004fa0ef4c4d8af86383d54d5610f3e790129a9311a35f27"
+      "address": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "runtimeCodeHash": "0xe548428d65bf2a8cee29a63e8dfaaeda0b4d44294d80f67f7626e1da8b89be69"
     },
     "collection": {
-      "address": "0xD07A692076E226D69608F1Ca34024705D9eBBF2d",
-      "runtimeCodeHash": "0x1894614318b9ee18b34cab6ad116ae513c10f99bdddd2119e724699a089545eb"
+      "address": "0x6c9197347161FC140a209175849d443FeaAF509c",
+      "runtimeCodeHash": "0xec224f66ecfa265dd306c54b2b683ba96395cd8f822dd2d51f84a2bac9d62afa"
     },
     "renderer": {
-      "address": "0xB7a0722ecf5A6EAFA23573D2250DD6a465b7CaB4",
-      "runtimeCodeHash": "0xb3c26a23d91f764ad3f7ac494469e069d4eca3e0fddc6bd247a5272a4823f923"
+      "address": "0x67Ea65ceaC50551c773e655Dddece1466d0A89aF",
+      "runtimeCodeHash": "0x79d595216ab3f318555d22aedc95fe3423ac418fa3dc7ccc33e7989cfa132d6a"
     },
     "avatarSvg": {
-      "address": "0x641535d09e6D5a76651d6707AdBe37Cf4656f655",
-      "runtimeCodeHash": "0x0be229cf3ae4d5b5a37bcddf2501e583460729a35f9c80d8de2ffb2120785787"
+      "address": "0x37587c0bd19196d0bf135b801B909BD6f3492F41",
+      "runtimeCodeHash": "0x0f68dd8d29303123225778ef519ff922048828d7051fbe7fb2e23e225cc986bd"
+    },
+    "activationRegistry": {
+      "address": "0x8cE462A801726FA030e06264f3423Be2Ae8d6414",
+      "runtimeCodeHash": "0xc4bf24efb6c99c95060186a30200b7ee952604d77b917d0dae2cde87e6419e82"
     }
   },
   "liquidity": {
@@ -74,12 +79,12 @@
       "runtimeCodeHash": "0x0117e0ed818bc3f2a8729ffc336c837e63e965f04b473047b39b35ad86aac259"
     },
     "swapFeeHook": {
-      "address": "0x120B21978627e2b821d2B91786cB3359703090EC",
-      "runtimeCodeHash": "0x8686a94ff4f85d449b77288ced44c2222b6a599527f93c17d1cf9b423bc00066"
+      "address": "0x8afD614Eb367Ed71d19568511C141847bbBc10EC",
+      "runtimeCodeHash": "0xe299906f90bf7da54602153e227ba9e0883c8399f4435c9f297c7ef0c7964330"
     },
     "liquidityManager": {
-      "address": "0xa8484f431F7b48616669b0357125eDEE70234682",
-      "runtimeCodeHash": "0x8e15091bac456625e466e3c0a2f34f2bf80f4c39c179c54b7d8540d9793d5497"
+      "address": "0x5BbBC16824a84192781aE26B88C61a058A73f10e",
+      "runtimeCodeHash": "0xbf4083335c5af68e367c999931fa6e450ec1a3ec6c99bd411df9e0c59930cbf0"
     },
     "stateView": {
       "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
@@ -97,16 +102,48 @@
   "pegged": {
     "profileId": "2",
     "collateral": {
-      "address": "0xe46898175ffBdC6788432b2c537eE4033B809A88",
-      "runtimeCodeHash": "0x1628ff1ae48c5fe529343b4786fcfd05b96ac4171c356f6ef12f3ea4656cb679"
+      "address": "0x3c9dCe3FD17f3FC8A1929B1614b2c99124129Da1",
+      "runtimeCodeHash": "0x9c8f77b351af6eec700c86095467d0fb41f6f7bec159fa00416005decd8a80b6"
     },
     "oracle": {
-      "address": "0x247c3543B7f710311B44735f76ef087ACa242b8e",
-      "runtimeCodeHash": "0xa857db54d9b01b50490fb464d00b35a531d4637ce7b3a2d45e33dfaa10d5e662"
+      "address": "0x00DfE3A9DfdAc81A62b1Ee8BECBd041323601948",
+      "runtimeCodeHash": "0x1948d45ade531296c649545403032c4d7d30ad71c5e52a6618471dcfc60de1d6"
     }
   },
   "faucet": {
-    "address": "0xC00BE4eC9D2AF217DdD2989695249208CfD459eA",
-    "runtimeCodeHash": "0xa0903aaf8ebd61099837a652bbb657ed715196ae265306f05b030b8facf7f103"
+    "address": "0xb80f88145315a772829B42c0Efb6F79ee8A55645",
+    "runtimeCodeHash": "0xf1a50b46e5f92e4810b948af60eca78a4d1a4dffc54140ea27153b8d916d9da2"
+  },
+  "morpho": {
+    "protocol": {
+      "address": "0xC0dd6aB9E1e59F9dF696cc90Ba947B4E6C74E6A9",
+      "runtimeCodeHash": "0x05b1f72824e35c509e745c951bc13a7375b0e6affa3ee668bd52e55962741ce7"
+    },
+    "irm": {
+      "address": "0x6e8555DAbbAe94aDfA5b606E3eaF35246E346332",
+      "runtimeCodeHash": "0x678e72ec2a2edafb6f4a25063d27db3afb3e36d081f556f3908775e400173fdf"
+    },
+    "lltv": "770000000000000000",
+    "markets": [
+      {
+        "marketId": "0xe33389dd66e032400d80cc014ef2364a74e0f75d0bbce938d27155d62680227b",
+        "collateral": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+        "oracle": {
+          "address": "0x8AA8Ef1F26Cb3d420E1ce7fD99250179Ef023261",
+          "runtimeCodeHash": "0x3e16f1ac8c263723b3c0014fabf823cf12d6ce1984f52bdaa7d03c747ebf499b"
+        },
+        "kind": "statics"
+      },
+      {
+        "marketId": "0xb9e6cd50636f45bd8b73a15b0b15168bcc44b3b1b5a42c2e23d997bdc0651040",
+        "collateral": "0xf6aC2b2B59133f3691C63e99Cb7b3ac507F7528B",
+        "oracle": {
+          "address": "0xcA0558c3a9Eaf54569cb4643D808df09f5839940",
+          "runtimeCodeHash": "0x3e16f1ac8c263723b3c0014fabf823cf12d6ce1984f52bdaa7d03c747ebf499b"
+        },
+        "kind": "basket",
+        "basketId": "0"
+      }
+    ]
   }
 }

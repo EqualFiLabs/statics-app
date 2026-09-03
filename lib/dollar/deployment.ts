@@ -8,6 +8,8 @@ import {
   type PublicClient,
 } from "viem";
 
+import { morphoBlueAbi, staticsAbi } from "@statics-protocol/sdk";
+
 import { deploymentManifests } from "@/deployments/manifests";
 import { parseDeploymentManifest } from "@/lib/dollar/manifest";
 
@@ -40,14 +42,35 @@ export type GenesisDeployment = Readonly<{
   collection: Address;
   renderer: Address;
   avatarSvg: Address;
+  activationRegistry: Address;
   tokenCodeHash: Hex;
   collectionCodeHash: Hex;
   rendererCodeHash: Hex;
   avatarSvgCodeHash: Hex;
+  activationRegistryCodeHash: Hex;
+}>;
+
+export type MorphoMarketDeployment = Readonly<{
+  marketId: Hex;
+  collateral: Address;
+  oracle: Address;
+  oracleCodeHash: Hex;
+  kind: "statics" | "basket";
+  basketId?: bigint;
+}>;
+
+export type MorphoDeployment = Readonly<{
+  address: Address;
+  runtimeCodeHash: Hex;
+  irm: Address;
+  irmCodeHash: Hex;
+  lltv: bigint;
+  markets: readonly MorphoMarketDeployment[];
 }>;
 
 export type DollarDeployment = Readonly<{
   chainId: number;
+  deploymentId: string;
   deploymentStartBlock: bigint;
   wethProfileId: bigint;
   protocolCommit: string;
@@ -71,6 +94,7 @@ export type DollarDeployment = Readonly<{
     address: Address;
     runtimeCodeHash: Hex;
   }> | null;
+  morpho?: MorphoDeployment | null;
 }>;
 
 export type DollarDeploymentState =
@@ -120,10 +144,12 @@ const genesisVariables = {
   collection: "NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS",
   renderer: "NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS",
   avatarSvg: "NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS",
+  activationRegistry: "NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_ADDRESS",
   tokenCodeHash: "NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH",
   collectionCodeHash: "NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH",
   rendererCodeHash: "NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH",
   avatarSvgCodeHash: "NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH",
+  activationRegistryCodeHash: "NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH",
 } as const;
 
 function parseAddress(value: string | undefined, variable: string): Address {
@@ -244,6 +270,10 @@ export function readDollarDeployment(
       ),
       renderer: parseAddress(environment[genesisVariables.renderer], genesisVariables.renderer),
       avatarSvg: parseAddress(environment[genesisVariables.avatarSvg], genesisVariables.avatarSvg),
+      activationRegistry: parseAddress(
+        environment[genesisVariables.activationRegistry],
+        genesisVariables.activationRegistry
+      ),
       tokenCodeHash: parseHash(
         environment[genesisVariables.tokenCodeHash],
         genesisVariables.tokenCodeHash
@@ -259,6 +289,10 @@ export function readDollarDeployment(
       avatarSvgCodeHash: parseHash(
         environment[genesisVariables.avatarSvgCodeHash],
         genesisVariables.avatarSvgCodeHash
+      ),
+      activationRegistryCodeHash: parseHash(
+        environment[genesisVariables.activationRegistryCodeHash],
+        genesisVariables.activationRegistryCodeHash
       ),
     };
   }
@@ -303,6 +337,7 @@ export function readDollarDeployment(
     status: "configured",
     deployment: {
       chainId,
+      deploymentId: protocolCommit,
       deploymentStartBlock: BigInt(deploymentStartBlock),
       wethProfileId: BigInt(profile),
       protocolCommit,
@@ -350,12 +385,16 @@ export function clientDollarEnvironment(): Record<string, string | undefined> {
     NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS:
       process.env.NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS,
+    NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_ADDRESS:
+      process.env.NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_ADDRESS,
     NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH,
     NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH,
     NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH:
       process.env.NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: process.env.NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH,
+    NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH:
+      process.env.NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH,
     NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS: process.env.NEXT_PUBLIC_STATICS_POOL_MANAGER_ADDRESS,
     NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS:
       process.env.NEXT_PUBLIC_STATICS_POSITION_MANAGER_ADDRESS,
@@ -438,6 +477,7 @@ async function verifyDollarDeploymentUncached(
     const genesisBindingAbi = parseAbi([
       "function stakingToken() view returns (address)",
       "function genesisCollection() view returns (address)",
+      "function activationRegistry() view returns (address)",
       "function renderer() view returns (address)",
       "function avatarSVG() view returns (address)",
     ]);
@@ -446,8 +486,10 @@ async function verifyDollarDeploymentUncached(
       collectionCode,
       rendererCode,
       avatarSvgCode,
+      activationRegistryCode,
       configuredToken,
       configuredCollection,
+      configuredActivationRegistry,
       configuredRenderer,
       configuredAvatarSvg,
     ] = await Promise.all([
@@ -455,6 +497,7 @@ async function verifyDollarDeploymentUncached(
       publicClient.getCode({ address: deployment.genesis.collection }),
       publicClient.getCode({ address: deployment.genesis.renderer }),
       publicClient.getCode({ address: deployment.genesis.avatarSvg }),
+      publicClient.getCode({ address: deployment.genesis.activationRegistry }),
       publicClient.readContract({
         address: deployment.contracts.diamond,
         abi: genesisBindingAbi,
@@ -464,6 +507,11 @@ async function verifyDollarDeploymentUncached(
         address: deployment.contracts.diamond,
         abi: genesisBindingAbi,
         functionName: "genesisCollection",
+      }),
+      publicClient.readContract({
+        address: deployment.genesis.collection,
+        abi: genesisBindingAbi,
+        functionName: "activationRegistry",
       }),
       publicClient.readContract({
         address: deployment.genesis.collection,
@@ -484,7 +532,9 @@ async function verifyDollarDeploymentUncached(
       !rendererCode ||
       rendererCode === "0x" ||
       !avatarSvgCode ||
-      avatarSvgCode === "0x"
+      avatarSvgCode === "0x" ||
+      !activationRegistryCode ||
+      activationRegistryCode === "0x"
     ) {
       throw new Error("Genesis deployment has missing runtime code.");
     }
@@ -493,7 +543,10 @@ async function verifyDollarDeploymentUncached(
       keccak256(collectionCode).toLowerCase() !==
         deployment.genesis.collectionCodeHash.toLowerCase() ||
       keccak256(rendererCode).toLowerCase() !== deployment.genesis.rendererCodeHash.toLowerCase() ||
-      keccak256(avatarSvgCode).toLowerCase() !== deployment.genesis.avatarSvgCodeHash.toLowerCase()
+      keccak256(avatarSvgCode).toLowerCase() !==
+        deployment.genesis.avatarSvgCodeHash.toLowerCase() ||
+      keccak256(activationRegistryCode).toLowerCase() !==
+        deployment.genesis.activationRegistryCodeHash.toLowerCase()
     ) {
       throw new Error("Genesis runtime code does not match the deployment manifest.");
     }
@@ -502,6 +555,11 @@ async function verifyDollarDeploymentUncached(
     }
     if (getAddress(configuredCollection) !== getAddress(deployment.genesis.collection)) {
       throw new Error("Statics is bound to a different Genesis collection.");
+    }
+    if (
+      getAddress(configuredActivationRegistry) !== getAddress(deployment.genesis.activationRegistry)
+    ) {
+      throw new Error("Genesis is bound to a different activation registry.");
     }
     if (getAddress(configuredRenderer) !== getAddress(deployment.genesis.renderer)) {
       throw new Error("Genesis is bound to a different renderer.");
@@ -533,6 +591,75 @@ async function verifyDollarDeploymentUncached(
       throw new Error("Testnet faucet runtime code does not match the deployment manifest.");
     }
   }
+  if (deployment.morpho) {
+    const morpho = deployment.morpho;
+    const [morphoCode, irmCode, boundMorpho, boundLoanToken] = await Promise.all([
+      publicClient.getCode({ address: morpho.address }),
+      publicClient.getCode({ address: morpho.irm }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "morpho",
+      }),
+      publicClient.readContract({
+        address: deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "morphoUsdStx",
+      }),
+    ]);
+    if (!morphoCode || morphoCode === "0x" || !irmCode || irmCode === "0x") {
+      throw new Error("Morpho deployment has missing runtime code.");
+    }
+    if (
+      keccak256(morphoCode).toLowerCase() !== morpho.runtimeCodeHash.toLowerCase() ||
+      keccak256(irmCode).toLowerCase() !== morpho.irmCodeHash.toLowerCase()
+    ) {
+      throw new Error("Morpho runtime code does not match the deployment manifest.");
+    }
+    if (getAddress(boundMorpho) !== getAddress(morpho.address)) {
+      throw new Error("Statics is bound to a different Morpho deployment.");
+    }
+    if (getAddress(boundLoanToken) !== getAddress(deployment.contracts.dollar)) {
+      throw new Error("Statics Morpho is bound to a different loan token.");
+    }
+    await Promise.all(
+      morpho.markets.map(async (market) => {
+        const [oracleCode, configured, canonical] = await Promise.all([
+          publicClient.getCode({ address: market.oracle }),
+          publicClient.readContract({
+            address: deployment.contracts.diamond,
+            abi: staticsAbi,
+            functionName: "morphoMarket",
+            args: [market.marketId],
+          }),
+          publicClient.readContract({
+            address: morpho.address,
+            abi: morphoBlueAbi,
+            functionName: "idToMarketParams",
+            args: [market.marketId],
+          }),
+        ]);
+        if (
+          !oracleCode ||
+          oracleCode === "0x" ||
+          keccak256(oracleCode).toLowerCase() !== market.oracleCodeHash.toLowerCase()
+        ) {
+          throw new Error("Morpho oracle runtime code does not match the deployment manifest.");
+        }
+        for (const params of [configured.params, canonical]) {
+          if (
+            getAddress(params.loanToken) !== getAddress(deployment.contracts.dollar) ||
+            getAddress(params.collateralToken) !== getAddress(market.collateral) ||
+            getAddress(params.oracle) !== getAddress(market.oracle) ||
+            getAddress(params.irm) !== getAddress(morpho.irm) ||
+            params.lltv !== morpho.lltv
+          ) {
+            throw new Error("Morpho market does not match the deployment manifest.");
+          }
+        }
+      })
+    );
+  }
 }
 
 export function verifyDollarDeployment(
@@ -542,7 +669,7 @@ export function verifyDollarDeployment(
   return cachedVerification(
     dollarVerificationCache,
     publicClient,
-    `${deployment.chainId}:${deployment.protocolCommit}`,
+    `${deployment.chainId}:${deployment.deploymentId}`,
     () => verifyDollarDeploymentUncached(publicClient, deployment)
   );
 }
@@ -650,7 +777,7 @@ export function verifyLiquidityDeployment(
   return cachedVerification(
     liquidityVerificationCache,
     publicClient,
-    `${deployment.chainId}:${deployment.protocolCommit}`,
+    `${deployment.chainId}:${deployment.deploymentId}`,
     () => verifyLiquidityDeploymentUncached(publicClient, deployment)
   );
 }

@@ -57,10 +57,12 @@ function genesisEnvironment() {
     NEXT_PUBLIC_STATICS_GENESIS_NFT_ADDRESS: address,
     NEXT_PUBLIC_STATICS_GENESIS_RENDERER_ADDRESS: address,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_ADDRESS: address,
+    NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_ADDRESS: address,
     NEXT_PUBLIC_STATICS_TOKEN_CODE_HASH: hash,
     NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: hash,
     NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: hash,
     NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: hash,
+    NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH: hash,
   };
 }
 
@@ -159,6 +161,7 @@ describe("Dollar deployment configuration", () => {
       NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH: runtimeCodeHash,
     });
     if (state.status !== "configured") throw new Error("expected configured deployment");
 
@@ -212,6 +215,7 @@ describe("Dollar deployment configuration", () => {
       NEXT_PUBLIC_STATICS_GENESIS_NFT_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_GENESIS_RENDERER_CODE_HASH: runtimeCodeHash,
       NEXT_PUBLIC_STATICS_AVATAR_SVG_CODE_HASH: runtimeCodeHash,
+      NEXT_PUBLIC_STATICS_GENESIS_ACTIVATION_REGISTRY_CODE_HASH: runtimeCodeHash,
     });
     if (state.status !== "configured") throw new Error("expected configured deployment");
 

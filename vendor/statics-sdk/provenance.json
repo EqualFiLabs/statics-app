@@ -1,30 +1,30 @@
 {
-  "protocolCommit": "730c613af14464965c2254f75f415b3c506bc8fc",
+  "protocolCommit": "31e870900615197277bcccef6bfdb06dba452930",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "fd3c4c0849afeb51e7cac0547cbd9d28676c0c74"
+    "commit": "d6fd04e1b5ab28d2cb956055616d233fe28f84b3"
   },
   "sdkTreeState": "clean",
   "extensionSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "cf6166565a884c972f53ec1d07e2793472d5b831"
+    "commit": "d6fd04e1b5ab28d2cb956055616d233fe28f84b3"
   },
   "extensionSourceChecksums": {
     "src/genesis-credit.ts": "868718ea20417287dd9daf994e97f14ca9b9d32a9a10d795d3f9e65e32f860d2",
     "package.json": "b8204badc86e111eb0d4bf3545ee4f60b989784698d8a96136f5cde409375bdd"
   },
   "sourceChecksums": {
-    "src/index.ts": "2a2bfd64b94a02f34e40ee88fb2abc766576bd6d0343c731270a360ad53e897d",
-    "package.json": "047657d558934ac444d1d1d5b6e816593b9200cddb62e64703462033b54cb66e"
+    "src/index.ts": "6381f0afe89796b969a9e8f397e1d4e81c347a2c66c7640811596bb1f23c306d",
+    "package.json": "b8204badc86e111eb0d4bf3545ee4f60b989784698d8a96136f5cde409375bdd"
   },
   "checksums": {
-    "dist/index.js": "649132730b0769e7debdf7b25cb361c5e486eb7f10360e9ee7c9e73a5379ab55",
-    "dist/index.d.ts": "f72c1f2e40c1ab44b8e591cbda8f9c4ceb328d0227a55f0db68f992e6b0823b9",
+    "dist/index.js": "08214317a3bf503e0e48cca520da78088d68fc5e23f2e9dd917fac0dd3b81418",
+    "dist/index.d.ts": "6d3baf16c5cf6c303d6cc8593b70a4e2b105ac27ff385e14ef8cbe153d0be62b",
     "dist/genesis-credit.js": "9b9be92463d34e6f18354c96064ad2f43365078945a13e9df0df7c8dd852e42d",
     "dist/genesis-credit.d.ts": "ffef22c37b79e975da48093ce8e572db6bcdd5d8f0b34617f4fbc6cfbd60a779",
-    "dist/generated/robinhoodChain.js": "69b5dbcb88d4f77e435c2ceaa7176ab51b727065dc12eb44200748922b48afec",
-    "dist/generated/robinhoodChain.d.ts": "f6a12b08c2b8cd85c769583f8ffcc632719c75d638803c17a83f51bcc2984337"
+    "dist/generated/robinhoodChain.js": "8fdfb858daa1078c466c6ed755462727aef6950ac9a8f3ae1a42811b9bf5cda3",
+    "dist/generated/robinhoodChain.d.ts": "9c55f6c1ab6dcd7034e88c79357bcc0f35b99fdbc89a1dac1edfec16bd31a027"
   }
 }

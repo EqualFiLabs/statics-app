@@ -85,10 +85,10 @@ export async function loadStakingSnapshot(
         return {
           token,
           selected: selection.selected,
-          actualEligibleStake: selection.actualEligibleStake,
-          actualPendingStake: selection.actualPendingStake,
-          effectiveEligibleWeight: selection.effectiveEligibleWeight,
-          effectivePendingWeight: selection.effectivePendingWeight,
+          actualEligibleStake: selection.eligibleStake,
+          actualPendingStake: selection.pendingStake,
+          effectiveEligibleWeight: selection.eligibleWeight,
+          effectivePendingWeight: selection.pendingWeight,
           eligibleAt: BigInt(selection.eligibleAt),
         } satisfies RewardSelection;
       })

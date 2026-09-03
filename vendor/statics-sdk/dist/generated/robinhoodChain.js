@@ -7,11 +7,11 @@ export const robinhoodChain = {
     "forkBlockHash": "0x6aa5df55371aa944352e06703b7905fb0ddf3a58c495833ee7595ef08aa46417",
     "inputFeeBps": 50,
     "outputFeeBps": 50,
-    "hookPermissionMask": "0x10cc",
+    "hookPermissionMask": "0x10ec",
     "liquidityCalibration": {
         "inputFeeBps": 50,
         "outputFeeBps": 50,
-        "hookPermissionMask": "0x10cc",
+        "hookPermissionMask": "0x10ec",
         "canonicalLpFeePips": 0,
         "canonicalTickSpacing": 10,
         "polShareBps": 1000,
@@ -24,7 +24,8 @@ export const robinhoodChain = {
             "beforeSwap",
             "beforeSwapReturnDelta",
             "afterSwap",
-            "afterSwapReturnDelta"
+            "afterSwapReturnDelta",
+            "beforeDonate"
         ]
     },
     "contracts": {

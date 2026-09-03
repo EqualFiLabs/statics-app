@@ -128,6 +128,7 @@ describe("basket action safety", () => {
   it("loads the complete current basket registry without event history", async () => {
     const deployment = {
       chainId: 31_337,
+      deploymentId: "local-basket-test",
       deploymentStartBlock: 1n,
       wethProfileId: 1n,
       protocolCommit: "a".repeat(40),

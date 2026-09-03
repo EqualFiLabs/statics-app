@@ -93,6 +93,7 @@ const basket = {
 
 const deployment = {
   chainId: 31_337,
+  deploymentId: "local-loan-test",
   deploymentStartBlock: 1n,
   protocolCommit: "a".repeat(40),
   source: "development-environment",

@@ -15,6 +15,7 @@ const entry = (a: string, h: string) => ({ address: address(a), runtimeCodeHash:
 function manifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManifest {
   return {
     schemaVersion: MANIFEST_SCHEMA_VERSION,
+    deploymentId: "robinhood-testnet-rehearsal-a",
     network: "Robinhood Chain Testnet",
     chainId: 46_630,
     deploymentStartBlock: "1234",
@@ -41,6 +42,7 @@ function manifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManife
       collection: entry("9", "9"),
       renderer: entry("a", "a"),
       avatarSvg: entry("b", "b"),
+      activationRegistry: entry("c", "c"),
     },
     liquidity: null,
     pegged: null,
@@ -53,6 +55,7 @@ describe("deployment manifest", () => {
     const deployment = parseDeploymentManifest(manifest());
 
     expect(deployment.chainId).toBe(46_630);
+    expect(deployment.deploymentId).toBe("robinhood-testnet-rehearsal-a");
     expect(deployment.deploymentStartBlock).toBe(1234n);
     expect(deployment.wethProfileId).toBe(1n);
     // Distinguishable from the Anvil-only environment path.
@@ -61,6 +64,31 @@ describe("deployment manifest", () => {
     expect(deployment.runtimeCodeHashes.diamond).toBe(hash("1"));
     expect(deployment.genesis?.token).toBe(address("8"));
     expect(deployment.genesis?.collection).toBe(address("9"));
+    expect(deployment.genesis?.activationRegistry.toLowerCase()).toBe(address("c"));
+  });
+
+  it("parses reviewed Morpho markets without inventing collateral metadata", () => {
+    const deployment = parseDeploymentManifest(
+      manifest({
+        morpho: {
+          protocol: entry("d", "d"),
+          irm: entry("e", "e"),
+          lltv: "770000000000000000",
+          markets: [
+            {
+              marketId: hash("f"),
+              collateral: address("8"),
+              oracle: entry("1", "2"),
+              kind: "statics",
+            },
+          ],
+        },
+      })
+    );
+
+    expect(deployment.morpho?.lltv).toBe(770000000000000000n);
+    expect(deployment.morpho?.markets[0]?.marketId).toBe(hash("f"));
+    expect(deployment.morpho?.markets[0]?.kind).toBe("statics");
   });
 
   it("refuses a manifest written against a different schema", () => {
@@ -109,6 +137,12 @@ describe("deployment manifest", () => {
   it("refuses a commit that is not a full git sha", () => {
     expect(() => parseDeploymentManifest(manifest({ protocolCommit: "abc123" }))).toThrow(
       /full Git commit/
+    );
+  });
+
+  it("requires a stable deployment identity for repeat rehearsals", () => {
+    expect(() => parseDeploymentManifest(manifest({ deploymentId: "" }))).toThrow(
+      /stable public identifier/
     );
   });
 

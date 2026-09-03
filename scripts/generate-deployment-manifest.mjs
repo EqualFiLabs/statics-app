@@ -32,7 +32,7 @@ import { createPublicClient, http, getAddress, keccak256 } from "viem";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deploymentsDir = resolve(siteRoot, "deployments");
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const DOLLAR = ["diamond", "core", "gateway", "dollar", "risk", "weth", "oracle"];
 const LIQUIDITY = [
@@ -174,43 +174,79 @@ async function main() {
     );
   }
 
-  const contractsSource = {
-    diamond: artifact.contracts?.staticsDiamond,
-    core: artifact.contracts?.staticsDollarCoreDiamond,
-    gateway: artifact.contracts?.staticsDiamond,
-    dollar: artifact.contracts?.staticsDollar,
-    risk: artifact.contracts?.staticsDollarRiskShares,
-    weth: artifact.externalDependencies?.weth,
-    oracle: artifact.contracts?.staticsDollarOracle,
-  };
+  const rehearsal = Boolean(artifact.protocol?.staticsDiamond);
+  const contractsSource = rehearsal
+    ? {
+        diamond: artifact.protocol.staticsDiamond,
+        core: artifact.protocol.coreDiamond,
+        gateway: artifact.protocol.staticsDiamond,
+        dollar: artifact.protocol.usdStx,
+        risk: artifact.protocol.riskShares,
+        weth: artifact.dependencies?.weth,
+        oracle: artifact.protocol.coreEthUsdOracle,
+      }
+    : {
+        diamond: artifact.contracts?.staticsDiamond,
+        core: artifact.contracts?.staticsDollarCoreDiamond,
+        gateway: artifact.contracts?.staticsDiamond,
+        dollar: artifact.contracts?.staticsDollar,
+        risk: artifact.contracts?.staticsDollarRiskShares,
+        weth: artifact.externalDependencies?.weth,
+        oracle: artifact.contracts?.staticsDollarOracle,
+      };
   const contracts = {};
   for (const name of DOLLAR) {
     contracts[name] = await entryFor(client, name, pick(contractsSource, name));
   }
 
-  const genesisSource = {
-    token: artifact.contracts?.staticsToken,
-    collection: artifact.contracts?.genesisNFT,
-    renderer: artifact.contracts?.genesisRenderer,
-    avatarSvg: artifact.contracts?.avatarSVG,
-  };
+  const genesisSource = rehearsal
+    ? {
+        token: artifact.genesisReplica?.statics,
+        collection: artifact.genesisReplica?.genesisCollection,
+        renderer: artifact.genesisReplica?.genesisRenderer,
+        avatarSvg: artifact.genesisReplica?.avatarSvg,
+        activationRegistry: artifact.genesisReplica?.activationRegistry,
+      }
+    : {
+        token: artifact.contracts?.staticsToken,
+        collection: artifact.contracts?.genesisNFT,
+        renderer: artifact.contracts?.genesisRenderer,
+        avatarSvg: artifact.contracts?.avatarSVG,
+        activationRegistry: artifact.contracts?.genesisActivationRegistry,
+      };
   const genesis = {
     token: await entryFor(client, "staticsToken", pick(genesisSource, "token")),
     collection: await entryFor(client, "genesisNFT", pick(genesisSource, "collection")),
     renderer: await entryFor(client, "genesisRenderer", pick(genesisSource, "renderer")),
     avatarSvg: await entryFor(client, "avatarSVG", pick(genesisSource, "avatarSvg")),
+    activationRegistry: await entryFor(
+      client,
+      "genesisActivationRegistry",
+      pick(genesisSource, "activationRegistry")
+    ),
   };
 
-  const liquiditySource = {
-    poolManager: artifact.externalDependencies?.poolManager,
-    positionManager: artifact.externalDependencies?.positionManager,
-    permit2: artifact.externalDependencies?.permit2,
-    swapFeeHook: artifact.contracts?.swapFeeHook,
-    liquidityManager: artifact.contracts?.liquidityManager,
-    stateView: artifact.externalDependencies?.stateView,
-    quoter: artifact.externalDependencies?.quoter,
-    universalRouter: artifact.externalDependencies?.universalRouter,
-  };
+  const liquiditySource = rehearsal
+    ? {
+        poolManager: artifact.dependencies?.poolManager,
+        positionManager: artifact.dependencies?.positionManager,
+        permit2: artifact.dependencies?.permit2,
+        swapFeeHook: artifact.protocol?.swapFeeHook,
+        liquidityManager: artifact.protocol?.liquidityManager,
+        stateView: artifact.dependencies?.stateView,
+        quoter: artifact.dependencies?.quoter,
+        universalRouter: artifact.dependencies?.universalRouter,
+      }
+    : {
+        poolManager: artifact.externalDependencies?.poolManager,
+        positionManager: artifact.externalDependencies?.positionManager,
+        permit2: artifact.externalDependencies?.permit2,
+        swapFeeHook: artifact.contracts?.swapFeeHook,
+        liquidityManager: artifact.contracts?.liquidityManager,
+        stateView: artifact.externalDependencies?.stateView,
+        quoter: artifact.externalDependencies?.quoter,
+        universalRouter: artifact.externalDependencies?.universalRouter,
+      };
   const liquidity = {};
   for (const name of LIQUIDITY) {
     liquidity[name] = await entryFor(client, name, pick(liquiditySource, name));
@@ -220,16 +256,51 @@ async function main() {
   if (peggedProfile) {
     pegged = {
       profileId: peggedProfile,
-      collateral: await entryFor(client, "usdg", pick(artifact.testnetFixtures, "mockUsdg")),
-      oracle: await entryFor(client, "usdgOracle", pick(artifact.testnetFixtures, "usdgOracle")),
+      collateral: await entryFor(
+        client,
+        "usdg",
+        rehearsal
+          ? pick(artifact.peggedProfile, "collateralToken")
+          : pick(artifact.testnetFixtures, "mockUsdg")
+      ),
+      oracle: await entryFor(
+        client,
+        "usdgOracle",
+        rehearsal
+          ? pick(artifact.peggedProfile, "oracle")
+          : pick(artifact.testnetFixtures, "usdgOracle")
+      ),
     };
   }
 
-  const faucetAddress = address(artifact.testnetFixtures?.faucet);
+  const faucetAddress = address(rehearsal ? artifact.faucet : artifact.testnetFixtures?.faucet);
   const faucet = faucetAddress ? await entryFor(client, "faucet", faucetAddress) : null;
+
+  let morpho = null;
+  if (rehearsal && artifact.morphoIntegration) {
+    const integration = artifact.morphoIntegration;
+    morpho = {
+      protocol: await entryFor(client, "morpho", pick(integration, "morpho")),
+      irm: await entryFor(client, "morphoIrm", pick(integration, "irm")),
+      lltv: String(integration.lltv),
+      markets: await Promise.all(
+        [
+          [integration.staticsMarket, "statics"],
+          [integration.basketMarket, "basket"],
+        ].map(async ([market, kind]) => ({
+          marketId: market.marketId,
+          collateral: getAddress(market.collateralToken),
+          oracle: await entryFor(client, `${kind}MorphoOracle`, market.oracle),
+          kind,
+          ...(kind === "basket" ? { basketId: String(market.basketId) } : {}),
+        }))
+      ),
+    };
+  }
 
   const manifest = {
     schemaVersion: SCHEMA_VERSION,
+    deploymentId: String(artifact.deploymentId ?? `${chainId}-${commit.slice(0, 12)}`),
     network,
     chainId,
     deploymentStartBlock: startBlock,
@@ -247,6 +318,7 @@ async function main() {
     liquidity,
     pegged,
     faucet,
+    morpho,
   };
 
   const target = resolve(deploymentsDir, `${chainId}.json`);

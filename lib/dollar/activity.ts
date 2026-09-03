@@ -2,6 +2,8 @@
 
 import type { Address, Hex } from "viem";
 
+import { deploymentManifests } from "@/deployments/manifests";
+
 export type DollarActivityStatus =
   | "simulating"
   | "signing"
@@ -85,6 +87,13 @@ export type DollarActivityKind =
   | "recover-genesis-credit"
   | "link-genesis"
   | "unlink-genesis"
+  | "deploy-morpho-collateral"
+  | "recall-morpho-collateral"
+  | "borrow-morpho"
+  | "repay-morpho"
+  | "sync-morpho"
+  | "supply-morpho"
+  | "withdraw-morpho"
   | "claim-creator-revenue"
   | "distribute-partner-revenue";
 
@@ -111,7 +120,8 @@ export type DollarActivity = Readonly<{
 }>;
 
 const activityEvent = "statics-protocol-activity";
-const DEFAULT_ACTIVITY_DEPLOYMENT_ID = "robinhood-testnet-genesis";
+const DEFAULT_ACTIVITY_DEPLOYMENT_ID =
+  deploymentManifests[46_630]?.deploymentId ?? "robinhood-testnet-genesis";
 const activityCache = new Map<string, { raw: string; value: DollarActivity[] }>();
 const aggregateActivityCache = new Map<
   string,
