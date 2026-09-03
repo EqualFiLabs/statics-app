@@ -14,6 +14,7 @@ import {
   harvestedFee,
   marketCandle,
   marketSwap,
+  morphoAction,
   v4Position,
 } from "ponder:schema";
 import { absoluteAmount, candleBucket, marketCandleKey, marketSwapMetrics } from "./market";
@@ -35,6 +36,7 @@ const onPositionManager = sourceHandler(
   Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
 );
 const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
+const onMorpho = sourceHandler(Boolean(configuredAddress("PONDER_MORPHO_ADDRESS")));
 
 onStatics("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
@@ -177,14 +179,6 @@ ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
   await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
 });
 
-onStatics("Statics:GenesisActivated", async ({ event, context }) => {
-  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
-    tier: Number(event.args.newTier),
-    multiplierBps: Number(event.args.multiplierBps),
-    updatedAtBlock: event.block.number,
-  });
-});
-
 onStatics("Statics:GenesisLinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
     linkedPositionId: event.args.positionId,
@@ -194,15 +188,6 @@ onStatics("Statics:GenesisLinked", async ({ event, context }) => {
 
 onStatics("Statics:GenesisUnlinked", async ({ event, context }) => {
   await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
-    linkedPositionId: 0n,
-    updatedAtBlock: event.block.number,
-  });
-});
-
-onStatics("Statics:GenesisActivationReset", async ({ event, context }) => {
-  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
-    tier: 0,
-    multiplierBps: 10_000,
     linkedPositionId: 0n,
     updatedAtBlock: event.block.number,
   });
@@ -278,6 +263,53 @@ ponder.on("GenesisLaunchDistributor:OwnerRewardsClaimed", async ({ event, contex
   });
 });
 
+onStatics("Statics:GenesisRegistered", async ({ event, context }) => {
+  await context.db.update(genesisNft, { key: entityKey(event.args.genesisId) }).set({
+    registered: true,
+    effectiveWeight: event.args.weight,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onStatics("Statics:GenesisWeightChanged", async ({ event, context }) => {
+  if (!genesisVault)
+    throw new Error("PONDER_GENESIS_VAULT_ADDRESS is required for Genesis weights.");
+  const mutation = genesisWeightChangedMutation({
+    deploymentId,
+    genesisId: event.args.genesisId,
+    vault: genesisVault,
+    newWeight: event.args.newWeight,
+    blockNumber: event.block.number,
+  });
+  await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
+});
+
+onStatics("Statics:GenesisRewardsClaimed", async ({ event, context }) => {
+  await context.db.insert(genesisRewardClaim).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    genesisId: event.args.genesisId,
+    owner: getAddress(event.args.owner),
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    previousOwnerClaim: false,
+    blockNumber: event.block.number,
+  });
+});
+
+onStatics("Statics:GenesisOwnerRewardsClaimed", async ({ event, context }) => {
+  await context.db.insert(genesisRewardClaim).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    genesisId: null,
+    owner: getAddress(event.args.owner),
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    previousOwnerClaim: true,
+    blockNumber: event.block.number,
+  });
+});
+
 ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
   await context.db.insert(harvestedFee).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
@@ -286,6 +318,91 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
     asset: getAddress(event.args.asset),
     amount: event.args.amount,
     cumulativeAmount: event.args.cumulativeAmount,
+    blockNumber: event.block.number,
+  });
+});
+
+onMorpho("Morpho:Supply", async ({ event, context }) => {
+  await context.db.insert(morphoAction).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    marketId: event.args.id,
+    action: "supply",
+    caller: getAddress(event.args.caller),
+    account: getAddress(event.args.onBehalf),
+    receiver: null,
+    assets: event.args.assets,
+    shares: event.args.shares,
+    collateralAssets: 0n,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+  });
+});
+
+onMorpho("Morpho:Withdraw", async ({ event, context }) => {
+  await context.db.insert(morphoAction).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    marketId: event.args.id,
+    action: "withdraw",
+    caller: getAddress(event.args.caller),
+    account: getAddress(event.args.onBehalf),
+    receiver: getAddress(event.args.receiver),
+    assets: event.args.assets,
+    shares: event.args.shares,
+    collateralAssets: 0n,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+  });
+});
+
+onMorpho("Morpho:Borrow", async ({ event, context }) => {
+  await context.db.insert(morphoAction).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    marketId: event.args.id,
+    action: "borrow",
+    caller: getAddress(event.args.caller),
+    account: getAddress(event.args.onBehalf),
+    receiver: getAddress(event.args.receiver),
+    assets: event.args.assets,
+    shares: event.args.shares,
+    collateralAssets: 0n,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+  });
+});
+
+onMorpho("Morpho:Repay", async ({ event, context }) => {
+  await context.db.insert(morphoAction).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    marketId: event.args.id,
+    action: "repay",
+    caller: getAddress(event.args.caller),
+    account: getAddress(event.args.onBehalf),
+    receiver: null,
+    assets: event.args.assets,
+    shares: event.args.shares,
+    collateralAssets: 0n,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+  });
+});
+
+onMorpho("Morpho:Liquidate", async ({ event, context }) => {
+  await context.db.insert(morphoAction).values({
+    key: eventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId,
+    marketId: event.args.id,
+    action: "liquidate",
+    caller: getAddress(event.args.caller),
+    account: getAddress(event.args.borrower),
+    receiver: null,
+    assets: event.args.repaidAssets,
+    shares: event.args.repaidShares,
+    collateralAssets: event.args.seizedAssets,
+    transactionHash: event.transaction.hash,
     blockNumber: event.block.number,
   });
 });
