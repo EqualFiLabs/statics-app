@@ -158,8 +158,8 @@ The following HTTPS JSON routes are anonymous and do not accept or require an AP
 - `GET /api/coingecko/v1/tickers` returns the canonical STATICS/WETH market as a one-item array.
 - `GET /api/coingecko/v1/historical_trades?ticker_id=<id>` returns completed trades split into
   `buy` and `sell` arrays.
-- `GET /api/coingecko/v1/status` reports the public market feed's chain, deployment, source block,
-  latest indexed trade, and index lag.
+- `GET /api/coingecko/v1/status` reports the public market feed's chain, deployment, RPC source
+  block, Ponder indexed block/time, latest indexed trade, and actual index lag.
 
 Circulating supply is the onchain total supply minus unreleased treasury vesting and Operator Vault
 token backing. Canonical AMM pool inventory remains circulating because it is publicly tradable.

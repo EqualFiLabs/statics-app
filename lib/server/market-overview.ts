@@ -150,13 +150,19 @@ async function loadActivity(deployment: LaunchDeployment, now: number): Promise<
     const url = staticsMainnetIndexerUrl("market/activity");
     url.searchParams.set("from", String(Math.floor(now / 1_000) - 24 * 60 * 60));
     url.searchParams.set("to", String(Math.floor(now / 1_000)));
+    url.searchParams.set("pool", deployment.market.poolId);
     const response = await fetch(url, {
       headers: { accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(4_000),
     });
     const activity: unknown = response.ok ? await response.json() : null;
-    if (!validIndexedActivity(activity)) return null;
+    if (
+      !validIndexedActivity(activity) ||
+      activity.deploymentId !== deployment.descriptor.deploymentId
+    ) {
+      return null;
+    }
     const staticsIsCurrency0 =
       deployment.market.poolKey.currency0.toLowerCase() ===
       deployment.contracts.statics.toLowerCase();

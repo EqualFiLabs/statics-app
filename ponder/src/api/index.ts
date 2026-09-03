@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, gt, gte, lt, lte, max, min, sum } from "pond
 import { db } from "ponder:api";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getAddress, isAddress } from "viem";
+import { getAddress, isAddress, isHex, size, type Hex } from "viem";
 
 import {
   activeGenesisCredit,
@@ -47,9 +47,14 @@ function marketRange(fromValue: string | undefined, toValue: string | undefined)
   return { from, to } as const;
 }
 
-function marketRangeWhere(from: bigint | undefined, to: bigint | undefined) {
+function readMarketPool(value: string | undefined): Hex | null {
+  return value && isHex(value, { strict: true }) && size(value) === 32 ? value : null;
+}
+
+function marketRangeWhere(poolId: Hex, from: bigint | undefined, to: bigint | undefined) {
   return and(
     eq(marketSwap.deploymentId, deploymentId),
+    eq(marketSwap.poolId, poolId),
     from === undefined ? undefined : gte(marketSwap.blockTimestamp, from),
     to === undefined ? undefined : lte(marketSwap.blockTimestamp, to)
   );
@@ -325,10 +330,12 @@ app.get("/market/swaps", async (context) => {
 app.get("/market/trades", async (context) => {
   const limit = readMarketTradeLimit(context.req.query("limit"));
   const range = marketRange(context.req.query("from"), context.req.query("to"));
+  const poolId = readMarketPool(context.req.query("pool"));
   const amount0Sign = context.req.query("amount0Sign");
   if (
     limit === 0 ||
     range === null ||
+    poolId === null ||
     (amount0Sign !== undefined && amount0Sign !== "positive" && amount0Sign !== "negative")
   ) {
     return context.json({ error: "Invalid trade query." }, 400);
@@ -349,7 +356,7 @@ app.get("/market/trades", async (context) => {
     .from(marketSwap)
     .where(
       and(
-        marketRangeWhere(range.from, range.to),
+        marketRangeWhere(poolId, range.from, range.to),
         amount0Sign === "positive"
           ? gt(marketSwap.amount0, 0n)
           : amount0Sign === "negative"
@@ -383,15 +390,17 @@ app.get("/market/trades", async (context) => {
 
 app.get("/market/activity", async (context) => {
   const range = marketRange(context.req.query("from"), context.req.query("to"));
+  const poolId = readMarketPool(context.req.query("pool"));
   if (
     range === null ||
+    poolId === null ||
     range.from === undefined ||
     range.to === undefined ||
     range.to - range.from > MAX_MARKET_RANGE_SECONDS
   ) {
     return context.json({ error: "Invalid market activity range." }, 400);
   }
-  const where = marketRangeWhere(range.from, range.to);
+  const where = marketRangeWhere(poolId, range.from, range.to);
   const [aggregateRows, firstRows, lastRows, zeroForOneRows, oneForZeroRows] = await Promise.all([
     db
       .select({

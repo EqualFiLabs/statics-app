@@ -30,6 +30,7 @@ vi.mock("@/lib/server/statics-indexer-url", () => ({
 import {
   coinGeckoSpotMarket,
   loadCoinGeckoHistoricalTrades,
+  loadCoinGeckoStatus,
   loadCoinGeckoTickers,
   resetCoinGeckoMarketCacheForTest,
 } from "@/lib/server/coingecko-market";
@@ -152,9 +153,25 @@ describe("CoinGecko market server adapter", () => {
     expect(requested.pathname).toBe("/market/trades");
     expect(Object.fromEntries(requested.searchParams)).toEqual({
       limit: "500",
+      pool: market.poolId,
       from: "10",
       to: "20",
       amount0Sign: "positive",
+    });
+  });
+
+  it("reports indexer block lag independently from the age of the last trade", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ active: { id: 4_663, block: { number: 456, timestamp: 1_788_278_390 } } }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    await expect(loadCoinGeckoStatus(1_788_278_400_000)).resolves.toMatchObject({
+      indexed_block: "456",
+      indexed_at: "2026-09-01T15:59:50.000Z",
+      last_trade_at: overview.activity24h.lastTradeAt,
+      lag_seconds: 10,
     });
   });
 });

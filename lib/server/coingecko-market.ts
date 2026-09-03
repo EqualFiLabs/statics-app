@@ -91,6 +91,7 @@ async function loadIndexedTrades(
 ) {
   const url = staticsMainnetIndexerUrl("market/trades");
   url.searchParams.set("limit", String(query.limit));
+  url.searchParams.set("pool", coinGeckoSpotMarket().poolId);
   if (query.from !== undefined) url.searchParams.set("from", query.from);
   if (query.to !== undefined) url.searchParams.set("to", query.to);
   if (query.amount0Sign !== undefined) url.searchParams.set("amount0Sign", query.amount0Sign);
@@ -215,18 +216,52 @@ export async function loadCoinGeckoHistoricalTrades(
 }
 
 export async function loadCoinGeckoStatus(now = Date.now()) {
-  const overview = await loadMarketSpotOverview(now);
+  const [overview, indexerResponse] = await Promise.all([
+    loadMarketSpotOverview(now),
+    fetch(staticsMainnetIndexerUrl("status"), {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(4_000),
+    }),
+  ]);
   if (!overview.activity24h.available) throw new Error("Indexed market activity is unavailable.");
+  const indexer: unknown = indexerResponse.ok ? await indexerResponse.json() : null;
+  const active =
+    indexer && typeof indexer === "object" && !Array.isArray(indexer)
+      ? (indexer as { active?: unknown }).active
+      : null;
+  const block =
+    active && typeof active === "object" && !Array.isArray(active)
+      ? (active as { block?: unknown }).block
+      : null;
+  if (
+    !active ||
+    typeof active !== "object" ||
+    Array.isArray(active) ||
+    (active as { id?: unknown }).id !== overview.chainId ||
+    !block ||
+    typeof block !== "object" ||
+    Array.isArray(block) ||
+    typeof (block as { number?: unknown }).number !== "number" ||
+    !Number.isSafeInteger((block as { number: number }).number) ||
+    typeof (block as { timestamp?: unknown }).timestamp !== "number" ||
+    !Number.isSafeInteger((block as { timestamp: number }).timestamp)
+  ) {
+    throw new Error("The indexer status response is unavailable or invalid.");
+  }
+  const indexedBlock = (block as { number: number; timestamp: number }).number;
+  const indexedTimestamp = (block as { number: number; timestamp: number }).timestamp;
   const indexedAt = overview.activity24h.lastTradeAt;
   return {
     ok: true,
     chain_id: overview.chainId,
     deployment_id: overview.deploymentId,
-    as_of_block: overview.asOfBlock,
+    rpc_as_of_block: overview.asOfBlock,
+    indexed_block: String(indexedBlock),
+    indexed_at: new Date(indexedTimestamp * 1_000).toISOString(),
     last_trade_at: indexedAt,
-    observed_at: overview.freshness.snapshotAt,
-    lag_seconds:
-      indexedAt === null ? null : Math.max(0, Math.floor((now - Date.parse(indexedAt)) / 1_000)),
+    observed_at: new Date(now).toISOString(),
+    lag_seconds: Math.max(0, Math.floor(now / 1_000) - indexedTimestamp),
   } as const;
 }
 
