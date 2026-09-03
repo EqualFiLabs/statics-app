@@ -1,4 +1,4 @@
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, isHex, size } from "viem";
 
 import { v4QuoterAbi } from "@statics-protocol/sdk";
 
@@ -59,9 +59,13 @@ function isUnsigned(value: unknown): value is string {
 function validIndexedTrade(value: unknown): value is IndexedMarketTrade {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
-  return (
+  const primitivesValid =
     typeof row.poolId === "string" &&
+    isHex(row.poolId, { strict: true }) &&
+    size(row.poolId) === 32 &&
     typeof row.transactionHash === "string" &&
+    isHex(row.transactionHash, { strict: true }) &&
+    size(row.transactionHash) === 32 &&
     [
       "amount0",
       "amount1",
@@ -77,7 +81,18 @@ function validIndexedTrade(value: unknown): value is IndexedMarketTrade {
     ) &&
     typeof row.logIndex === "number" &&
     Number.isSafeInteger(row.logIndex) &&
-    row.logIndex >= 0
+    row.logIndex >= 0;
+  if (!primitivesValid) return false;
+  const amount0 = BigInt(row.amount0 as string);
+  const amount1 = BigInt(row.amount1 as string);
+  const volume0 = BigInt(row.volume0 as string);
+  const volume1 = BigInt(row.volume1 as string);
+  return (
+    amount0 !== 0n &&
+    amount1 !== 0n &&
+    (amount0 < 0n ? -amount0 : amount0) === volume0 &&
+    (amount1 < 0n ? -amount1 : amount1) === volume1 &&
+    BigInt(row.price1Per0Wad as string) > 0n
   );
 }
 
@@ -244,8 +259,10 @@ export async function loadCoinGeckoStatus(now = Date.now()) {
     Array.isArray(block) ||
     typeof (block as { number?: unknown }).number !== "number" ||
     !Number.isSafeInteger((block as { number: number }).number) ||
+    (block as { number: number }).number < 0 ||
     typeof (block as { timestamp?: unknown }).timestamp !== "number" ||
-    !Number.isSafeInteger((block as { timestamp: number }).timestamp)
+    !Number.isSafeInteger((block as { timestamp: number }).timestamp) ||
+    (block as { timestamp: number }).timestamp < 0
   ) {
     throw new Error("The indexer status response is unavailable or invalid.");
   }

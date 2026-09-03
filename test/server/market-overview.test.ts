@@ -65,8 +65,8 @@ beforeEach(() => {
     new Response(
       JSON.stringify({
         deploymentId: "robinhood-genesis",
-        from: "1",
-        to: "2",
+        from: String(NOW / 1_000 - 24 * 60 * 60),
+        to: String(NOW / 1_000),
         volume0: (10_000_000n * WAD).toString(),
         volume1: (40n * WAD).toString(),
         swapCount: 12,
@@ -130,5 +130,39 @@ describe("shared market fundamentals", () => {
     });
     expect(mocks.simulateContract).not.toHaveBeenCalled();
     expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain("/market/activity?");
+  });
+
+  it("distinguishes a valid quiet market from an unavailable indexer", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          deploymentId: "robinhood-genesis",
+          from: String(NOW / 1_000 - 24 * 60 * 60),
+          to: String(NOW / 1_000),
+          volume0: "0",
+          volume1: "0",
+          swapCount: 0,
+          zeroForOneCount: 0,
+          oneForZeroCount: 0,
+          openPrice1Per0Wad: null,
+          highPrice1Per0Wad: null,
+          lowPrice1Per0Wad: null,
+          closePrice1Per0Wad: null,
+          lastBlock: null,
+          lastTimestamp: null,
+          lastLogIndex: null,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    await expect(loadMarketSpotOverview(NOW)).resolves.toMatchObject({
+      activity24h: {
+        available: true,
+        swaps: 0,
+        highWethPerStaticsWad: null,
+        lowWethPerStaticsWad: null,
+        lastWethPerStaticsWad: null,
+      },
+    });
   });
 });

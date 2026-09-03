@@ -147,9 +147,11 @@ function validIndexedActivity(value: unknown): value is IndexedActivity {
 
 async function loadActivity(deployment: LaunchDeployment, now: number): Promise<Activity | null> {
   try {
+    const from = Math.floor(now / 1_000) - 24 * 60 * 60;
+    const to = Math.floor(now / 1_000);
     const url = staticsMainnetIndexerUrl("market/activity");
-    url.searchParams.set("from", String(Math.floor(now / 1_000) - 24 * 60 * 60));
-    url.searchParams.set("to", String(Math.floor(now / 1_000)));
+    url.searchParams.set("from", String(from));
+    url.searchParams.set("to", String(to));
     url.searchParams.set("pool", deployment.market.poolId);
     const response = await fetch(url, {
       headers: { accept: "application/json" },
@@ -159,7 +161,35 @@ async function loadActivity(deployment: LaunchDeployment, now: number): Promise<
     const activity: unknown = response.ok ? await response.json() : null;
     if (
       !validIndexedActivity(activity) ||
-      activity.deploymentId !== deployment.descriptor.deploymentId
+      activity.deploymentId !== deployment.descriptor.deploymentId ||
+      activity.from !== String(from) ||
+      activity.to !== String(to)
+    ) {
+      return null;
+    }
+    const prices = [
+      activity.openPrice1Per0Wad,
+      activity.highPrice1Per0Wad,
+      activity.lowPrice1Per0Wad,
+      activity.closePrice1Per0Wad,
+    ];
+    const empty = activity.swapCount === 0;
+    if (
+      (empty &&
+        (activity.volume0 !== "0" ||
+          activity.volume1 !== "0" ||
+          activity.zeroForOneCount !== 0 ||
+          activity.oneForZeroCount !== 0 ||
+          prices.some((price) => price !== null) ||
+          activity.lastBlock !== null ||
+          activity.lastTimestamp !== null ||
+          activity.lastLogIndex !== null)) ||
+      (!empty &&
+        (activity.zeroForOneCount + activity.oneForZeroCount !== activity.swapCount ||
+          prices.some((price) => price === null) ||
+          activity.lastBlock === null ||
+          activity.lastTimestamp === null ||
+          activity.lastLogIndex === null))
     ) {
       return null;
     }
