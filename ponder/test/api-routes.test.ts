@@ -48,6 +48,31 @@ describe("indexer API routes", () => {
     const response = await app.request(path);
     expect(response.status).toBe(400);
   });
+
+  it.each([
+    "/market/trades?limit=0",
+    "/market/trades?limit=501",
+    "/market/trades?limit=1.5",
+    "/market/trades?from=nope",
+    "/market/trades?from=2&to=1",
+    "/market/trades?amount0Sign=zero",
+    "/market/trades?pool=0x12",
+  ])("rejects invalid market trade query %s", async (path) => {
+    const response = await app.request(path);
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    "/market/activity",
+    "/market/activity?from=1",
+    "/market/activity?from=nope&to=2",
+    "/market/activity?from=2&to=1",
+    "/market/activity?from=0&to=2678401",
+    `/market/activity?from=1&to=2&pool=0x${"12".repeat(31)}`,
+  ])("rejects invalid market activity query %s", async (path) => {
+    const response = await app.request(path);
+    expect(response.status).toBe(400);
+  });
 });
 
 describe("recoverable Genesis credit query", () => {

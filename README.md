@@ -145,6 +145,64 @@ Coinbase ETH/USD may use its last good value for no more than 15 minutes and the
 `null`. Ponder supplies activity and history; onchain reads remain authoritative for reserves,
 supply, vesting, backing, and spot price.
 
+### Public CoinGecko API
+
+The following HTTPS JSON routes are anonymous and do not accept or require an API key:
+
+- `GET /api/coingecko/v1/supply/total` returns `{"result":"1000000000"}` in decimal token
+  units.
+- `GET /api/coingecko/v1/supply/circulating` returns the public tradable supply as
+  `{"result":"<decimal token units>"}`.
+- `GET /api/coingecko/v1/supply` discloses both supplies, all exclusions, the source block,
+  timestamp, and methodology.
+- `GET /api/coingecko/v1/tickers` returns the canonical STATICS/WETH market as a one-item array.
+- `GET /api/coingecko/v1/historical_trades?ticker_id=<id>` returns completed trades split into
+  `buy` and `sell` arrays.
+- `GET /api/coingecko/v1/status` reports the public market feed's chain, deployment, RPC source
+  block, Ponder indexed block/time, latest indexed trade, and actual index lag.
+
+Circulating supply is the onchain total supply minus unreleased treasury vesting and Operator Vault
+token backing. Canonical AMM pool inventory remains circulating because it is publicly tradable.
+These fundamentals are read at one block and shared with the Overview dashboard. Supply responses
+cache for five minutes and may use the last successful onchain snapshot for at most 30 minutes
+during an RPC interruption.
+
+The ticker ID is the lowercase STATICS contract address, an underscore, and the lowercase WETH
+contract address. Ticker values use decimal token units. `last_price`, `high`, and `low` are
+transaction prices in WETH per STATICS; volumes are rolling single-sided 24-hour STATICS and WETH
+amounts. `bid` and `ask` are fee-inclusive executable prices for matching 0.01 WETH notionals from
+the canonical Uniswap v4 Quoter. Their server result is shared for one minute, so polling never
+starts the multi-level market-depth search.
+
+Historical trades accept optional `type=buy|sell`, `limit` from 1 through 500 (default 200), and
+inclusive `start_time`/`end_time` Unix timestamps in seconds. Results are newest first. A trade ID
+is the safe integer `blockNumber * 1,000,000 + logIndex`, which is deterministic per onchain event.
+The public CoinGecko history limit does not change the authenticated `/api/market/v1/swaps` limit.
+
+Statics is an AMM, so it does not expose a synthetic orderbook. The canonical 2% depth methodology
+uses the Uniswap v4 Quoter in each direction and finds the largest exact-input trade whose
+fee-adjusted execution price remains within 2% of the current pool price. This reflects executable
+concentrated liquidity rather than a Uniswap v2 constant-product approximation. The richer 1%, 2%,
+and 5% depth calculation remains available on the Statics Overview interface and is not performed
+for each CoinGecko ticker request.
+
+All routes allow read-only cross-origin requests. Configure the public reverse proxy or CDN for a
+limit of 60 requests per minute per source IP with a burst of 20. If Cloudflare protects these
+paths, prefer an explicit CoinGecko IP allowlist. Where an IP allowlist is unavailable, skip bot
+challenges only for the exact `/api/coingecko/v1/*` paths when both of these headers are present,
+while retaining the WAF and rate limit:
+
+```text
+X-Requested-With: com.coingecko
+User-Agent: CoinGecko +https://coingecko.com/
+```
+
+Ticker responses cache for one minute with a bounded five-minute last-good fallback. Historical
+responses cache for 15 seconds and status responses for 30 seconds. Missing mandatory market data
+returns `503` rather than publishing an indexer outage as zero activity. A real 24-hour period with
+no trades returns zero volumes and omits high/low; the last all-time indexed trade remains the
+ticker's last price.
+
 ## Connected local environment
 
 The complete local workflow requires a separate clean clone of the public Statics protocol

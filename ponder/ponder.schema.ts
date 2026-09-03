@@ -102,6 +102,9 @@ export const marketSwap = onchainTable(
     sender: table.hex().notNull(),
     amount0: table.bigint().notNull(),
     amount1: table.bigint().notNull(),
+    volume0: table.bigint().notNull(),
+    volume1: table.bigint().notNull(),
+    price1Per0Wad: table.bigint().notNull(),
     sqrtPriceX96: table.bigint().notNull(),
     liquidity: table.bigint().notNull(),
     tick: table.integer().notNull(),
@@ -109,8 +112,17 @@ export const marketSwap = onchainTable(
     transactionHash: table.hex().notNull(),
     blockNumber: table.bigint().notNull(),
     blockTimestamp: table.bigint().notNull(),
+    logIndex: table.integer().notNull(),
   }),
-  (table) => ({ market: index().on(table.deploymentId, table.poolId, table.blockNumber) })
+  (table) => ({
+    market: index().on(
+      table.deploymentId,
+      table.poolId,
+      table.blockTimestamp,
+      table.blockNumber,
+      table.logIndex
+    ),
+  })
 );
 
 export const marketCandle = onchainTable(

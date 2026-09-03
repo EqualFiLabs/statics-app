@@ -29,6 +29,14 @@ export function canonicalPrices(
   };
 }
 
+export function canonicalWethPerStaticsFromPrice1Per0(
+  price1Per0Wad: bigint,
+  staticsIsCurrency0: boolean
+): bigint {
+  if (price1Per0Wad <= 0n) throw new Error("Indexed execution price must be positive.");
+  return staticsIsCurrency0 ? price1Per0Wad : (WAD * WAD) / price1Per0Wad;
+}
+
 export function usdValueWad(amount: bigint, tokenUsdWad: bigint): bigint {
   return (amount * tokenUsdWad) / WAD;
 }

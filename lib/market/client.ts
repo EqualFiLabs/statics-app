@@ -62,8 +62,13 @@ export function isStaticsMarketOverview(value: unknown): value is StaticsMarketO
     unsigned(liquidity.principalStatics) &&
     nullableUnsigned(liquidity.tvlUsdWad) &&
     activity &&
+    typeof activity.available === "boolean" &&
     unsigned(activity.wethVolume) &&
     unsigned(activity.staticsVolume) &&
+    nullableUnsigned(activity.highWethPerStaticsWad) &&
+    nullableUnsigned(activity.lowWethPerStaticsWad) &&
+    nullableUnsigned(activity.lastWethPerStaticsWad) &&
+    (activity.lastTradeAt === null || typeof activity.lastTradeAt === "string") &&
     ["swaps", "buys", "sells", "priceChangeBps"].every(
       (key) => typeof activity[key] === "number" && Number.isSafeInteger(activity[key])
     ) &&
@@ -82,8 +87,8 @@ export function isStaticsMarketOverview(value: unknown): value is StaticsMarketO
   );
 }
 
-export async function loadMarketOverview(signal?: AbortSignal): Promise<StaticsMarketOverview> {
-  const response = await fetch("/api/market/overview", {
+async function loadMarket(path: string, signal?: AbortSignal): Promise<StaticsMarketOverview> {
+  const response = await fetch(path, {
     headers: { accept: "application/json" },
     signal,
   });
@@ -92,4 +97,12 @@ export async function loadMarketOverview(signal?: AbortSignal): Promise<StaticsM
     throw new Error("The market analytics response is unavailable or invalid.");
   }
   return payload;
+}
+
+export function loadMarketOverview(signal?: AbortSignal): Promise<StaticsMarketOverview> {
+  return loadMarket("/api/market/overview", signal);
+}
+
+export function loadMarketSpotOverview(signal?: AbortSignal): Promise<StaticsMarketOverview> {
+  return loadMarket("/api/market/spot", signal);
 }

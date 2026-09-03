@@ -1,4 +1,5 @@
 export const MARKET_CANDLE_SECONDS = 60n;
+export const MARKET_PRICE_SCALE = 10n ** 18n;
 export const MARKET_RESOLUTIONS = [1, 5, 15, 60, 240, 1_440] as const;
 
 export type MarketResolution = (typeof MARKET_RESOLUTIONS)[number];
@@ -20,6 +21,19 @@ export type MarketCandleRow = Readonly<{
 
 export function absoluteAmount(value: bigint): bigint {
   return value < 0n ? -value : value;
+}
+
+export function marketSwapMetrics(amount0: bigint, amount1: bigint) {
+  const volume0 = absoluteAmount(amount0);
+  const volume1 = absoluteAmount(amount1);
+  if (volume0 === 0n || volume1 === 0n) {
+    throw new Error("Canonical market swaps must exchange non-zero token amounts.");
+  }
+  return {
+    volume0,
+    volume1,
+    price1Per0Wad: (volume1 * MARKET_PRICE_SCALE) / volume0,
+  } as const;
 }
 
 export function candleBucket(timestamp: bigint, resolutionMinutes = 1): bigint {

@@ -4,6 +4,7 @@ import {
   absoluteAmount,
   aggregateMarketCandles,
   candleBucket,
+  marketSwapMetrics,
   marketCandleKey,
   readMarketResolution,
   type MarketCandleRow,
@@ -32,6 +33,15 @@ describe("canonical market candles", () => {
     expect(absoluteAmount(-42n)).toBe(42n);
     expect(candleBucket(179n)).toBe(120n);
     expect(marketCandleKey("launch", `0x${"12".repeat(32)}`, 179n)).toContain(":120");
+  });
+
+  it("derives absolute volumes and token1-per-token0 execution price", () => {
+    expect(marketSwapMetrics(2n * 10n ** 18n, -5n * 10n ** 15n)).toEqual({
+      volume0: 2n * 10n ** 18n,
+      volume1: 5n * 10n ** 15n,
+      price1Per0Wad: 25n * 10n ** 14n,
+    });
+    expect(() => marketSwapMetrics(0n, 1n)).toThrow("non-zero token amounts");
   });
 
   it("aggregates exact OHLC, volume, direction counts, and block bounds", () => {

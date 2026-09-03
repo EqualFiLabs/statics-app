@@ -75,6 +75,10 @@ function volumeUsd(data: StaticsMarketOverview): string | null {
   ).toString();
 }
 
+function wethPerStatics(value: string | null): string {
+  return value === null ? "—" : `${formatTokenAmountGrouped(BigInt(value), 18, 10)} WETH`;
+}
+
 export function MarketAnalyticsPanel({
   analytics,
   loading,
@@ -123,6 +127,9 @@ export function MarketAnalyticsPanel({
               ? `${change > 0 ? "+" : ""}${(change / 100).toFixed(2)}% ${t("last24h")}`
               : "—"}
           </small>
+          <small>
+            {analytics ? wethPerStatics(analytics.activity24h.lastWethPerStaticsWad) : "—"}
+          </small>
         </article>
         <article>
           <span>{t("publicMarketCap")}</span>
@@ -138,6 +145,20 @@ export function MarketAnalyticsPanel({
           <span>{t("volume24h")}</span>
           <strong>{analytics ? usdWad(volumeUsd(analytics)) : "—"}</strong>
           <small>{analytics ? t("swapCount", { count: analytics.activity24h.swaps }) : "—"}</small>
+        </article>
+        <article>
+          <span>{t("high24h")}</span>
+          <strong>
+            {analytics ? wethPerStatics(analytics.activity24h.highWethPerStaticsWad) : "—"}
+          </strong>
+          <small>{t("perStatics")}</small>
+        </article>
+        <article>
+          <span>{t("low24h")}</span>
+          <strong>
+            {analytics ? wethPerStatics(analytics.activity24h.lowWethPerStaticsWad) : "—"}
+          </strong>
+          <small>{t("perStatics")}</small>
         </article>
       </div>
 

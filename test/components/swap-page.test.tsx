@@ -19,6 +19,9 @@ vi.mock("@/components/portal/EvmSwapPanel", () => ({
 vi.mock("@/components/genesis/GenesisVaultSwapPanel", () => ({
   GenesisVaultSwapPanel: () => <div>Next available Operator NFT</div>,
 }));
+vi.mock("@/components/swap/TradeMarketStats", () => ({
+  TradeMarketStats: () => <div>Market statistics</div>,
+}));
 
 const statics = getAddress("0x1111111111111111111111111111111111111111");
 const weth = getAddress("0x7777777777777777777777777777777777777777");

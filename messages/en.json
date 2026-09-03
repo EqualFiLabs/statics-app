@@ -166,6 +166,9 @@
     "poolLiquidity": "Pool liquidity",
     "poolPrincipalOnly": "Canonical pool principal",
     "volume24h": "24h volume",
+    "high24h": "24h high",
+    "low24h": "24h low",
+    "perStatics": "per STATICS",
     "swapCount": "{count, plural, one {# swap} other {# swaps}}",
     "supplyDefinitions": "Supply definitions",
     "totalSupply": "Total supply",
@@ -229,7 +232,14 @@
     "launchUnavailable": "The Statics launch is not available on {network} yet.",
     "swapType": "Swap type",
     "token": "Token",
-    "operatorNft": "Operator NFT"
+    "operatorNft": "Operator NFT",
+    "marketStats": "STATICS/WETH market",
+    "lastPrice": "Last price",
+    "high24h": "24h high",
+    "low24h": "24h low",
+    "volume24h": "24h volume",
+    "liquidity": "Liquidity",
+    "marketStatsUnavailable": "Market statistics are temporarily unavailable."
   },
   "operatorVault": {
     "walletRejected": "The wallet request was rejected.",

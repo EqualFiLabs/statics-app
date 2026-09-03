@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gt, gte, lt, lte } from "ponder";
+import { and, asc, count, desc, eq, gt, gte, lt, lte, max, min, sum } from "ponder";
 import { db } from "ponder:api";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getAddress, isAddress } from "viem";
+import { getAddress, isAddress, isHex, size, type Hex } from "viem";
 
 import {
   activeGenesisCredit,
@@ -22,6 +22,43 @@ import { aggregateMarketCandles, readMarketResolution } from "../market";
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim() || "unconfigured";
+
+const MAX_MARKET_RANGE_SECONDS = 31n * 24n * 60n * 60n;
+
+function readUnsignedTimestamp(value: string | undefined): bigint | null | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) return null;
+  return BigInt(value);
+}
+
+function readMarketTradeLimit(value: string | undefined): number {
+  if (value === undefined) return 200;
+  if (!/^\d+$/.test(value)) return 0;
+  const limit = Number(value);
+  return Number.isSafeInteger(limit) && limit >= 1 && limit <= 500 ? limit : 0;
+}
+
+function marketRange(fromValue: string | undefined, toValue: string | undefined) {
+  const from = readUnsignedTimestamp(fromValue);
+  const to = readUnsignedTimestamp(toValue);
+  if (from === null || to === null || (from !== undefined && to !== undefined && to < from)) {
+    return null;
+  }
+  return { from, to } as const;
+}
+
+function readMarketPool(value: string | undefined): Hex | null {
+  return value && isHex(value, { strict: true }) && size(value) === 32 ? value : null;
+}
+
+function marketRangeWhere(poolId: Hex, from: bigint | undefined, to: bigint | undefined) {
+  return and(
+    eq(marketSwap.deploymentId, deploymentId),
+    eq(marketSwap.poolId, poolId),
+    from === undefined ? undefined : gte(marketSwap.blockTimestamp, from),
+    to === undefined ? undefined : lte(marketSwap.blockTimestamp, to)
+  );
+}
 
 app.get("/loans/recoverable", async (context) => {
   const asOfValue = context.req.query("asOf");
@@ -287,6 +324,148 @@ app.get("/market/swaps", async (context) => {
       blockNumber: row.blockNumber.toString(),
       blockTimestamp: row.blockTimestamp.toString(),
     })),
+  });
+});
+
+app.get("/market/trades", async (context) => {
+  const limit = readMarketTradeLimit(context.req.query("limit"));
+  const range = marketRange(context.req.query("from"), context.req.query("to"));
+  const poolId = readMarketPool(context.req.query("pool"));
+  const amount0Sign = context.req.query("amount0Sign");
+  if (
+    limit === 0 ||
+    range === null ||
+    poolId === null ||
+    (amount0Sign !== undefined && amount0Sign !== "positive" && amount0Sign !== "negative")
+  ) {
+    return context.json({ error: "Invalid trade query." }, 400);
+  }
+  const rows = await db
+    .select({
+      poolId: marketSwap.poolId,
+      amount0: marketSwap.amount0,
+      amount1: marketSwap.amount1,
+      volume0: marketSwap.volume0,
+      volume1: marketSwap.volume1,
+      price1Per0Wad: marketSwap.price1Per0Wad,
+      transactionHash: marketSwap.transactionHash,
+      blockNumber: marketSwap.blockNumber,
+      blockTimestamp: marketSwap.blockTimestamp,
+      logIndex: marketSwap.logIndex,
+    })
+    .from(marketSwap)
+    .where(
+      and(
+        marketRangeWhere(poolId, range.from, range.to),
+        amount0Sign === "positive"
+          ? gt(marketSwap.amount0, 0n)
+          : amount0Sign === "negative"
+            ? lt(marketSwap.amount0, 0n)
+            : undefined
+      )
+    )
+    .orderBy(
+      desc(marketSwap.blockTimestamp),
+      desc(marketSwap.blockNumber),
+      desc(marketSwap.logIndex)
+    )
+    .limit(limit);
+  context.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+  return context.json({
+    deploymentId,
+    items: rows.map((row) => ({
+      poolId: row.poolId,
+      amount0: row.amount0.toString(),
+      amount1: row.amount1.toString(),
+      volume0: row.volume0.toString(),
+      volume1: row.volume1.toString(),
+      price1Per0Wad: row.price1Per0Wad.toString(),
+      transactionHash: row.transactionHash,
+      blockNumber: row.blockNumber.toString(),
+      blockTimestamp: row.blockTimestamp.toString(),
+      logIndex: row.logIndex,
+    })),
+  });
+});
+
+app.get("/market/activity", async (context) => {
+  const range = marketRange(context.req.query("from"), context.req.query("to"));
+  const poolId = readMarketPool(context.req.query("pool"));
+  if (
+    range === null ||
+    poolId === null ||
+    range.from === undefined ||
+    range.to === undefined ||
+    range.to - range.from > MAX_MARKET_RANGE_SECONDS
+  ) {
+    return context.json({ error: "Invalid market activity range." }, 400);
+  }
+  const where = marketRangeWhere(poolId, range.from, range.to);
+  const [aggregateRows, firstRows, lastRows, zeroForOneRows, oneForZeroRows] = await Promise.all([
+    db
+      .select({
+        volume0: sum(marketSwap.volume0),
+        volume1: sum(marketSwap.volume1),
+        lowPrice1Per0Wad: min(marketSwap.price1Per0Wad),
+        highPrice1Per0Wad: max(marketSwap.price1Per0Wad),
+        swapCount: count(),
+      })
+      .from(marketSwap)
+      .where(where),
+    db
+      .select({ price1Per0Wad: marketSwap.price1Per0Wad })
+      .from(marketSwap)
+      .where(where)
+      .orderBy(
+        asc(marketSwap.blockTimestamp),
+        asc(marketSwap.blockNumber),
+        asc(marketSwap.logIndex)
+      )
+      .limit(1),
+    db
+      .select({
+        price1Per0Wad: marketSwap.price1Per0Wad,
+        blockNumber: marketSwap.blockNumber,
+        blockTimestamp: marketSwap.blockTimestamp,
+        logIndex: marketSwap.logIndex,
+      })
+      .from(marketSwap)
+      .where(where)
+      .orderBy(
+        desc(marketSwap.blockTimestamp),
+        desc(marketSwap.blockNumber),
+        desc(marketSwap.logIndex)
+      )
+      .limit(1),
+    db
+      .select({ swapCount: count() })
+      .from(marketSwap)
+      .where(and(where, gt(marketSwap.amount0, 0n))),
+    db
+      .select({ swapCount: count() })
+      .from(marketSwap)
+      .where(and(where, lt(marketSwap.amount0, 0n))),
+  ]);
+  const aggregate = aggregateRows[0];
+  const first = firstRows[0];
+  const last = lastRows[0];
+  context.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+  return context.json({
+    deploymentId,
+    from: range.from.toString(),
+    to: range.to.toString(),
+    volume0: String(aggregate?.volume0 ?? 0),
+    volume1: String(aggregate?.volume1 ?? 0),
+    swapCount: Number(aggregate?.swapCount ?? 0),
+    zeroForOneCount: Number(zeroForOneRows[0]?.swapCount ?? 0),
+    oneForZeroCount: Number(oneForZeroRows[0]?.swapCount ?? 0),
+    openPrice1Per0Wad: first?.price1Per0Wad.toString() ?? null,
+    highPrice1Per0Wad: aggregate?.highPrice1Per0Wad?.toString() ?? null,
+    lowPrice1Per0Wad: aggregate?.lowPrice1Per0Wad?.toString() ?? null,
+    closePrice1Per0Wad: last?.price1Per0Wad.toString() ?? null,
+    lastBlock: last?.blockNumber.toString() ?? null,
+    lastTimestamp: last?.blockTimestamp.toString() ?? null,
+    lastLogIndex: last?.logIndex ?? null,
   });
 });
 

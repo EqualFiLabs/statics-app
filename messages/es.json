@@ -166,6 +166,9 @@
     "poolLiquidity": "Liquidez del pool",
     "poolPrincipalOnly": "Principal del pool canónico",
     "volume24h": "Volumen de 24 h",
+    "high24h": "Máximo de 24 h",
+    "low24h": "Mínimo de 24 h",
+    "perStatics": "por STATICS",
     "swapCount": "{count, plural, one {# intercambio} other {# intercambios}}",
     "supplyDefinitions": "Definiciones de suministro",
     "totalSupply": "Suministro total",
@@ -229,7 +232,14 @@
     "launchUnavailable": "El lanzamiento de Statics aún no está disponible en {network}.",
     "swapType": "Tipo de intercambio",
     "token": "Token",
-    "operatorNft": "NFT de Operator"
+    "operatorNft": "NFT de Operator",
+    "marketStats": "Mercado STATICS/WETH",
+    "lastPrice": "Último precio",
+    "high24h": "Máximo de 24 h",
+    "low24h": "Mínimo de 24 h",
+    "volume24h": "Volumen de 24 h",
+    "liquidity": "Liquidez",
+    "marketStatsUnavailable": "Las estadísticas del mercado no están disponibles temporalmente."
   },
   "operatorVault": {
     "walletRejected": "Se rechazó la solicitud de la billetera.",

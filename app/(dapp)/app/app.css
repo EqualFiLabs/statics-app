@@ -1796,6 +1796,49 @@
   min-width: 0;
 }
 
+.trade-market-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-border);
+}
+
+.trade-market-stats > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.7rem;
+  background: var(--app-surface);
+}
+
+.trade-market-stats span,
+.trade-market-stats p {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+
+.trade-market-stats strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.trade-market-stats p {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.65rem;
+  background: var(--app-surface);
+}
+
+@media (max-width: 560px) {
+  .trade-market-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .wallet-network-row {
   display: flex;
   gap: 0.75rem;

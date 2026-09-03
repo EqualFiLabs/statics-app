@@ -37,12 +37,17 @@ const analytics = {
     tvlUsdWad: (2_000_000n * WAD).toString(),
   },
   activity24h: {
+    available: true,
     wethVolume: (40n * WAD).toString(),
     staticsVolume: (10_000_000n * WAD).toString(),
     swaps: 12,
     buys: 7,
     sells: 5,
     priceChangeBps: 125,
+    highWethPerStaticsWad: 4_400_000_000_000n.toString(),
+    lowWethPerStaticsWad: 3_800_000_000_000n.toString(),
+    lastWethPerStaticsWad: 4_000_000_000_000n.toString(),
+    lastTradeAt: "2026-08-31T00:00:00.000Z",
   },
   depth: {
     buyStatics: [100, 200, 500].map((impact) => ({
@@ -77,6 +82,10 @@ describe("market analytics panel", () => {
   it("separates valuation, supply, pool principal, and executable depth", () => {
     render(<MarketAnalyticsPanel analytics={analytics} loading={false} error={false} />);
     expect(screen.getByText("Public market cap")).toBeInTheDocument();
+    expect(screen.getByText("STATICS price")).toBeInTheDocument();
+    expect(screen.getByText("24h volume")).toBeInTheDocument();
+    expect(screen.getByText("24h high")).toBeInTheDocument();
+    expect(screen.getByText("24h low")).toBeInTheDocument();
     expect(screen.getByText("Public distributed supply")).toBeInTheDocument();
     expect(screen.getByText("Strict liquid float")).toBeInTheDocument();
     expect(screen.getByText("Canonical pool principal")).toBeInTheDocument();
