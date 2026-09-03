@@ -222,7 +222,7 @@ describe("Genesis discovery", () => {
       ids: [7n, 16n],
       indexedBlock: 10n,
       chainHead: 11_010n,
-      stale: true,
+      stale: false,
     });
     expect(getLogs).toHaveBeenCalledTimes(3);
     expect(getLogs).toHaveBeenNthCalledWith(
