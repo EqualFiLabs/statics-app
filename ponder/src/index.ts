@@ -16,7 +16,7 @@ import {
   marketSwap,
   v4Position,
 } from "ponder:schema";
-import { absoluteAmount, candleBucket, marketCandleKey } from "./market";
+import { absoluteAmount, candleBucket, marketCandleKey, marketSwapMetrics } from "./market";
 
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim();
 if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
@@ -291,6 +291,7 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
 });
 
 onPoolManager("PoolManager:Swap", async ({ event, context }) => {
+  const metrics = marketSwapMetrics(event.args.amount0, event.args.amount1);
   await context.db.insert(marketSwap).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
     deploymentId,
@@ -298,6 +299,9 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
     sender: getAddress(event.args.sender),
     amount0: event.args.amount0,
     amount1: event.args.amount1,
+    volume0: metrics.volume0,
+    volume1: metrics.volume1,
+    price1Per0Wad: metrics.price1Per0Wad,
     sqrtPriceX96: event.args.sqrtPriceX96,
     liquidity: event.args.liquidity,
     tick: event.args.tick,
@@ -305,6 +309,7 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
     transactionHash: event.transaction.hash,
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
   });
 
   const bucketTimestamp = candleBucket(event.block.timestamp);
