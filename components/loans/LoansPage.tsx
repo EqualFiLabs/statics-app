@@ -28,6 +28,7 @@ import {
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { BorrowUtilizationSlider } from "@/components/loans/BorrowUtilizationSlider";
+import { MorphoLenderPanel } from "@/components/morpho/MorphoLenderPanel";
 import {
   ProtocolSlippageControl,
   useProtocolSlippage,
@@ -1029,6 +1030,8 @@ function LoansRuntime({
           </div>
         </dl>
       </section>
+
+      <MorphoLenderPanel />
 
       {catalog.isFetching && catalog.data && (
         <p className="dollar-warning">Refreshing current loan and wallet state…</p>

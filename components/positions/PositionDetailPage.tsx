@@ -44,6 +44,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { AmountPercentageSlider } from "@/components/protocol/PercentageSlider";
 import { PositionCollateralSummary } from "@/components/positions/PositionCollateralSummary";
 import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
+import { MorphoPositionPanel } from "@/components/morpho/MorphoPositionPanel";
 import { EmptyState, SurfaceEmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import {
   ProtocolActionScope,
@@ -757,6 +758,8 @@ function PositionDetailRuntime({ positionId }: { positionId: bigint }) {
           </button>
         </section>
       </div>
+
+      <MorphoPositionPanel position={position} />
 
       <section className="position-panel position-rewards">
         <RewardSelectionEditor

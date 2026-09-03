@@ -119,6 +119,7 @@ export function protocolQueryScopes(kind: ProtocolActivityKind): readonly Protoc
   if (kind.includes("loan") || kind === "borrow-liquidity") {
     return ["loan", "position", "basket", "liquidity", "wallet"];
   }
+  if (kind.includes("morpho")) return ["loan", "position", "reward", "wallet"];
   if (kind.includes("lp-")) return ["liquidity", "position", "basket", "wallet"];
   if (kind.includes("reward") || kind === "stake-position" || kind === "unstake-position") {
     return ["reward", "position", "wallet"];
