@@ -20,6 +20,7 @@ import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useAppLocale } from "@/i18n/client";
 import { loadMorphoPosition, maximumBorrowShares, maximumRepayAssets } from "@/lib/morpho/morpho";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
+import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 
 function display(value: bigint, decimals = 18, precision = 4): string {
@@ -60,7 +61,11 @@ export function MorphoPositionPanel({ position }: { position: PositionRecord }) 
   const selected = markets.find((market) => market.marketId === selectedId) ?? markets[0];
 
   const snapshot = useQuery({
-    queryKey: ["morpho-position", deployment.deploymentId, position.positionId, selected?.marketId],
+    queryKey: protocolQueryKeys.morphoPosition(
+      deployment.deploymentId,
+      position.positionId,
+      selected?.marketId
+    ),
     enabled: Boolean(publicClient && wallet && selected && walletState.isTargetChain),
     queryFn: () => {
       if (!publicClient || !selected) throw new Error("Morpho market unavailable.");

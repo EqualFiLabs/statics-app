@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 
 const deploymentIdentity = (protocolCommit: string | undefined) => protocolCommit ?? "unconfigured";
 
@@ -11,4 +11,6 @@ export const protocolQueryKeys = {
     ["basket-catalog", deploymentIdentity(protocolCommit), wallet] as const,
   positionCatalog: (protocolCommit: string | undefined, wallet: Address | null) =>
     ["position-catalog", deploymentIdentity(protocolCommit), wallet] as const,
+  morphoPosition: (deploymentId: string, positionId: bigint, marketId: Hex | undefined) =>
+    ["morpho-position", deploymentId, positionId.toString(), marketId] as const,
 };
