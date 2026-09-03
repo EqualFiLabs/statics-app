@@ -33,13 +33,13 @@ reserved `/health`, `/ready`, and `/status` endpoints. Vault ownership is the im
 the indexer does not materialize 5,555 identical rows. The application treats an unavailable or
 lagging indexer as degraded discovery only; transaction state is always re-read onchain. Operator
 wallet discovery reads `/status` as a checkpoint and reconciles no more than 50,000 subsequent
-blocks with one `eth_getLogs` request before checking current `ownerOf` state. Larger gaps retain the
-indexed snapshot as stale instead of replaying deployment history. The trade card accepts next
-inventory only from a checkpoint no more than 100 blocks behind the RPC head and withholds cached
-inventory while that authoritative read is refreshing.
+blocks in sequential 5,000-block `eth_getLogs` requests before checking current `ownerOf` state.
+Larger gaps retain the indexed snapshot as stale instead of replaying deployment history. The trade
+card rechecks every indexed inventory candidate onchain regardless of checkpoint lag, and accepts an
+indexed exhausted state only when the checkpoint is at the RPC head.
 
-Robinhood mainnet polls every two seconds. This keeps ordinary indexer lag inside the application's
-100-block freshness boundary while halving the fixed provider cost of Ponder's latest-block poll.
+Robinhood mainnet polls every two seconds. This keeps ordinary indexer lag within the application's
+bounded recent-reconciliation path while halving the fixed provider cost of Ponder's latest-block poll.
 The `/market/candles` route accepts `1`, `5`, `15`, `60`, `240`, and `1440` minute resolutions and
 an ordered Unix-second range of at most 31 days. It aggregates larger resolutions from reorg-safe
 one-minute rows and never scans historical RPC logs in response to an API request.
@@ -52,6 +52,6 @@ applications and API keys. They must also use separate Nginx rate-limit zones: b
 `/status`. Preserve an upstream `Retry-After` header through both proxy layers.
 
 Alert on sustained provider `429` or proxy `502` responses, an unhealthy `/ready` response, and a
-checkpoint that remains more than 100 blocks behind its configured chain. Logs and alerts may
-include status, chain ID, method names, batch size, and duration, but must not include RPC URLs,
-credentials, calldata, wallet addresses, or complete request bodies.
+checkpoint that remains outside the 50,000-block recent-reconciliation window or whose lag keeps
+growing. Logs and alerts may include status, chain ID, method names, batch size, and duration, but
+must not include RPC URLs, credentials, calldata, wallet addresses, or complete request bodies.
