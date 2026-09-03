@@ -37,6 +37,10 @@ const fixture = {
     buys: 5,
     sells: 4,
     priceChangeBps: -25,
+    highWethPerStaticsWad: "9",
+    lowWethPerStaticsWad: "6",
+    lastWethPerStaticsWad: "7",
+    lastTradeAt: "2026-08-31T00:00:00.000Z",
   },
   depth: {
     buyStatics: [

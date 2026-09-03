@@ -44,6 +44,10 @@ const analytics = {
     buys: 7,
     sells: 5,
     priceChangeBps: 125,
+    highWethPerStaticsWad: 4_400_000_000_000n.toString(),
+    lowWethPerStaticsWad: 3_800_000_000_000n.toString(),
+    lastWethPerStaticsWad: 4_000_000_000_000n.toString(),
+    lastTradeAt: "2026-08-31T00:00:00.000Z",
   },
   depth: {
     buyStatics: [100, 200, 500].map((impact) => ({

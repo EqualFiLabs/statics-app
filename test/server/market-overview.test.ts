@@ -28,11 +28,12 @@ vi.mock("@/lib/server/robinhood-rpc", () => ({
   robinhoodRpcUrl: () => "https://rpc.example",
 }));
 vi.mock("@/lib/server/statics-indexer-url", () => ({
-  staticsMainnetIndexerUrl: () => new URL("https://indexer.example/market/candles"),
+  staticsMainnetIndexerUrl: (path: string) => new URL(`https://indexer.example/${path}`),
 }));
 
 import {
   loadMarketOverview,
+  loadMarketSpotOverview,
   loadMarketSupplySnapshot,
   resetMarketOverviewCacheForTest,
 } from "@/lib/server/market-overview";
@@ -61,10 +62,29 @@ beforeEach(() => {
   mocks.simulateContract.mockReset().mockRejectedValue(new Error("Quoter unavailable"));
   mocks.loadEthUsd.mockReset().mockResolvedValue(null);
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify({ items: [] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })
+    new Response(
+      JSON.stringify({
+        deploymentId: "robinhood-genesis",
+        from: "1",
+        to: "2",
+        volume0: (10_000_000n * WAD).toString(),
+        volume1: (40n * WAD).toString(),
+        swapCount: 12,
+        zeroForOneCount: 5,
+        oneForZeroCount: 7,
+        openPrice1Per0Wad: (250_000n * WAD).toString(),
+        highPrice1Per0Wad: (333_333n * WAD).toString(),
+        lowPrice1Per0Wad: (200_000n * WAD).toString(),
+        closePrice1Per0Wad: (222_222n * WAD).toString(),
+        lastBlock: "122",
+        lastTimestamp: "1788263990",
+        lastLogIndex: 3,
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }
+    )
   );
 });
 
@@ -94,5 +114,21 @@ describe("shared market fundamentals", () => {
     await expect(loadMarketSupplySnapshot(NOW + 30 * 60_000 + 1)).rejects.toThrow(
       "RPC unavailable"
     );
+  });
+
+  it("loads exact indexed activity without running executable depth quotes", async () => {
+    const overview = await loadMarketSpotOverview(NOW);
+    expect(overview.activity24h).toMatchObject({
+      available: true,
+      swaps: 12,
+      buys: 5,
+      sells: 7,
+      highWethPerStaticsWad: ((WAD * WAD) / (200_000n * WAD)).toString(),
+      lowWethPerStaticsWad: ((WAD * WAD) / (333_333n * WAD)).toString(),
+      lastWethPerStaticsWad: ((WAD * WAD) / (222_222n * WAD)).toString(),
+      lastTradeAt: "2026-09-01T11:59:50.000Z",
+    });
+    expect(mocks.simulateContract).not.toHaveBeenCalled();
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain("/market/activity?");
   });
 });

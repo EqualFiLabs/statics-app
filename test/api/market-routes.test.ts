@@ -2,11 +2,15 @@ import { createHash } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ loadOverview: vi.fn() }));
+const mocks = vi.hoisted(() => ({ loadOverview: vi.fn(), loadSpotOverview: vi.fn() }));
 
-vi.mock("@/lib/server/market-overview", () => ({ loadMarketOverview: mocks.loadOverview }));
+vi.mock("@/lib/server/market-overview", () => ({
+  loadMarketOverview: mocks.loadOverview,
+  loadMarketSpotOverview: mocks.loadSpotOverview,
+}));
 
 import { GET as getInternalOverview } from "@/app/api/market/overview/route";
+import { GET as getSpotOverview } from "@/app/api/market/spot/route";
 import { GET as getCandles } from "@/app/api/market/v1/candles/route";
 import { GET as getExternalOverview } from "@/app/api/market/v1/overview/route";
 import { GET as getStatus } from "@/app/api/market/v1/status/route";
@@ -32,6 +36,7 @@ function authorized(url: string): Request {
 beforeEach(() => {
   resetMarketRateLimitsForTest();
   mocks.loadOverview.mockResolvedValue(overview);
+  mocks.loadSpotOverview.mockResolvedValue({ ...overview, depth: null });
   process.env.STATICS_MARKET_API_KEYS = `partner:${createHash("sha256").update(secret).digest("hex")}`;
   process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL = "https://indexer.example/api";
 });
@@ -45,6 +50,9 @@ afterEach(() => {
 describe("market API routes", () => {
   it("keeps the dashboard overview public while authenticating external routes", async () => {
     expect((await getInternalOverview()).status).toBe(200);
+    const spot = await getSpotOverview();
+    expect(spot.status).toBe(200);
+    expect(spot.headers.get("cache-control")).toContain("s-maxage=60");
     expect(
       (await getExternalOverview(new Request("https://app.example/api/market/v1/overview"))).status
     ).toBe(401);
@@ -52,6 +60,7 @@ describe("market API routes", () => {
       (await getExternalOverview(authorized("https://app.example/api/market/v1/overview"))).status
     ).toBe(200);
     expect(mocks.loadOverview).toHaveBeenCalledTimes(2);
+    expect(mocks.loadSpotOverview).toHaveBeenCalledOnce();
   });
 
   it("returns bounded status data", async () => {

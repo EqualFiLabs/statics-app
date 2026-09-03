@@ -7,6 +7,7 @@ import type { LaunchDeployment } from "@/lib/deployments/types";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   canonicalPrices,
+  canonicalWethPerStaticsFromPrice1Per0,
   feeAdjustedImpactBps,
   findMaximumDepthInput,
   priceChangeBps,
@@ -39,16 +40,22 @@ const DEPTH_TTL_MS = 5 * 60_000;
 const DEPTH_MAX_STALE_MS = 15 * 60_000;
 const DEPTH_TARGETS = [100, 200, 500] as const;
 
-type Candle = Readonly<{
-  timestamp: string;
-  openSqrtPriceX96: string;
-  closeSqrtPriceX96: string;
+type IndexedActivity = Readonly<{
+  deploymentId: string;
+  from: string;
+  to: string;
   volume0: string;
   volume1: string;
   zeroForOneCount: number;
   oneForZeroCount: number;
   swapCount: number;
-  lastBlock: string;
+  openPrice1Per0Wad: string | null;
+  highPrice1Per0Wad: string | null;
+  lowPrice1Per0Wad: string | null;
+  closePrice1Per0Wad: string | null;
+  lastBlock: string | null;
+  lastTimestamp: string | null;
+  lastLogIndex: number | null;
 }>;
 
 type Activity = Readonly<{
@@ -58,6 +65,9 @@ type Activity = Readonly<{
   buys: number;
   sells: number;
   priceChangeBps: number;
+  highWethPerStaticsWad: bigint | null;
+  lowWethPerStaticsWad: bigint | null;
+  lastWethPerStaticsWad: bigint | null;
   indexedAt: string | null;
 }>;
 
@@ -88,6 +98,8 @@ type FundamentalsCache = Readonly<{
 
 let snapshotCache: Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null = null;
 let snapshotInFlight: Promise<StaticsMarketOverview> | null = null;
+let spotSnapshotCache: Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null = null;
+let spotSnapshotInFlight: Promise<StaticsMarketOverview> | null = null;
 let fundamentalsCache: FundamentalsCache | null = null;
 let fundamentalsInFlight: Promise<FundamentalsCache> | null = null;
 let depthCache: DepthCache | null = null;
@@ -103,13 +115,30 @@ function mainnetLaunch(): LaunchDeployment {
   return deployment;
 }
 
-function validCandle(value: unknown): value is Candle {
+function nullableUnsigned(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && /^\d+$/.test(value));
+}
+
+function validIndexedActivity(value: unknown): value is IndexedActivity {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
-    ["timestamp", "openSqrtPriceX96", "closeSqrtPriceX96", "volume0", "volume1", "lastBlock"].every(
+    typeof row.deploymentId === "string" &&
+    ["from", "to", "volume0", "volume1"].every(
       (key) => typeof row[key] === "string" && /^\d+$/.test(row[key])
     ) &&
+    [
+      "openPrice1Per0Wad",
+      "highPrice1Per0Wad",
+      "lowPrice1Per0Wad",
+      "closePrice1Per0Wad",
+      "lastBlock",
+      "lastTimestamp",
+    ].every((key) => nullableUnsigned(row[key])) &&
+    (row.lastLogIndex === null ||
+      (typeof row.lastLogIndex === "number" &&
+        Number.isSafeInteger(row.lastLogIndex) &&
+        row.lastLogIndex >= 0)) &&
     ["zeroForOneCount", "oneForZeroCount", "swapCount"].every(
       (key) => typeof row[key] === "number" && Number.isSafeInteger(row[key]) && row[key] >= 0
     )
@@ -118,55 +147,43 @@ function validCandle(value: unknown): value is Candle {
 
 async function loadActivity(deployment: LaunchDeployment, now: number): Promise<Activity | null> {
   try {
-    const url = staticsMainnetIndexerUrl("market/candles");
+    const url = staticsMainnetIndexerUrl("market/activity");
     url.searchParams.set("from", String(Math.floor(now / 1_000) - 24 * 60 * 60));
     url.searchParams.set("to", String(Math.floor(now / 1_000)));
-    url.searchParams.set("resolution", "60");
     const response = await fetch(url, {
       headers: { accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(4_000),
     });
-    const payload: unknown = response.ok ? await response.json() : null;
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-    const rawItems = (payload as { items?: unknown }).items;
-    if (!Array.isArray(rawItems) || !rawItems.every(validCandle)) return null;
-    const items = rawItems;
+    const activity: unknown = response.ok ? await response.json() : null;
+    if (!validIndexedActivity(activity)) return null;
     const staticsIsCurrency0 =
       deployment.market.poolKey.currency0.toLowerCase() ===
       deployment.contracts.statics.toLowerCase();
-    const volume0 = items.reduce((sum, item) => sum + BigInt(item.volume0), 0n);
-    const volume1 = items.reduce((sum, item) => sum + BigInt(item.volume1), 0n);
-    const first = items[0];
-    const last = items.at(-1);
-    let change = 0;
-    if (first && last) {
-      const open = canonicalPrices(
-        BigInt(first.openSqrtPriceX96),
-        deployment.market.poolKey.currency0,
-        deployment.contracts.statics
-      ).wethPerStaticsWad;
-      const close = canonicalPrices(
-        BigInt(last.closeSqrtPriceX96),
-        deployment.market.poolKey.currency0,
-        deployment.contracts.statics
-      ).wethPerStaticsWad;
-      change = priceChangeBps(open, close);
-    }
+    const canonical = (value: string | null) =>
+      value === null
+        ? null
+        : canonicalWethPerStaticsFromPrice1Per0(BigInt(value), staticsIsCurrency0);
+    const open = canonical(activity.openPrice1Per0Wad);
+    const close = canonical(activity.closePrice1Per0Wad);
+    const rawHigh = canonical(activity.highPrice1Per0Wad);
+    const rawLow = canonical(activity.lowPrice1Per0Wad);
+    const high = staticsIsCurrency0 ? rawHigh : rawLow;
+    const low = staticsIsCurrency0 ? rawLow : rawHigh;
     return {
-      wethVolume: staticsIsCurrency0 ? volume1 : volume0,
-      staticsVolume: staticsIsCurrency0 ? volume0 : volume1,
-      swaps: items.reduce((sum, item) => sum + item.swapCount, 0),
-      buys: items.reduce(
-        (sum, item) => sum + (staticsIsCurrency0 ? item.oneForZeroCount : item.zeroForOneCount),
-        0
-      ),
-      sells: items.reduce(
-        (sum, item) => sum + (staticsIsCurrency0 ? item.zeroForOneCount : item.oneForZeroCount),
-        0
-      ),
-      priceChangeBps: change,
-      indexedAt: last ? new Date(Number(BigInt(last.timestamp)) * 1_000).toISOString() : null,
+      wethVolume: BigInt(staticsIsCurrency0 ? activity.volume1 : activity.volume0),
+      staticsVolume: BigInt(staticsIsCurrency0 ? activity.volume0 : activity.volume1),
+      swaps: activity.swapCount,
+      buys: staticsIsCurrency0 ? activity.oneForZeroCount : activity.zeroForOneCount,
+      sells: staticsIsCurrency0 ? activity.zeroForOneCount : activity.oneForZeroCount,
+      priceChangeBps: open === null || close === null ? 0 : priceChangeBps(open, close),
+      highWethPerStaticsWad: high,
+      lowWethPerStaticsWad: low,
+      lastWethPerStaticsWad: close,
+      indexedAt:
+        activity.lastTimestamp === null
+          ? null
+          : new Date(Number(BigInt(activity.lastTimestamp)) * 1_000).toISOString(),
     };
   } catch {
     return null;
@@ -447,7 +464,7 @@ export async function loadMarketSupplySnapshot(now = Date.now()): Promise<Market
   };
 }
 
-async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
+async function refreshOverview(now: number, includeDepth: boolean): Promise<StaticsMarketOverview> {
   const deployment = mainnetLaunch();
   const [fundamentals, ethUsd, activity] = await Promise.all([
     loadFundamentals(now, false),
@@ -469,19 +486,21 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
   const ethUsdWad = ethUsd?.valueWad ?? null;
   const staticsUsdWad =
     ethUsdWad === null ? null : staticsUsdPriceWad(prices.wethPerStaticsWad, ethUsdWad);
-  const depth = await loadDepth(
-    client,
-    deployment,
-    prices,
-    poolStatics,
-    poolWeth,
-    ethUsdWad,
-    staticsUsdWad,
-    blockNumber,
-    now
-  );
-  const partial = !activity || !depth || ethUsdWad === null;
-  const stale = Boolean(ethUsd?.stale || depth?.stale);
+  const depth = includeDepth
+    ? await loadDepth(
+        client,
+        deployment,
+        prices,
+        poolStatics,
+        poolWeth,
+        ethUsdWad,
+        staticsUsdWad,
+        blockNumber,
+        now
+      )
+    : null;
+  const partial = !activity || ethUsdWad === null || (includeDepth && !depth);
+  const stale = Boolean(ethUsd?.stale || (includeDepth && depth?.stale));
   return {
     schemaVersion: 1,
     status: partial ? "partial" : stale ? "stale" : "fresh",
@@ -527,6 +546,10 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
           buys: activity.buys,
           sells: activity.sells,
           priceChangeBps: activity.priceChangeBps,
+          highWethPerStaticsWad: activity.highWethPerStaticsWad?.toString() ?? null,
+          lowWethPerStaticsWad: activity.lowWethPerStaticsWad?.toString() ?? null,
+          lastWethPerStaticsWad: activity.lastWethPerStaticsWad?.toString() ?? null,
+          lastTradeAt: activity.indexedAt,
         }
       : {
           available: false,
@@ -536,6 +559,10 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
           buys: 0,
           sells: 0,
           priceChangeBps: 0,
+          highWethPerStaticsWad: null,
+          lowWethPerStaticsWad: null,
+          lastWethPerStaticsWad: null,
+          lastTradeAt: null,
         },
     depth: depth?.value ?? null,
     freshness: {
@@ -551,7 +578,7 @@ async function refreshOverview(now: number): Promise<StaticsMarketOverview> {
 export async function loadMarketOverview(now = Date.now()): Promise<StaticsMarketOverview> {
   if (snapshotCache && now - snapshotCache.fetchedAt <= SNAPSHOT_TTL_MS) return snapshotCache.value;
   if (!snapshotInFlight) {
-    snapshotInFlight = refreshOverview(now)
+    snapshotInFlight = refreshOverview(now, true)
       .then((value) => {
         snapshotCache = { value, fetchedAt: now };
         return value;
@@ -563,9 +590,28 @@ export async function loadMarketOverview(now = Date.now()): Promise<StaticsMarke
   return snapshotInFlight;
 }
 
+export async function loadMarketSpotOverview(now = Date.now()): Promise<StaticsMarketOverview> {
+  if (spotSnapshotCache && now - spotSnapshotCache.fetchedAt <= SNAPSHOT_TTL_MS) {
+    return spotSnapshotCache.value;
+  }
+  if (!spotSnapshotInFlight) {
+    spotSnapshotInFlight = refreshOverview(now, false)
+      .then((value) => {
+        spotSnapshotCache = { value, fetchedAt: now };
+        return value;
+      })
+      .finally(() => {
+        spotSnapshotInFlight = null;
+      });
+  }
+  return spotSnapshotInFlight;
+}
+
 export function resetMarketOverviewCacheForTest(): void {
   snapshotCache = null;
   snapshotInFlight = null;
+  spotSnapshotCache = null;
+  spotSnapshotInFlight = null;
   fundamentalsCache = null;
   fundamentalsInFlight = null;
   depthCache = null;

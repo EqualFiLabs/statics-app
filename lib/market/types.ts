@@ -49,6 +49,10 @@ export type StaticsMarketOverview = Readonly<{
     buys: number;
     sells: number;
     priceChangeBps: number;
+    highWethPerStaticsWad: string | null;
+    lowWethPerStaticsWad: string | null;
+    lastWethPerStaticsWad: string | null;
+    lastTradeAt: string | null;
   }>;
   depth: Readonly<{
     buyStatics: readonly MarketDepthLevel[];
