@@ -125,7 +125,7 @@ export async function discoverWalletGenesisSnapshot(
       stale = true;
     } else {
       const lag = chainHead - checkpoint.blockNumber;
-      stale = lag > 0n;
+      stale = lag > MAX_GENESIS_RECONCILIATION_BLOCKS;
       if (lag > 0n && lag <= MAX_GENESIS_RECONCILIATION_BLOCKS) {
         try {
           recentIds = await loadIncomingGenesisIds(
@@ -135,6 +135,7 @@ export async function discoverWalletGenesisSnapshot(
             checkpoint.blockNumber + 1n,
             chainHead
           );
+          stale = false;
         } catch {
           // Keep the last indexed snapshot visible. The stale marker tells the
           // UI it may not include transfers that occurred after the checkpoint.

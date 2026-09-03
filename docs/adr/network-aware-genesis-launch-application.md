@@ -94,11 +94,11 @@ The application does not scan all 5,555 IDs as a fallback.
 
 Wallet discovery starts from Ponder's ownership snapshot. When the checkpoint trails by no more than
 50,000 blocks, the application reconciles `Transfer` logs in sequential 5,000-block requests and then
-rechecks every resulting candidate with `ownerOf`. Any lag marks the snapshot stale. If the checkpoint
-is unavailable, is ahead of the RPC, or trails by more than the reconciliation bound, the indexed
-snapshot remains visible but is marked stale; the application never replays the collection's full
-history. A stale empty snapshot is presented as syncing rather than as proof that the wallet owns no
-Operators.
+rechecks every resulting candidate with `ownerOf`. A successful reconciliation makes that snapshot
+current at the observed RPC head. If the checkpoint is unavailable, is ahead of the RPC, trails by
+more than the reconciliation bound, or reconciliation fails, the indexed snapshot remains visible but
+is marked stale; the application never replays the collection's full history. A stale empty snapshot
+is presented as syncing rather than as proof that the wallet owns no Operators.
 
 ### Local fork
 
