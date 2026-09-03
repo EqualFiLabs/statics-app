@@ -93,6 +93,28 @@ export const harvestedFee = onchainTable(
   (table) => ({ asset: index().on(table.deploymentId, table.asset, table.blockNumber) })
 );
 
+export const morphoAction = onchainTable(
+  "morpho_action",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    marketId: table.hex().notNull(),
+    action: table.text().notNull(),
+    caller: table.hex().notNull(),
+    account: table.hex().notNull(),
+    receiver: table.hex(),
+    assets: table.bigint().notNull(),
+    shares: table.bigint().notNull(),
+    collateralAssets: table.bigint().notNull(),
+    transactionHash: table.hex().notNull(),
+    blockNumber: table.bigint().notNull(),
+  }),
+  (table) => ({
+    account: index().on(table.deploymentId, table.account, table.blockNumber),
+    market: index().on(table.deploymentId, table.marketId, table.blockNumber),
+  })
+);
+
 export const marketSwap = onchainTable(
   "market_swap",
   (table) => ({

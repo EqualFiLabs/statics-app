@@ -4,6 +4,7 @@ import { getAddress, parseAbi, zeroAddress, zeroHash } from "viem";
 import {
   genesisActivationRegistryAbi,
   genesisLaunchDistributorAbi,
+  morphoBlueAbi,
   staticsAbi,
   staticsFeeReceiverAbi,
   staticsGenesisAbi,
@@ -45,11 +46,13 @@ const staticsAddress = configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS");
 const positionManagerAddress = configuredAddress("PONDER_POSITION_MANAGER_ADDRESS");
 const poolManagerAddress = configuredAddress("PONDER_POOL_MANAGER_ADDRESS");
 const canonicalPoolId = configuredCanonicalPool(poolManagerAddress);
+const morphoAddress = configuredAddress("PONDER_MORPHO_ADDRESS");
 
 function activeContracts<T extends Record<string, unknown>>(contracts: T): T {
   if (!staticsAddress) delete contracts.Statics;
   if (!positionManagerAddress) delete contracts.PositionManager;
   if (!poolManagerAddress) delete contracts.PoolManager;
+  if (!morphoAddress) delete contracts.Morpho;
   return contracts;
 }
 
@@ -130,6 +133,12 @@ export default createConfig({
       address: poolManagerAddress ?? zeroAddress,
       startBlock: optionalStartBlock("PONDER_POOL_MANAGER_START_BLOCK", deploymentStartBlock),
       filter: { event: "Swap", args: { id: canonicalPoolId ?? zeroHash } },
+    },
+    Morpho: {
+      chain: "active",
+      abi: morphoBlueAbi,
+      address: morphoAddress ?? zeroAddress,
+      startBlock: optionalStartBlock("PONDER_MORPHO_START_BLOCK", deploymentStartBlock),
     },
   } as const),
 });

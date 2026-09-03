@@ -4,15 +4,17 @@ This Ponder service indexes discovery data that the UI cannot enumerate cheaply:
 
 - active loans and current Uniswap v4 PositionManager ownership for the full protocol;
 - circulating Genesis ownership, next available Vault inventory, activation, registration, and effective weight;
-- Genesis and previous-owner launch reward claims; and
-- standalone launch fees harvested into the permanent fee receiver; and
+- Genesis and previous-owner rewards before and after the Diamond handoff;
+- direct Morpho lender, borrower, repayment, and liquidation activity;
+- standalone launch fees harvested into the permanent fee receiver;
 - canonical STATICS/WETH swap history from the selected PoolManager and PoolId; and
 - reorg-safe one-minute STATICS/WETH candles aggregated from those swaps.
 
 The PoolManager source requires `PONDER_CANONICAL_POOL_ID` and filters the indexed `id` topic at
 the RPC boundary. Never run the source without this filter: Robinhood Chain produces many unrelated
 PoolManager swaps per block. Full-protocol Statics and PositionManager sources are omitted entirely
-when their addresses are unset.
+when their addresses are unset. The Morpho source is likewise omitted unless
+`PONDER_MORPHO_ADDRESS` is configured.
 
 Run a separate process and database schema for each network. Every process uses the same
 config, schema, handlers, and API; `PONDER_DEPLOYMENT_ID`, `PONDER_CHAIN_ID`, addresses, start
@@ -26,6 +28,9 @@ npm install
 npm run codegen
 npm run dev
 ```
+
+The current combined testnet values (without RPC or database credentials) are
+checked in at `../deployments/46630-ponder-config.md`.
 
 Point the application at the separate instances with
 `NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL` and `NEXT_PUBLIC_STATICS_INDEXER_URL`. Ponder owns the

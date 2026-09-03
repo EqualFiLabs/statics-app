@@ -47,11 +47,12 @@ function target(
   protocol: ProtocolDeployment | null
 ): DeploymentOption {
   const deploymentId =
-    networkId === "anvil"
+    protocol?.descriptor.deploymentId ??
+    (networkId === "anvil"
       ? LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID
       : networkId === "robinhood"
         ? ROBINHOOD_GENESIS_DEPLOYMENT_ID
-        : ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID;
+        : ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID);
   const capabilities = Array.from(
     new Set<DeploymentCapability>([
       ...commonCapabilities,
@@ -118,7 +119,7 @@ function protocolDeployment(
     return {
       kind: "protocol",
       descriptor: {
-        deploymentId: state.deployment.protocolCommit,
+        deploymentId: state.deployment.deploymentId,
         label: "Statics Protocol",
         network: "Local Anvil",
         chainId,
@@ -135,7 +136,7 @@ function protocolDeployment(
   return {
     kind: "protocol",
     descriptor: {
-      deploymentId: protocol.protocolCommit,
+      deploymentId: protocol.deploymentId,
       label: "Statics Protocol",
       network: chainId === 4_663 ? "Robinhood Chain" : "Robinhood Chain Testnet",
       chainId,

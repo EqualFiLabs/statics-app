@@ -25,4 +25,12 @@ describe("protocol query keys", () => {
       null,
     ]);
   });
+
+  it("keeps Morpho position keys JSON serializable", () => {
+    const marketId = `0x${"12".repeat(32)}` as const;
+    const key = protocolQueryKeys.morphoPosition("testnet-rehearsal", 1n, marketId);
+
+    expect(key).toEqual(["morpho-position", "testnet-rehearsal", "1", marketId]);
+    expect(() => JSON.stringify(key)).not.toThrow();
+  });
 });

@@ -6,10 +6,16 @@ was deployed at it and to the recorded deployment commit. The `source` block
 also names the reachable public Statics commit and canonical deployment artifact
 that preserve the public provenance record without relabeling deployed bytecode.
 
-`46630.json` records the clean-break Genesis release. It binds the unified
-Statics deployment, fixed STATICS token, Genesis NFT/renderer/avatar stack,
-USDG profile, and Robinhood Uniswap v4 dependencies to runtime code hashes read
-from the live chain. The obsolete pre-Genesis manifest remains excluded.
+`46630.json` records the September 2026 full-stack rehearsal. It binds the
+unified Statics deployment, attached Genesis launch, six-asset faucet, USDG
+profile, Robinhood Uniswap v4 dependencies, shared Morpho Blue deployment, and
+both isolated Morpho markets to runtime code hashes read from the live chain.
+The obsolete testnet releases remain excluded.
+
+`robinhood-testnet-genesis.json` separately records the attached launch market
+and its reviewed post-Diamond activation and fee-distribution handoff. The swap
+and Operator acquisition surfaces use this launch-specific manifest while the
+rest of the application uses `46630.json`.
 
 ## Generating one
 
@@ -29,7 +35,8 @@ npm run deployment:manifest -- \
   --pegged-profile 2        # optional, only where USDG is deployed
 ```
 
-The address input is the operator's current deployment record. The public
+The address input may be the full rehearsal record or the legacy deployment
+artifact. The public
 deployment artifact is the reviewed provenance record in the Statics repository;
 it can be either `deployment.md` or a JSON record under `deployments/`. Every
 runtime code hash is read from the chain. Generation also records the STATICS
@@ -37,8 +44,9 @@ token, Genesis collection, Genesis renderer, and Avatar SVG contracts. Runtime
 verification checks their Diamond and renderer bindings, so a stale or
 inconsistent metadata stack fails closed.
 
-The recorded deployment commit remains the identity used by the application for
-cache separation. It may predate a public repository snapshot. The public commit
+Each rehearsal record supplies a unique `deploymentId`, which the application
+uses for cache and activity separation across repeated shots. The recorded
+deployment commit may predate a public repository snapshot; the public commit
 and deployment artifact make that relationship explicit and reviewable.
 
 The command writes `<chainId>.json` and rewrites `manifests.ts` to match this

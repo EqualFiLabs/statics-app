@@ -34,6 +34,10 @@ export type LaunchDeploymentManifest = Readonly<{
       hooks: string;
     }>;
   }>;
+  handoff?: Readonly<{
+    activationConsumer: string;
+    feeDistributor: string;
+  }>;
 }>;
 
 const launchCapabilities = [
@@ -130,6 +134,15 @@ export function parseLaunchDeploymentManifest(
     capabilities: launchCapabilities,
     available: true,
   };
+  const handoff = manifest.handoff
+    ? {
+        activationConsumer: address(
+          manifest.handoff.activationConsumer,
+          "handoff.activationConsumer"
+        ),
+        feeDistributor: address(manifest.handoff.feeDistributor, "handoff.feeDistributor"),
+      }
+    : undefined;
   const analytics = manifest.analytics
     ? {
         treasuryBeneficiary: address(
@@ -166,6 +179,7 @@ export function parseLaunchDeploymentManifest(
     source,
     contracts,
     runtimeCodeHashes,
+    handoff,
     analytics,
     market: { poolId, poolKey },
   };

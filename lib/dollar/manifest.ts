@@ -27,7 +27,7 @@ import type {
 } from "@/lib/dollar/deployment";
 
 /** Bump when the shape changes so an older generator cannot write a newer app. */
-export const MANIFEST_SCHEMA_VERSION = 5;
+export const MANIFEST_SCHEMA_VERSION = 6;
 
 const dollarContractNames: readonly DollarContractName[] = [
   "diamond",
@@ -54,6 +54,7 @@ type RawEntry = Readonly<{ address: string; runtimeCodeHash: string }>;
 
 export type DeploymentManifest = Readonly<{
   schemaVersion: number;
+  deploymentId: string;
   network: string;
   chainId: number;
   deploymentStartBlock: string;
@@ -72,6 +73,7 @@ export type DeploymentManifest = Readonly<{
     collection: RawEntry;
     renderer: RawEntry;
     avatarSvg: RawEntry;
+    activationRegistry: RawEntry;
   }>;
   liquidity?: Readonly<Record<string, RawEntry>> | null;
   pegged?: Readonly<{
@@ -80,6 +82,18 @@ export type DeploymentManifest = Readonly<{
     oracle: RawEntry;
   }> | null;
   faucet?: RawEntry | null;
+  morpho?: Readonly<{
+    protocol: RawEntry;
+    irm: RawEntry;
+    lltv: string;
+    markets: readonly Readonly<{
+      marketId: string;
+      collateral: string;
+      oracle: RawEntry;
+      kind: "statics" | "basket";
+      basketId?: string;
+    }>[];
+  }> | null;
 }>;
 
 function readSource(chainId: number, manifest: DeploymentManifest) {
@@ -149,6 +163,9 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
   if (!Number.isSafeInteger(chainId) || chainId <= 0) {
     fail(chainId, "chainId must be a positive integer.");
   }
+  if (!/^[a-z0-9][a-z0-9._-]{2,127}$/i.test(manifest.deploymentId ?? "")) {
+    fail(chainId, "deploymentId must be a stable public identifier.");
+  }
   if (!/^[a-f0-9]{40}$/i.test(manifest.protocolCommit ?? "")) {
     fail(chainId, "protocolCommit must be a full Git commit.");
   }
@@ -166,15 +183,22 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
   const collection = readEntry(chainId, "genesis.collection", manifest.genesis?.collection);
   const renderer = readEntry(chainId, "genesis.renderer", manifest.genesis?.renderer);
   const avatarSvg = readEntry(chainId, "genesis.avatarSvg", manifest.genesis?.avatarSvg);
+  const activationRegistry = readEntry(
+    chainId,
+    "genesis.activationRegistry",
+    manifest.genesis?.activationRegistry
+  );
   const genesis: NonNullable<DollarDeployment["genesis"]> = {
     token: token.address,
     collection: collection.address,
     renderer: renderer.address,
     avatarSvg: avatarSvg.address,
+    activationRegistry: activationRegistry.address,
     tokenCodeHash: token.runtimeCodeHash,
     collectionCodeHash: collection.runtimeCodeHash,
     rendererCodeHash: renderer.runtimeCodeHash,
     avatarSvgCodeHash: avatarSvg.runtimeCodeHash,
+    activationRegistryCodeHash: activationRegistry.runtimeCodeHash,
   };
 
   let liquidity: DollarDeployment["liquidity"] = null;
@@ -212,8 +236,48 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     faucet = { address: entry.address, runtimeCodeHash: entry.runtimeCodeHash };
   }
 
+  let morpho: DollarDeployment["morpho"] = null;
+  if (manifest.morpho) {
+    const protocol = readEntry(chainId, "morpho.protocol", manifest.morpho.protocol);
+    const irm = readEntry(chainId, "morpho.irm", manifest.morpho.irm);
+    const lltv = readDigits(chainId, "morpho.lltv", manifest.morpho.lltv);
+    const markets = manifest.morpho.markets.map((market, index) => {
+      if (!isHash(market.marketId)) fail(chainId, `morpho.markets.${index}.marketId is invalid.`);
+      if (market.kind !== "statics" && market.kind !== "basket") {
+        fail(chainId, `morpho.markets.${index}.kind is invalid.`);
+      }
+      const oracle = readEntry(chainId, `morpho.markets.${index}.oracle`, market.oracle);
+      let collateral: Address;
+      try {
+        collateral = getAddress(market.collateral);
+      } catch {
+        return fail(chainId, `morpho.markets.${index}.collateral is invalid.`);
+      }
+      return {
+        marketId: market.marketId as Hex,
+        collateral,
+        oracle: oracle.address,
+        oracleCodeHash: oracle.runtimeCodeHash,
+        kind: market.kind,
+        basketId:
+          market.basketId === undefined
+            ? undefined
+            : readDigits(chainId, `morpho.markets.${index}.basketId`, market.basketId),
+      };
+    });
+    morpho = {
+      address: protocol.address,
+      runtimeCodeHash: protocol.runtimeCodeHash,
+      irm: irm.address,
+      irmCodeHash: irm.runtimeCodeHash,
+      lltv,
+      markets,
+    };
+  }
+
   return {
     chainId,
+    deploymentId: manifest.deploymentId,
     deploymentStartBlock: readDigits(
       chainId,
       "deploymentStartBlock",
@@ -230,5 +294,6 @@ export function parseDeploymentManifest(manifest: DeploymentManifest): DollarDep
     liquidity,
     pegged,
     faucet,
+    morpho,
   };
 }

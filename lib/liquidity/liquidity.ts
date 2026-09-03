@@ -490,8 +490,9 @@ async function loadPool(
     slot0,
     decommissioned,
     managerSynced,
-    globalFees,
-    poolFees,
+    defaultFeeRate,
+    poolFeeRate,
+    feeAllocation,
     pending0,
     pending1,
     locked,
@@ -521,14 +522,20 @@ async function loadPool(
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
-      functionName: "feeConfiguration",
+      functionName: "defaultFeeRate",
       blockNumber,
     }),
     publicClient.readContract({
       address: liquidity.contracts.swapFeeHook,
       abi: staticsSwapFeeHookAbi,
-      functionName: "poolFeeConfiguration",
+      functionName: "poolFeeRate",
       args: [configured.poolId],
+      blockNumber,
+    }),
+    publicClient.readContract({
+      address: liquidity.contracts.swapFeeHook,
+      abi: staticsSwapFeeHookAbi,
+      functionName: "basketFeeAllocation",
       blockNumber,
     }),
     publicClient.readContract({
@@ -553,7 +560,8 @@ async function loadPool(
       blockNumber,
     }),
   ]);
-  const effective = poolFees.overridden ? poolFees : { ...globalFees, overridden: false };
+  const inputFeeBps = poolFeeRate.overridden ? poolFeeRate.inputFeeBps : defaultFeeRate[0];
+  const outputFeeBps = poolFeeRate.overridden ? poolFeeRate.outputFeeBps : defaultFeeRate[1];
   return {
     basketId: basket.basketId,
     basketName: basket.name,
@@ -568,16 +576,14 @@ async function loadPool(
     currentTick: slot0[1],
     lpFee: slot0[3],
     hookFees: {
-      inputFeeBps: BigInt(effective.inputFeeBps),
-      outputFeeBps: BigInt(effective.outputFeeBps),
-      lockedLiquidityShareBps: BigInt(effective.lockedLiquidityShareBps),
-      liquidityProviderShareBps: BigInt(effective.liquidityProviderShareBps),
-      basketStakerShareBps: BigInt(effective.basketStakerShareBps),
-      staticsStakerShareBps: BigInt(effective.staticsStakerShareBps),
-      stonkBrokersShareBps: BigInt(effective.stonkBrokersShareBps),
-      indexCreatorShareBps: BigInt(effective.indexCreatorShareBps),
-      treasuryShareBps: BigInt(effective.treasuryShareBps),
-      overridden: effective.overridden,
+      inputFeeBps: BigInt(inputFeeBps),
+      outputFeeBps: BigInt(outputFeeBps),
+      polShareBps: BigInt(feeAllocation.polShareBps),
+      liquidityProviderShareBps: BigInt(feeAllocation.liquidityProviderShareBps),
+      basketStakerShareBps: BigInt(feeAllocation.basketStakerShareBps),
+      staticsStakerShareBps: BigInt(feeAllocation.staticsStakerShareBps),
+      treasuryShareBps: BigInt(feeAllocation.treasuryShareBps),
+      overridden: poolFeeRate.overridden,
     },
     pending0,
     pending1,
