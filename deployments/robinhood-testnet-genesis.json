@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "deploymentId": "robinhood-testnet-genesis",
+  "network": "Robinhood Chain Testnet",
+  "chainId": 46630,
+  "deploymentStartBlock": "110897601",
+  "protocolCommit": "43018f109006aa2c2eef2808adc2aa74dfc9a6d4b",
+  "contracts": {
+    "statics": {
+      "address": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "runtimeCodeHash": "0xe548428d65bf2a8cee29a63e8dfaaeda0b4d44294d80f67f7626e1da8b89be69"
+    },
+    "genesis": {
+      "address": "0x6c9197347161FC140a209175849d443FeaAF509c",
+      "runtimeCodeHash": "0xec224f66ecfa265dd306c54b2b683ba96395cd8f822dd2d51f84a2bac9d62afa"
+    },
+    "vault": {
+      "address": "0x8D3a32ddF8bD529EC847457eC79620D2870FFdc4",
+      "runtimeCodeHash": "0x34641b08c85d3dc3e9b94551cb3b7b8d3a664dd773504849aec07499db5bb660"
+    },
+    "activationRegistry": {
+      "address": "0x8cE462A801726FA030e06264f3423Be2Ae8d6414",
+      "runtimeCodeHash": "0xc4bf24efb6c99c95060186a30200b7ee952604d77b917d0dae2cde87e6419e82"
+    },
+    "feeReceiver": {
+      "address": "0x2410284D5Af2Ee9DC92e4f62f6ec99C8445C6a2B",
+      "runtimeCodeHash": "0xed7b3cb5a9b71c24015ba251673d906668135f5dfd69b9d76ec71701b9b077fa"
+    },
+    "launchDistributor": {
+      "address": "0x9dac0e56b1cB829F1012f3A3CE8488451Adb76A4",
+      "runtimeCodeHash": "0x7c8d95a041b0ca08b981941c708497f2ebd88029b96f9f0f35c26998083cccdb"
+    },
+    "weth": {
+      "address": "0x33e4191705c386532ba27cBF171Db86919200B94",
+      "runtimeCodeHash": "0x55f8ac53c64450f01880d8249fc5cb0c69c064e4bcb097ea80a02fff40485a7c"
+    },
+    "poolManager": {
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "runtimeCodeHash": "0xbd3881180b547f5fe817545743cfb4343e96b1bc6640dcd70c106b0066e95626"
+    },
+    "stateView": {
+      "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "runtimeCodeHash": "0x7d9c591e0956fd89d98feb4ffcfe8bf1f7a62bd485edd979fa21d104b49878a6"
+    },
+    "quoter": {
+      "address": "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
+      "runtimeCodeHash": "0xd707b1da8cb165e5ea35a3b4450d971eb562ec171e23492aa117036b78a868f6"
+    },
+    "universalRouter": {
+      "address": "0x8876789976dEcBfCbBbe364623C63652db8C0904",
+      "runtimeCodeHash": "0xfdd90802f39ce5fc8bac4c2f1b3ac7bac530fd17ff46b0630f1bd00f1e14082f"
+    },
+    "permit2": {
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "runtimeCodeHash": "0x0117e0ed818bc3f2a8729ffc336c837e63e965f04b473047b39b35ad86aac259"
+    }
+  },
+  "market": {
+    "poolId": "0xefa89ba41bec4594215ce1f1fab70ee2685bb415ffc7edf5d543c1f9bf6ae95d",
+    "poolKey": {
+      "currency0": "0x33e4191705c386532ba27cBF171Db86919200B94",
+      "currency1": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "fee": 15000,
+      "tickSpacing": 100,
+      "hooks": "0x751099991d86c43d8DB540f1e5757A629663e544"
+    }
+  },
+  "handoff": {
+    "activationConsumer": "0xA37016d1d5daA516c2E9cE32d335048D11FeA395",
+    "feeDistributor": "0xA37016d1d5daA516c2E9cE32d335048D11FeA395"
+  }
+}

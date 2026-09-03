@@ -7,6 +7,7 @@ import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest
 import {
   LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
   ROBINHOOD_GENESIS_DEPLOYMENT_ID,
+  ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID,
   defaultNetworkId,
   deploymentRegistry,
   hasCapability,
@@ -109,7 +110,7 @@ describe("deployment registry", () => {
     ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
-  it("publishes the reviewed mainnet Genesis launch manifest", () => {
+  it("publishes the reviewed mainnet and testnet Genesis launch manifests", () => {
     const [mainnet, testnet] = deploymentRegistry({ NEXT_PUBLIC_APP_ENV: "production" });
     expect(mainnet?.descriptor.available).toBe(true);
     expect(mainnet?.descriptor.chainId).toBe(4_663);
@@ -124,6 +125,14 @@ describe("deployment registry", () => {
     expect(hasCapability(mainnet!.descriptor, "genesis-launch-rewards")).toBe(true);
     expect(testnet?.descriptor.chainId).toBe(46_630);
     expect(testnet?.protocol).not.toBeNull();
+    expect(testnet?.launch?.descriptor.deploymentId).toBe(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID);
+    expect(testnet?.launch?.market.poolId).toBe(
+      "0xefa89ba41bec4594215ce1f1fab70ee2685bb415ffc7edf5d543c1f9bf6ae95d"
+    );
+    expect(testnet?.launch?.handoff?.activationConsumer).toBe(
+      getAddress("0xA37016d1d5daA516c2E9cE32d335048D11FeA395")
+    );
+    expect(hasCapability(testnet!.descriptor, "canonical-statics-market")).toBe(true);
     expect(hasCapability(testnet!.descriptor, "faucet")).toBe(true);
   });
 

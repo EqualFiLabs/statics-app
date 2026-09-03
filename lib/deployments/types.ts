@@ -63,6 +63,10 @@ export type LaunchDeployment = Readonly<{
   source: "checked-in-manifest" | "development-fixture";
   contracts: Readonly<Record<LaunchContractName, Address>>;
   runtimeCodeHashes: Readonly<Partial<Record<LaunchContractName, Hex>>>;
+  handoff?: Readonly<{
+    activationConsumer: Address;
+    feeDistributor: Address;
+  }>;
   analytics?: Readonly<{
     treasuryBeneficiary: Address;
     treasuryVesting: Readonly<{ address: Address; runtimeCodeHash: Hex }>;

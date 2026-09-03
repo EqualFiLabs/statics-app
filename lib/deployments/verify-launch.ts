@@ -192,7 +192,7 @@ async function verifyLaunchBindings(
   requireAddress(registryGenesis, deployment.contracts.genesis, "Registry Genesis binding");
   requireAddress(
     registryConsumer,
-    deployment.contracts.launchDistributor,
+    deployment.handoff?.activationConsumer ?? deployment.contracts.launchDistributor,
     "Registry consumer binding"
   );
   requireAddress(receiverStatics, deployment.contracts.statics, "Fee Receiver STATICS binding");
@@ -207,7 +207,7 @@ async function verifyLaunchBindings(
   }
   requireAddress(
     receiverDistributor,
-    deployment.contracts.launchDistributor,
+    deployment.handoff?.feeDistributor ?? deployment.contracts.launchDistributor,
     "Fee Receiver distributor binding"
   );
   requireAddress(
@@ -264,7 +264,13 @@ export function verifyLaunchDeploymentCached(
     runtimeVerificationCache.set(runtimeKey, runtime);
   }
 
-  const bindingKey = `${deployment.descriptor.deploymentId}:${deployment.descriptor.chainId}:${deployment.protocolCommit}`;
+  const bindingKey = [
+    deployment.descriptor.deploymentId,
+    deployment.descriptor.chainId,
+    deployment.protocolCommit,
+    deployment.handoff?.activationConsumer ?? deployment.contracts.launchDistributor,
+    deployment.handoff?.feeDistributor ?? deployment.contracts.launchDistributor,
+  ].join(":");
   const existingBindings = bindingVerificationCache.get(bindingKey);
   if (existingBindings) return runtime.then(() => existingBindings);
   const bindings = runtime

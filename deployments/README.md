@@ -12,6 +12,11 @@ profile, Robinhood Uniswap v4 dependencies, shared Morpho Blue deployment, and
 both isolated Morpho markets to runtime code hashes read from the live chain.
 The obsolete testnet releases remain excluded.
 
+`robinhood-testnet-genesis.json` separately records the attached launch market
+and its reviewed post-Diamond activation and fee-distribution handoff. The swap
+and Operator acquisition surfaces use this launch-specific manifest while the
+rest of the application uses `46630.json`.
+
 ## Generating one
 
 Manifests are generated from a live deployment, then committed:

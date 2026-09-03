@@ -52,7 +52,10 @@ const deployment = {
   },
 } as const satisfies LaunchDeployment;
 
-function client(registryConsumer = contracts.launchDistributor): PublicClient {
+function client(
+  registryConsumer = contracts.launchDistributor,
+  receiverDistributor = contracts.launchDistributor
+): PublicClient {
   return {
     chain: { id: 4_663 },
     readContract: vi.fn(async ({ address: target, functionName }) => {
@@ -70,7 +73,7 @@ function client(registryConsumer = contracts.launchDistributor): PublicClient {
         [`${contracts.feeReceiver.toLowerCase()}:numeraire`]: contracts.weth,
         [`${contracts.feeReceiver.toLowerCase()}:poolInitializer`]: poolInitializer,
         [`${contracts.feeReceiver.toLowerCase()}:poolId`]: poolId,
-        [`${contracts.feeReceiver.toLowerCase()}:activeDistributor`]: contracts.launchDistributor,
+        [`${contracts.feeReceiver.toLowerCase()}:activeDistributor`]: receiverDistributor,
         [`${contracts.launchDistributor.toLowerCase()}:feeReceiver`]: contracts.feeReceiver,
         [`${contracts.launchDistributor.toLowerCase()}:genesis`]: contracts.genesis,
         [`${contracts.launchDistributor.toLowerCase()}:activationRegistry`]:
@@ -94,6 +97,18 @@ describe("standalone launch verification", () => {
     await expect(verifyLaunchDeployment(client(address("f")), deployment)).rejects.toThrow(
       "Registry consumer binding"
     );
+  });
+
+  it("accepts a reviewed post-Diamond handoff", async () => {
+    const diamond = address("e");
+    const handedOff = {
+      ...deployment,
+      handoff: { activationConsumer: diamond, feeDistributor: diamond },
+    } satisfies LaunchDeployment;
+
+    await expect(
+      verifyLaunchDeployment(client(diamond, diamond), handedOff)
+    ).resolves.toBeUndefined();
   });
 
   it("keeps successful runtime verification cached while retrying failed bindings", async () => {

@@ -139,7 +139,9 @@ test.describe("Dollar DApp foundation", () => {
 
     await navigateDapp(page, "/app/swap");
     await expect(page).toHaveURL(/\/app\/swap$/);
-    await expect(page.getByRole("heading", { name: "Launch market not deployed" })).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Swap type" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Token" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Operator NFT" })).toBeVisible();
 
     await navigateDapp(page, "/app/dollar");
     await expect(page).toHaveURL(/\/app\/dollar$/);
