@@ -166,6 +166,9 @@
     "poolLiquidity": "池流动性",
     "poolPrincipalOnly": "规范池本金",
     "volume24h": "24 小时交易量",
+    "high24h": "24 小时最高价",
+    "low24h": "24 小时最低价",
+    "perStatics": "每 STATICS",
     "swapCount": "{count} 笔兑换",
     "supplyDefinitions": "供应量定义",
     "totalSupply": "总供应量",
@@ -229,7 +232,14 @@
     "launchUnavailable": "Statics 启动尚未在 {network} 上开放。",
     "swapType": "兑换类型",
     "token": "代币",
-    "operatorNft": "Operator NFT"
+    "operatorNft": "Operator NFT",
+    "marketStats": "STATICS/WETH 市场",
+    "lastPrice": "最新成交价",
+    "high24h": "24 小时最高价",
+    "low24h": "24 小时最低价",
+    "volume24h": "24 小时交易量",
+    "liquidity": "流动性",
+    "marketStatsUnavailable": "市场统计数据暂时不可用。"
   },
   "operatorVault": {
     "walletRejected": "钱包请求已被拒绝。",

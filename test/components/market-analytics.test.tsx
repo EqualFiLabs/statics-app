@@ -84,6 +84,8 @@ describe("market analytics panel", () => {
     expect(screen.getByText("Public market cap")).toBeInTheDocument();
     expect(screen.getByText("STATICS price")).toBeInTheDocument();
     expect(screen.getByText("24h volume")).toBeInTheDocument();
+    expect(screen.getByText("24h high")).toBeInTheDocument();
+    expect(screen.getByText("24h low")).toBeInTheDocument();
     expect(screen.getByText("Public distributed supply")).toBeInTheDocument();
     expect(screen.getByText("Strict liquid float")).toBeInTheDocument();
     expect(screen.getByText("Canonical pool principal")).toBeInTheDocument();
