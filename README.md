@@ -145,6 +145,36 @@ Coinbase ETH/USD may use its last good value for no more than 15 minutes and the
 `null`. Ponder supplies activity and history; onchain reads remain authoritative for reserves,
 supply, vesting, backing, and spot price.
 
+### Public CoinGecko API
+
+The following HTTPS JSON routes are anonymous and do not accept or require an API key:
+
+- `GET /api/coingecko/v1/supply/total` returns `{"result":"1000000000"}` in decimal token
+  units.
+- `GET /api/coingecko/v1/supply/circulating` returns the public tradable supply as
+  `{"result":"<decimal token units>"}`.
+- `GET /api/coingecko/v1/supply` discloses both supplies, all exclusions, the source block,
+  timestamp, and methodology.
+
+Circulating supply is the onchain total supply minus unreleased treasury vesting and Operator Vault
+token backing. Canonical AMM pool inventory remains circulating because it is publicly tradable.
+These fundamentals are read at one block and shared with the Overview dashboard. Supply responses
+cache for five minutes and may use the last successful onchain snapshot for at most 30 minutes
+during an RPC interruption.
+
+All routes allow read-only cross-origin requests. Configure the public reverse proxy or CDN for a
+limit of 60 requests per minute per source IP with a burst of 20. If Cloudflare protects these
+paths, prefer an explicit CoinGecko IP allowlist. Where an IP allowlist is unavailable, skip bot
+challenges only for the exact `/api/coingecko/v1/*` paths when both of these headers are present,
+while retaining the WAF and rate limit:
+
+```text
+X-Requested-With: com.coingecko
+User-Agent: CoinGecko +https://coingecko.com/
+```
+
+The market-data endpoints are documented with the stacked CoinGecko market integration.
+
 ## Connected local environment
 
 The complete local workflow requires a separate clean clone of the public Statics protocol
