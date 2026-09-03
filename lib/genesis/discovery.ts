@@ -11,10 +11,8 @@ import {
 } from "@/lib/indexer/statics";
 import type { IndexedLaunchGenesis } from "@/lib/indexer/statics";
 
-const GENESIS_SUPPLY = 5_555n;
-const DISCOVERY_BATCH = 64n;
-const DISCOVERY_LOG_CHUNK = 50_000n;
-const MAX_INDEXER_BLOCK_LAG = 100n;
+const DISCOVERY_LOG_CHUNK = 5_000n;
+export const MAX_GENESIS_RECONCILIATION_BLOCKS = 50_000n;
 
 const genesisTransferEvent = staticsGenesisAbi.find(
   (entry) => entry.type === "event" && entry.name === "Transfer"
@@ -28,6 +26,9 @@ async function loadIncomingGenesisIds(
   latestBlock: bigint
 ): Promise<bigint[]> {
   if (fromBlock > latestBlock) return [];
+  if (latestBlock - fromBlock + 1n > MAX_GENESIS_RECONCILIATION_BLOCKS) {
+    throw new Error("The Operator reconciliation range exceeds its browser RPC bound.");
+  }
   const ids = new Set<string>();
   for (let start = fromBlock; start <= latestBlock; start += DISCOVERY_LOG_CHUNK) {
     const end = start + DISCOVERY_LOG_CHUNK - 1n;
@@ -50,51 +51,33 @@ export async function discoverNextAvailableGenesisId(
   deployment: LaunchDeployment
 ): Promise<bigint | null> {
   const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
-  if (indexerUrl) {
-    try {
-      const indexed = await loadNextAvailableGenesisId(
-        deployment.descriptor.deploymentId,
-        indexerUrl
-      );
-      // A null or stale indexer response must never make the UI claim that the
-      // vault is exhausted. Verify the candidate and fall through to the
-      // authoritative scan when the snapshot cannot prove availability.
-      if (
-        indexed !== null &&
-        (await publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "isVaultInventory",
-          args: [indexed],
-        }))
-      ) {
-        return indexed;
-      }
-    } catch {
-      // A degraded indexer is a discovery optimization only. The onchain scan
-      // below remains the correctness fallback.
+  if (!indexerUrl) throw new Error("Operator inventory indexing is unavailable.");
+  const [indexed, checkpoint, chainHead] = await Promise.all([
+    loadNextAvailableGenesisId(deployment.descriptor.deploymentId, indexerUrl),
+    loadIndexerCheckpoint(
+      deployment.descriptor.chainId,
+      deployment.descriptor.deploymentId,
+      indexerUrl
+    ),
+    publicClient.getBlockNumber(),
+  ]);
+  if (checkpoint.blockNumber > chainHead) {
+    throw new Error("Operator inventory data is still syncing.");
+  }
+  if (indexed === null) {
+    if (checkpoint.blockNumber < chainHead) {
+      throw new Error("Operator inventory data is still syncing.");
     }
+    return null;
   }
-  for (let start = 1n; start <= GENESIS_SUPPLY; start += DISCOVERY_BATCH) {
-    const end = start + DISCOVERY_BATCH - 1n;
-    const ids = Array.from(
-      { length: Number((end < GENESIS_SUPPLY ? end : GENESIS_SUPPLY) - start + 1n) },
-      (_, index) => start + BigInt(index)
-    );
-    const results = await Promise.all(
-      ids.map((id) =>
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: staticsGenesisVaultAbi,
-          functionName: "isVaultInventory",
-          args: [id],
-        })
-      )
-    );
-    const availableIndex = results.findIndex(Boolean);
-    if (availableIndex >= 0) return ids[availableIndex]!;
-  }
-  return null;
+  const available = await publicClient.readContract({
+    address: deployment.contracts.vault,
+    abi: staticsGenesisVaultAbi,
+    functionName: "isVaultInventory",
+    args: [indexed],
+  });
+  if (!available) throw new Error("The indexed Operator inventory changed. Try again shortly.");
+  return indexed;
 }
 
 export type GenesisDiscoverySnapshot = Readonly<{
@@ -115,75 +98,67 @@ export async function discoverWalletGenesisSnapshot(
   deployment: LaunchDeployment,
   owner: Address
 ): Promise<GenesisDiscoverySnapshot> {
-  let ids: bigint[] | null = null;
-  let indexed: readonly IndexedLaunchGenesis[] = [];
+  let recentIds: readonly bigint[] = [];
   let indexedBlock: bigint | null = null;
-  let chainHead: bigint | null = null;
-  let stale = false;
   const indexerUrl = configuredIndexerUrlForDeployment(deployment.descriptor.deploymentId);
-  if (indexerUrl) {
-    try {
-      const checkpoint = await loadIndexerCheckpoint(
-        deployment.descriptor.chainId,
-        deployment.descriptor.deploymentId,
-        indexerUrl
-      );
-      chainHead = await publicClient.getBlockNumber();
-      indexedBlock = checkpoint.blockNumber;
-      stale =
-        checkpoint.blockNumber > chainHead ||
-        chainHead - checkpoint.blockNumber > MAX_INDEXER_BLOCK_LAG;
-      if (stale) throw new Error("The Statics indexer is too far behind the selected chain.");
-      const [indexedItems, recentIds] = await Promise.all([
-        loadWalletLaunchGenesisItems(owner, deployment.descriptor.deploymentId, indexerUrl),
-        loadIncomingGenesisIds(
-          publicClient,
-          deployment,
-          owner,
-          checkpoint.blockNumber + 1n,
-          chainHead
-        ),
-      ]);
-      indexed = indexedItems;
-      ids = [...new Set([...indexedItems.map((item) => item.id), ...recentIds].map(String))].map(
-        BigInt
-      );
-    } catch {
-      // An unavailable, invalid, or stale indexer falls through to chain history.
-      if (!stale) {
-        // The onchain fallback is authoritative when the indexer failed for a
-        // reason other than freshness. Do not retain partial indexer metadata
-        // or report that authoritative result as stale.
-        indexed = [];
-        indexedBlock = null;
+  if (!indexerUrl) throw new Error("Operator ownership indexing is unavailable.");
+
+  const [indexedResult, checkpointResult, chainHeadResult] = await Promise.allSettled([
+    loadWalletLaunchGenesisItems(owner, deployment.descriptor.deploymentId, indexerUrl),
+    loadIndexerCheckpoint(
+      deployment.descriptor.chainId,
+      deployment.descriptor.deploymentId,
+      indexerUrl
+    ),
+    publicClient.getBlockNumber(),
+  ]);
+  if (indexedResult.status === "rejected") throw indexedResult.reason;
+  if (chainHeadResult.status === "rejected") throw chainHeadResult.reason;
+
+  const indexed = indexedResult.value;
+  const chainHead = chainHeadResult.value;
+  let stale = checkpointResult.status === "rejected";
+  if (checkpointResult.status === "fulfilled") {
+    const checkpoint = checkpointResult.value;
+    indexedBlock = checkpoint.blockNumber;
+    if (checkpoint.blockNumber > chainHead) {
+      stale = true;
+    } else {
+      const lag = chainHead - checkpoint.blockNumber;
+      stale = lag > 0n;
+      if (lag > 0n && lag <= MAX_GENESIS_RECONCILIATION_BLOCKS) {
+        try {
+          recentIds = await loadIncomingGenesisIds(
+            publicClient,
+            deployment,
+            owner,
+            checkpoint.blockNumber + 1n,
+            chainHead
+          );
+        } catch {
+          // Keep the last indexed snapshot visible. The stale marker tells the
+          // UI it may not include transfers that occurred after the checkpoint.
+          stale = true;
+        }
       }
     }
   }
-  if (ids === null) {
-    chainHead ??= await publicClient.getBlockNumber();
-    ids = await loadIncomingGenesisIds(
-      publicClient,
-      deployment,
-      owner,
-      deployment.deploymentStartBlock,
-      chainHead
-    );
-  }
+
+  const ids = [...new Set([...indexed.map((item) => item.id), ...recentIds].map(String))].map(
+    BigInt
+  );
   const current = await Promise.all(
     ids.map((id) =>
-      publicClient
-        .readContract({
-          address: deployment.contracts.genesis,
-          abi: staticsGenesisAbi,
-          functionName: "ownerOf",
-          args: [id],
-        })
-        .catch(() => null)
+      publicClient.readContract({
+        address: deployment.contracts.genesis,
+        abi: staticsGenesisAbi,
+        functionName: "ownerOf",
+        args: [id],
+      })
     )
   );
   const ownedIds = ids.filter(
-    (_, index) =>
-      current[index] !== null && String(current[index]).toLowerCase() === owner.toLowerCase()
+    (_, index) => String(current[index]).toLowerCase() === owner.toLowerCase()
   );
   const ownedSet = new Set(ownedIds.map(String));
   return {

@@ -87,18 +87,18 @@ ownership as the implicit initial state and does not expand the ERC-2309 `Consec
 
 Ponder stores circulating ownership changes plus activation, registration, fee, and reward events.
 A transfer back to the Vault removes the circulating ownership row. The next available token ID is
-derived from the bounded collection and circulating exceptions. It is authoritative only while the
-Ponder checkpoint is within 100 blocks of the RPC head, and the returned candidate is rechecked
-against `isVaultInventory(tokenId)` before acquisition. A fresh `null` response means the Vault is
-exhausted. An unavailable or stale response means inventory is syncing and must never be presented
-as exhaustion. The application does not scan all 5,555 IDs as a fallback.
+derived from the bounded collection and circulating exceptions, then rechecked against
+`isVaultInventory(tokenId)` before acquisition regardless of checkpoint lag. A `null` response means
+the Vault is exhausted only when the checkpoint is at the RPC head; otherwise inventory is syncing.
+The application does not scan all 5,555 IDs as a fallback.
 
-Wallet discovery starts from Ponder's ownership snapshot. When its checkpoint is healthy enough to
-reconcile, the application requests `Transfer` logs once for at most the next 50,000 blocks and then
-rechecks every resulting candidate with `ownerOf`. If the checkpoint is unavailable, is ahead of the
-RPC, or trails by more than 50,000 blocks, the indexed snapshot remains visible but is marked stale;
-the application does not replay the collection's full history. A stale empty snapshot is presented
-as syncing rather than as proof that the wallet owns no Operators.
+Wallet discovery starts from Ponder's ownership snapshot. When the checkpoint trails by no more than
+50,000 blocks, the application reconciles `Transfer` logs in sequential 5,000-block requests and then
+rechecks every resulting candidate with `ownerOf`. Any lag marks the snapshot stale. If the checkpoint
+is unavailable, is ahead of the RPC, or trails by more than the reconciliation bound, the indexed
+snapshot remains visible but is marked stale; the application never replays the collection's full
+history. A stale empty snapshot is presented as syncing rather than as proof that the wallet owns no
+Operators.
 
 ### Local fork
 
