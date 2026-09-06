@@ -1,10 +1,54 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { PlaceholderLink } from "./PlaceholderLink";
 import { SiteHeader } from "./SiteHeader";
 import { UtcClock } from "./UtcClock";
+
+const volatilityCopy = {
+  en: {
+    heroDescription:
+      "Every basket is a fixed bundle, always redeemable for exactly what is inside it. Markets move. Prices diverge. Arbitrage brings them back together. Every trade feeds permanent liquidity and real rewards.",
+    basketsDescription:
+      "Bundle 1 to 16 assets into one token. Trade it as a single position or redeem it for exactly what is inside. Fixed composition creates a hard anchor for arbitrage.",
+    deepLiquidity: "Volatility builds liquidity",
+    deepLiquidityDescription:
+      "Prices move. Statics markets move with them. When prices diverge, arbitrageurs trade the gap. Those swaps generate fees, and a share of every swap becomes permanent protocol-owned liquidity. More volatility can mean more arbitrage, more volume, and deeper markets.",
+    stakeEarn: "Earn from market activity",
+    stakeEarnDescription:
+      "Volatility creates trades. Trades generate fees. Stake and opt into up to 12 reward assets. Rewards are swap fees paid in kind: real revenue, not emissions.",
+    tagline: "Markets move. Statics compounds.",
+  },
+  es: {
+    heroDescription:
+      "Cada cesta es un paquete fijo, siempre rescatable por exactamente lo que contiene. Los mercados se mueven. Los precios divergen. El arbitraje vuelve a alinearlos. Cada operación alimenta liquidez permanente y recompensas reales.",
+    basketsDescription:
+      "Agrupa entre 1 y 16 activos en un solo token. Opéralo como una única posición o rescátalo por exactamente lo que contiene. La composición fija crea un ancla sólida para el arbitraje.",
+    deepLiquidity: "La volatilidad construye liquidez",
+    deepLiquidityDescription:
+      "Los precios se mueven. Los mercados de Statics se mueven con ellos. Cuando los precios divergen, los arbitrajistas operan la diferencia. Esas operaciones generan comisiones, y una parte de cada intercambio se convierte en liquidez permanente propiedad del protocolo. Más volatilidad puede significar más arbitraje, más volumen y mercados más profundos.",
+    stakeEarn: "Gana con la actividad del mercado",
+    stakeEarnDescription:
+      "La volatilidad crea operaciones. Las operaciones generan comisiones. Haz staking y opta por hasta 12 activos de recompensa. Las recompensas son comisiones de intercambio pagadas en especie: ingresos reales, no emisiones.",
+    tagline: "Los mercados se mueven. Statics acumula.",
+  },
+  "zh-CN": {
+    heroDescription:
+      "每个篮子都是固定资产组合，并且始终可以精确赎回其中的资产。市场会波动，价格会偏离，套利让它们重新对齐。每一笔交易都为永久流动性和真实奖励提供资金。",
+    basketsDescription:
+      "将 1 到 16 种资产组合成一个代币。可将其作为单一头寸交易，也可精确赎回篮子中的资产。固定组成，为套利提供明确锚点。",
+    deepLiquidity: "波动构建流动性",
+    deepLiquidityDescription:
+      "价格会波动，Statics 市场随之变化。当价格出现偏离时，套利者会交易价差。这些交易产生费用，其中一部分会转化为协议永久持有的流动性。更高的波动可能带来更多套利、更多交易量和更深的市场。",
+    stakeEarn: "从市场活动中赚取收益",
+    stakeEarnDescription:
+      "波动带来交易，交易产生费用。质押后最多可选择 12 种奖励资产。奖励以原资产形式支付，来自真实的交易费用，而非代币增发。",
+    tagline: "市场在动，Statics 在积累。",
+  },
+} as const;
+
+type LandingLocale = keyof typeof volatilityCopy;
 
 function Corners() {
   return (
@@ -18,11 +62,13 @@ function Corners() {
 }
 
 export async function LandingPage() {
-  const [t, tCommon, tNavigation] = await Promise.all([
+  const [locale, t, tCommon, tNavigation] = await Promise.all([
+    getLocale(),
     getTranslations("landing"),
     getTranslations("common"),
     getTranslations("navigation"),
   ]);
+  const copy = volatilityCopy[locale as LandingLocale] ?? volatilityCopy.en;
 
   return (
     <div id="top" className="landing-page">
@@ -45,7 +91,7 @@ export async function LandingPage() {
               <span>{t("heroLine2")}</span>
               <span>{t("heroLine3")}</span>
             </h1>
-            <p className="hero-description">{t("heroDescription")}</p>
+            <p className="hero-description">{copy.heroDescription}</p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/app">
                 {tNavigation("launchApp")} <span aria-hidden="true">→</span>
@@ -105,7 +151,7 @@ export async function LandingPage() {
                 →
               </a>
             </div>
-            <p>{t("basketsDescription")}</p>
+            <p>{copy.basketsDescription}</p>
             <ul className="token-list" aria-label={t("assetExamples")}>
               <li title={t("ether")}>◆</li>
               <li title={t("bitcoin")}>₿</li>
@@ -213,8 +259,8 @@ export async function LandingPage() {
                 <path d="M24 2v12M24 34v12M2 24h12M34 24h12M20 20h8v8h-8z" />
               </svg>
             </span>
-            <h2>{t("deepLiquidity")}</h2>
-            <p>{t("deepLiquidityDescription")}</p>
+            <h2>{copy.deepLiquidity}</h2>
+            <p>{copy.deepLiquidityDescription}</p>
           </article>
           <article>
             <span className="line-icon" aria-hidden="true">
@@ -223,8 +269,8 @@ export async function LandingPage() {
                 <circle cx="37" cy="9" r="5" />
               </svg>
             </span>
-            <h2>{t("stakeEarn")}</h2>
-            <p>{t("stakeEarnDescription")}</p>
+            <h2>{copy.stakeEarn}</h2>
+            <p>{copy.stakeEarnDescription}</p>
           </article>
         </section>
 
@@ -236,7 +282,7 @@ export async function LandingPage() {
               width={1259}
               height={304}
             />
-            <p id="launch-title">{t("tagline")}</p>
+            <p id="launch-title">{copy.tagline}</p>
           </div>
           <div className="terminal" aria-label={t("principles")} tabIndex={0}>
             <p>
