@@ -136,6 +136,18 @@ describe("stage-aware dapp navigation", () => {
     expect(appNavigationGroupsForStage("full-protocol")).toBe(appNavigationGroups);
     expect(appTabNavigationForStage("full-protocol")).toBe(appTabNavigation);
   });
+
+  it("maps Phase 1 product capabilities onto shared top-level routes only", () => {
+    const phaseOne = {
+      ...launch,
+      stage: "phase-one",
+      capabilities: ["overview", "position-staking", "public-lp-positions", "global-rewards"],
+    } as const satisfies DeploymentDescriptor;
+    expect(isDappRouteAllowed("/app/positions", phaseOne)).toBe(true);
+    expect(isDappRouteAllowed("/app/positions/1042", phaseOne)).toBe(false);
+    expect(isDappRouteAllowed("/app/liquidity", phaseOne)).toBe(true);
+    expect(isDappRouteAllowed("/app/rewards", phaseOne)).toBe(true);
+  });
 });
 
 describe("dapp navigation grouping", () => {

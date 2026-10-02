@@ -31,6 +31,9 @@ export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescr
   if (pathname === "/app/liquidity") {
     return descriptor.capabilities.includes("public-lp-positions");
   }
+  if (pathname === "/app/positions") {
+    return descriptor.capabilities.includes("position-staking");
+  }
   if (pathname === "/app/rewards") {
     return (
       descriptor.capabilities.includes("global-rewards") ||

@@ -37,7 +37,16 @@ const fullDescriptor = {
   capabilities: [...launchDescriptor.capabilities, "positions"],
 } as const;
 
-function option(descriptor: typeof launchDescriptor | typeof fullDescriptor): DeploymentOption {
+const phaseOneDescriptor = {
+  ...launchDescriptor,
+  deploymentId: "phase-one",
+  stage: "phase-one",
+  capabilities: [...launchDescriptor.capabilities, "position-staking"],
+} as const;
+
+function option(
+  descriptor: typeof launchDescriptor | typeof fullDescriptor | typeof phaseOneDescriptor
+): DeploymentOption {
   return {
     networkId: "robinhood",
     descriptor,
@@ -46,7 +55,9 @@ function option(descriptor: typeof launchDescriptor | typeof fullDescriptor): De
   };
 }
 
-function renderGuard(descriptor: typeof launchDescriptor | typeof fullDescriptor) {
+function renderGuard(
+  descriptor: typeof launchDescriptor | typeof fullDescriptor | typeof phaseOneDescriptor
+) {
   const active = option(descriptor);
   return render(
     <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
@@ -88,6 +99,18 @@ describe("DappRouteGuard", () => {
     renderGuard(fullDescriptor);
     expect(screen.getByText("Route content")).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("allows the Phase 1 position dashboard but rejects legacy position details", async () => {
+    pathname = "/app/positions";
+    const rendered = renderGuard(phaseOneDescriptor);
+    expect(screen.getByText("Route content")).toBeInTheDocument();
+    rendered.unmount();
+
+    pathname = "/app/positions/1042";
+    renderGuard(phaseOneDescriptor);
+    expect(screen.queryByText("Route content")).not.toBeInTheDocument();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/app"));
   });
 
   it("leaves unknown routes to Next.js instead of treating them as Overview", () => {

@@ -304,6 +304,9 @@ export function isNavigationItemAvailable(
   if (item.capability === "protocol-liquidity") {
     return capabilities.includes("public-lp-positions");
   }
+  if (item.capability === "positions") {
+    return capabilities.includes("position-staking");
+  }
   if (item.capability === "protocol-rewards") {
     return (
       capabilities.includes("global-rewards") ||
