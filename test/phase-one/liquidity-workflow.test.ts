@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   advancePublicLiquidityWorkflow,
   createPublicLiquidityWorkflow,
+  loadPublicLiquidityWorkflow,
+  parsePublicLiquidityWorkflow,
   publicLiquidityWorkflowStorageKey,
+  savePublicLiquidityWorkflow,
 } from "@/lib/phase-one/liquidity-workflow";
 
 const hash = (digit: string) => `0x${digit.repeat(64)}` as const;
@@ -55,5 +58,24 @@ describe("Phase 1 liquidity workflow persistence", () => {
     expect(() => advancePublicLiquidityWorkflow(created, { status: "complete" })).toThrow(
       "Invalid liquidity workflow transition"
     );
+  });
+
+  it("persists and validates resumable workflow state", () => {
+    const workflow = createPublicLiquidityWorkflow({
+      deploymentId: "phase-one",
+      chainId: 4663,
+      wallet: "0x1111111111111111111111111111111111111111",
+      poolId: hash("1"),
+      intentId: "intent-1",
+      now: 10,
+    });
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    savePublicLiquidityWorkflow(storage, workflow);
+    expect(loadPublicLiquidityWorkflow(storage, workflow)).toEqual(workflow);
+    expect(() => parsePublicLiquidityWorkflow('{"version":2}')).toThrow("invalid");
   });
 });

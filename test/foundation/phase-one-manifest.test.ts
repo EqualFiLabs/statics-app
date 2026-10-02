@@ -122,6 +122,29 @@ describe("Phase 1 deployment manifest", () => {
     ).toThrow("PoolId");
   });
 
+  it("rejects missing and unexpected contract identities from untyped JSON", () => {
+    const missing = manifest() as unknown as Record<string, unknown>;
+    const missingContracts = { ...(missing.contracts as Record<string, unknown>) };
+    delete missingContracts.quoter;
+    expect(() =>
+      parsePhaseOneDeploymentManifest({
+        ...missing,
+        contracts: missingContracts,
+      } as unknown as PhaseOneDeploymentManifest)
+    ).toThrow("contract quoter is required");
+
+    const extra = manifest();
+    expect(() =>
+      parsePhaseOneDeploymentManifest({
+        ...extra,
+        contracts: {
+          ...extra.contracts,
+          unsafeRouter: extra.contracts.universalRouter,
+        },
+      } as PhaseOneDeploymentManifest)
+    ).toThrow("Unsupported Phase 1 contract unsafeRouter");
+  });
+
   it("composes a local Phase 1 deployment without requiring a Genesis fixture", () => {
     const phaseOne = manifest();
     const options = deploymentRegistry({

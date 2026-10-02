@@ -13,6 +13,21 @@ import type {
 
 type ManifestContract = Readonly<{ address: string; runtimeCodeHash: string }>;
 
+const phaseOneContractNames = [
+  "diamond",
+  "timelock",
+  "publicHook",
+  "liquidityManager",
+  "statics",
+  "weth",
+  "poolManager",
+  "positionManager",
+  "permit2",
+  "quoter",
+  "stateView",
+  "universalRouter",
+] as const satisfies readonly PhaseOneContractName[];
+
 export type PhaseOneDeploymentManifest = Readonly<{
   schemaVersion: 1;
   deploymentId: string;
@@ -149,16 +164,30 @@ export function parsePhaseOneDeploymentManifest(
 
   const protocolCommit = commit(manifest.protocolCommit, "protocolCommit");
   const sdkCommit = commit(manifest.sdkCommit, "sdkCommit");
+  if (!manifest.contracts || typeof manifest.contracts !== "object") {
+    throw new Error("Phase 1 contracts are required.");
+  }
+  const suppliedContractNames = Object.keys(manifest.contracts);
+  const unexpectedContract = suppliedContractNames.find(
+    (name) => !phaseOneContractNames.includes(name as PhaseOneContractName)
+  );
+  if (unexpectedContract) {
+    throw new Error(`Unsupported Phase 1 contract ${unexpectedContract}.`);
+  }
+  const missingContract = phaseOneContractNames.find((name) => !manifest.contracts[name]);
+  if (missingContract) {
+    throw new Error(`Phase 1 contract ${missingContract} is required.`);
+  }
   const contracts = Object.fromEntries(
-    Object.entries(manifest.contracts).map(([name, entry]) => [
+    phaseOneContractNames.map((name) => [
       name,
-      address(entry.address, `contracts.${name}.address`),
+      address(manifest.contracts[name].address, `contracts.${name}.address`),
     ])
   ) as Record<PhaseOneContractName, Address>;
   const runtimeCodeHashes = Object.fromEntries(
-    Object.entries(manifest.contracts).map(([name, entry]) => [
+    phaseOneContractNames.map((name) => [
       name,
-      hash(entry.runtimeCodeHash, `contracts.${name}.runtimeCodeHash`),
+      hash(manifest.contracts[name].runtimeCodeHash, `contracts.${name}.runtimeCodeHash`),
     ])
   ) as Record<PhaseOneContractName, Hex>;
 

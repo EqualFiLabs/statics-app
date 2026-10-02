@@ -106,3 +106,61 @@ export function publicLiquidityWorkflowStorageKey(
     workflow.intentId,
   ].join(":");
 }
+
+export function parsePublicLiquidityWorkflow(value: string): PublicLiquidityWorkflow {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Saved liquidity workflow is not valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Saved liquidity workflow is invalid.");
+  }
+  const candidate = parsed as Record<string, unknown>;
+  const statuses: readonly PublicLiquidityWorkflowStatus[] = [
+    "position-required",
+    "position-confirming",
+    "liquidity-ready",
+    "liquidity-confirming",
+    "complete",
+  ];
+  if (
+    candidate.version !== 1 ||
+    typeof candidate.deploymentId !== "string" ||
+    !Number.isSafeInteger(candidate.chainId) ||
+    typeof candidate.wallet !== "string" ||
+    typeof candidate.poolId !== "string" ||
+    !/^0x[a-f0-9]{64}$/iu.test(candidate.poolId) ||
+    typeof candidate.intentId !== "string" ||
+    !statuses.includes(candidate.status as PublicLiquidityWorkflowStatus) ||
+    !(candidate.positionId === null || /^\d+$/.test(String(candidate.positionId))) ||
+    !(
+      candidate.positionTransactionHash === null ||
+      /^0x[a-f0-9]{64}$/iu.test(String(candidate.positionTransactionHash))
+    ) ||
+    !(
+      candidate.liquidityTransactionHash === null ||
+      /^0x[a-f0-9]{64}$/iu.test(String(candidate.liquidityTransactionHash))
+    ) ||
+    !Number.isSafeInteger(candidate.updatedAt)
+  ) {
+    throw new Error("Saved liquidity workflow is invalid.");
+  }
+  return candidate as unknown as PublicLiquidityWorkflow;
+}
+
+export function savePublicLiquidityWorkflow(
+  storage: Pick<Storage, "setItem">,
+  workflow: PublicLiquidityWorkflow
+): void {
+  storage.setItem(publicLiquidityWorkflowStorageKey(workflow), JSON.stringify(workflow));
+}
+
+export function loadPublicLiquidityWorkflow(
+  storage: Pick<Storage, "getItem">,
+  identity: Pick<PublicLiquidityWorkflow, "deploymentId" | "chainId" | "wallet" | "intentId">
+): PublicLiquidityWorkflow | null {
+  const value = storage.getItem(publicLiquidityWorkflowStorageKey(identity));
+  return value === null ? null : parsePublicLiquidityWorkflow(value);
+}
