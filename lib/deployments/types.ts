@@ -115,7 +115,7 @@ export type PublicPoolToken = Readonly<{
   symbol: string;
   decimals: number;
   logoUri?: string;
-  metadataSource: "reviewed-manifest";
+  metadataSource: "reviewed-manifest" | "onchain-import";
 }>;
 
 export type SupportedPublicPool = Readonly<{
