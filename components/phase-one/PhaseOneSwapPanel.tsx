@@ -7,6 +7,7 @@ import { usePublicClient } from "wagmi";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { verifyPhaseOneDeploymentCached } from "@/lib/deployments/verify-phase-one";
+import { loadPhaseOneCandles } from "@/lib/indexer/phase-one";
 import { listedPublicPool, readPublicPoolPreflight } from "@/lib/phase-one/pools";
 import {
   buildPublicExactInputSwap,
@@ -50,6 +51,7 @@ export function PhaseOneSwapPanel({ deployment }: { deployment: PhaseOneDeployme
   const supported = deployment.supportedPools.filter((pool) => pool.enabled);
   const selected = supported[poolIndex] ?? supported[0] ?? null;
   const pool = selected ? listedPublicPool(selected) : null;
+  const [candleTo] = useState(() => BigInt(Math.floor(Date.now() / 3_600_000) * 3_600));
   const inputToken = pool ? (zeroForOne ? pool.token0 : pool.token1) : null;
   const outputToken = pool ? (zeroForOne ? pool.token1 : pool.token0) : null;
   let amountIn = 0n;
@@ -69,6 +71,27 @@ export function PhaseOneSwapPanel({ deployment }: { deployment: PhaseOneDeployme
       if (!publicClient || !pool) throw new Error("No public pool is selected.");
       await verifyPhaseOneDeploymentCached(publicClient, deployment);
       return readPublicPoolPreflight(publicClient, deployment, pool);
+    },
+  });
+
+  const marketTape = useQuery({
+    queryKey: [
+      "phase-one-market-candles",
+      deployment.descriptor.deploymentId,
+      pool?.poolId,
+      candleTo.toString(),
+    ],
+    enabled: Boolean(pool),
+    retry: false,
+    queryFn: () => {
+      if (!pool) throw new Error("No public pool is selected.");
+      return loadPhaseOneCandles({
+        deploymentId: deployment.descriptor.deploymentId,
+        poolId: pool.poolId,
+        from: candleTo - 86_400n,
+        to: candleTo,
+        resolution: 60,
+      });
     },
   });
 
@@ -347,6 +370,27 @@ export function PhaseOneSwapPanel({ deployment }: { deployment: PhaseOneDeployme
           input and{" "}
           {amountLabel(quote.data.fees.staticsOutputFee, outputToken.decimals, outputToken.symbol)}{" "}
           output.
+        </p>
+      )}
+      {marketTape.data && (
+        <p>
+          MarketTape, last 24 hours:{" "}
+          {marketTape.data.items.reduce((sum, item) => sum + item.swapCount, 0)} swaps,{" "}
+          {formatUnits(
+            marketTape.data.items.reduce((sum, item) => sum + item.volume0, 0n),
+            pool.token0.decimals
+          )}{" "}
+          {pool.token0.symbol} volume and{" "}
+          {formatUnits(
+            marketTape.data.items.reduce((sum, item) => sum + item.volume1, 0n),
+            pool.token1.decimals
+          )}{" "}
+          {pool.token1.symbol} volume.
+        </p>
+      )}
+      {marketTape.isError && (
+        <p role="status">
+          MarketTape history is temporarily unavailable. Live quoting is unaffected.
         </p>
       )}
       {error && <p role="alert">{error}</p>}

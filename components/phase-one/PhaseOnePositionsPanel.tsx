@@ -71,17 +71,18 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
       wallet,
       positionId ?? 0n
     ),
-    enabled: Boolean(publicClient && positionId !== null),
+    enabled: Boolean(publicClient && wallet && positionId !== null),
     queryFn: async () => {
-      if (!publicClient || positionId === null) throw new Error("Select a PositionNFT.");
+      if (!publicClient || !wallet || positionId === null) throw new Error("Select a PositionNFT.");
       const block = await publicClient.getBlock();
       const [staking, gauges] = await Promise.all([
-        readPositionStakingState({ publicClient, deployment, positionId }),
+        readPositionStakingState({ publicClient, deployment, positionId, account: wallet }),
         readPositionGaugeState({
           publicClient,
           deployment,
           positionId,
           now: Number(block.timestamp),
+          account: wallet,
         }),
       ]);
       return { staking, gauges };
@@ -94,15 +95,15 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
       wallet,
       positionId ?? 0n
     ),
-    enabled: Boolean(publicClient && positionId !== null && allocationPoolId),
+    enabled: Boolean(publicClient && wallet && positionId !== null && allocationPoolId),
     queryFn: () => {
-      if (!publicClient || positionId === null) throw new Error("Select a PositionNFT.");
+      if (!publicClient || !wallet || positionId === null) throw new Error("Select a PositionNFT.");
       return readPositionGaugeRewards({
         publicClient,
         deployment,
         positionId,
         poolId: selectedPoolId,
-        allocatorSlots: [0, 1, 2, 3, 4],
+        account: wallet,
       });
     },
   });
@@ -285,7 +286,13 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
         sendTransaction: walletState.sendEvmTransaction,
         describeError,
         verifyConfirmation: () =>
-          verifyGaugeAllocations({ publicClient, deployment, positionId, expected: next }),
+          verifyGaugeAllocations({
+            publicClient,
+            deployment,
+            positionId,
+            account: wallet,
+            expected: next,
+          }),
       });
     });
 

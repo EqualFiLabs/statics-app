@@ -130,6 +130,7 @@ export async function readPositionStakingState(input: {
   publicClient: PublicClient;
   deployment: PhaseOneDeployment;
   positionId: bigint;
+  account: Address;
 }): Promise<PositionStakingState> {
   const [owner, position, selectedAssets, maximumRewardAssets, rewardEligibilityDelay, locked] =
     await Promise.all([
@@ -138,34 +139,40 @@ export async function readPositionStakingState(input: {
         abi: staticsAbi,
         functionName: "ownerOf",
         args: [input.positionId],
+        account: input.account,
       }),
       input.publicClient.readContract({
         address: input.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "stakePosition",
         args: [input.positionId],
+        account: input.account,
       }),
       input.publicClient.readContract({
         address: input.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "positionRewardAssets",
         args: [input.positionId],
+        account: input.account,
       }),
       input.publicClient.readContract({
         address: input.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "maxRewardAssetsPerPosition",
+        account: input.account,
       }),
       input.publicClient.readContract({
         address: input.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "rewardEligibilityDelay",
+        account: input.account,
       }),
       input.publicClient.readContract({
         address: input.deployment.contracts.diamond,
         abi: staticsAbi,
         functionName: "locked",
         args: [input.positionId],
+        account: input.account,
       }),
     ]);
   const pendingRewards =
@@ -176,6 +183,7 @@ export async function readPositionStakingState(input: {
           abi: staticsAbi,
           functionName: "pendingRewards",
           args: [input.positionId, selectedAssets],
+          account: input.account,
         });
   return {
     positionId: input.positionId,

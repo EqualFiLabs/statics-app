@@ -145,6 +145,7 @@ export async function verifyGaugeAllocations(input: {
   publicClient: PublicClient;
   deployment: PhaseOneDeployment;
   positionId: bigint;
+  account: Address;
   expected: readonly Readonly<{ poolId: Hex; amount: bigint }>[];
 }): Promise<void> {
   const result = await input.publicClient.readContract({
@@ -152,6 +153,7 @@ export async function verifyGaugeAllocations(input: {
     abi: staticsGaugeIncentivesAbi,
     functionName: "gaugePositionAllocations",
     args: [input.positionId],
+    account: input.account,
   });
   const actual = new Map(
     result[2].map((allocation) => [allocation.poolId.toLowerCase(), allocation.amount])

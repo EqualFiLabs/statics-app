@@ -16,9 +16,13 @@ import {
   type PublicLiquidityWorkflow,
 } from "@/lib/phase-one/liquidity-workflow";
 import {
+  buildAttachPublicLiquidityTransactions,
   buildCreatePositionNftTransaction,
   buildProvidePublicLiquidityTransaction,
+  buildPublicLiquidityChangeTransaction,
+  inspectAttachableV4Position,
   quotePublicLiquidity,
+  readPublicManagedLiquidityPosition,
   readPublicLiquidityApprovals,
 } from "@/lib/phase-one/liquidity";
 import { listedPublicPool, readPublicPoolPreflight } from "@/lib/phase-one/pools";
@@ -45,6 +49,13 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
   const [tickUpperInput, setTickUpperInput] = useState("");
   const [amount0Input, setAmount0Input] = useState("");
   const [amount1Input, setAmount1Input] = useState("");
+  const [changeKind, setChangeKind] = useState<
+    "increase" | "decrease" | "collect" | "rebalance" | "exit"
+  >("increase");
+  const [liquidityInput, setLiquidityInput] = useState("");
+  const [amount0MinimumInput, setAmount0MinimumInput] = useState("");
+  const [amount1MinimumInput, setAmount1MinimumInput] = useState("");
+  const [positionManagerTokenId, setPositionManagerTokenId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<PublicLiquidityWorkflow | null>(null);
@@ -52,6 +63,7 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
   const supported = deployment.supportedPools.filter((candidate) => candidate.enabled);
   const selected = supported[poolIndex] ?? supported[0] ?? null;
   const pool = selected ? listedPublicPool(selected) : null;
+  const positionId = /^\d+$/.test(positionIdInput) ? BigInt(positionIdInput) : null;
 
   const preflight = useQuery({
     queryKey: protocolQueryKeys.phaseOnePool(
@@ -63,6 +75,25 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
       if (!publicClient || !pool) throw new Error("No public pool is selected.");
       await verifyPhaseOneDeploymentCached(publicClient, deployment);
       return readPublicPoolPreflight(publicClient, deployment, pool);
+    },
+  });
+  const managed = useQuery({
+    queryKey: protocolQueryKeys.phaseOneLiquidity(
+      deployment.descriptor.deploymentId,
+      wallet,
+      positionId ?? 0n,
+      pool?.poolId ?? "unselected"
+    ),
+    enabled: Boolean(publicClient && pool && positionId !== null),
+    queryFn: () => {
+      if (!publicClient || !pool || positionId === null)
+        throw new Error("Select a PositionNFT and public pool.");
+      return readPublicManagedLiquidityPosition({
+        publicClient,
+        deployment,
+        positionId,
+        poolId: pool.poolId,
+      });
     },
   });
 
@@ -83,6 +114,17 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
   } catch {
     amount0 = 0n;
     amount1 = 0n;
+  }
+  let amount0Minimum = 0n;
+  let amount1Minimum = 0n;
+  try {
+    amount0Minimum =
+      pool && amount0MinimumInput ? parseUnits(amount0MinimumInput, pool.token0.decimals) : 0n;
+    amount1Minimum =
+      pool && amount1MinimumInput ? parseUnits(amount1MinimumInput, pool.token1.decimals) : 0n;
+  } catch {
+    amount0Minimum = 0n;
+    amount1Minimum = 0n;
   }
   let quote: ReturnType<typeof quotePublicLiquidity> | null = null;
   try {
@@ -280,6 +322,185 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
     }
   };
 
+  const attachLiquidity = async () => {
+    if (!publicClient || !wallet || !pool || positionId === null || !positionManagerTokenId) return;
+    setPending(true);
+    setError(null);
+    try {
+      await verifyPhaseOneDeploymentCached(publicClient, deployment);
+      const inspected = await inspectAttachableV4Position({
+        publicClient,
+        deployment,
+        pool,
+        owner: wallet,
+        tokenId: BigInt(positionManagerTokenId),
+      });
+      const transactions = buildAttachPublicLiquidityTransactions({
+        deployment,
+        pool,
+        positionId,
+        position: inspected,
+      });
+      for (const transaction of transactions) {
+        await executePhaseOneTransaction({
+          deployment,
+          publicClient,
+          wallet,
+          kind: "phase-one-attach-liquidity",
+          label:
+            transaction.kind === "approve"
+              ? "Approve PositionManager NFT"
+              : "Attach PositionManager NFT",
+          amount: `PositionManager NFT #${inspected.tokenId}`,
+          to: transaction.target,
+          data: transaction.calldata,
+          sendTransaction: walletState.sendEvmTransaction,
+          describeError,
+        });
+      }
+      await verifyManagedLiquidity({
+        publicClient,
+        deployment,
+        positionId,
+        poolId: pool.poolId,
+        expectedLiquidity: inspected.liquidity,
+      });
+      await managed.refetch();
+    } catch (failure) {
+      setError(describeError(failure));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const changeLiquidity = async () => {
+    if (!publicClient || !wallet || !pool || positionId === null || !managed.data) return;
+    setPending(true);
+    setError(null);
+    try {
+      const needsDeposit = changeKind === "increase" || changeKind === "rebalance";
+      if (needsDeposit && !quote) throw new Error("Enter token maximums and a valid range.");
+      if (needsDeposit && quote) {
+        const approvals = await readPublicLiquidityApprovals({
+          publicClient,
+          deployment,
+          pool,
+          owner: wallet,
+          amount0Maximum: quote.maximumAmount0,
+          amount1Maximum: quote.maximumAmount1,
+        });
+        for (const approval of approvals.filter((candidate) => candidate.needed)) {
+          const token = approval.token === pool.token0.address ? pool.token0 : pool.token1;
+          await executePhaseOneTransaction({
+            deployment,
+            publicClient,
+            wallet,
+            kind: "phase-one-approve-token",
+            label: `Enable ${token.symbol} for managed liquidity`,
+            amount: `${formatUnits(approval.required, token.decimals)} ${token.symbol}`,
+            to: approval.target,
+            data: approval.calldata,
+            sendTransaction: walletState.sendEvmTransaction,
+            describeError,
+            verifyConfirmation: () =>
+              verifyErc20Allowance({
+                publicClient,
+                token: approval.token,
+                owner: wallet,
+                spender: deployment.contracts.diamond,
+                minimum: approval.required,
+              }),
+          });
+        }
+      }
+      const currentLiquidity = managed.data.leg.liquidity;
+      const delta = /^\d+$/.test(liquidityInput) ? BigInt(liquidityInput) : 0n;
+      if (changeKind === "decrease" && (delta === 0n || delta > currentLiquidity)) {
+        throw new Error("Enter a liquidity-unit amount no greater than the managed liquidity.");
+      }
+      const block = await publicClient.getBlock();
+      const deadline = block.timestamp + 1_200n;
+      const change =
+        changeKind === "increase"
+          ? {
+              kind: "increase" as const,
+              liquidity: quote!.liquidity,
+              amount0Maximum: quote!.maximumAmount0,
+              amount1Maximum: quote!.maximumAmount1,
+            }
+          : changeKind === "decrease"
+            ? {
+                kind: "decrease" as const,
+                liquidity: delta,
+                amount0Minimum,
+                amount1Minimum,
+              }
+            : changeKind === "collect"
+              ? { kind: "collect" as const, amount0Minimum, amount1Minimum }
+              : changeKind === "rebalance"
+                ? {
+                    kind: "rebalance" as const,
+                    tickLower: quote!.range.tickLower,
+                    tickUpper: quote!.range.tickUpper,
+                    liquidity: quote!.liquidity,
+                    amount0Maximum: quote!.maximumAmount0,
+                    amount1Maximum: quote!.maximumAmount1,
+                    amount0Minimum,
+                    amount1Minimum,
+                  }
+                : { kind: "exit" as const, amount0Minimum, amount1Minimum };
+      const transaction = buildPublicLiquidityChangeTransaction({
+        deployment,
+        pool,
+        positionId,
+        deadline,
+        change,
+      });
+      const kinds = {
+        increase: "phase-one-increase-liquidity",
+        decrease: "phase-one-decrease-liquidity",
+        collect: "phase-one-collect-fees",
+        rebalance: "phase-one-rebalance-liquidity",
+        exit: "phase-one-exit-liquidity",
+      } as const;
+      const expectedLiquidity =
+        changeKind === "increase"
+          ? currentLiquidity + quote!.liquidity
+          : changeKind === "decrease"
+            ? currentLiquidity - delta
+            : changeKind === "rebalance"
+              ? quote!.liquidity
+              : changeKind === "exit"
+                ? 0n
+                : currentLiquidity;
+      await executePhaseOneTransaction({
+        deployment,
+        publicClient,
+        wallet,
+        kind: kinds[changeKind],
+        label: `${changeKind} ${pool.token0.symbol}/${pool.token1.symbol} liquidity`,
+        amount: changeKind === "decrease" ? `${delta} liquidity units` : changeKind,
+        to: transaction.target,
+        data: transaction.calldata,
+        sendTransaction: walletState.sendEvmTransaction,
+        describeError,
+        verifyConfirmation: () =>
+          verifyManagedLiquidity({
+            publicClient,
+            deployment,
+            positionId,
+            poolId: pool.poolId,
+            expectedLiquidity,
+          }),
+      });
+      await managed.refetch();
+    } catch (failure) {
+      setError(describeError(failure));
+    } finally {
+      setPending(false);
+    }
+  };
+
   if (!pool) return <p>No reviewed Phase 1 public pools are enabled for this deployment.</p>;
   return (
     <section aria-label="Phase 1 public liquidity">
@@ -304,6 +525,20 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
       </label>
       <button type="button" disabled={pending || !wallet} onClick={createPosition}>
         Create PositionNFT
+      </button>
+      <label>
+        Existing PositionManager NFT ID
+        <input
+          value={positionManagerTokenId}
+          onChange={(event) => setPositionManagerTokenId(event.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={pending || !wallet || positionId === null || !positionManagerTokenId}
+        onClick={attachLiquidity}
+      >
+        Inspect, approve, and attach NFT
       </button>
       <label>
         Lower tick
@@ -339,6 +574,12 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
         </p>
       )}
       {workflow && <p role="status">Workflow: {workflow.status}</p>}
+      {managed.data && (
+        <p>
+          Managed liquidity: {managed.data.leg.liquidity.toString()} units. PositionManager NFT #
+          {managed.data.leg.posmTokenId.toString()}.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       <button
         type="button"
@@ -346,6 +587,58 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
         onClick={provideLiquidity}
       >
         {pending ? "Confirming" : "Review liquidity provision"}
+      </button>
+      <h3>Manage an existing range</h3>
+      <label>
+        Action
+        <select
+          value={changeKind}
+          onChange={(event) =>
+            setChangeKind(
+              event.target.value as "increase" | "decrease" | "collect" | "rebalance" | "exit"
+            )
+          }
+        >
+          <option value="increase">Increase</option>
+          <option value="decrease">Decrease</option>
+          <option value="collect">Collect native fees</option>
+          <option value="rebalance">Rebalance</option>
+          <option value="exit">Exit</option>
+        </select>
+      </label>
+      {changeKind === "decrease" && (
+        <label>
+          Liquidity units to remove
+          <input
+            value={liquidityInput}
+            onChange={(event) => setLiquidityInput(event.target.value)}
+          />
+        </label>
+      )}
+      {changeKind !== "increase" && (
+        <>
+          <label>
+            Minimum {pool.token0.symbol} received
+            <input
+              value={amount0MinimumInput}
+              onChange={(event) => setAmount0MinimumInput(event.target.value)}
+            />
+          </label>
+          <label>
+            Minimum {pool.token1.symbol} received
+            <input
+              value={amount1MinimumInput}
+              onChange={(event) => setAmount1MinimumInput(event.target.value)}
+            />
+          </label>
+        </>
+      )}
+      <button
+        type="button"
+        disabled={pending || !wallet || positionId === null || !managed.data}
+        onClick={changeLiquidity}
+      >
+        Review {changeKind}
       </button>
     </section>
   );

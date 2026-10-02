@@ -103,6 +103,7 @@ export async function readPositionGaugeState(input: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
   now: number;
+  account: Address;
 }): Promise<PositionGaugeState> {
   const [rawAllocations, maximumAllocations, cooldown] = await Promise.all([
     input.publicClient.readContract({
@@ -110,16 +111,19 @@ export async function readPositionGaugeState(input: {
       abi: staticsGaugeIncentivesAbi,
       functionName: "gaugePositionAllocations",
       args: [input.positionId],
+      account: input.account,
     }),
     input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsGaugeIncentivesAbi,
       functionName: "maxGaugeAllocationsPerPosition",
+      account: input.account,
     }),
     input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsGaugeIncentivesAbi,
       functionName: "gaugeAllocationCooldown",
+      account: input.account,
     }),
   ]);
   const allocations: GaugePositionAllocations = {
@@ -136,6 +140,7 @@ export async function readPositionGaugeState(input: {
         abi: staticsGaugeIncentivesAbi,
         functionName: "gaugePoolWeight",
         args: [allocation.poolId],
+        account: input.account,
       }),
     }))
   );
@@ -153,26 +158,31 @@ export async function readPositionGaugeRewards(input: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
   poolId: Hex;
-  allocatorSlots: readonly number[];
+  allocatorSlots?: readonly number[];
+  account: Address;
 }): Promise<
   Readonly<{ lp: RangeGaugePendingRewards; allocator: readonly GaugeAllocatorClaimPreview[] }>
 > {
-  const [lp, allocator] = await Promise.all([
-    input.publicClient.readContract({
-      address: input.deployment.contracts.diamond,
-      abi: staticsRangeGaugeAbi,
-      functionName: "previewLpRewards",
-      args: [input.positionId, input.poolId],
-    }),
-    input.allocatorSlots.length === 0
-      ? Promise.resolve([] as readonly GaugeAllocatorClaimPreview[])
-      : input.publicClient.readContract({
+  const lp = await input.publicClient.readContract({
+    address: input.deployment.contracts.diamond,
+    abi: staticsRangeGaugeAbi,
+    functionName: "previewLpRewards",
+    args: [input.positionId, input.poolId],
+    account: input.account,
+  });
+  const allocatorSlots =
+    input.allocatorSlots ??
+    Array.from({ length: Math.max(0, lp.slotCount - 1) }, (_, index) => index + 1);
+  const allocator =
+    allocatorSlots.length === 0
+      ? ([] as readonly GaugeAllocatorClaimPreview[])
+      : await input.publicClient.readContract({
           address: input.deployment.contracts.diamond,
           abi: staticsGaugeIncentivesAbi,
           functionName: "previewGaugeAllocatorRewards",
-          args: [input.positionId, input.poolId, input.allocatorSlots],
-        }),
-  ]);
+          args: [input.positionId, input.poolId, allocatorSlots],
+          account: input.account,
+        });
   return { lp, allocator };
 }
 

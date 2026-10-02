@@ -1,5 +1,5 @@
-import { decodeFunctionData, getAddress } from "viem";
-import { describe, expect, it } from "vitest";
+import { decodeFunctionData, getAddress, zeroAddress, type PublicClient } from "viem";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   staticsGaugeIncentivesAbi,
@@ -11,6 +11,7 @@ import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import {
   buildGaugeAllocationTransaction,
   buildGaugeRewardResolution,
+  readPositionGaugeRewards,
   validateGaugeAllocationChange,
 } from "@/lib/phase-one/gauges";
 
@@ -126,5 +127,24 @@ describe("Phase 1 gauge allocations and rewards", () => {
       "claimGaugeAllocatorRewards",
       "forfeitGaugeAllocatorReward",
     ]);
+  });
+
+  it("derives only configured non-STATICS allocator slots from the LP reward config", async () => {
+    const readContract = vi
+      .fn()
+      .mockResolvedValueOnce({
+        slotCount: 3,
+        assets: [zeroAddress, address("2"), address("3"), zeroAddress, zeroAddress],
+        amounts: [0n, 1n, 2n, 0n, 0n],
+      })
+      .mockResolvedValueOnce([]);
+    await readPositionGaugeRewards({
+      publicClient: { readContract } as unknown as PublicClient,
+      deployment,
+      positionId: 9n,
+      poolId: hash("3"),
+      account: address("4"),
+    });
+    expect(readContract.mock.calls[1]?.[0].args).toEqual([9n, hash("3"), [1, 2]]);
   });
 });
