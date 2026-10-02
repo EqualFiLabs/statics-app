@@ -24,15 +24,21 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
 export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescriptor): boolean {
   const capability = getDappRouteCapability(pathname);
   if (capability === null) return true;
-  if (descriptor.stage === "full-protocol") return true;
-  return (
-    capability === "overview" ||
-    capability === "canonical-statics-market" ||
-    capability === "genesis-vault" ||
-    capability === "wallet" ||
-    capability === "activity" ||
-    capability === "approval-tools"
-  );
+  if (descriptor.capabilities.includes(capability)) return true;
+  if (pathname === "/app/swap") {
+    return descriptor.capabilities.includes("public-direct-swaps");
+  }
+  if (pathname === "/app/liquidity") {
+    return descriptor.capabilities.includes("public-lp-positions");
+  }
+  if (pathname === "/app/rewards") {
+    return (
+      descriptor.capabilities.includes("global-rewards") ||
+      descriptor.capabilities.includes("lp-rewards") ||
+      descriptor.capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
 }
 export type DappRoutePresentation = {
   label: string;

@@ -1,5 +1,5 @@
 {
-  "protocolCommit": "730c613af14464965c2254f75f415b3c506bc8fc",
+  "protocolCommit": "0010957fa23de441c62d00b64a5afeaeb74f762e",
   "source": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
@@ -15,6 +15,18 @@
     "src/genesis-credit.ts": "868718ea20417287dd9daf994e97f14ca9b9d32a9a10d795d3f9e65e32f860d2",
     "package.json": "b8204badc86e111eb0d4bf3545ee4f60b989784698d8a96136f5cde409375bdd"
   },
+  "phaseOneSource": {
+    "repository": "https://github.com/EqualFiLabs/statics-sdk",
+    "path": ".",
+    "commit": "6770d0caef5b94b8f102d2a33534970fb31b681e"
+  },
+  "phaseOneSourceChecksums": {
+    "src/index.ts": "1f20360d32c8c52ec8c8934d66d60a9bb76be4326e9d5e722d082b9b35a3e55b",
+    "src/gauge-incentives.ts": "e8b2cb783d8fcdab3007e546ec29593dd8f4f87c180f9180b2f665d5b703e244",
+    "src/market-tape.ts": "c519039d5bfadc16810d20cd7cbc003aabb82e0c9fceca73f086eee743df4d6d",
+    "src/range-gauges.ts": "310b4a3d8c9053e75c1ea8022cb456d87899fd360d0b2ee52fe9959ff2b42f55",
+    "package.json": "98fa4239fadcf6659053e995f0d80c0e76588c9734297e85cea6cf634dee56e6"
+  },
   "sourceChecksums": {
     "src/index.ts": "2a2bfd64b94a02f34e40ee88fb2abc766576bd6d0343c731270a360ad53e897d",
     "package.json": "047657d558934ac444d1d1d5b6e816593b9200cddb62e64703462033b54cb66e"
@@ -25,6 +37,16 @@
     "dist/genesis-credit.js": "9b9be92463d34e6f18354c96064ad2f43365078945a13e9df0df7c8dd852e42d",
     "dist/genesis-credit.d.ts": "ffef22c37b79e975da48093ce8e572db6bcdd5d8f0b34617f4fbc6cfbd60a779",
     "dist/generated/robinhoodChain.js": "69b5dbcb88d4f77e435c2ceaa7176ab51b727065dc12eb44200748922b48afec",
-    "dist/generated/robinhoodChain.d.ts": "f6a12b08c2b8cd85c769583f8ffcc632719c75d638803c17a83f51bcc2984337"
+    "dist/generated/robinhoodChain.d.ts": "f6a12b08c2b8cd85c769583f8ffcc632719c75d638803c17a83f51bcc2984337",
+    "dist/phase-one/index.js": "aeadbd898aa6b1465472764ad18fc338cd5fbc5a71093880a9af80e59a11d789",
+    "dist/phase-one/index.d.ts": "c10b98812ff608b9f88a066bf8822282ba3b6d55ca4d66fd3fb0662b7db45f40",
+    "dist/phase-one/gauge-incentives.js": "e86da39440b2dd9380011b445b9fdb47af92937b384a0e4c4bd32f80a80433d4",
+    "dist/phase-one/gauge-incentives.d.ts": "abc23eed03c60e6bb3685c3bc19c662713ffcc75f3acd03f7a84dd60c1fa5bda",
+    "dist/phase-one/market-tape.js": "96a4049d36914fa16ed19e421493085d36eaef562c73e6afe5911c09c0c73d27",
+    "dist/phase-one/market-tape.d.ts": "1915d80d993d214ae16532af3c1251895b48a3220c08685a0f3dd1c34bce6850",
+    "dist/phase-one/range-gauges.js": "fceb0018b2e861345eb5d212b66ba20c211fd37a1607d56d4790621afb3d593a",
+    "dist/phase-one/range-gauges.d.ts": "1b9caf21ec7b7c249dd260e2214a38ba161e6324ab8e6b46bb74f072f7a510af",
+    "dist/phase-one/generated/robinhoodChain.js": "30d4a618c61a835c469019ed59e0e7894c995c648c7e73db9c742aa010849c53",
+    "dist/phase-one/generated/robinhoodChain.d.ts": "2b1c6402c7189ca7aee68cf5d9fdf73456abdab7af5115926a8c86f2567edd48"
   }
 }

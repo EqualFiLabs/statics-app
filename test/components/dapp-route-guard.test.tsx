@@ -19,7 +19,14 @@ const launchDescriptor = {
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",
-  capabilities: [],
+  capabilities: [
+    "overview",
+    "canonical-statics-market",
+    "genesis-vault",
+    "wallet",
+    "activity",
+    "approval-tools",
+  ],
   available: true,
 } as const;
 
@@ -27,6 +34,7 @@ const fullDescriptor = {
   ...launchDescriptor,
   deploymentId: "full",
   stage: "full-protocol",
+  capabilities: [...launchDescriptor.capabilities, "positions"],
 } as const;
 
 function option(descriptor: typeof launchDescriptor | typeof fullDescriptor): DeploymentOption {

@@ -5,6 +5,7 @@ import {
   getDappRoutePresentation,
   isDappRouteAllowed,
 } from "@/lib/dapp-navigation";
+import type { DeploymentDescriptor } from "@/lib/deployments/types";
 import {
   appNavigation,
   appNavigationGroups,
@@ -92,10 +93,17 @@ describe("stage-aware dapp navigation", () => {
     label: "Operators launch",
     network: "Robinhood Chain",
     chainId: 4663,
-    stage: "launch" as const,
-    capabilities: [],
+    stage: "launch",
+    capabilities: [
+      "overview",
+      "canonical-statics-market",
+      "genesis-vault",
+      "wallet",
+      "activity",
+      "approval-tools",
+    ],
     available: true,
-  };
+  } as const satisfies DeploymentDescriptor;
 
   it("selects the launch product plus Wallet in the sidebar and three product tabs", () => {
     const groups = appNavigationGroupsForStage("launch");

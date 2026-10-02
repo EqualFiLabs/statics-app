@@ -9,7 +9,10 @@ import { useEffect, useRef, useState } from "react";
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId } from "@/lib/dapp-navigation";
-import { appNavigationGroupsForStage, appTabNavigationForStage } from "@/lib/site-config";
+import {
+  appNavigationGroupsForCapabilities,
+  appTabNavigationForCapabilities,
+} from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -219,8 +222,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const { active, options } = useDeployment();
-  const navigationGroups = appNavigationGroupsForStage(active.descriptor.stage);
-  const tabNavigation = appTabNavigationForStage(active.descriptor.stage);
+  const navigationGroups = appNavigationGroupsForCapabilities(active.descriptor.capabilities);
+  const tabNavigation = appTabNavigationForCapabilities(active.descriptor.capabilities);
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");

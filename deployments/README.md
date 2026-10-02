@@ -55,3 +55,20 @@ approved rather than state on a build machine.
 The manifest is only half the check. `verifyDollarDeployment` re-reads every
 runtime code hash from the connected chain before any transaction path is
 offered, so a manifest that has drifted from the chain fails closed.
+
+## Phase 1 manifests
+
+Standalone Genesis and Phase 1 use separate reviewed artifacts. Genesis remains
+in `robinhood-genesis.json`; public pools, the Phase 1 Diamond, its complete
+facet inventory, periphery dependencies, and supported PoolKeys belong in a
+Phase 1 manifest registered by `phase-one-manifests.ts`.
+
+The Phase 1 parser verifies the protocol and SDK commits, every runtime identity,
+the exact facet fingerprint, canonical PoolKey ordering, PoolId derivation, hook
+identity, and reviewed token metadata. Runtime verification then rereads the
+Diamond facet inventory, immutable periphery bindings, public-hook pool
+registrations, and pool initialization state. Until a reviewed Phase 1 manifest
+is registered, its capabilities and writes stay unavailable.
+
+Local development may supply `NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST`, but
+only for chain `31337` and only when `NEXT_PUBLIC_APP_ENV=development`.

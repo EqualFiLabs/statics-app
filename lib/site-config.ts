@@ -292,3 +292,41 @@ export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNa
   ];
   return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));
 }
+
+export function isNavigationItemAvailable(
+  item: AppNavigationItem,
+  capabilities: readonly DeploymentCapability[]
+): boolean {
+  if (capabilities.includes(item.capability)) return true;
+  if (item.capability === "canonical-statics-market") {
+    return capabilities.includes("public-direct-swaps");
+  }
+  if (item.capability === "protocol-liquidity") {
+    return capabilities.includes("public-lp-positions");
+  }
+  if (item.capability === "protocol-rewards") {
+    return (
+      capabilities.includes("global-rewards") ||
+      capabilities.includes("lp-rewards") ||
+      capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
+}
+
+export function appNavigationGroupsForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationGroup[] {
+  return appNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isNavigationItemAvailable(item, capabilities)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function appTabNavigationForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationItem[] {
+  return appTabNavigation.filter((item) => isNavigationItemAvailable(item, capabilities));
+}
