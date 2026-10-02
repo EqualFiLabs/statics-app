@@ -4,13 +4,20 @@ import { getAddress, parseAbi, zeroAddress, zeroHash } from "viem";
 import {
   genesisActivationRegistryAbi,
   genesisLaunchDistributorAbi,
-  staticsAbi,
+  staticsAbi as legacyStaticsAbi,
   staticsFeeReceiverAbi,
   staticsGenesisAbi,
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
+import {
+  staticsAbi as phaseOneStaticsAbi,
+  staticsGaugeIncentivesAbi,
+  staticsMarketTapeAbi,
+  staticsRangeGaugeAbi,
+  staticsSwapFeeHookAbi,
+} from "@statics-protocol/sdk/phase-one";
 
 import { configuredAddress, configuredCanonicalPool } from "./src/source-config";
 
@@ -42,12 +49,15 @@ const poolManagerEventsAbi = parseAbi([
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
 ]);
 const staticsAddress = configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS");
+const publicHookAddress = configuredAddress("PONDER_PUBLIC_HOOK_ADDRESS");
 const positionManagerAddress = configuredAddress("PONDER_POSITION_MANAGER_ADDRESS");
 const poolManagerAddress = configuredAddress("PONDER_POOL_MANAGER_ADDRESS");
 const canonicalPoolId = configuredCanonicalPool(poolManagerAddress);
 
 function activeContracts<T extends Record<string, unknown>>(contracts: T): T {
   if (!staticsAddress) delete contracts.Statics;
+  if (!staticsAddress) delete contracts.PhaseOneStatics;
+  if (!publicHookAddress) delete contracts.PublicHook;
   if (!positionManagerAddress) delete contracts.PositionManager;
   if (!poolManagerAddress) delete contracts.PoolManager;
   return contracts;
@@ -78,9 +88,29 @@ export default createConfig({
   contracts: activeContracts({
     Statics: {
       chain: "active",
-      abi: staticsAbi,
+      abi: legacyStaticsAbi,
       address: staticsAddress ?? zeroAddress,
       startBlock: optionalStartBlock("PONDER_STATICS_START_BLOCK", deploymentStartBlock),
+    },
+    PhaseOneStatics: {
+      chain: "active",
+      abi: [
+        ...phaseOneStaticsAbi,
+        ...staticsGaugeIncentivesAbi,
+        ...staticsMarketTapeAbi,
+        ...staticsRangeGaugeAbi,
+      ],
+      address: staticsAddress ?? zeroAddress,
+      startBlock: optionalStartBlock(
+        "PONDER_PHASE_ONE_START_BLOCK",
+        optionalStartBlock("PONDER_STATICS_START_BLOCK", deploymentStartBlock)
+      ),
+    },
+    PublicHook: {
+      chain: "active",
+      abi: staticsSwapFeeHookAbi,
+      address: publicHookAddress ?? zeroAddress,
+      startBlock: optionalStartBlock("PONDER_PHASE_ONE_START_BLOCK", deploymentStartBlock),
     },
     PositionManager: {
       chain: "active",
