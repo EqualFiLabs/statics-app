@@ -64,6 +64,8 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
+import { PhaseOneLiquidityPanel } from "@/components/phase-one/PhaseOneLiquidityPanel";
 
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
 
@@ -290,6 +292,8 @@ export function LiquidityContributionForm({
 
 export function LiquidityPage() {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.phaseOne) return <PhaseOneLiquidityPanel deployment={active.phaseOne} />;
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
   return (
     <ProtocolActionScope>
@@ -1348,7 +1352,7 @@ function LiquidityRuntime() {
               <div className="remaining-section-heading">
                 <div>
                   <p className="dapp-section-label">Selected LP NFT</p>
-                  <h3>Liquidity position #{position?.tokenId.toString() ?? "—"}</h3>
+                  <h3>Liquidity position #{position?.tokenId.toString() ?? "-"}</h3>
                 </div>
                 <span className={`remaining-status ${position?.staked ? "is-active" : ""}`}>
                   {position?.staked ? "earning" : "wallet-owned"}

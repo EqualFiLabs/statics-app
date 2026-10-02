@@ -1,4 +1,4 @@
-import type { Address, Hex } from "viem";
+import type { Address, Hex, PublicClient } from "viem";
 
 import {
   buildCheckpointGaugePoolCall,
@@ -6,6 +6,7 @@ import {
   buildCheckpointRewardAssetsCall,
   buildSettleProtocolPoolRevenueCall,
   buildSettlePublicSwapRewardsCall,
+  staticsAbi,
 } from "@statics-protocol/sdk/phase-one";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
@@ -19,6 +20,34 @@ export type PublicMaintenanceAction = Readonly<{
   value: 0n;
   rereadAfterConfirmation: true;
 }>;
+
+export type PublicRewardMaintenanceState = Readonly<{
+  asset: Address;
+  unfundedSwapRewards: bigint;
+  rewardBookNeedsCheckpoint: boolean;
+}>;
+
+export async function readPublicRewardMaintenanceState(input: {
+  publicClient: PublicClient;
+  deployment: PhaseOneDeployment;
+  asset: Address;
+}): Promise<PublicRewardMaintenanceState> {
+  const [unfundedSwapRewards, rewardBookNeedsCheckpoint] = await Promise.all([
+    input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "unfundedSwapRewards",
+      args: [input.asset],
+    }),
+    input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "rewardBookNeedsCheckpoint",
+      args: [input.asset],
+    }),
+  ]);
+  return { asset: input.asset, unfundedSwapRewards, rewardBookNeedsCheckpoint };
+}
 
 function action(
   deployment: PhaseOneDeployment,

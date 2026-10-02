@@ -52,6 +52,9 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
+import { PhaseOneMaintenancePanel } from "@/components/phase-one/PhaseOneMaintenancePanel";
+import { PhaseOnePositionsPanel } from "@/components/phase-one/PhaseOnePositionsPanel";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -69,6 +72,15 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 
 export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.phaseOne) {
+    return (
+      <>
+        <PhaseOnePositionsPanel deployment={active.phaseOne} />
+        <PhaseOneMaintenancePanel deployment={active.phaseOne} />
+      </>
+    );
+  }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
   return (
     <ProtocolActionScope>
