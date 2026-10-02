@@ -86,7 +86,31 @@ export type DollarActivityKind =
   | "link-genesis"
   | "unlink-genesis"
   | "claim-creator-revenue"
-  | "distribute-partner-revenue";
+  | "distribute-partner-revenue"
+  | "phase-one-approve-token"
+  | "phase-one-approve-permit2"
+  | "phase-one-swap"
+  | "phase-one-create-position"
+  | "phase-one-provide-liquidity"
+  | "phase-one-attach-liquidity"
+  | "phase-one-increase-liquidity"
+  | "phase-one-decrease-liquidity"
+  | "phase-one-collect-fees"
+  | "phase-one-rebalance-liquidity"
+  | "phase-one-exit-liquidity"
+  | "phase-one-stake"
+  | "phase-one-unstake"
+  | "phase-one-reward-selection"
+  | "phase-one-claim-global-rewards"
+  | "phase-one-set-allocations"
+  | "phase-one-claim-lp-rewards"
+  | "phase-one-forfeit-lp-reward"
+  | "phase-one-claim-allocator-rewards"
+  | "phase-one-forfeit-allocator-reward"
+  | "phase-one-checkpoint-schedule"
+  | "phase-one-checkpoint-pool"
+  | "phase-one-settle-rewards"
+  | "phase-one-settle-revenue";
 
 /** Wall clock for an activity record. Impure, so it stays out of components. */
 export function activityTimestamp(): number {

@@ -17,11 +17,17 @@ export type ProtocolQueryScope =
   | "dollar"
   | "wallet"
   | "approval"
-  | "genesis";
+  | "genesis"
+  | "phase-one-market"
+  | "phase-one-position"
+  | "phase-one-liquidity"
+  | "phase-one-reward"
+  | "phase-one-maintenance";
 
 export type ProtocolTransactionConfirmedDetail = Readonly<{
   wallet: Address;
   chainId: number;
+  deploymentId: string;
   blockNumber: bigint;
   kind: ProtocolActivityKind;
   scopes: readonly ProtocolQueryScope[];
@@ -59,6 +65,16 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "launch-genesis-recoveries": "genesis",
   "nft-image": "genesis",
   "genesis-traits": "genesis",
+  "phase-one-pools": "phase-one-market",
+  "phase-one-pool": "phase-one-market",
+  "phase-one-swap-quote": "phase-one-market",
+  "phase-one-swap-approvals": "approval",
+  "phase-one-positions": "phase-one-position",
+  "phase-one-position": "phase-one-position",
+  "phase-one-liquidity": "phase-one-liquidity",
+  "phase-one-rewards": "phase-one-reward",
+  "phase-one-gauges": "phase-one-reward",
+  "phase-one-maintenance": "phase-one-maintenance",
 };
 
 const walletScopedRoots = new Set([
@@ -80,9 +96,60 @@ const walletScopedRoots = new Set([
   "genesis-vault-swap",
   "genesis-vault-wallet",
   "launch-genesis-credit",
+  "phase-one-swap-approvals",
+  "phase-one-positions",
+  "phase-one-position",
+  "phase-one-liquidity",
+  "phase-one-rewards",
+  "phase-one-gauges",
+]);
+
+const deploymentScopedRoots = new Set([
+  "phase-one-pools",
+  "phase-one-pool",
+  "phase-one-swap-quote",
+  "phase-one-swap-approvals",
+  "phase-one-positions",
+  "phase-one-position",
+  "phase-one-liquidity",
+  "phase-one-rewards",
+  "phase-one-gauges",
+  "phase-one-maintenance",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
+  if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
+  if (kind === "phase-one-approve-token" || kind === "phase-one-approve-permit2") {
+    return ["approval", "phase-one-market", "phase-one-liquidity", "wallet"];
+  }
+  if (
+    kind === "phase-one-create-position" ||
+    kind === "phase-one-stake" ||
+    kind === "phase-one-unstake" ||
+    kind === "phase-one-reward-selection" ||
+    kind === "phase-one-claim-global-rewards" ||
+    kind === "phase-one-set-allocations" ||
+    kind === "phase-one-claim-lp-rewards" ||
+    kind === "phase-one-forfeit-lp-reward" ||
+    kind === "phase-one-claim-allocator-rewards" ||
+    kind === "phase-one-forfeit-allocator-reward"
+  ) {
+    return ["phase-one-position", "phase-one-reward", "wallet"];
+  }
+  if (
+    kind === "phase-one-provide-liquidity" ||
+    kind === "phase-one-attach-liquidity" ||
+    kind === "phase-one-increase-liquidity" ||
+    kind === "phase-one-decrease-liquidity" ||
+    kind === "phase-one-collect-fees" ||
+    kind === "phase-one-rebalance-liquidity" ||
+    kind === "phase-one-exit-liquidity"
+  ) {
+    return ["phase-one-liquidity", "phase-one-position", "phase-one-reward", "wallet"];
+  }
+  if (kind.startsWith("phase-one-checkpoint-") || kind.startsWith("phase-one-settle-")) {
+    return ["phase-one-maintenance", "phase-one-reward", "phase-one-market"];
+  }
   if (kind === "buy-genesis" || kind === "redeem-genesis" || kind === "approve-genesis") {
     return ["genesis", "wallet"];
   }
@@ -139,6 +206,7 @@ export function queryMatchesProtocolReconciliation(
   const root = typeof queryKey[0] === "string" ? queryKey[0] : "";
   const scope = scopeRoots[root];
   if (!scope || !detail.scopes.includes(scope)) return false;
+  if (deploymentScopedRoots.has(root) && queryKey[1] !== detail.deploymentId) return false;
   if (!walletScopedRoots.has(root)) return true;
   const addresses = queryKey.filter((part): part is string =>
     /^0x[0-9a-f]{40}$/i.test(String(part))

@@ -323,6 +323,7 @@ export async function executeProtocolTransaction(
       announceProtocolTransactionConfirmed({
         wallet: request.wallet,
         chainId: request.chainId,
+        deploymentId,
         blockNumber: receipt.blockNumber,
         kind: request.kind,
         scopes: protocolQueryScopes(request.kind),

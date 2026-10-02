@@ -39,6 +39,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet: "0x0000000000000000000000000000000000000001" as Address,
       chainId: 46_630,
+      deploymentId: "release",
       blockNumber: 123n,
       kind: "mint-basket" as const,
       scopes: protocolQueryScopes("mint-basket"),
@@ -77,6 +78,7 @@ describe("confirmed transaction reconciliation", () => {
       announceProtocolTransactionConfirmed({
         wallet,
         chainId: 46_630,
+        deploymentId: "release",
         blockNumber: 100n,
         kind: "repay-loan",
         scopes: protocolQueryScopes("repay-loan"),
@@ -87,6 +89,7 @@ describe("confirmed transaction reconciliation", () => {
       announceProtocolTransactionConfirmed({
         wallet,
         chainId: 46_630,
+        deploymentId: "release",
         blockNumber: 101n,
         kind: "repay-loan",
         scopes: protocolQueryScopes("repay-loan"),
@@ -107,6 +110,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet,
       chainId: 46_630,
+      deploymentId: "release",
       blockNumber: 100n,
       kind: "repay-loan" as const,
       scopes: protocolQueryScopes("repay-loan"),
@@ -166,6 +170,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet,
       chainId: 4_663,
+      deploymentId: "robinhood-genesis",
       blockNumber: 100n,
       kind: "buy-genesis" as const,
       scopes: protocolQueryScopes("buy-genesis"),
@@ -193,5 +198,32 @@ describe("confirmed transaction reconciliation", () => {
     expect(queryMatchesProtocolReconciliation(["loan-catalog", "release", wallet], detail)).toBe(
       false
     );
+  });
+
+  it("keeps Phase 1 reconciliation scoped to its deployment", () => {
+    const wallet = "0x0000000000000000000000000000000000000001" as Address;
+    const detail = {
+      wallet,
+      chainId: 4_663,
+      deploymentId: "robinhood-phase-one",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-liquidity", "robinhood-phase-one", wallet, "7", "0xpool"],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-liquidity", "robinhood-testnet-phase-one", wallet, "7", "0xpool"],
+        detail
+      )
+    ).toBe(false);
+    expect(detail.scopes).toContain("phase-one-position");
+    expect(detail.scopes).toContain("phase-one-reward");
   });
 });
