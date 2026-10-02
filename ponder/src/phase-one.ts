@@ -1,6 +1,14 @@
 import { decodeFunctionData, type Address, type Hex } from "viem";
 
-import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
+import { getSqrtPriceAtTick, staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
+
+import {
+  absoluteAmount,
+  aggregateMarketCandles,
+  candleBucket,
+  type MarketCandleRow,
+  type MarketResolution,
+} from "./market";
 
 const UINT128_MASK = (1n << 128n) - 1n;
 const INT128_SIGN = 1n << 127n;
@@ -149,3 +157,37 @@ export type PhaseOneActivityInput = Readonly<{
   slot?: number;
   actor?: Address;
 }>;
+
+export type PhaseOneSwapCandleInput = Readonly<{
+  finalTick: number;
+  amount0: bigint;
+  amount1: bigint;
+  flags: number;
+  blockNumber: bigint;
+  blockTimestamp: bigint;
+}>;
+
+export function aggregatePhaseOneSwapCandles(
+  swaps: readonly PhaseOneSwapCandleInput[],
+  resolution: MarketResolution
+): MarketCandleRow[] {
+  const minutes = swaps.map((swap): MarketCandleRow => {
+    const sqrtPriceX96 = getSqrtPriceAtTick(swap.finalTick);
+    const zeroForOne = (swap.flags & 1) !== 0;
+    return {
+      bucketTimestamp: candleBucket(swap.blockTimestamp),
+      openSqrtPriceX96: sqrtPriceX96,
+      highSqrtPriceX96: sqrtPriceX96,
+      lowSqrtPriceX96: sqrtPriceX96,
+      closeSqrtPriceX96: sqrtPriceX96,
+      volume0: absoluteAmount(swap.amount0),
+      volume1: absoluteAmount(swap.amount1),
+      zeroForOneCount: zeroForOne ? 1 : 0,
+      oneForZeroCount: zeroForOne ? 0 : 1,
+      swapCount: 1,
+      firstBlock: swap.blockNumber,
+      lastBlock: swap.blockNumber,
+    };
+  });
+  return aggregateMarketCandles(minutes, resolution);
+}

@@ -48,6 +48,11 @@ const deploymentStartBlock = optionalStartBlock("PONDER_DEPLOYMENT_START_BLOCK",
 const poolManagerEventsAbi = parseAbi([
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
 ]);
+const phaseOnePolicyEventsAbi = parseAbi([
+  "event ProtocolPoolQuarantineSet(bytes32 indexed poolId,address indexed caller,bool quarantined)",
+  "event RewardRestrictionAdded(address indexed asset,address indexed caller)",
+  "event RewardRestrictionRemoved(address indexed asset)",
+]);
 const staticsAddress = configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS");
 const publicHookAddress = configuredAddress("PONDER_PUBLIC_HOOK_ADDRESS");
 const positionManagerAddress = configuredAddress("PONDER_POSITION_MANAGER_ADDRESS");
@@ -99,6 +104,7 @@ export default createConfig({
         ...staticsGaugeIncentivesAbi,
         ...staticsMarketTapeAbi,
         ...staticsRangeGaugeAbi,
+        ...phaseOnePolicyEventsAbi,
       ],
       address: staticsAddress ?? zeroAddress,
       startBlock: optionalStartBlock(

@@ -9,6 +9,7 @@ import {
   reconcileGaugeAllocation,
   unpackBalanceDelta,
   unpackUint128Pair,
+  aggregatePhaseOneSwapCandles,
 } from "../src/phase-one";
 
 const poolA = `0x${"11".repeat(32)}` as Hex;
@@ -80,5 +81,40 @@ describe("Phase 1 indexer reconciliation", () => {
       "does not match same-block"
     );
     expect(() => reconcileGaugeAllocation(toHex("not allocations"), 42n, snapshot)).toThrow();
+  });
+
+  it("builds canonical Phase 1 candles from external MarketTape swaps", () => {
+    const candles = aggregatePhaseOneSwapCandles(
+      [
+        {
+          finalTick: 0,
+          amount0: -100n,
+          amount1: 99n,
+          flags: 1,
+          blockNumber: 10n,
+          blockTimestamp: 60n,
+        },
+        {
+          finalTick: 60,
+          amount0: 90n,
+          amount1: -100n,
+          flags: 0,
+          blockNumber: 11n,
+          blockTimestamp: 90n,
+        },
+      ],
+      1
+    );
+    expect(candles).toHaveLength(1);
+    expect(candles[0]).toMatchObject({
+      volume0: 190n,
+      volume1: 199n,
+      zeroForOneCount: 1,
+      oneForZeroCount: 1,
+      swapCount: 2,
+      firstBlock: 10n,
+      lastBlock: 11n,
+    });
+    expect(candles[0]!.openSqrtPriceX96).not.toBe(candles[0]!.closeSqrtPriceX96);
   });
 });

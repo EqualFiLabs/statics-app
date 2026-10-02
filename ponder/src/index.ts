@@ -33,6 +33,7 @@ import {
   positionGaugeState,
   positionNft,
   publicPool,
+  rewardRestriction,
   v4Position,
 } from "ponder:schema";
 import { absoluteAmount, candleBucket, marketCandleKey, marketSwapMetrics } from "./market";
@@ -420,6 +421,7 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => 
       inputFeeBps: feeRate.inputFeeBps,
       outputFeeBps: feeRate.outputFeeBps,
       feeRateOverridden: feeRate.overridden,
+      quarantined: false,
       decommissioned: false,
       polActivated: false,
       createdAtBlock: event.block.number,
@@ -476,6 +478,7 @@ onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
       inputFeeBps: event.args.inputFeeBps,
       outputFeeBps: event.args.outputFeeBps,
       feeRateOverridden: event.args.overridden,
+      quarantined: false,
       decommissioned: pool.decommissioned,
       polActivated: pool.polActivated,
       createdAtBlock: event.block.number,
@@ -494,6 +497,41 @@ onPublicHook("PublicHook:PoolDecommissioned", async ({ event, context }) => {
     decommissioned: true,
     updatedAtBlock: event.block.number,
   });
+});
+
+onPhaseOne("PhaseOneStatics:ProtocolPoolQuarantineSet", async ({ event, context }) => {
+  await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+    quarantined: event.args.quarantined,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:RewardRestrictionAdded", async ({ event, context }) => {
+  const asset = getAddress(event.args.asset);
+  await context.db
+    .insert(rewardRestriction)
+    .values({
+      key: phaseOneKey(asset.toLowerCase()),
+      deploymentId: phaseOneDeploymentId!,
+      asset,
+      restricted: true,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({ restricted: true, updatedAtBlock: event.block.number });
+});
+
+onPhaseOne("PhaseOneStatics:RewardRestrictionRemoved", async ({ event, context }) => {
+  const asset = getAddress(event.args.asset);
+  await context.db
+    .insert(rewardRestriction)
+    .values({
+      key: phaseOneKey(asset.toLowerCase()),
+      deploymentId: phaseOneDeploymentId!,
+      asset,
+      restricted: false,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({ restricted: false, updatedAtBlock: event.block.number });
 });
 
 onPhaseOne("PhaseOneStatics:MarketSwapRecorded", async ({ event, context }) => {

@@ -164,6 +164,7 @@ export const publicPool = onchainTable(
     inputFeeBps: table.integer().notNull(),
     outputFeeBps: table.integer().notNull(),
     feeRateOverridden: table.boolean().notNull(),
+    quarantined: table.boolean().notNull(),
     decommissioned: table.boolean().notNull(),
     polActivated: table.boolean().notNull(),
     createdAtBlock: table.bigint().notNull(),
@@ -173,6 +174,18 @@ export const publicPool = onchainTable(
     inventory: index().on(table.deploymentId, table.decommissioned, table.poolId),
     creator: index().on(table.deploymentId, table.creator, table.poolId),
   })
+);
+
+export const rewardRestriction = onchainTable(
+  "reward_restriction",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    asset: table.hex().notNull(),
+    restricted: table.boolean().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ asset: index().on(table.deploymentId, table.asset) })
 );
 
 export const phaseOneMarketSwap = onchainTable(

@@ -22,12 +22,14 @@ import {
   positionGaugeState,
   positionNft,
   publicPool,
+  rewardRestriction,
   v4Position,
 } from "ponder:schema";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
 import { nextAvailableGenesisId } from "../genesis";
 import { aggregateMarketCandles, readMarketResolution } from "../market";
+import { aggregatePhaseOneSwapCandles } from "../phase-one";
 
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
@@ -549,11 +551,20 @@ app.get("/market/candles", async (context) => {
 });
 
 app.get("/phase-one/pools", async (context) => {
-  const rows = await db
-    .select()
-    .from(publicPool)
-    .where(eq(publicPool.deploymentId, phaseOneDeploymentId))
-    .orderBy(asc(publicPool.createdAtBlock));
+  const [rows, restrictionRows] = await Promise.all([
+    db
+      .select()
+      .from(publicPool)
+      .where(eq(publicPool.deploymentId, phaseOneDeploymentId))
+      .orderBy(asc(publicPool.createdAtBlock)),
+    db
+      .select()
+      .from(rewardRestriction)
+      .where(eq(rewardRestriction.deploymentId, phaseOneDeploymentId)),
+  ]);
+  const restrictions = new Map(
+    restrictionRows.map((row) => [row.asset.toLowerCase(), row.restricted])
+  );
   const indexedAtBlock = rows.reduce(
     (latest, row) => (row.updatedAtBlock > latest ? row.updatedAtBlock : latest),
     0n
@@ -577,10 +588,78 @@ app.get("/phase-one/pools", async (context) => {
       inputFeeBps: row.inputFeeBps,
       outputFeeBps: row.outputFeeBps,
       feeRateOverridden: row.feeRateOverridden,
+      quarantined: row.quarantined,
+      rewardRestrictions: {
+        token0: restrictions.get(row.currency0.toLowerCase()) ?? false,
+        token1: restrictions.get(row.currency1.toLowerCase()) ?? false,
+      },
       decommissioned: row.decommissioned,
       polActivated: row.polActivated,
       createdAtBlock: row.createdAtBlock.toString(),
       updatedAtBlock: row.updatedAtBlock.toString(),
+    })),
+  });
+});
+
+app.get("/phase-one/market/candles", async (context) => {
+  const poolId = readMarketPool(context.req.query("pool"));
+  const range = marketRange(context.req.query("from"), context.req.query("to"));
+  const resolution = readMarketResolution(context.req.query("resolution"));
+  if (
+    !poolId ||
+    range === null ||
+    range.from === undefined ||
+    range.to === undefined ||
+    range.to - range.from > MAX_MARKET_RANGE_SECONDS ||
+    !resolution
+  ) {
+    return context.json({ error: "Invalid Phase 1 candle query." }, 400);
+  }
+  const rows = await db
+    .select({
+      finalTick: phaseOneMarketSwap.finalTick,
+      amount0: phaseOneMarketSwap.amount0,
+      amount1: phaseOneMarketSwap.amount1,
+      flags: phaseOneMarketSwap.flags,
+      blockNumber: phaseOneMarketSwap.blockNumber,
+      blockTimestamp: phaseOneMarketSwap.blockTimestamp,
+    })
+    .from(phaseOneMarketSwap)
+    .where(
+      and(
+        eq(phaseOneMarketSwap.deploymentId, phaseOneDeploymentId),
+        eq(phaseOneMarketSwap.poolId, poolId),
+        eq(phaseOneMarketSwap.internal, false),
+        gte(phaseOneMarketSwap.blockTimestamp, range.from),
+        lte(phaseOneMarketSwap.blockTimestamp, range.to)
+      )
+    )
+    .orderBy(
+      asc(phaseOneMarketSwap.blockTimestamp),
+      asc(phaseOneMarketSwap.blockNumber),
+      asc(phaseOneMarketSwap.logIndex)
+    )
+    .limit(44_641);
+  const items = aggregatePhaseOneSwapCandles(rows, resolution);
+  context.header("Cache-Control", "public, max-age=5, stale-while-revalidate=30");
+  return context.json({
+    deploymentId: phaseOneDeploymentId,
+    poolId,
+    indexedAtBlock: rows.at(-1)?.blockNumber.toString() ?? null,
+    resolution,
+    items: items.map((row) => ({
+      timestamp: row.bucketTimestamp.toString(),
+      openSqrtPriceX96: row.openSqrtPriceX96.toString(),
+      highSqrtPriceX96: row.highSqrtPriceX96.toString(),
+      lowSqrtPriceX96: row.lowSqrtPriceX96.toString(),
+      closeSqrtPriceX96: row.closeSqrtPriceX96.toString(),
+      volume0: row.volume0.toString(),
+      volume1: row.volume1.toString(),
+      zeroForOneCount: row.zeroForOneCount,
+      oneForZeroCount: row.oneForZeroCount,
+      swapCount: row.swapCount,
+      firstBlock: row.firstBlock.toString(),
+      lastBlock: row.lastBlock.toString(),
     })),
   });
 });

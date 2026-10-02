@@ -12,10 +12,35 @@ export type IndexedPublicPool = Readonly<{
   inputFeeBps: number;
   outputFeeBps: number;
   feeRateOverridden: boolean;
+  quarantined: boolean;
+  rewardRestrictions: Readonly<{ token0: boolean; token1: boolean }>;
   decommissioned: boolean;
   polActivated: boolean;
   createdAtBlock: bigint;
   updatedAtBlock: bigint;
+}>;
+
+export type IndexedPhaseOneCandle = Readonly<{
+  timestamp: bigint;
+  openSqrtPriceX96: bigint;
+  highSqrtPriceX96: bigint;
+  lowSqrtPriceX96: bigint;
+  closeSqrtPriceX96: bigint;
+  volume0: bigint;
+  volume1: bigint;
+  zeroForOneCount: number;
+  oneForZeroCount: number;
+  swapCount: number;
+  firstBlock: bigint;
+  lastBlock: bigint;
+}>;
+
+export type PhaseOneCandlePage = Readonly<{
+  deploymentId: string;
+  poolId: Hex;
+  indexedAtBlock: bigint | null;
+  resolution: number;
+  items: readonly IndexedPhaseOneCandle[];
 }>;
 
 export type IndexedPhaseOnePosition = Readonly<{
@@ -114,10 +139,49 @@ export function parseIndexedPublicPools(
         inputFeeBps: integer(row.inputFeeBps, "input fee"),
         outputFeeBps: integer(row.outputFeeBps, "output fee"),
         feeRateOverridden: boolean(row.feeRateOverridden, "fee override flag"),
+        quarantined: boolean(row.quarantined, "quarantine flag"),
+        rewardRestrictions: {
+          token0: boolean(
+            record(row.rewardRestrictions, "reward restrictions").token0,
+            "token0 reward restriction"
+          ),
+          token1: boolean(
+            record(row.rewardRestrictions, "reward restrictions").token1,
+            "token1 reward restriction"
+          ),
+        },
         decommissioned: boolean(row.decommissioned, "decommission flag"),
         polActivated: boolean(row.polActivated, "managed POL flag"),
         createdAtBlock: unsignedBigint(row.createdAtBlock, "creation block"),
         updatedAtBlock: unsignedBigint(row.updatedAtBlock, "update block"),
+      };
+    }),
+  };
+}
+
+export function parsePhaseOneCandles(value: unknown, deploymentId: string): PhaseOneCandlePage {
+  const body = page(value, deploymentId);
+  return {
+    deploymentId,
+    poolId: hash(body.poolId, "PoolId"),
+    indexedAtBlock:
+      body.indexedAtBlock === null ? null : unsignedBigint(body.indexedAtBlock, "indexed block"),
+    resolution: integer(body.resolution, "candle resolution"),
+    items: (body.items as unknown[]).map((item) => {
+      const row = record(item, "market candle");
+      return {
+        timestamp: unsignedBigint(row.timestamp, "candle timestamp"),
+        openSqrtPriceX96: unsignedBigint(row.openSqrtPriceX96, "open price"),
+        highSqrtPriceX96: unsignedBigint(row.highSqrtPriceX96, "high price"),
+        lowSqrtPriceX96: unsignedBigint(row.lowSqrtPriceX96, "low price"),
+        closeSqrtPriceX96: unsignedBigint(row.closeSqrtPriceX96, "close price"),
+        volume0: unsignedBigint(row.volume0, "token0 volume"),
+        volume1: unsignedBigint(row.volume1, "token1 volume"),
+        zeroForOneCount: integer(row.zeroForOneCount, "zero-for-one count"),
+        oneForZeroCount: integer(row.oneForZeroCount, "one-for-zero count"),
+        swapCount: integer(row.swapCount, "swap count"),
+        firstBlock: unsignedBigint(row.firstBlock, "first block"),
+        lastBlock: unsignedBigint(row.lastBlock, "last block"),
       };
     }),
   };
@@ -179,5 +243,25 @@ export async function loadIndexedPhaseOnePositions(
   return parseIndexedPositions(
     await load(deploymentId, `/phase-one/wallets/${getAddress(owner)}/positions`, indexerUrl),
     deploymentId
+  );
+}
+
+export async function loadPhaseOneCandles(input: {
+  deploymentId: string;
+  poolId: Hex;
+  from: bigint;
+  to: bigint;
+  resolution: 1 | 5 | 15 | 60 | 240 | 1_440;
+  indexerUrl?: string | null;
+}): Promise<PhaseOneCandlePage> {
+  const query = new URLSearchParams({
+    pool: input.poolId,
+    from: input.from.toString(),
+    to: input.to.toString(),
+    resolution: input.resolution.toString(),
+  });
+  return parsePhaseOneCandles(
+    await load(input.deploymentId, `/phase-one/market/candles?${query}`, input.indexerUrl),
+    input.deploymentId
   );
 }
