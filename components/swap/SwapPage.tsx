@@ -8,18 +8,21 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
 import { TradeMarketStats } from "@/components/swap/TradeMarketStats";
+import { PhaseOneSwapPanel } from "@/components/phase-one/PhaseOneSwapPanel";
 import { useDeployment } from "@/providers/deployment-context";
 
-type SwapMode = "token" | "nft";
+type SwapMode = "public" | "token" | "nft";
 
 export function SwapPage() {
   const t = useTranslations("trade");
   const { active } = useDeployment();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<SwapMode>(() =>
-    searchParams?.get("mode") === "nft" ? "nft" : "token"
-  );
-  if (!active.launch) {
+  const [mode, setMode] = useState<SwapMode>(() => {
+    const requested = searchParams?.get("mode");
+    if (requested === "nft" || requested === "token") return requested;
+    return active.phaseOne ? "public" : "token";
+  });
+  if (!active.launch && !active.phaseOne) {
     return (
       <EmptyState
         title={t("marketUnavailable")}
@@ -33,9 +36,14 @@ export function SwapPage() {
 
   return (
     <div className="swap-page">
-      <TradeMarketStats deploymentId={active.descriptor.deploymentId} />
+      {active.launch && <TradeMarketStats deploymentId={active.launch.descriptor.deploymentId} />}
       <div className="portal-direction-tabs" role="tablist" aria-label={t("swapType")}>
-        {(["token", "nft"] as const).map((item) => (
+        {(
+          [
+            ...(active.phaseOne ? (["public"] as const) : []),
+            ...(active.launch ? (["token", "nft"] as const) : []),
+          ] as const
+        ).map((item) => (
           <button
             key={item}
             type="button"
@@ -43,15 +51,17 @@ export function SwapPage() {
             aria-selected={mode === item}
             onClick={() => setMode(item)}
           >
-            {item === "token" ? t("token") : t("operatorNft")}
+            {item === "public" ? "Public pools" : item === "token" ? t("token") : t("operatorNft")}
           </button>
         ))}
       </div>
-      {mode === "token" ? (
+      {mode === "public" && active.phaseOne ? (
+        <PhaseOneSwapPanel deployment={active.phaseOne} />
+      ) : mode === "token" && active.launch ? (
         <EvmSwapPanel canonicalOnly />
-      ) : (
+      ) : active.launch ? (
         <GenesisVaultSwapPanel deployment={active.launch} />
-      )}
+      ) : null}
     </div>
   );
 }
