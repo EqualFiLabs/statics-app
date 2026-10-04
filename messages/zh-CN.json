@@ -1505,7 +1505,7 @@
     "withdrawPercent": "提取流动性 (%)",
     "slippage": "滑点",
     "slippageError": "滑点必须在 0 到 50% 之间。",
-    "percentageError": "提取比例必须大于零且不超过 100%。",
+    "percentageError": "提取比例必须大于零且小于 100%。如需提取全部流动性，请使用退出。",
     "noLiquidity": "此头寸没有可提取的流动性。",
     "exitHelp": "复用此池或关闭头寸之前，请领取或放弃剩余奖励。",
     "actions": "流动性操作",

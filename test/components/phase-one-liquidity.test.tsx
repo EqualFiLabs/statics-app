@@ -163,6 +163,44 @@ async function provideReview() {
   return screen.findByRole("button", { name: "Confirm transaction" });
 }
 describe("Phase 1 liquidity in the existing screen", () => {
+  it("defaults Decrease to a valid partial withdrawal and directs full withdrawals to Exit", async () => {
+    mocks.liquidity = 100n;
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Decrease liquidity" }));
+    const share = screen.getByRole("textbox", { name: "Liquidity to withdraw (%)" });
+    expect(share).toHaveValue("50");
+    fireEvent.click(screen.getByRole("button", { name: "Review Decrease liquidity" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsRangeGaugeAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.args?.[2]).toMatchObject({ liquidity: 50n });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review Decrease liquidity" })).toBeEnabled()
+    );
+    fireEvent.change(share, { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review Decrease liquidity" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Use Exit");
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+  });
+  it("rebalances using principal with no wallet top-up", async () => {
+    mocks.liquidity = 10n ** 21n;
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Rebalance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review Rebalance" }));
+    expect(await screen.findByText("Maximum token debit: 0 STATICS + 0 WETH")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsRangeGaugeAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.functionName).toBe("rebalanceLiquidity");
+    expect(decoded.args?.[2]).toMatchObject({ amount0Maximum: 0n, amount1Maximum: 0n });
+    expect((decoded.args?.[2] as { liquidity: bigint }).liquidity).toBeGreaterThan(0n);
+  });
   it("collects fees without gauge reads or unfinished range inputs from another action", async () => {
     mocks.liquidity = 100n;
     render(tree());
@@ -268,6 +306,12 @@ describe("Phase 1 liquidity in the existing screen", () => {
   });
   it("requires explicit review of the reward amount before forfeiture", async () => {
     mocks.reward = 1000000000000000000n;
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) =>
+      input.functionName === "gaugeReserve"
+        ? { activated: true, periodFinish: 10000000000 - 53 * 604800, lastCheckpoint: 0 }
+        : original(input)
+    );
     render(tree());
     const button = await screen.findByRole("button", { name: "Review forfeiture" });
     fireEvent.click(button);
@@ -275,7 +319,10 @@ describe("Phase 1 liquidity in the existing screen", () => {
     await screen.findByText("You permanently give up this reward amount. It cannot be recovered.");
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
-    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
-    expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-forfeit-lp-reward");
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+    expect(mocks.execute.mock.calls.map(([request]) => request.kind)).toEqual([
+      "phase-one-checkpoint-schedule",
+      "phase-one-forfeit-lp-reward",
+    ]);
   });
 });

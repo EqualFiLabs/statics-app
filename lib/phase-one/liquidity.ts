@@ -19,6 +19,7 @@ import {
   buildProvideRangeLiquidityCall,
   buildRebalanceRangeLiquidityCall,
   decodePositionInfo,
+  getSqrtPriceAtTick,
   maximumLiquidityForAmounts,
   quoteRangeAmounts,
   staticsAbi,
@@ -36,6 +37,24 @@ const MIN_TICK = -887_272;
 const MAX_TICK = 887_272;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const BPS = 10_000n;
+
+/** Principal returned by a v4 burn rounds down; deposit quotes round up. */
+export function quoteWithdrawalAmounts(
+  sqrtPriceX96: bigint,
+  tickLower: number,
+  tickUpper: number,
+  liquidity: bigint
+) {
+  if (sqrtPriceX96 <= 0n || tickLower >= tickUpper || liquidity <= 0n || liquidity > MAX_UINT128)
+    throw new Error("Invalid withdrawal range or liquidity.");
+  const lower = getSqrtPriceAtTick(tickLower);
+  const upper = getSqrtPriceAtTick(tickUpper);
+  const price = sqrtPriceX96 < lower ? lower : sqrtPriceX96 > upper ? upper : sqrtPriceX96;
+  return {
+    amount0: ((liquidity << 96n) * (upper - price)) / upper / price,
+    amount1: (liquidity * (price - lower)) / (1n << 96n),
+  };
+}
 
 export type PublicLiquidityRange = Readonly<{
   tickLower: number;

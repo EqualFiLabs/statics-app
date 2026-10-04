@@ -13,9 +13,9 @@ multichain funding.
 - **Review status:** Internal review
 - **License:** Business Source License 1.1
 
-Contract addresses are accepted only from a checked-in deployment manifest. Before enabling a
-transaction path, the application reads deployed bytecode and verifies its runtime code hash
-against that manifest.
+Public contract addresses come from checked-in deployment manifests. Phase 1 configuration
+uses local chain, address, and PoolKey checks; swaps and Phase 1 actions do not run deployment
+audits. The existing full-protocol Dollar deployment validation remains separate.
 
 ## Application boundaries
 

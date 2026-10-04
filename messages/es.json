@@ -1505,7 +1505,7 @@
     "withdrawPercent": "Liquidez a retirar (%)",
     "slippage": "Deslizamiento",
     "slippageError": "El deslizamiento debe estar entre 0 y 50%.",
-    "percentageError": "Elige un porcentaje de retiro mayor que cero y hasta el 100%.",
+    "percentageError": "Elige un porcentaje de retiro mayor que cero y menor del 100%. Usa Salir para retirar toda la liquidez.",
     "noLiquidity": "Esta posición no tiene liquidez para retirar.",
     "exitHelp": "Debes reclamar o renunciar a las recompensas restantes antes de reutilizar este pool o cerrar la posición.",
     "actions": "Acciones de liquidez",

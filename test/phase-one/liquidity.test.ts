@@ -10,6 +10,7 @@ import {
   buildPublicLiquidityChangeTransaction,
   planPublicLiquidityApprovals,
   quotePublicLiquidity,
+  quoteWithdrawalAmounts,
   usableTickBounds,
   validatePublicLiquidityRange,
 } from "@/lib/phase-one/liquidity";
@@ -43,6 +44,12 @@ const deployment = {
 } as PhaseOneDeployment;
 
 describe("Phase 1 public liquidity", () => {
+  it("uses burn rounding for withdrawal floors even with zero slippage and tiny liquidity", () => {
+    expect(quoteWithdrawalAmounts(1n << 96n, -60, 60, 100n)).toEqual({ amount0: 0n, amount1: 0n });
+    const principal = quoteWithdrawalAmounts(1n << 96n, -60, 60, 10n ** 18n);
+    expect(principal.amount0).toBeGreaterThan(0n);
+    expect(principal.amount1).toBeGreaterThan(0n);
+  });
   it("validates usable, spacing-aligned concentrated ranges", () => {
     expect(usableTickBounds(60)).toEqual([-887_220, 887_220]);
     expect(validatePublicLiquidityRange(-60, 60, 60, 0).inRange).toBe(true);

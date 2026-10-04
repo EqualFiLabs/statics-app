@@ -1505,7 +1505,7 @@
     "withdrawPercent": "Liquidity to withdraw (%)",
     "slippage": "Slippage",
     "slippageError": "Slippage must be between 0 and 50%.",
-    "percentageError": "Choose a withdrawal percentage greater than zero and at most 100%.",
+    "percentageError": "Choose a withdrawal percentage greater than zero and below 100%. Use Exit to withdraw all liquidity.",
     "noLiquidity": "This position has no liquidity to withdraw.",
     "exitHelp": "Any remaining rewards must be claimed or forfeited before reusing this pool leg or closing the position.",
     "actions": "Liquidity actions",

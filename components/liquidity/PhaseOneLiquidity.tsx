@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, parseEventLogs, type Hex } from "viem";
-import { quoteRangeAmounts, staticsAbi } from "@statics-protocol/sdk/phase-one";
+import { staticsAbi } from "@statics-protocol/sdk/phase-one";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
@@ -18,6 +18,7 @@ import {
   buildPublicLiquidityChangeTransaction,
   inspectAttachableV4Position,
   quotePublicLiquidity,
+  quoteWithdrawalAmounts,
   readPublicManagedLiquidityPosition,
   planPublicLiquidityApprovals,
   usableTickBounds,
@@ -221,7 +222,7 @@ function ManagedLiquidity({
   const [amount1, setAmount1] = useState("");
   const [minimum0, setMinimum0] = useState("");
   const [minimum1, setMinimum1] = useState("");
-  const [percentage, setPercentage] = useState("100");
+  const [percentage, setPercentage] = useState("50");
   const [slippage, setSlippage] = useState("0.5");
   const [lpId, setLpId] = useState("");
   const state = useQuery({
@@ -393,21 +394,10 @@ function ManagedLiquidity({
                   "upper"
                 ),
               ];
-      const quote = deposits
-        ? quotePublicLiquidity({
-            sqrtPriceX96: market.sqrtPriceX96,
-            currentTick: market.tick,
-            tickSpacing: pool.poolKey.tickSpacing,
-            tickLower,
-            tickUpper,
-            amount0Maximum: parseLocalizedUnits(amount0 || "0", pool.token0.decimals, locale),
-            amount1Maximum: parseLocalizedUnits(amount1 || "0", pool.token1.decimals, locale),
-            toleranceBps: tolerance,
-          })
-        : null;
       const share =
         selectedMode === "decrease" ? parseLocalizedUnits(percentage, 2, locale) : 10000n;
-      if (share <= 0n || share > 10000n) throw new Error(t("percentageError"));
+      if (selectedMode === "decrease" && (share <= 0n || share >= 10000n))
+        throw new Error(t("percentageError"));
       const delta =
         selectedMode === "decrease"
           ? (latestManaged.leg.liquidity * share) / 10000n
@@ -416,7 +406,7 @@ function ManagedLiquidity({
         throw new Error(t("noLiquidity"));
       const estimated =
         latestManaged.leg.liquidity > 0n && withdrawals && selectedMode !== "collect"
-          ? quoteRangeAmounts(
+          ? quoteWithdrawalAmounts(
               market.sqrtPriceX96,
               latestManaged.leg.tickLower,
               latestManaged.leg.tickUpper,
@@ -429,6 +419,29 @@ function ManagedLiquidity({
       const min1 = minimum1
         ? parseLocalizedUnits(minimum1, pool.token1.decimals, locale)
         : (estimated.amount1 * BigInt(10000 - tolerance)) / 10000n;
+      const maximum0 = deposits
+        ? parseLocalizedUnits(amount0 || "0", pool.token0.decimals, locale)
+        : 0n;
+      const maximum1 = deposits
+        ? parseLocalizedUnits(amount1 || "0", pool.token1.decimals, locale)
+        : 0n;
+      const quote = deposits
+        ? {
+            ...quotePublicLiquidity({
+              sqrtPriceX96: market.sqrtPriceX96,
+              currentTick: market.tick,
+              tickSpacing: pool.poolKey.tickSpacing,
+              tickLower,
+              tickUpper,
+              amount0Maximum: maximum0 + (selectedMode === "rebalance" ? min0 : 0n),
+              amount1Maximum: maximum1 + (selectedMode === "rebalance" ? min1 : 0n),
+              toleranceBps: tolerance,
+            }),
+            // Rebalance reuses withdrawn principal; these limits cap additional wallet funds.
+            maximumAmount0: maximum0,
+            maximumAmount1: maximum1,
+          }
+        : null;
       const prerequisites =
         selectedMode === "collect" ? [] : await gaugePrerequisites(action.publicClient, deployment);
       const change: PublicLiquidityChange | null =
@@ -474,7 +487,8 @@ function ManagedLiquidity({
           ...(selectedMode === "exit" ? [t("exitHelp")] : []),
         ],
         execute: async () => {
-          if (quote) await approve(quote.maximumAmount0, quote.maximumAmount1);
+          if (quote && (quote.maximumAmount0 > 0n || quote.maximumAmount1 > 0n))
+            await approve(quote.maximumAmount0, quote.maximumAmount1);
           for (const prerequisite of prerequisites)
             await action.send({
               kind: "phase-one-checkpoint-schedule",
@@ -553,7 +567,9 @@ function ManagedLiquidity({
             },
       });
       const prerequisites =
-        latest.leg.liquidity > 0n ? await gaugePrerequisites(action.publicClient!, deployment) : [];
+        latest.leg.liquidity > 0n || (forfeit && slot === 0 && amount > 0n)
+          ? await gaugePrerequisites(action.publicClient!, deployment)
+          : [];
       return {
         label: forfeit ? t("forfeit") : t("claimReward"),
         details: [
