@@ -361,9 +361,10 @@ The transaction suite requires `manifest.json` and `cleanup-launch-manifest.json
 uses only loopback Anvil at port `8663` with chain ID `31337`, and reuses its existing contracts.
 It submits local transactions, funds fixture accounts, advances the fork clock, and configures a
 reward slot through local impersonation. It does not start another Anvil or map Uniswap API
-execution to a mainnet chain. Uniswap execution uses component fixtures; production integration
-is checked with read-only quotes. The browser suite checks the configured page layouts and
-disconnected states; wallet signing is covered separately by component and fork transaction tests.
+execution to a mainnet chain. Uniswap execution uses component fixtures. A live production
+integration check is a separate read-only quote on the selected network. The browser suite checks
+the configured page layouts and disconnected states; wallet signing is covered separately by
+component and fork transaction tests.
 
 Use a separate recoverable indexer database for this rehearsal, as described in
 [`docs/phase-one-indexer-replay.md`](docs/phase-one-indexer-replay.md).

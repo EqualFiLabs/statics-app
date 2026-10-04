@@ -34,17 +34,35 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const path of [
-    "/app/genesis",
-    "/app/positions",
-    "/app/rewards",
-    "/app/liquidity",
-    "/app/activity",
+  for (const { path, heading, copy } of [
+    {
+      path: "/app/genesis",
+      heading: "Manage your Operators NFTs",
+      copy: "Connect to view and manage your Operators NFTs.",
+    },
+    {
+      path: "/app/positions",
+      heading: "Your Position NFTs",
+      copy: "Create or reuse a position for staking, rewards, and liquidity.",
+    },
+    {
+      path: "/app/rewards",
+      heading: "Stake Statics",
+      copy: "Reuse a Position you own, or explicitly open a new one, then choose which fee assets it earns.",
+    },
+    {
+      path: "/app/liquidity",
+      heading: "Your liquidity",
+      copy: "No positions found. Create a position to get started.",
+    },
+    { path: "/app/activity", heading: "Transactions", copy: "Your activity" },
   ]) {
     await page.goto(path);
     await expect(page.locator("#dapp-content")).toBeVisible();
     await expect(page.getByText("ROUTE UNAVAILABLE", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/Application error/i)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
+    await expect(page.getByText(copy, { exact: true }).first()).toBeVisible();
   }
   await page.goto("/app/genesis");
   await expect(page.locator('.dapp-nav-item[href="/app/genesis"]')).toBeVisible();
