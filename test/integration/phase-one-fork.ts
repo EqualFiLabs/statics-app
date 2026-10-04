@@ -107,10 +107,15 @@ const read = <T>(
   client.readContract({ address, abi, functionName, args } as Parameters<
     typeof client.readContract
   >[0]) as Promise<T>;
-async function send(to: Address, data: Hex, value = 0n) {
+async function send(to: Address, data: Hex, value = 0n, fixtureGasPadding = 0n) {
   await client.call({ account, to, data, value });
   const gas = await client.estimateGas({ account, to, data, value });
-  const hash = await wallet.sendTransaction({ to, data, value, gas: gas + gas / 5n });
+  const hash = await wallet.sendTransaction({
+    to,
+    data,
+    value,
+    gas: gas + gas / 5n + fixtureGasPadding,
+  });
   const receipt = await client.waitForTransactionReceipt({ hash });
   expect(receipt.status).toBe("success");
   return receipt;
@@ -704,7 +709,10 @@ it("claims funded global, LP and allocator rewards and preserves the global port
       abi: staticsRangeGaugeAbi,
       functionName: "fundPoolReward",
       args: [pool.poolId, slot, parseEther("0.001"), 0, 2500],
-    })
+    }),
+    0n,
+    // Fixture-only funding can initialize stream accrual in the next block after estimation.
+    100_000n
   );
   await client.request({ method: "evm_increaseTime" as never, params: [25 * 3600] as never });
   await client.request({ method: "evm_mine" as never });
