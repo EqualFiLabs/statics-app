@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
@@ -26,8 +26,6 @@ import {
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
-import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 import { useWalletState } from "@/providers/wallet-context";
 
 type VaultDirection = "acquire" | "redeem";
@@ -64,7 +62,6 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const describeTransactionError = (cause: unknown) => describeError(cause, errorCopy);
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
-  const queryClient = useQueryClient();
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
   const [selectedOwnedId, setSelectedOwnedId] = useState<string>("");
@@ -72,26 +69,9 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const [busy, setBusy] = useState<"buy" | "redeem" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const verification = useQuery({
-    queryKey: [
-      "launch-deployment-verification",
-      deployment.descriptor.deploymentId,
-      deployment.protocolCommit,
-    ],
-    enabled: Boolean(publicClient),
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: Number.POSITIVE_INFINITY,
-    retry: false,
-    queryFn: async () => {
-      if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
-      await verifyLaunchDeploymentForRead(publicClient, deployment);
-      return true;
-    },
-  });
-
   const vault = useQuery({
     queryKey: ["genesis-vault-swap", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient && verification.data),
+    enabled: Boolean(publicClient),
     retry: false,
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
@@ -118,7 +98,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
   const nextAvailable = useQuery({
     queryKey: ["genesis-vault-next", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient && verification.data),
+    enabled: Boolean(publicClient),
     retry: false,
     queryFn: async () => {
       if (!publicClient) throw new Error("Robinhood RPC is unavailable.");
@@ -128,7 +108,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
   const walletBalances = useQuery({
     queryKey: ["genesis-vault-balances", deployment.descriptor.deploymentId, wallet],
-    enabled: Boolean(publicClient && wallet && verification.data),
+    enabled: Boolean(publicClient && wallet),
     retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
@@ -147,7 +127,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
 
   const walletOperators = useQuery({
     queryKey: ["genesis-vault-wallet", deployment.descriptor.deploymentId, wallet],
-    enabled: Boolean(publicClient && wallet && verification.data),
+    enabled: Boolean(publicClient && wallet),
     retry: false,
     queryFn: async () => {
       if (!publicClient || !wallet) throw new Error("Connect a wallet to view Operators.");
@@ -171,16 +151,6 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     },
   });
 
-  const refresh = async () => {
-    await queryClient.invalidateQueries({
-      predicate: (query) =>
-        Array.isArray(query.queryKey) &&
-        query.queryKey.includes(deployment.descriptor.deploymentId) &&
-        (String(query.queryKey[0]).startsWith("genesis-vault") ||
-          String(query.queryKey[0]).startsWith("launch-genesis")),
-    });
-  };
-
   const requireWallet = () => {
     if (walletState.status === "signed-out" || walletState.status === "error") {
       walletState.login();
@@ -200,7 +170,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const transact = async (
     request: Omit<Parameters<typeof executeProtocolTransaction>[0], "deploymentId">
   ) => {
-    await verifyLaunchDeployment(request.publicClient, deployment);
+    if (
+      request.publicClient.chain &&
+      request.publicClient.chain.id !== deployment.descriptor.chainId
+    )
+      throw new Error("Switch to the selected Statics network.");
     return executeProtocolTransaction({
       ...request,
       deploymentId: deployment.descriptor.deploymentId,
@@ -272,10 +246,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         sendTransaction: walletState.sendEvmTransaction,
         describeError: describeTransactionError,
       });
-      await refresh();
     } catch (cause) {
       setError(describeTransactionError(cause));
-      await refresh();
     } finally {
       setBusy(null);
     }
@@ -329,10 +301,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
         describeError: describeTransactionError,
       });
       setSelectedOwnedId("");
-      await refresh();
     } catch (cause) {
       setError(describeTransactionError(cause));
-      await refresh();
     } finally {
       setBusy(null);
     }
@@ -341,21 +311,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   // Keep the last complete snapshot visible during background reconciliation.
   // Only the initial load blocks the panel, so navigation and confirmed writes
   // do not flash an empty state while the RPC catches up.
-  if (verification.isLoading || vault.isLoading)
-    return <p className="dapp-loading">{t("loading")}</p>;
-  if (verification.error && !verification.data)
-    return (
-      <EmptyState
-        tone="error"
-        title={t("unavailable")}
-        description={describeTransactionError(verification.error)}
-        action={{
-          label: t("retry"),
-          onClick: () => void verification.refetch(),
-          disabled: verification.isFetching,
-        }}
-      />
-    );
+  if (vault.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
   if (vault.error && !vault.data)
     return (
       <EmptyState

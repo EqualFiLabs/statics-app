@@ -53,7 +53,6 @@ import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useDeployment } from "@/providers/deployment-context";
-import { PhaseOneMaintenancePanel } from "@/components/phase-one/PhaseOneMaintenancePanel";
 import { PhaseOnePositionsPanel } from "@/components/phase-one/PhaseOnePositionsPanel";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
@@ -77,7 +76,6 @@ export function RewardsPage({ initialPositionId = null }: { initialPositionId?: 
     return (
       <>
         <PhaseOnePositionsPanel deployment={active.phaseOne} />
-        <PhaseOneMaintenancePanel deployment={active.phaseOne} />
       </>
     );
   }

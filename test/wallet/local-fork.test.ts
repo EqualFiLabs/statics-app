@@ -46,18 +46,20 @@ function deployment(staticsCode: `0x${string}`) {
 }
 
 describe("local fork wallet provider", () => {
-  it("accepts the signer provider only when it sees the local runtime", async () => {
+  it("checks the selected local chain without reading bytecode", async () => {
     const code = "0x6001600055" as const;
     const request = vi.fn().mockResolvedValueOnce("0x7a69").mockResolvedValueOnce(code);
     await expect(
       verifyLocalForkWalletProvider({ request }, deployment(code))
     ).resolves.toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith({ method: "eth_chainId" });
   });
 
-  it("rejects a same-chain provider that cannot see the fork deployment", async () => {
-    const request = vi.fn().mockResolvedValueOnce("0x7a69").mockResolvedValueOnce("0x");
+  it("rejects a provider connected to a different chain", async () => {
+    const request = vi.fn().mockResolvedValueOnce("0x1237");
     await expect(
       verifyLocalForkWalletProvider({ request }, deployment("0x6001600055"))
-    ).rejects.toThrow("cannot see the Local Anvil deployment");
+    ).rejects.toThrow("not connected to Local Anvil");
   });
 });

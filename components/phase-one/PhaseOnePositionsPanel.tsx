@@ -67,6 +67,8 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
     enabled: Boolean(publicClient && wallet && positionId !== null),
     queryFn: async () => {
       if (!publicClient || !wallet || positionId === null) throw new Error("Select a PositionNFT.");
+      if (publicClient.chain && publicClient.chain.id !== deployment.descriptor.chainId)
+        throw new Error("Select the configured Statics network.");
       const block = await publicClient.getBlock();
       const [staking, gauges] = await Promise.all([
         readPositionStakingState({ publicClient, deployment, positionId, account: wallet }),
@@ -91,6 +93,8 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
     enabled: Boolean(publicClient && wallet && positionId !== null && allocationPoolId),
     queryFn: () => {
       if (!publicClient || !wallet || positionId === null) throw new Error("Select a PositionNFT.");
+      if (publicClient.chain && publicClient.chain.id !== deployment.descriptor.chainId)
+        throw new Error("Select the configured Statics network.");
       return readPositionGaugeRewards({
         publicClient,
         deployment,
@@ -241,6 +245,8 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
       const next = allocationInput
         ? [{ poolId: allocationPoolId as `0x${string}`, amount: parseUnits(allocationInput, 18) }]
         : [];
+      if (publicClient.chain && publicClient.chain.id !== deployment.descriptor.chainId)
+        throw new Error("Select the configured Statics network.");
       const block = await publicClient.getBlock();
       const validation = validateGaugeAllocationChange({
         current: live.data.gauges.allocations,

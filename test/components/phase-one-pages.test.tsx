@@ -7,9 +7,6 @@ vi.mock("@/components/phase-one/PhaseOneLiquidityPanel", () => ({
 vi.mock("@/components/phase-one/PhaseOnePositionsPanel", () => ({
   PhaseOnePositionsPanel: () => <div>Phase 1 position plumbing</div>,
 }));
-vi.mock("@/components/phase-one/PhaseOneMaintenancePanel", () => ({
-  PhaseOneMaintenancePanel: () => <div>Phase 1 maintenance plumbing</div>,
-}));
 
 import { LiquidityPage } from "@/components/liquidity/LiquidityPage";
 import { PositionListPage } from "@/components/positions/PositionListPage";
@@ -59,9 +56,9 @@ describe("Phase 1 product routes", () => {
     expect(screen.getByText("Phase 1 position plumbing")).toBeInTheDocument();
   });
 
-  it("composes rewards with position state and permissionless maintenance", () => {
+  it("keeps staking in rewards without a maintenance console", () => {
     withPhaseOne(<RewardsPage />);
     expect(screen.getByText("Phase 1 position plumbing")).toBeInTheDocument();
-    expect(screen.getByText("Phase 1 maintenance plumbing")).toBeInTheDocument();
+    expect(screen.queryByText("Phase 1 maintenance plumbing")).not.toBeInTheDocument();
   });
 });

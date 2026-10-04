@@ -16,6 +16,8 @@ export type PhaseOneTransactionRequest = Omit<
 
 export function executePhaseOneTransaction(request: PhaseOneTransactionRequest): Promise<Hex> {
   const { deployment, ...transaction } = request;
+  if (request.publicClient.chain && request.publicClient.chain.id !== deployment.descriptor.chainId)
+    throw new Error("Select the configured Statics network.");
   return executeProtocolTransaction({
     ...transaction,
     chainId: deployment.descriptor.chainId,
