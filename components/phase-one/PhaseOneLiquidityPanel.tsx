@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatUnits, getAddress, parseEventLogs, parseUnits } from "viem";
 import { usePublicClient } from "wagmi";
@@ -8,7 +8,6 @@ import { usePublicClient } from "wagmi";
 import { staticsAbi } from "@statics-protocol/sdk/phase-one";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
-import { verifyPhaseOneDeploymentCached } from "@/lib/deployments/verify-phase-one";
 import {
   advancePublicLiquidityWorkflow,
   createPublicLiquidityWorkflow,
@@ -25,13 +24,8 @@ import {
   readPublicManagedLiquidityPosition,
   readPublicLiquidityApprovals,
 } from "@/lib/phase-one/liquidity";
-import { listedPublicPool, readPublicPoolPreflight } from "@/lib/phase-one/pools";
-import {
-  executePhaseOneTransaction,
-  verifyErc20Allowance,
-  verifyManagedLiquidity,
-  verifyPositionOwner,
-} from "@/lib/phase-one/transactions";
+import { listedPublicPool, readPublicPoolState } from "@/lib/phase-one/pools";
+import { executePhaseOneTransaction } from "@/lib/phase-one/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -42,7 +36,6 @@ function describeError(error: unknown): string {
 export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDeployment }) {
   const publicClient = usePublicClient();
   const walletState = useWalletState();
-  const queryClient = useQueryClient();
   const [poolIndex, setPoolIndex] = useState(0);
   const [positionIdInput, setPositionIdInput] = useState("");
   const [tickLowerInput, setTickLowerInput] = useState("");
@@ -73,8 +66,7 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
     enabled: Boolean(publicClient && pool),
     queryFn: async () => {
       if (!publicClient || !pool) throw new Error("No public pool is selected.");
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
-      return readPublicPoolPreflight(publicClient, deployment, pool);
+      return readPublicPoolState(publicClient, deployment, pool);
     },
   });
   const managed = useQuery({
@@ -162,7 +154,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
     });
     persist(initial);
     try {
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       const transaction = await buildCreatePositionNftTransaction({
         publicClient,
         deployment,
@@ -197,12 +188,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
           }).find((candidate) => getAddress(candidate.args.owner) === wallet);
           if (!event) throw new Error("The confirmed transaction did not create a PositionNFT.");
           createdPosition.id = event.args.positionId;
-          await verifyPositionOwner({
-            publicClient,
-            deployment,
-            positionId: event.args.positionId,
-            owner: wallet,
-          });
         },
       });
       if (createdPosition.id === 0n) throw new Error("The new PositionNFT ID is unavailable.");
@@ -214,9 +199,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
           positionId: createdPositionId,
         })
       );
-      await queryClient.invalidateQueries({
-        queryKey: ["phase-one-positions", deployment.descriptor.deploymentId],
-      });
     } catch (failure) {
       setError(describeError(failure));
     } finally {
@@ -230,7 +212,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
     setError(null);
     try {
       const positionId = BigInt(positionIdInput);
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       const approvals = await readPublicLiquidityApprovals({
         publicClient,
         deployment,
@@ -252,14 +233,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
           data: approval.calldata,
           sendTransaction: walletState.sendEvmTransaction,
           describeError,
-          verifyConfirmation: () =>
-            verifyErc20Allowance({
-              publicClient,
-              token: approval.token,
-              owner: wallet,
-              spender: deployment.contracts.diamond,
-              minimum: approval.required,
-            }),
         });
       }
       const block = await publicClient.getBlock();
@@ -302,19 +275,8 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
           });
           persist(liquidityWorkflow);
         },
-        verifyConfirmation: () =>
-          verifyManagedLiquidity({
-            publicClient,
-            deployment,
-            positionId,
-            poolId: pool.poolId,
-            expectedLiquidity: quote.liquidity,
-          }),
       });
       persist(advancePublicLiquidityWorkflow(liquidityWorkflow, { status: "complete" }));
-      await queryClient.invalidateQueries({
-        queryKey: ["phase-one-liquidity", deployment.descriptor.deploymentId],
-      });
     } catch (failure) {
       setError(describeError(failure));
     } finally {
@@ -327,7 +289,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
     setPending(true);
     setError(null);
     try {
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       const inspected = await inspectAttachableV4Position({
         publicClient,
         deployment,
@@ -358,14 +319,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
           describeError,
         });
       }
-      await verifyManagedLiquidity({
-        publicClient,
-        deployment,
-        positionId,
-        poolId: pool.poolId,
-        expectedLiquidity: inspected.liquidity,
-      });
-      await managed.refetch();
     } catch (failure) {
       setError(describeError(failure));
     } finally {
@@ -402,14 +355,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
             data: approval.calldata,
             sendTransaction: walletState.sendEvmTransaction,
             describeError,
-            verifyConfirmation: () =>
-              verifyErc20Allowance({
-                publicClient,
-                token: approval.token,
-                owner: wallet,
-                spender: deployment.contracts.diamond,
-                minimum: approval.required,
-              }),
           });
         }
       }
@@ -463,16 +408,6 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
         rebalance: "phase-one-rebalance-liquidity",
         exit: "phase-one-exit-liquidity",
       } as const;
-      const expectedLiquidity =
-        changeKind === "increase"
-          ? currentLiquidity + quote!.liquidity
-          : changeKind === "decrease"
-            ? currentLiquidity - delta
-            : changeKind === "rebalance"
-              ? quote!.liquidity
-              : changeKind === "exit"
-                ? 0n
-                : currentLiquidity;
       await executePhaseOneTransaction({
         deployment,
         publicClient,
@@ -484,16 +419,7 @@ export function PhaseOneLiquidityPanel({ deployment }: { deployment: PhaseOneDep
         data: transaction.calldata,
         sendTransaction: walletState.sendEvmTransaction,
         describeError,
-        verifyConfirmation: () =>
-          verifyManagedLiquidity({
-            publicClient,
-            deployment,
-            positionId,
-            poolId: pool.poolId,
-            expectedLiquidity,
-          }),
       });
-      await managed.refetch();
     } catch (failure) {
       setError(describeError(failure));
     } finally {

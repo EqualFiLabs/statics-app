@@ -146,8 +146,8 @@ export type PhaseOneDeployment = Readonly<{
   installedPhase: 1;
   source: "checked-in-manifest" | "development-fixture";
   contracts: Readonly<Record<PhaseOneContractName, Address>>;
-  runtimeCodeHashes: Readonly<Record<PhaseOneContractName, Hex>>;
-  facetFingerprint: Hex;
+  runtimeCodeHashes: Readonly<Partial<Record<PhaseOneContractName, Hex>>>;
+  facetFingerprint?: Hex;
   facets: readonly PhaseOneFacet[];
   supportedPools: readonly SupportedPublicPool[];
 }>;

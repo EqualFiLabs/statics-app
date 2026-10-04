@@ -4,7 +4,7 @@ import type { Address, PublicClient } from "viem";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
 
 const RPC_CATCH_UP_DELAYS_MS = [0, 250, 750, 1_500, 3_000] as const;
-const QUERY_RECONCILIATION_DELAYS_MS = [0, 1_500, 4_000, 8_000] as const;
+const QUERY_RECONCILIATION_DELAYS_MS = [0] as const;
 
 export const PROTOCOL_TRANSACTION_CONFIRMED_EVENT = "statics:protocol-transaction-confirmed";
 
@@ -69,6 +69,7 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-pool": "phase-one-market",
   "phase-one-swap-quote": "phase-one-market",
   "phase-one-swap-approvals": "approval",
+  "direct-swap-allowances": "approval",
   "phase-one-positions": "phase-one-position",
   "phase-one-position": "phase-one-position",
   "phase-one-liquidity": "phase-one-liquidity",
@@ -97,6 +98,7 @@ const walletScopedRoots = new Set([
   "genesis-vault-wallet",
   "launch-genesis-credit",
   "phase-one-swap-approvals",
+  "direct-swap-allowances",
   "phase-one-positions",
   "phase-one-position",
   "phase-one-liquidity",
@@ -109,6 +111,7 @@ const deploymentScopedRoots = new Set([
   "phase-one-pool",
   "phase-one-swap-quote",
   "phase-one-swap-approvals",
+  "direct-swap-allowances",
   "phase-one-positions",
   "phase-one-position",
   "phase-one-liquidity",

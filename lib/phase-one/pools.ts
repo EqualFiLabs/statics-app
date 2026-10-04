@@ -390,3 +390,20 @@ export async function readPublicPoolPreflight(
     swappable: initialized && liquidity > 0n && !decommissioned && !swapsBlocked,
   };
 }
+
+/** Liquidity forms need the current price only; rewards and deployment state are unrelated. */
+export async function readPublicPoolState(
+  publicClient: PublicClient,
+  deployment: PhaseOneDeployment,
+  pool: PublicPoolSelection
+) {
+  if (publicClient.chain && publicClient.chain.id !== deployment.descriptor.chainId)
+    throw new Error("Select the configured Statics network.");
+  const [sqrtPriceX96, tick] = await publicClient.readContract({
+    address: deployment.contracts.stateView,
+    abi: v4StateViewReadAbi,
+    functionName: "getSlot0",
+    args: [pool.poolId],
+  });
+  return { sqrtPriceX96, tick };
+}

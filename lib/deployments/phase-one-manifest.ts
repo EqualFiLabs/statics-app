@@ -11,7 +11,7 @@ import type {
   SupportedPublicPool,
 } from "@/lib/deployments/types";
 
-type ManifestContract = Readonly<{ address: string; runtimeCodeHash: string }>;
+type ManifestContract = Readonly<{ address: string; runtimeCodeHash?: string }>;
 
 const phaseOneContractNames = [
   "diamond",
@@ -38,8 +38,8 @@ export type PhaseOneDeploymentManifest = Readonly<{
   sdkCommit: string;
   installedPhase: 1;
   contracts: Readonly<Record<PhaseOneContractName, ManifestContract>>;
-  facetFingerprint: string;
-  facets: readonly Readonly<{
+  facetFingerprint?: string;
+  facets?: readonly Readonly<{
     address: string;
     runtimeCodeHash: string;
     selectors: readonly string[];
@@ -182,15 +182,15 @@ export function parsePhaseOneDeploymentManifest(
     ])
   ) as Record<PhaseOneContractName, Address>;
   const runtimeCodeHashes = Object.fromEntries(
-    phaseOneContractNames.map((name) => [
-      name,
-      hash(manifest.contracts[name].runtimeCodeHash, `contracts.${name}.runtimeCodeHash`),
-    ])
-  ) as Record<PhaseOneContractName, Hex>;
+    phaseOneContractNames.flatMap((name) => {
+      const value = manifest.contracts[name].runtimeCodeHash;
+      return value ? [[name, hash(value, `contracts.${name}.runtimeCodeHash`)]] : [];
+    })
+  ) as Partial<Record<PhaseOneContractName, Hex>>;
 
   const seenFacetAddresses = new Set<string>();
   const seenSelectors = new Set<string>();
-  const facets = manifest.facets.map((entry, index): PhaseOneFacet => {
+  const facets = (manifest.facets ?? []).map((entry, index): PhaseOneFacet => {
     const facetAddress = address(entry.address, `facets.${index}.address`);
     const addressKey = facetAddress.toLowerCase();
     if (seenFacetAddresses.has(addressKey))
@@ -213,9 +213,14 @@ export function parsePhaseOneDeploymentManifest(
       selectors,
     };
   });
-  if (facets.length === 0) throw new Error("The Phase 1 facet inventory is required.");
-  const facetFingerprint = hash(manifest.facetFingerprint, "facetFingerprint");
-  if (phaseOneFacetFingerprint(facets).toLowerCase() !== facetFingerprint.toLowerCase()) {
+  const facetFingerprint = manifest.facetFingerprint
+    ? hash(manifest.facetFingerprint, "facetFingerprint")
+    : undefined;
+  if (
+    facetFingerprint &&
+    facets.length > 0 &&
+    phaseOneFacetFingerprint(facets).toLowerCase() !== facetFingerprint.toLowerCase()
+  ) {
     throw new Error("Phase 1 facet fingerprint does not match the facet inventory.");
   }
 

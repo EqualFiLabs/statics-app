@@ -95,6 +95,22 @@ describe("Phase 1 deployment manifest", () => {
     expect(hasCapability(deployment, "genesis-position-linking")).toBe(false);
   });
 
+  it("accepts configured addresses and pools without optional provenance inventories", () => {
+    const source = manifest();
+    const minimal = {
+      ...source,
+      facets: undefined,
+      facetFingerprint: undefined,
+      contracts: Object.fromEntries(
+        Object.entries(source.contracts).map(([name, value]) => [name, { address: value.address }])
+      ),
+    } as PhaseOneDeploymentManifest;
+    const parsed = parsePhaseOneDeploymentManifest(minimal);
+    expect(parsed.runtimeCodeHashes).toEqual({});
+    expect(parsed.facets).toEqual([]);
+    expect(parsed.supportedPools).toHaveLength(1);
+  });
+
   it("rejects a mismatched fingerprint, hook, or PoolId", () => {
     expect(() =>
       parsePhaseOneDeploymentManifest({ ...manifest(), facetFingerprint: hash("f") })

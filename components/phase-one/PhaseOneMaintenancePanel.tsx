@@ -6,7 +6,6 @@ import { formatUnits, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
-import { verifyPhaseOneDeploymentCached } from "@/lib/deployments/verify-phase-one";
 import {
   planGaugeCatchup,
   planPoolCheckpoint,
@@ -49,7 +48,6 @@ export function PhaseOneMaintenancePanel({ deployment }: { deployment: PhaseOneD
     enabled: Boolean(publicClient && pool),
     queryFn: async () => {
       if (!publicClient || !pool) throw new Error("No public pool is selected.");
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       const state = await readPublicPoolPreflight(publicClient, deployment, pool);
       const rewards = await Promise.all(
         [pool.token0.address, pool.token1.address].map((asset) =>
@@ -65,7 +63,6 @@ export function PhaseOneMaintenancePanel({ deployment }: { deployment: PhaseOneD
     setPending(true);
     setError(null);
     try {
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       for (const action of actions) {
         await executePhaseOneTransaction({
           deployment,

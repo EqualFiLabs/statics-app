@@ -1,12 +1,11 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { erc20Abi, formatUnits, getAddress, parseUnits, type Address } from "viem";
 import { usePublicClient } from "wagmi";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
-import { verifyPhaseOneDeploymentCached } from "@/lib/deployments/verify-phase-one";
 import { loadIndexedPhaseOnePositions } from "@/lib/indexer/phase-one";
 import {
   buildGaugeAllocationTransaction,
@@ -20,11 +19,7 @@ import {
   buildStaticsStakeApproval,
   readPositionStakingState,
 } from "@/lib/phase-one/staking";
-import {
-  executePhaseOneTransaction,
-  verifyErc20Allowance,
-  verifyGaugeAllocations,
-} from "@/lib/phase-one/transactions";
+import { executePhaseOneTransaction } from "@/lib/phase-one/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 
@@ -40,7 +35,6 @@ function addressList(value: string): readonly Address[] {
 export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDeployment }) {
   const publicClient = usePublicClient();
   const walletState = useWalletState();
-  const queryClient = useQueryClient();
   const wallet = walletState.address ? getAddress(walletState.address) : null;
   const [selectedId, setSelectedId] = useState("");
   const [stakeInput, setStakeInput] = useState("");
@@ -58,7 +52,6 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
     retry: false,
     queryFn: async () => {
       if (!wallet || !publicClient) throw new Error("Connect a wallet to load PositionNFTs.");
-      await verifyPhaseOneDeploymentCached(publicClient, deployment);
       return loadIndexedPhaseOnePositions(wallet, deployment.descriptor.deploymentId);
     },
   });
@@ -113,10 +106,6 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
     setError(null);
     try {
       await action();
-      await Promise.all([positions.refetch(), live.refetch()]);
-      await queryClient.invalidateQueries({
-        queryKey: ["phase-one-rewards", deployment.descriptor.deploymentId],
-      });
     } catch (failure) {
       setError(describeError(failure));
     } finally {
@@ -147,14 +136,6 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
           data: approval.calldata,
           sendTransaction: walletState.sendEvmTransaction,
           describeError,
-          verifyConfirmation: () =>
-            verifyErc20Allowance({
-              publicClient,
-              token: deployment.contracts.statics,
-              owner: wallet,
-              spender: deployment.contracts.diamond,
-              minimum: amount,
-            }),
         });
       }
       const transaction = buildPositionStakingTransaction({
@@ -285,14 +266,6 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
         data: transaction.calldata,
         sendTransaction: walletState.sendEvmTransaction,
         describeError,
-        verifyConfirmation: () =>
-          verifyGaugeAllocations({
-            publicClient,
-            deployment,
-            positionId,
-            account: wallet,
-            expected: next,
-          }),
       });
     });
 

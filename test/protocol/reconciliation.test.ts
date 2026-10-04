@@ -51,6 +51,18 @@ describe("confirmed transaction reconciliation", () => {
     unsubscribe();
   });
 
+  it("uses one immediate refresh by default", async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn();
+      scheduleProtocolReconciliation(refresh);
+      await vi.runAllTimersAsync();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("runs bounded refresh passes and supports cancellation", async () => {
     vi.useFakeTimers();
     try {
