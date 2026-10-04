@@ -65,7 +65,7 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useDeployment } from "@/providers/deployment-context";
-import { PhaseOneLiquidityPanel } from "@/components/phase-one/PhaseOneLiquidityPanel";
+import { PhaseOneLiquidity } from "@/components/liquidity/PhaseOneLiquidity";
 
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
 
@@ -290,10 +290,17 @@ export function LiquidityContributionForm({
   );
 }
 
-export function LiquidityPage() {
+export function LiquidityPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
   const wallet = useWalletState();
   const { active } = useDeployment();
-  if (active.phaseOne) return <PhaseOneLiquidityPanel deployment={active.phaseOne} />;
+  if (active.phaseOne)
+    return (
+      <PhaseOneLiquidity
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
+        deployment={active.phaseOne}
+        initialPositionId={initialPositionId}
+      />
+    );
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
   return (
     <ProtocolActionScope>

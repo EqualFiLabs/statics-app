@@ -3,10 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { v4PoolId, type V4PoolKey } from "@statics-protocol/sdk/phase-one";
 
-import type { PhaseOneDeployment, PublicPoolToken } from "@/lib/deployments/types";
 import {
   gaugeScheduleFreshness,
-  importedPublicPool,
   requireCanonicalPublicPoolKey,
   samePoolKey,
 } from "@/lib/phase-one/pools";
@@ -20,16 +18,6 @@ const poolKey: V4PoolKey = {
   tickSpacing: 60,
   hooks: address("3"),
 };
-
-function token(tokenAddress: `0x${string}`, symbol: string): PublicPoolToken {
-  return {
-    address: tokenAddress,
-    name: symbol,
-    symbol,
-    decimals: 18,
-    metadataSource: "onchain-import",
-  };
-}
 
 describe("Phase 1 public pools", () => {
   it("derives the PoolId only for canonical keys using the reviewed hook", () => {
@@ -47,22 +35,6 @@ describe("Phase 1 public pools", () => {
     expect(() =>
       requireCanonicalPublicPoolKey({ ...poolKey, fee: 1_000_000 }, poolKey.hooks)
     ).toThrow("supported static");
-  });
-
-  it("marks explicit imports as warned and direct-only", () => {
-    const deployment = {
-      contracts: { publicHook: poolKey.hooks },
-    } as PhaseOneDeployment;
-    const imported = importedPublicPool({
-      deployment,
-      poolKey,
-      token0: token(poolKey.currency0, "ONE"),
-      token1: token(poolKey.currency1, "TWO"),
-    });
-    expect(imported.poolId).toBe(v4PoolId(poolKey));
-    expect(imported.source).toBe("explicit-import");
-    expect(imported.directOnly).toBe(true);
-    expect(imported.warning).toContain("never a routing intermediary");
   });
 
   it("reports bounded permissionless gauge catch-up without treating it as swap state", () => {

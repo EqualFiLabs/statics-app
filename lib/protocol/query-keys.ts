@@ -14,14 +14,6 @@ export const protocolQueryKeys = {
   phaseOnePools: (deploymentId: string) => ["phase-one-pools", deploymentId] as const,
   phaseOnePool: (deploymentId: string, poolId: string) =>
     ["phase-one-pool", deploymentId, poolId] as const,
-  phaseOneSwapQuote: (deploymentId: string, poolId: string, inputToken: Address, amount: bigint) =>
-    ["phase-one-swap-quote", deploymentId, poolId, inputToken, amount.toString()] as const,
-  phaseOneSwapApprovals: (
-    deploymentId: string,
-    wallet: Address | null,
-    token: Address,
-    amount: bigint
-  ) => ["phase-one-swap-approvals", deploymentId, wallet, token, amount.toString()] as const,
   phaseOnePositions: (deploymentId: string, wallet: Address | null) =>
     ["phase-one-positions", deploymentId, wallet] as const,
   phaseOnePosition: (deploymentId: string, wallet: Address | null, positionId: bigint) =>
@@ -40,6 +32,4 @@ export const protocolQueryKeys = {
   ) => ["phase-one-rewards", deploymentId, wallet, positionId.toString(), poolId] as const,
   phaseOneGauges: (deploymentId: string, wallet: Address | null, positionId: bigint) =>
     ["phase-one-gauges", deploymentId, wallet, positionId.toString()] as const,
-  phaseOneMaintenance: (deploymentId: string, poolId: string) =>
-    ["phase-one-maintenance", deploymentId, poolId] as const,
 };

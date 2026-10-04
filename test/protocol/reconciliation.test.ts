@@ -16,6 +16,8 @@ describe("confirmed transaction reconciliation", () => {
   it("refreshes Phase 1 positions after close and reward catch-up", () => {
     expect(protocolQueryScopes("phase-one-close-position")).toContain("phase-one-position");
     expect(protocolQueryScopes("phase-one-checkpoint-schedule")).toContain("phase-one-reward");
+    expect(protocolQueryScopes("phase-one-claim-lp-rewards")).toContain("phase-one-liquidity");
+    expect(protocolQueryScopes("phase-one-forfeit-lp-reward")).toContain("phase-one-liquidity");
   });
 
   it("waits until the read RPC serves the confirmed block", async () => {

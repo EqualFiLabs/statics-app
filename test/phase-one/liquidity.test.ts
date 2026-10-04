@@ -144,3 +144,16 @@ describe("Phase 1 public liquidity", () => {
     ]);
   });
 });
+
+describe("user-facing price bounds", () => {
+  it("uses full range by default and aligns price bounds with token decimals", async () => {
+    const { priceToAlignedTick, tickPrice } = await import("@/lib/phase-one/prices");
+    const { parseUnits } = await import("viem");
+    expect(usableTickBounds(60)).toEqual([-887220, 887220]);
+    expect(priceToAlignedTick(parseUnits("1", 36), 18, 18, 60, "lower")).toBe(0);
+    expect(priceToAlignedTick(parseUnits("1.000001", 36), 18, 18, 60, "upper")).toBe(60);
+    expect(priceToAlignedTick(parseUnits("1", 36), 6, 18, 60, "lower")).toBeGreaterThan(270000);
+    expect(tickPrice(0, 6, 18)).toBe("0.000000000001");
+    expect(() => priceToAlignedTick(0n, 18, 18, 60, "lower")).toThrow("greater than zero");
+  });
+});

@@ -28,6 +28,7 @@ import {
   type RangeGaugePendingRewards,
 } from "@statics-protocol/sdk/phase-one";
 
+import { swapDeadlineBase } from "@/lib/trade/canonical-market";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { samePoolKey, type PublicPoolSelection } from "@/lib/phase-one/pools";
 
@@ -196,31 +197,6 @@ export function planPublicLiquidityApprovals(input: {
       args: [input.deployment.contracts.diamond, maxUint256],
     }),
   }));
-}
-
-export async function readPublicLiquidityApprovals(input: {
-  publicClient: PublicClient;
-  deployment: PhaseOneDeployment;
-  pool: PublicPoolSelection;
-  owner: Address;
-  amount0Maximum: bigint;
-  amount1Maximum: bigint;
-}): Promise<readonly PublicLiquidityApproval[]> {
-  const [allowance0, allowance1] = await Promise.all([
-    input.publicClient.readContract({
-      address: input.pool.poolKey.currency0,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [input.owner, input.deployment.contracts.diamond],
-    }),
-    input.publicClient.readContract({
-      address: input.pool.poolKey.currency1,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [input.owner, input.deployment.contracts.diamond],
-    }),
-  ]);
-  return planPublicLiquidityApprovals({ ...input, allowance0, allowance1 });
 }
 
 export async function buildCreatePositionNftTransaction(input: {
@@ -470,4 +446,15 @@ export async function readPublicManagedLiquidityPosition(input: {
     canExitLiquidity: leg.liquidity > 0n,
     closeBlockers,
   };
+}
+
+export async function publicLiquidityDeadline(publicClient: PublicClient): Promise<bigint> {
+  const [latest, pending] = await Promise.all([
+    publicClient.getBlock(),
+    publicClient.getBlock({ blockTag: "pending" }),
+  ]);
+  return (
+    swapDeadlineBase(latest.timestamp, pending.timestamp, BigInt(Math.floor(Date.now() / 1000))) +
+    1200n
+  );
 }

@@ -58,17 +58,24 @@ offered, so a manifest that has drifted from the chain fails closed.
 
 ## Phase 1 manifests
 
-Standalone Genesis and Phase 1 use separate reviewed artifacts. Genesis remains
-in `robinhood-genesis.json`; public pools, the Phase 1 Diamond, its complete
-facet inventory, periphery dependencies, and supported PoolKeys belong in a
-Phase 1 manifest registered by `phase-one-manifests.ts`.
+Genesis and Phase 1 use separate reviewed artifacts and coexist on the selected
+network. Genesis remains in `robinhood-genesis.json`; Phase 1 contracts, periphery
+dependencies, and supported PoolKeys belong in a manifest registered by
+`phase-one-manifests.ts`.
 
-The Phase 1 parser verifies the protocol and SDK commits, every runtime identity,
-the exact facet fingerprint, canonical PoolKey ordering, PoolId derivation, hook
-identity, and reviewed token metadata. Runtime verification then rereads the
-Diamond facet inventory, immutable periphery bindings, public-hook pool
-registrations, and pool initialization state. Until a reviewed Phase 1 manifest
-is registered, its capabilities and writes stay unavailable.
+The Phase 1 parser checks chain and address configuration, canonical PoolKey
+ordering, PoolId derivation, hook identity, and token metadata locally. Runtime
+hashes, facet inventories, and fingerprints are optional provenance. Swaps and
+Phase 1 actions do not repeat deployment audits or wait for unrelated reward,
+gauge, or treasury reads. A configured manifest enables its declared capabilities;
+unavailable basket, Dollar, and loan operations remain gated.
 
 Local development may supply `NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST`, but
 only for chain `31337` and only when `NEXT_PUBLIC_APP_ENV=development`.
+
+The swap card selects the Genesis canonical pair first, then the first enabled
+Phase 1 pool matching the pair, then Uniswap on the selected network. Direct
+Statics quote errors remain errors. Routing stays internal to the card. Liquidity,
+Positions, Rewards, and Activity extend the existing screens. Liquidity recovery
+uses receipts, transaction history, and indexed ownership; saved workflow records
+are no longer read or written.
