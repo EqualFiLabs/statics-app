@@ -75,6 +75,8 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-positions": "phase-one-position",
   "phase-one-position": "phase-one-position",
   "phase-one-stake-allowance": "approval",
+  "phase-one-liquidity-allowance": "approval",
+  "phase-one-wallet-lp": "phase-one-liquidity",
   "phase-one-liquidity": "phase-one-liquidity",
   "phase-one-rewards": "phase-one-reward",
   "phase-one-gauges": "phase-one-reward",
@@ -131,6 +133,7 @@ export function protocolQueryScopes(kind: ProtocolActivityKind): readonly Protoc
   }
   if (
     kind === "phase-one-create-position" ||
+    kind === "phase-one-close-position" ||
     kind === "phase-one-stake" ||
     kind === "phase-one-unstake" ||
     kind === "phase-one-reward-selection" ||

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, type Address } from "viem";
+import { staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
 import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
 import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { ActionReview } from "@/components/phase-one/ActionReview";
@@ -13,6 +14,7 @@ import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { loadIndexedPhaseOnePosition } from "@/lib/indexer/phase-one";
 import {
   readPositionStakingState,
+  readPositionGlobalRewards,
   buildPositionStakingTransaction,
   buildStaticsStakeApproval,
 } from "@/lib/phase-one/staking";
@@ -24,7 +26,7 @@ import {
   validateGaugeAllocationChange,
   replacePoolAllocation,
 } from "@/lib/phase-one/gauges";
-import { globalRewardPrerequisites, gaugePrerequisites } from "@/lib/phase-one/reward-actions";
+import { gaugePrerequisites } from "@/lib/phase-one/reward-actions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useAppLocale } from "@/i18n/client";
@@ -219,6 +221,7 @@ function PositionRewards({
   };
   const selectedAssets = assetDraft ?? live.data?.staking.selectedAssets ?? [];
   const confirmedAssets = live.data?.staking.selectedAssets ?? [];
+  const claimAssets = live.data?.staking.claimAssets ?? [];
   const additions = selectedAssets.filter((asset) => !confirmedAssets.includes(asset));
   const removals = confirmedAssets.filter((asset) => !selectedAssets.includes(asset));
   const allocation =
@@ -231,7 +234,7 @@ function PositionRewards({
   ) => {
     for (const prerequisite of prerequisites)
       await action.send({
-        kind: "checkpoint-rewards",
+        kind: "phase-one-checkpoint-schedule",
         label: prerequisite.label,
         amount: `Position #${positionId}`,
         to: deployment.contracts.diamond,
@@ -247,14 +250,9 @@ function PositionRewards({
         positionId,
         action: kind === "stake" ? { kind, amount } : { kind, amount, receiver: action.wallet },
       });
-      const prerequisites = await globalRewardPrerequisites(
-        action.publicClient,
-        deployment,
-        confirmedAssets
-      );
       return {
         label: kind === "stake" ? p("stake") : p("unstake"),
-        details: [`${formatUnits(amount, 18)} STATICS`, ...prerequisites.map((item) => item.label)],
+        details: [`${formatUnits(amount, 18)} STATICS`],
         execute: async () => {
           if (kind === "stake") {
             const key = [
@@ -289,7 +287,6 @@ function PositionRewards({
               await queryClient.fetchQuery({ queryKey: key, staleTime: 0, queryFn: read });
             }
           }
-          await sendPrerequisites(prerequisites);
           await action.send({
             kind: kind === "stake" ? "phase-one-stake" : "phase-one-unstake",
             label: kind === "stake" ? p("stake") : p("unstake"),
@@ -308,10 +305,6 @@ function PositionRewards({
         throw new Error(
           d("chooseAssets", { count: String(live.data.staking.maximumRewardAssets) })
         );
-      const prerequisites = await globalRewardPrerequisites(action.publicClient, deployment, [
-        ...confirmedAssets,
-        ...additions,
-      ]);
       const transactions = [
         ...(removals.length
           ? [
@@ -338,10 +331,8 @@ function PositionRewards({
           p("selectionHelp"),
           ...additions.map((asset) => `+ ${describeAmount(asset, 0n)}`),
           ...removals.map((asset) => `− ${describeAmount(asset, 0n)}`),
-          ...prerequisites.map((item) => item.label),
         ],
         execute: async () => {
-          await sendPrerequisites(prerequisites);
           for (const transaction of transactions)
             await action.send({
               kind: "phase-one-reward-selection",
@@ -418,13 +409,24 @@ function PositionRewards({
   const claim = (kind: "global" | "lp" | "allocator") =>
     action.prepare(async () => {
       if (!action.publicClient || !action.wallet) throw new Error(p("selection"));
+      const activeLp =
+        kind === "lp"
+          ? (
+              await action.publicClient.readContract({
+                address: deployment.contracts.diamond,
+                abi: staticsRangeGaugeAbi,
+                functionName: "lpLeg",
+                args: [positionId, poolId],
+              })
+            ).liquidity > 0n
+          : false;
       const prerequisites =
-        kind === "global"
-          ? await globalRewardPrerequisites(action.publicClient, deployment, confirmedAssets, true)
-          : await gaugePrerequisites(action.publicClient, deployment);
+        kind === "allocator" || activeLp
+          ? await gaugePrerequisites(action.publicClient, deployment)
+          : [];
       const latest =
         kind === "global"
-          ? await readPositionStakingState({
+          ? await readPositionGlobalRewards({
               publicClient: action.publicClient,
               deployment,
               positionId,
@@ -439,7 +441,7 @@ function PositionRewards({
             });
       const claims =
         "pendingRewards" in latest
-          ? latest.selectedAssets.map((asset, index) => ({
+          ? latest.claimAssets.map((asset, index) => ({
               asset,
               slot: index,
               amount: latest.pendingRewards[index],
@@ -552,8 +554,7 @@ function PositionRewards({
           selected={selectedAssets}
           rewards={tokens.map((token) => ({
             token,
-            pending:
-              live.data?.staking.pendingRewards[confirmedAssets.indexOf(token.address)] ?? 0n,
+            pending: live.data?.staking.pendingRewards[claimAssets.indexOf(token.address)] ?? 0n,
           }))}
           maximum={live.data?.staking.maximumRewardAssets ?? 0n}
           chainId={deployment.descriptor.chainId}
@@ -601,7 +602,7 @@ function PositionRewards({
         <div className="reward-position-list">
           <article className="reward-position">
             <h4>{t("stakingSource")}</h4>
-            {confirmedAssets.map((asset, index) => (
+            {claimAssets.map((asset, index) => (
               <p key={asset}>
                 {describeAmount(asset, live.data?.staking.pendingRewards[index] ?? 0n)}
               </p>

@@ -35,7 +35,7 @@ export function usePhaseOneAction(deployment: PhaseOneDeployment, selection = ""
     publicClient &&
     (!publicClient.chain || publicClient.chain.id === deployment.descriptor.chainId)
   );
-  const context = `${deployment.descriptor.deploymentId}:${wallet}:${walletState.chainId}:${walletState.status}:${selection}`;
+  const context = `${deployment.descriptor.deploymentId}:${wallet}:${walletState.chainId}:${walletState.status}:${walletState.walletKind}:${selection}`;
   const current = useRef(context);
   useLayoutEffect(() => {
     current.current = context;

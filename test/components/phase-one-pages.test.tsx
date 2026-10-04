@@ -104,19 +104,18 @@ function withPhaseOne(ui: React.ReactElement) {
 beforeEach(() => {
   mocks.execute.mockReset().mockResolvedValue(hash("f"));
   mocks.position.mockReset().mockImplementation(async (id) => position(id));
-  mocks.page
-    .mockReset()
-    .mockResolvedValue({
-      deploymentId: "phase-one-fixture",
-      indexedAtBlock: 1n,
-      items: [position(1n)],
-      nextCursor: null,
-    });
+  mocks.page.mockReset().mockResolvedValue({
+    deploymentId: "phase-one-fixture",
+    indexedAtBlock: 1n,
+    items: [position(1n)],
+    nextCursor: null,
+  });
   mocks.read.mockReset().mockImplementation(async ({ functionName, args }) => {
     if (functionName === "positionCreationFee") return 1n;
     if (functionName === "stakePosition")
       return { stakedBalance: parseEther("100"), rewardMultiplierBps: 10000 };
     if (functionName === "positionRewardAssets") return [tokens[0].address];
+    if (functionName === "globalRewardAssetsOfPosition") return [[tokens[0].address], 1n];
     if (functionName === "pendingRewards") return [parseEther("3")];
     if (functionName === "maxRewardAssetsPerPosition") return 10n;
     if (functionName === "gaugePositionAllocations")
@@ -139,6 +138,7 @@ beforeEach(() => {
     if (functionName === "gaugeReserve")
       return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
     if (functionName === "maxGaugeCatchupPeriods") return 10;
+    if (functionName === "lpLeg") return { liquidity: 0n };
     if (functionName === "allowance") return maxUint256;
     if (functionName === "rewardBookNeedsCheckpoint") return false;
     if (functionName === "unfundedSwapRewards") return 0n;
@@ -197,6 +197,35 @@ describe("additive Phase 1 screens", () => {
     });
     expect(decoded.args?.[1]).toBe(hash("2"));
   });
+  it.each(["opt-out", "full unstake"])(
+    "keeps accrued global rewards claimable after %s",
+    async (kind) => {
+      const original = mocks.read.getMockImplementation()!;
+      mocks.read.mockImplementation(async (input) => {
+        if (input.functionName === "positionRewardAssets") return [];
+        if (input.functionName === "stakePosition")
+          return {
+            stakedBalance: kind === "full unstake" ? 0n : parseEther("100"),
+            rewardMultiplierBps: 10000,
+          };
+        return original(input);
+      });
+      withPhaseOne(<RewardsPage />);
+      const button = await screen.findByRole("button", { name: "Review global rewards" });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await screen.findByText("Minimum payout: 2.985 STATICS");
+      fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+      await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+      expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-claim-global-rewards");
+      expect(
+        mocks.read.mock.calls.some(([input]) =>
+          ["rewardBookNeedsCheckpoint", "unfundedSwapRewards"].includes(input.functionName)
+        )
+      ).toBe(false);
+    }
+  );
+
   it("editing and clearing one allocation preserves the other pool", async () => {
     withPhaseOne(<RewardsPage />);
     const save = await screen.findByRole("button", { name: "Review allocation" });

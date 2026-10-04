@@ -6,6 +6,9 @@ export const genesisVaultRecoveryErrors = parseAbi([
   "error GenesisNotInVault(uint256 tokenId)",
   "error GenesisLocked(uint256 genesisId)",
   "error CreditAlreadyActive(uint256 genesisId)",
+  "error NotGenesisOwner(uint256 tokenId,address caller,address owner)",
+  "error ERC721InvalidApprover(address approver)",
+  "error ERC721IncorrectOwner(address sender,uint256 tokenId,address owner)",
 ]);
 
 /** viem's raw call errors can carry encoded revert data inside nested causes. */

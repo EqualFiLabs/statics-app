@@ -90,6 +90,7 @@ export type DollarActivityKind =
   | "phase-one-approve-token"
   | "phase-one-approve-permit2"
   | "phase-one-swap"
+  | "phase-one-close-position"
   | "phase-one-create-position"
   | "phase-one-provide-liquidity"
   | "phase-one-attach-liquidity"

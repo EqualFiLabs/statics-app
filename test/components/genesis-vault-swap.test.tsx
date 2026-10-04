@@ -11,11 +11,12 @@ import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 const readContract = vi.fn();
 const getBalance = vi.fn();
+const call = vi.fn();
 const discoverNextAvailableGenesisId = vi.fn();
 const discoverWalletGenesisSnapshot = vi.fn();
 
 vi.mock("wagmi", () => ({
-  usePublicClient: () => ({ readContract, getBalance }),
+  usePublicClient: () => ({ readContract, getBalance, call }),
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
@@ -151,6 +152,7 @@ function renderPanel() {
 
 beforeEach(() => {
   readContract.mockReset();
+  call.mockReset();
   getBalance.mockReset();
   discoverNextAvailableGenesisId.mockReset();
   discoverWalletGenesisSnapshot.mockReset();
@@ -256,6 +258,45 @@ describe("Genesis Vault trade card", () => {
     ).toBeInTheDocument();
     expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(2);
   });
+
+  it.each(["before approval", "after approval"])(
+    "refreshes ownership when an Operator transfers %s",
+    async (timing) => {
+      reads();
+      const original = readContract.getMockImplementation()!;
+      readContract.mockImplementation(async (input) =>
+        input.functionName === "getApproved"
+          ? timing === "before approval"
+            ? statics
+            : zeroAddress
+          : original(input)
+      );
+      const encoded =
+        timing === "before approval"
+          ? encodeErrorResult({
+              abi: genesisVaultRecoveryErrors,
+              errorName: "ERC721InvalidApprover",
+              args: [wallet],
+            })
+          : encodeErrorResult({
+              abi: genesisVaultRecoveryErrors,
+              errorName: "NotGenesisOwner",
+              args: [1204n, wallet, statics],
+            });
+      call.mockRejectedValue(new Error("CallExecutionError", { cause: { data: encoded } }));
+      const snapshot = { indexed: [], indexedBlock: 1n, chainHead: 1n, stale: false };
+      discoverWalletGenesisSnapshot
+        .mockResolvedValueOnce({ ...snapshot, ids: [1204n] })
+        .mockResolvedValue({ ...snapshot, ids: [] });
+      renderPanel();
+      fireEvent.click(await screen.findByRole("tab", { name: "Redeem" }));
+      fireEvent.click(await screen.findByRole("radio", { name: /1204/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Redeem Operator #1204" }));
+      await screen.findByText("No Operators NFTs to redeem");
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(discoverWalletGenesisSnapshot).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {
     reads({ credits: new Map([["4419", true]]) });

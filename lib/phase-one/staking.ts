@@ -24,6 +24,7 @@ export type PositionStakingState = Readonly<{
   stakedBalance: bigint;
   rewardMultiplierBps: number;
   selectedAssets: readonly Address[];
+  claimAssets: readonly Address[];
   pendingRewards: readonly bigint[];
   maximumRewardAssets: bigint;
 }>;
@@ -123,13 +124,37 @@ export function buildPositionStakingTransaction(input: {
   return { target: input.deployment.contracts.diamond, calldata, value: 0n };
 }
 
+async function readClaimAssets(input: {
+  publicClient: PublicClient;
+  deployment: PhaseOneDeployment;
+  positionId: bigint;
+  account: Address;
+}): Promise<readonly Address[]> {
+  const assets: Address[] = [];
+  let cursor = 0n;
+  for (let page = 0; page < 100; page += 1) {
+    const [entries, next] = await input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "globalRewardAssetsOfPosition",
+      args: [input.positionId, cursor, 100n],
+      account: input.account,
+    });
+    assets.push(...entries);
+    if (entries.length < 100) return [...new Set(assets)];
+    if (next <= cursor) throw new Error("Reward discovery returned a stalled cursor.");
+    cursor = next;
+  }
+  throw new Error("Reward discovery exceeded its page limit.");
+}
+
 export async function readPositionStakingState(input: {
   publicClient: PublicClient;
   deployment: PhaseOneDeployment;
   positionId: bigint;
   account: Address;
 }): Promise<PositionStakingState> {
-  const [position, selectedAssets, maximumRewardAssets] = await Promise.all([
+  const [position, selectedAssets, claimAssets, maximumRewardAssets] = await Promise.all([
     input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsAbi,
@@ -144,6 +169,7 @@ export async function readPositionStakingState(input: {
       args: [input.positionId],
       account: input.account,
     }),
+    readClaimAssets(input),
     input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsAbi,
@@ -152,13 +178,13 @@ export async function readPositionStakingState(input: {
     }),
   ]);
   const pendingRewards =
-    selectedAssets.length === 0
+    claimAssets.length === 0
       ? []
       : await input.publicClient.readContract({
           address: input.deployment.contracts.diamond,
           abi: staticsAbi,
           functionName: "pendingRewards",
-          args: [input.positionId, selectedAssets],
+          args: [input.positionId, claimAssets],
           account: input.account,
         });
   return {
@@ -166,7 +192,27 @@ export async function readPositionStakingState(input: {
     stakedBalance: position.stakedBalance,
     rewardMultiplierBps: position.rewardMultiplierBps,
     selectedAssets,
+    claimAssets,
     pendingRewards,
     maximumRewardAssets,
   };
+}
+
+export async function readPositionGlobalRewards(input: {
+  publicClient: PublicClient;
+  deployment: PhaseOneDeployment;
+  positionId: bigint;
+  account: Address;
+}) {
+  const claimAssets = await readClaimAssets(input);
+  const pendingRewards = claimAssets.length
+    ? await input.publicClient.readContract({
+        address: input.deployment.contracts.diamond,
+        abi: staticsAbi,
+        functionName: "pendingRewards",
+        args: [input.positionId, claimAssets],
+        account: input.account,
+      })
+    : [];
+  return { claimAssets, pendingRewards };
 }

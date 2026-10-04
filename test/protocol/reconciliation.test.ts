@@ -13,6 +13,11 @@ import {
 } from "@/lib/protocol/reconciliation";
 
 describe("confirmed transaction reconciliation", () => {
+  it("refreshes Phase 1 positions after close and reward catch-up", () => {
+    expect(protocolQueryScopes("phase-one-close-position")).toContain("phase-one-position");
+    expect(protocolQueryScopes("phase-one-checkpoint-schedule")).toContain("phase-one-reward");
+  });
+
   it("waits until the read RPC serves the confirmed block", async () => {
     const getBlockNumber = vi.fn().mockResolvedValueOnce(99n).mockResolvedValueOnce(100n);
 

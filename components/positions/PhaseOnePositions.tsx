@@ -145,6 +145,7 @@ export function PhaseOnePositionDetail({
   const t = useTranslations("positionDetail");
   const p = useTranslations("phaseOne");
   const action = usePhaseOneAction(deployment, String(positionId));
+  const [closed, setClosed] = useState(false);
   const position = useQuery({
     queryKey: [
       "phase-one-position",
@@ -164,14 +165,22 @@ export function PhaseOnePositionDetail({
       details: [t("closeReady")],
       execute: async () => {
         await action.send({
-          kind: "close-position",
+          kind: "phase-one-close-position",
           label: t("closePosition"),
           amount: `Position #${positionId}`,
           to: deployment.contracts.diamond,
           data: buildClosePositionCall(positionId),
         });
+        setClosed(true);
       },
     }));
+  if (closed)
+    return (
+      <section className="position-panel">
+        <Link href="/app/positions">← {t("allPositions")}</Link>
+        <p>{p("closed")}</p>
+      </section>
+    );
   return (
     <div className="position-detail">
       <Link href="/app/positions">← {t("allPositions")}</Link>

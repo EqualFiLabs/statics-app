@@ -308,7 +308,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
     } catch (cause) {
       setError(describeTransactionError(cause));
       if (
-        /GenesisLocked|CreditAlreadyActive|IncorrectOwner|NotOwner/.test(
+        /GenesisLocked|CreditAlreadyActive|NotGenesisOwner|ERC721InvalidApprover|ERC721IncorrectOwner|NotOwner/.test(
           genesisVaultErrorName(cause) ?? String(cause)
         )
       )
