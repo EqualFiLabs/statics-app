@@ -8,8 +8,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import {
-  readProtocolActivityAcrossChains,
-  readActivityChainIds,
+  readProtocolActivityAcrossDeployments,
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
@@ -221,10 +220,15 @@ export function ActivityPage() {
     subscribeProtocolActivity,
     () =>
       evmAddress
-        ? readProtocolActivityAcrossChains(
+        ? readProtocolActivityAcrossDeployments(
             evmAddress,
-            [...chainIds, ...readActivityChainIds(evmAddress, active.descriptor.deploymentId)],
-            active.descriptor.deploymentId
+            chainIds,
+            [
+              active.descriptor.deploymentId,
+              active.launch?.descriptor.deploymentId,
+              active.phaseOne?.descriptor.deploymentId,
+              active.protocol?.descriptor.deploymentId,
+            ].filter((id): id is string => Boolean(id))
           )
         : emptyProtocolActivity,
     () => emptyProtocolActivity

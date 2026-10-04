@@ -32,8 +32,12 @@ export const protocolQueryKeys = {
     positionId: bigint,
     poolId: string
   ) => ["phase-one-liquidity", deploymentId, wallet, positionId.toString(), poolId] as const,
-  phaseOneRewards: (deploymentId: string, wallet: Address | null, positionId: bigint) =>
-    ["phase-one-rewards", deploymentId, wallet, positionId.toString()] as const,
+  phaseOneRewards: (
+    deploymentId: string,
+    wallet: Address | null,
+    positionId: bigint,
+    poolId: string
+  ) => ["phase-one-rewards", deploymentId, wallet, positionId.toString(), poolId] as const,
   phaseOneGauges: (deploymentId: string, wallet: Address | null, positionId: bigint) =>
     ["phase-one-gauges", deploymentId, wallet, positionId.toString()] as const,
   phaseOneMaintenance: (deploymentId: string, poolId: string) =>

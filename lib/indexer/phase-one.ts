@@ -278,3 +278,21 @@ export async function loadPhaseOneCandles(input: {
     input.deploymentId
   );
 }
+
+export async function loadIndexedPhaseOnePosition(
+  positionId: bigint,
+  deploymentId: string
+): Promise<IndexedPhaseOnePosition> {
+  const body = record(
+    await load(deploymentId, `/phase-one/positions/${positionId}`),
+    "position response"
+  );
+  return parseIndexedPositions(
+    {
+      deploymentId: body.deploymentId,
+      indexedAtBlock: body.indexedAtBlock,
+      items: [{ ...record(body.position, "position"), updatedAtBlock: body.indexedAtBlock }],
+    },
+    deploymentId
+  ).items[0];
+}

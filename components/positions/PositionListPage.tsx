@@ -23,7 +23,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
-import { PhaseOnePositionsPanel } from "@/components/phase-one/PhaseOnePositionsPanel";
+import { PhaseOnePositions } from "@/components/positions/PhaseOnePositions";
 
 function displayAmount(value: bigint, decimals = 18): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -35,7 +35,13 @@ export function PositionListPage() {
   const t = useTranslations("positions");
   const wallet = useWalletState();
   const { active } = useDeployment();
-  if (active.phaseOne) return <PhaseOnePositionsPanel deployment={active.phaseOne} />;
+  if (active.phaseOne)
+    return (
+      <PhaseOnePositions
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
+        deployment={active.phaseOne}
+      />
+    );
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject={t("subject")} />;
   return (
     <ProtocolActionScope>

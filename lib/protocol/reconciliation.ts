@@ -74,6 +74,7 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "direct-swap-allowances": "approval",
   "phase-one-positions": "phase-one-position",
   "phase-one-position": "phase-one-position",
+  "phase-one-stake-allowance": "approval",
   "phase-one-liquidity": "phase-one-liquidity",
   "phase-one-rewards": "phase-one-reward",
   "phase-one-gauges": "phase-one-reward",

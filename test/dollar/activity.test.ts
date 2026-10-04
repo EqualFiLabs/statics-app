@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   readDollarActivity,
   readProtocolActivityAcrossChains,
+  readProtocolActivityAcrossDeployments,
   updateDollarActivity,
   writeDollarActivity,
   type DollarActivity,
@@ -68,6 +69,22 @@ describe("Dollar activity storage", () => {
     expect(
       readProtocolActivityAcrossChains(wallet, [31_337, 8_453]).map((entry) => entry.id)
     ).toEqual(["base", "local"]);
+  });
+
+  it("shows Genesis and Phase 1 activity together, deduplicated with stable snapshots", () => {
+    writeDollarActivity(activity({ id: "genesis", deploymentId: "genesis", createdAt: 1 }));
+    writeDollarActivity(activity({ id: "phase-one", deploymentId: "phase-one", createdAt: 2 }));
+    writeDollarActivity(activity({ id: "genesis", deploymentId: "parent", createdAt: 1 }));
+    const records = readProtocolActivityAcrossDeployments(
+      wallet,
+      [31337],
+      ["parent", "genesis", "phase-one"]
+    );
+    expect(records.map((entry) => entry.id)).toEqual(["phase-one", "genesis"]);
+    expect(
+      readProtocolActivityAcrossDeployments(wallet, [31337], ["parent", "genesis", "phase-one"])
+    ).toBe(records);
+    expect(readDollarActivity(wallet, 31337, "parent")).toHaveLength(1);
   });
 
   it("fails closed for malformed browser storage", () => {

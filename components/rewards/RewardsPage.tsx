@@ -53,7 +53,7 @@ import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useDeployment } from "@/providers/deployment-context";
-import { PhaseOnePositionsPanel } from "@/components/phase-one/PhaseOnePositionsPanel";
+import { PhaseOneRewards } from "@/components/rewards/PhaseOneRewards";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -74,9 +74,11 @@ export function RewardsPage({ initialPositionId = null }: { initialPositionId?: 
   const { active } = useDeployment();
   if (active.phaseOne) {
     return (
-      <>
-        <PhaseOnePositionsPanel deployment={active.phaseOne} />
-      </>
+      <PhaseOneRewards
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
+        deployment={active.phaseOne}
+        initialPositionId={initialPositionId}
+      />
     );
   }
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;

@@ -21,14 +21,11 @@ import type { PhaseOneDeployment } from "@/lib/deployments/types";
 
 export type PositionStakingState = Readonly<{
   positionId: bigint;
-  owner: Address;
   stakedBalance: bigint;
   rewardMultiplierBps: number;
   selectedAssets: readonly Address[];
   pendingRewards: readonly bigint[];
   maximumRewardAssets: bigint;
-  rewardEligibilityDelay: bigint;
-  locked: boolean;
 }>;
 
 export function buildStaticsStakeApproval(input: {
@@ -132,49 +129,28 @@ export async function readPositionStakingState(input: {
   positionId: bigint;
   account: Address;
 }): Promise<PositionStakingState> {
-  const [owner, position, selectedAssets, maximumRewardAssets, rewardEligibilityDelay, locked] =
-    await Promise.all([
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "ownerOf",
-        args: [input.positionId],
-        account: input.account,
-      }),
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "stakePosition",
-        args: [input.positionId],
-        account: input.account,
-      }),
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "positionRewardAssets",
-        args: [input.positionId],
-        account: input.account,
-      }),
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "maxRewardAssetsPerPosition",
-        account: input.account,
-      }),
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "rewardEligibilityDelay",
-        account: input.account,
-      }),
-      input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsAbi,
-        functionName: "locked",
-        args: [input.positionId],
-        account: input.account,
-      }),
-    ]);
+  const [position, selectedAssets, maximumRewardAssets] = await Promise.all([
+    input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "stakePosition",
+      args: [input.positionId],
+      account: input.account,
+    }),
+    input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "positionRewardAssets",
+      args: [input.positionId],
+      account: input.account,
+    }),
+    input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsAbi,
+      functionName: "maxRewardAssetsPerPosition",
+      account: input.account,
+    }),
+  ]);
   const pendingRewards =
     selectedAssets.length === 0
       ? []
@@ -187,13 +163,10 @@ export async function readPositionStakingState(input: {
         });
   return {
     positionId: input.positionId,
-    owner,
     stakedBalance: position.stakedBalance,
     rewardMultiplierBps: position.rewardMultiplierBps,
     selectedAssets,
     pendingRewards,
     maximumRewardAssets,
-    rewardEligibilityDelay,
-    locked,
   };
 }

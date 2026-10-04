@@ -8,9 +8,7 @@ import {
   buildSetGaugeAllocationsCall,
   staticsGaugeIncentivesAbi,
   staticsRangeGaugeAbi,
-  type GaugeAllocation,
   type GaugeAllocatorClaimPreview,
-  type GaugePoolWeight,
   type GaugePositionAllocations,
   type RangeGaugePendingRewards,
 } from "@statics-protocol/sdk/phase-one";
@@ -31,9 +29,7 @@ export type GaugeAllocationValidation = Readonly<{
 export type PositionGaugeState = Readonly<{
   allocations: GaugePositionAllocations;
   maximumAllocations: bigint;
-  cooldown: number;
   coolingDown: boolean;
-  weights: readonly Readonly<{ allocation: GaugeAllocation; pool: GaugePoolWeight }>[];
 }>;
 
 export function validateGaugeAllocationChange(input: {
@@ -105,7 +101,7 @@ export async function readPositionGaugeState(input: {
   now: number;
   account: Address;
 }): Promise<PositionGaugeState> {
-  const [rawAllocations, maximumAllocations, cooldown] = await Promise.all([
+  const [rawAllocations, maximumAllocations] = await Promise.all([
     input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsGaugeIncentivesAbi,
@@ -119,12 +115,6 @@ export async function readPositionGaugeState(input: {
       functionName: "maxGaugeAllocationsPerPosition",
       account: input.account,
     }),
-    input.publicClient.readContract({
-      address: input.deployment.contracts.diamond,
-      abi: staticsGaugeIncentivesAbi,
-      functionName: "gaugeAllocationCooldown",
-      account: input.account,
-    }),
   ]);
   const allocations: GaugePositionAllocations = {
     nextAllocationAt: rawAllocations[0],
@@ -132,24 +122,10 @@ export async function readPositionGaugeState(input: {
     active: rawAllocations[2],
     lockedStake: rawAllocations[3],
   };
-  const weights = await Promise.all(
-    allocations.active.map(async (allocation) => ({
-      allocation,
-      pool: await input.publicClient.readContract({
-        address: input.deployment.contracts.diamond,
-        abi: staticsGaugeIncentivesAbi,
-        functionName: "gaugePoolWeight",
-        args: [allocation.poolId],
-        account: input.account,
-      }),
-    }))
-  );
   return {
     allocations,
     maximumAllocations,
-    cooldown,
     coolingDown: input.now < allocations.nextAllocationAt,
-    weights,
   };
 }
 
@@ -238,4 +214,15 @@ export function buildGaugeRewardResolution(input: {
       break;
   }
   return { target: input.deployment.contracts.diamond, calldata, value: 0n };
+}
+
+/** Editing a single pool never clears allocations to other pools. */
+export function replacePoolAllocation(
+  current: readonly GaugeAllocationInput[],
+  poolId: Hex,
+  amount: bigint
+): readonly GaugeAllocationInput[] {
+  if (amount < 0n) throw new Error("Allocation cannot be negative.");
+  const others = current.filter((entry) => entry.poolId.toLowerCase() !== poolId.toLowerCase());
+  return amount === 0n ? others : [...others, { poolId, amount }];
 }

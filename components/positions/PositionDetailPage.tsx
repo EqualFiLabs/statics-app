@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useDeployment } from "@/providers/deployment-context";
+import { PhaseOnePositionDetail } from "@/components/positions/PhaseOnePositions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   encodeFunctionData,
@@ -86,6 +88,15 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
 
 export function PositionDetailPage({ positionId }: { positionId: bigint }) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.phaseOne)
+    return (
+      <PhaseOnePositionDetail
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}:${positionId}`}
+        deployment={active.phaseOne}
+        positionId={positionId}
+      />
+    );
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Position" />;
   return (
     <ProtocolActionScope>

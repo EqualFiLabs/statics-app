@@ -289,3 +289,40 @@ export function subscribeDollarActivity(listener: () => void): () => void {
     window.removeEventListener("storage", listener);
   };
 }
+
+const deploymentsActivityCache = new Map<
+  string,
+  { sources: DollarActivity[][]; value: DollarActivity[] }
+>();
+export function readProtocolActivityAcrossDeployments(
+  wallet: Address,
+  chainIds: readonly number[],
+  deploymentIds: readonly string[]
+): DollarActivity[] {
+  const ids = [...new Set(deploymentIds)].sort();
+  const sources = ids.map((id) =>
+    readProtocolActivityAcrossChains(wallet, [...chainIds, ...readActivityChainIds(wallet, id)], id)
+  );
+  const key = `${wallet.toLowerCase()}:${ids.join(",")}:${chainIds.join(",")}`;
+  const cached = deploymentsActivityCache.get(key);
+  if (
+    cached &&
+    cached.sources.length === sources.length &&
+    cached.sources.every((source, index) => source === sources[index])
+  )
+    return cached.value;
+  const seen = new Set<string>();
+  const value = sources
+    .flat()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .filter((entry) => {
+      const hash = entry.hash ? `${entry.chainId}:${entry.hash.toLowerCase()}` : null;
+      if (seen.has(entry.id) || (hash && seen.has(hash))) return false;
+      seen.add(entry.id);
+      if (hash) seen.add(hash);
+      return true;
+    })
+    .slice(0, 100);
+  deploymentsActivityCache.set(key, { sources, value });
+  return value;
+}
