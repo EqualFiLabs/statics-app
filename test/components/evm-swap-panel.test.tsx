@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@/test/render";
-import { decodeFunctionData, encodeFunctionResult, getAddress, zeroAddress } from "viem";
+import {
+  decodeFunctionData,
+  encodeFunctionResult,
+  getAddress,
+  maxUint256,
+  zeroAddress,
+} from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -203,6 +209,37 @@ describe("integrated swap execution", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Confirm swap" })).not.toBeInTheDocument();
+  });
+
+  it("renews a Permit2 allowance that expires before the pending fork block", async () => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    mocks.getBlock.mockImplementation((input) =>
+      Promise.resolve({ timestamp: now + (input?.blockTag === "pending" ? 3600n : 0n) })
+    );
+    mocks.readContract.mockImplementation((input) =>
+      Promise.resolve(
+        input.functionName === "balanceOf"
+          ? 100n * 10n ** 18n
+          : input.address === deployment.contracts.permit2
+            ? [10n ** 18n, Number(now + 100n), 0]
+            : maxUint256
+      )
+    );
+    renderCanonicalTrade(descriptor.chainId, true);
+    fireEvent.change(await screen.findByRole("combobox", { name: "You pay asset" }), {
+      target: { value: deployment.contracts.weth },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "1" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+    expect(mocks.execute.mock.calls.map(([request]) => request.kind)).toEqual([
+      "approve-permit2",
+      "swap",
+    ]);
   });
 
   it("discards a pending quote when the wallet changes networks", async () => {

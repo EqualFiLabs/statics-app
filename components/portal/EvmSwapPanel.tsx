@@ -524,9 +524,16 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
               label: `Enable ${source.symbol} swaps`,
             });
           }
-          const block = await publicClient.getBlock();
+          const [block, pending] = await Promise.all([
+            publicClient.getBlock(),
+            publicClient.getBlock({ blockTag: "pending" }).catch(() => null),
+          ]);
           const now = Number(
-            swapDeadlineBase(block.timestamp, null, BigInt(Math.floor(Date.now() / 1000)))
+            swapDeadlineBase(
+              block.timestamp,
+              pending?.timestamp ?? null,
+              BigInt(Math.floor(Date.now() / 1000))
+            )
           );
           if (
             !hasUsablePermit2Allowance(allowance.permit[0], allowance.permit[1], parsedAmount, now)
