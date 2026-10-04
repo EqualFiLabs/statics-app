@@ -16,8 +16,8 @@ import { DeploymentContext } from "@/providers/deployment-context";
 import spanish from "@/messages/es.json";
 
 vi.mock("@/components/portal/EvmSwapPanel", () => ({
-  EvmSwapPanel: ({ canonicalOnly }: { canonicalOnly?: boolean }) => (
-    <div>Token swap {canonicalOnly ? "canonical" : "general"}</div>
+  EvmSwapPanel: ({ staticsNetwork }: { staticsNetwork?: boolean }) => (
+    <div>Token swap {staticsNetwork ? "statics" : "general"}</div>
   ),
 }));
 vi.mock("@/components/genesis/GenesisVaultSwapPanel", () => ({
@@ -105,10 +105,10 @@ describe("Swap page", () => {
       </DeploymentContext.Provider>
     );
 
-    expect(screen.getByText("Token swap canonical")).toBeInTheDocument();
+    expect(screen.getByText("Token swap statics")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Operator NFT" }));
     expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
-    expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
+    expect(screen.queryByText("Token swap statics")).not.toBeInTheDocument();
   });
 
   it("starts in NFT mode for the explicit mode query", () => {
@@ -122,7 +122,7 @@ describe("Swap page", () => {
     );
 
     expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
-    expect(screen.queryByText("Token swap canonical")).not.toBeInTheDocument();
+    expect(screen.queryByText("Token swap statics")).not.toBeInTheDocument();
     searchParams.delete("mode");
   });
 
@@ -142,7 +142,7 @@ describe("Swap page", () => {
     expect(screen.getByRole("tab", { name: "NFT de Operator" })).toBeInTheDocument();
   });
 
-  it("composes Phase 1 public pools beside the canonical market and Operator NFTs", () => {
+  it("composes the existing Token and Operator tabs beside the canonical market and Operator NFTs", () => {
     render(
       <DeploymentContext.Provider
         value={{ active: composedOption, options: [composedOption], selectNetwork: vi.fn() }}
@@ -151,9 +151,10 @@ describe("Swap page", () => {
       </DeploymentContext.Provider>
     );
 
-    expect(screen.getByText("Phase 1 direct public swap")).toBeInTheDocument();
+    expect(screen.getByText("Token swap statics")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Public pools" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Token" }));
-    expect(screen.getByText("Token swap canonical")).toBeInTheDocument();
+    expect(screen.getByText("Token swap statics")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Operator NFT" }));
     expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
   });

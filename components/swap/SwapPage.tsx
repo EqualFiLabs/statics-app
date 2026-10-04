@@ -8,10 +8,9 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
 import { TradeMarketStats } from "@/components/swap/TradeMarketStats";
-import { PhaseOneSwapPanel } from "@/components/phase-one/PhaseOneSwapPanel";
 import { useDeployment } from "@/providers/deployment-context";
 
-type SwapMode = "public" | "token" | "nft";
+type SwapMode = "token" | "nft";
 
 export function SwapPage() {
   const t = useTranslations("trade");
@@ -20,7 +19,7 @@ export function SwapPage() {
   const [mode, setMode] = useState<SwapMode>(() => {
     const requested = searchParams?.get("mode");
     if (requested === "nft" || requested === "token") return requested;
-    return active.phaseOne ? "public" : "token";
+    return "token";
   });
   if (!active.launch && !active.phaseOne) {
     return (
@@ -38,12 +37,7 @@ export function SwapPage() {
     <div className="swap-page">
       {active.launch && <TradeMarketStats deploymentId={active.launch.descriptor.deploymentId} />}
       <div className="portal-direction-tabs" role="tablist" aria-label={t("swapType")}>
-        {(
-          [
-            ...(active.phaseOne ? (["public"] as const) : []),
-            ...(active.launch ? (["token", "nft"] as const) : []),
-          ] as const
-        ).map((item) => (
+        {(["token", ...(active.launch ? (["nft"] as const) : [])] as const).map((item) => (
           <button
             key={item}
             type="button"
@@ -51,14 +45,12 @@ export function SwapPage() {
             aria-selected={mode === item}
             onClick={() => setMode(item)}
           >
-            {item === "public" ? "Public pools" : item === "token" ? t("token") : t("operatorNft")}
+            {item === "token" ? t("token") : t("operatorNft")}
           </button>
         ))}
       </div>
-      {mode === "public" && active.phaseOne ? (
-        <PhaseOneSwapPanel deployment={active.phaseOne} />
-      ) : mode === "token" && active.launch ? (
-        <EvmSwapPanel canonicalOnly />
+      {mode === "token" ? (
+        <EvmSwapPanel staticsNetwork />
       ) : active.launch ? (
         <GenesisVaultSwapPanel deployment={active.launch} />
       ) : null}

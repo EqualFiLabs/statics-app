@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import {
   createPublicClient,
   custom,
-  decodeFunctionResult,
   encodeFunctionData,
   formatUnits,
   getAddress,
   zeroAddress,
   type Address,
+  type Hex,
 } from "viem";
 import {
-  buildQuoteV4ExactInputSingleCall,
   buildV4ExactInputSingleSwap,
   dopplerStaticsTokenAbi,
   permit2AllowanceAbi,
-  v4QuoterAbi,
 } from "@statics-protocol/sdk";
 
 import {
@@ -40,22 +39,15 @@ import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { minimumWithSlippage } from "@/lib/baskets/baskets";
-import {
-  canonicalTradeDirection,
-  maximumTokenApproval,
-  poolKeyForLaunch,
-  settlementForTrade,
-  swapDeadlineBase,
-  tokenAddress,
-  zeroForTrade,
-} from "@/lib/trade/canonical-market";
+import { maximumTokenApproval, swapDeadlineBase } from "@/lib/trade/canonical-market";
 import {
   MAX_PERMIT2_ALLOWANCE,
   MAX_PERMIT2_EXPIRATION,
   hasUsablePermit2Allowance,
 } from "@/lib/protocol/approvals";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
-import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
+import { isUniswapSwapChainId } from "@/lib/portal/uniswap";
+import { quoteDirectSwap, selectSwapRoute } from "@/lib/trade/swap-routing";
 
 const PERMIT_TTL = 20n * 60n;
 
@@ -70,6 +62,7 @@ const erc20BalanceAbi = [
 ] as const;
 
 type QuotePayload = {
+  routeId?: string;
   routing?: string;
   quote?: {
     input: { amount: string; token: string };
@@ -104,20 +97,25 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
     : whole;
 }
 
-export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolean }) {
+export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: boolean }) {
+  const queryClient = useQueryClient();
   const t = useTranslations("portal");
   const locale = useAppLocale();
   const wallet = useWalletState();
   const slippage = usePortalSlippage();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { active } = useDeployment();
-  const selectedChainId =
-    canonicalOnly && active.launch ? active.launch.descriptor.chainId : wallet.fundingChainId;
-  const selectedNetworkName =
-    canonicalOnly && active.launch ? active.launch.descriptor.network : wallet.fundingNetworkName;
+  const selectedChainId = staticsNetwork ? active.descriptor.chainId : wallet.fundingChainId;
+  const selectedNetworkName = staticsNetwork
+    ? active.descriptor.network
+    : wallet.fundingNetworkName;
   const walletOnSelectedChain = wallet.chainId === selectedChainId;
   const launch =
     active.launch && active.launch.descriptor.chainId === selectedChainId ? active.launch : null;
+  const phaseOne =
+    staticsNetwork && active.phaseOne?.descriptor.chainId === selectedChainId
+      ? active.phaseOne
+      : null;
   const walletTokens = useWalletTokens(selectedChainId, active.protocol ?? active.launch);
   const tokens = useMemo(() => {
     const native = getDefaultEvmSwapTokens(selectedChainId).filter(
@@ -141,22 +139,26 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           },
         ]
       : [];
-    const discovered = canonicalOnly
-      ? []
-      : walletTokens.tokens.map((token): EvmSwapToken => ({
-          address: token.address,
-          decimals: token.decimals,
-          kind: "erc20",
-          name: token.name,
-          symbol: token.symbol,
-        }));
-    return [...native, ...canonical, ...discovered].filter(
+    const registered: EvmSwapToken[] = phaseOne
+      ? phaseOne.supportedPools
+          .filter((pool) => pool.enabled)
+          .flatMap((pool) => [pool.token0, pool.token1])
+          .map((token) => ({ ...token, kind: "erc20" as const }))
+      : [];
+    const discovered = walletTokens.tokens.map((token): EvmSwapToken => ({
+      address: token.address,
+      decimals: token.decimals,
+      kind: "erc20",
+      name: token.name,
+      symbol: token.symbol,
+    }));
+    return [...native, ...canonical, ...registered, ...discovered].filter(
       (token, index, values) =>
         values.findIndex(
           (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
         ) === index
     );
-  }, [canonicalOnly, launch, selectedChainId, walletTokens.tokens]);
+  }, [phaseOne, launch, selectedChainId, walletTokens.tokens]);
   const [sourceAddress, setSourceAddress] = useState<string>(zeroAddress);
   const [destinationAddress, setDestinationAddress] = useState<string>(
     launch?.contracts.statics ?? ""
@@ -188,7 +190,29 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     quote?.quote?.aggregatedOutputs?.[0]?.minAmount ??
     quote?.quote?.aggregatedOutputs?.[0]?.amount ??
     outputRaw;
-  const directDirection = canonicalTradeDirection(launch, source, destination);
+  const route =
+    source && destination
+      ? selectSwapRoute(active, selectedChainId, source, destination, staticsNetwork)
+      : null;
+  const identity = [
+    wallet.address,
+    selectedChainId,
+    route?.id,
+    source?.address,
+    destination?.address,
+    parsedAmount.toString(),
+    slippage,
+  ].join(":");
+  const identityRef = useRef(identity);
+  const [review, setReview] = useState<{ identity: string; minimum: bigint } | null>(null);
+  useEffect(() => {
+    identityRef.current = identity;
+    const timer = window.setTimeout(() => {
+      setReview(null);
+      setReviewing(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [identity]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -202,7 +226,10 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       setError(null);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [tokens]);
+    // Discovery can refresh balances/metadata while the user types. Reset only
+    // when the selected network or canonical deployment changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChainId, launch?.contracts.statics]);
 
   useEffect(() => {
     let active = true;
@@ -239,11 +266,11 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     };
   }, [source, walletAddress, selectedChainId, walletOnSelectedChain, getEthereumProvider]);
 
-  const requestQuote = async (): Promise<QuotePayload> => {
-    if (!wallet.address || !source || !destination || parsedAmount <= 0n) {
+  const requestQuote = async (signal?: AbortSignal): Promise<QuotePayload> => {
+    if (!wallet.address || !source || !destination || !route || parsedAmount <= 0n) {
       throw new Error("Enter an amount and choose two assets.");
     }
-    if (directDirection && launch) {
+    if (route.kind === "direct") {
       const provider = await wallet.getEthereumProvider();
       const network = getFundingNetwork(selectedChainId);
       if (!provider || !network) throw new Error("The selected wallet is unavailable.");
@@ -251,43 +278,34 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
         chain: network.chain,
         transport: custom(provider),
       });
-      await verifyLaunchDeployment(publicClient, launch);
-      const result = await publicClient.call({
-        account: getAddress(wallet.address),
-        to: launch.contracts.quoter,
-        data: buildQuoteV4ExactInputSingleCall(
-          poolKeyForLaunch(launch),
-          zeroForTrade(launch, directDirection.input),
-          parsedAmount
-        ),
-      });
-      if (!result.data) throw new Error("The canonical pool returned no quote.");
-      const [amountOut] = decodeFunctionResult({
-        abi: v4QuoterAbi,
-        functionName: "quoteExactInputSingle",
-        data: result.data,
-      });
-      const slippageBps = slippagePercentToBps(slippage);
-      if (slippageBps === null) throw new Error("Choose a valid slippage tolerance.");
-      const minimumOut = minimumWithSlippage(amountOut, slippageBps);
+      const amountOut = await quoteDirectSwap(
+        publicClient,
+        route,
+        parsedAmount,
+        getAddress(wallet.address)
+      );
+      const bps = slippagePercentToBps(slippage);
+      if (bps === null) throw new Error("Choose a valid slippage tolerance.");
       return {
-        routing: "STATICS_CANONICAL",
+        routeId: route.id,
         quote: {
           input: { amount: parsedAmount.toString(), token: source.address },
           output: { amount: amountOut.toString(), token: destination.address },
           aggregatedOutputs: [
             {
               amount: amountOut.toString(),
-              minAmount: minimumOut.toString(),
+              minAmount: minimumWithSlippage(amountOut, bps).toString(),
               token: destination.address,
             },
           ],
         },
       };
     }
-    if (canonicalOnly) throw new Error("The canonical STATICS market is unavailable.");
+    if (!isUniswapSwapChainId(selectedChainId))
+      throw new Error("No swap route is available for this pair on this network.");
     const response = await fetch("/api/uniswap/quote", {
       method: "POST",
+      signal,
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         chainId: selectedChainId,
@@ -299,10 +317,9 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       }),
     });
     const payload = (await readJson(response)) as QuotePayload;
-    if (!response.ok || !payload.quote) {
+    if (!response.ok || !payload.quote)
       throw new Error(uniswapError(payload, "No swap route is available."));
-    }
-    return payload;
+    return { ...payload, routeId: route.id };
   };
 
   useEffect(() => {
@@ -323,7 +340,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     const timeout = window.setTimeout(() => {
       setQuoteLoading(true);
       setError(null);
-      void requestQuote()
+      void requestQuote(controller.signal)
         .then((next) => {
           if (!controller.signal.aborted) setQuote(next);
         })
@@ -352,6 +369,8 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     destination?.address,
     parsedAmount,
     insufficient,
+    route?.id,
+    slippage,
   ]);
 
   const sendTransaction = async (raw: unknown, kind: "approve-swap" | "swap", label: string) => {
@@ -372,6 +391,7 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
       publicClient,
       wallet: account,
       chainId: selectedChainId,
+      deploymentId: active.descriptor.deploymentId,
       kind,
       label,
       amount: `${amount} ${source?.symbol ?? ""}`.trim(),
@@ -385,18 +405,44 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
   };
 
   const confirmSwap = async () => {
-    if (!source || !destination || !quote?.quote || !wallet.address || submitting) return;
+    if (
+      !source ||
+      !destination ||
+      !quote?.quote ||
+      !wallet.address ||
+      !route ||
+      !review ||
+      submitting
+    )
+      return;
+    const accepted = review;
+    const assertCurrent = () => {
+      if (identityRef.current !== accepted.identity)
+        throw new Error("The wallet, network, or swap inputs changed. Review the swap again.");
+    };
+    const refreshQuote = async () => {
+      assertCurrent();
+      const fresh = await requestQuote();
+      assertCurrent();
+      const freshMinimum = fresh.quote?.aggregatedOutputs?.[0]?.minAmount;
+      const executableMinimum = route.kind === "direct" ? fresh.quote?.output.amount : freshMinimum;
+      if (
+        fresh.routeId !== route.id ||
+        !executableMinimum ||
+        BigInt(executableMinimum) < accepted.minimum
+      ) {
+        setQuote(fresh);
+        setReviewing(false);
+        setReview(null);
+        throw new Error("The quote moved below the reviewed minimum. Review the new quote.");
+      }
+      return fresh;
+    };
     setSubmitState("approving");
     setError(null);
     try {
-      const fresh = await requestQuote();
-      const reviewedMinimum = BigInt(minimumRaw ?? "0");
-      if (BigInt(fresh.quote!.output.amount) < reviewedMinimum) {
-        setQuote(fresh);
-        setReviewing(false);
-        throw new Error("The quote moved below the reviewed minimum. Review the new quote.");
-      }
-      if (fresh.routing === "STATICS_CANONICAL" && directDirection && launch) {
+      await refreshQuote();
+      if (route.kind === "direct") {
         const provider = await wallet.getEthereumProvider();
         const network = getFundingNetwork(selectedChainId);
         if (!provider || !network) throw new Error("The selected wallet is unavailable.");
@@ -405,153 +451,173 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
           chain: network.chain,
           transport: custom(provider),
         });
-        await verifyLaunchDeployment(publicClient, launch);
-        const [block, pendingBlock] = await Promise.all([
-          publicClient.getBlock(),
-          // Not every node serves a pending block; the fallbacks cover it.
-          publicClient.getBlock({ blockTag: "pending" }).catch(() => null),
-        ]);
-        const deadlineBase = swapDeadlineBase(
-          block.timestamp,
-          pendingBlock?.timestamp ?? null,
-          BigInt(Math.floor(Date.now() / 1_000))
-        );
-        const inputToken = tokenAddress(launch, directDirection.input);
-        if (directDirection.input !== "eth") {
-          const tokenAllowance = await publicClient.readContract({
-            address: inputToken,
-            abi: dopplerStaticsTokenAbi,
-            functionName: "allowance",
-            args: [account, launch.contracts.permit2],
+        const send = (input: {
+          to: Address;
+          data: Hex;
+          value?: bigint;
+          label: string;
+          kind: "approve-swap" | "approve-permit2" | "swap" | "phase-one-swap";
+        }) => {
+          assertCurrent();
+          return executeProtocolTransaction({
+            ...input,
+            publicClient,
+            wallet: account,
+            chainId: selectedChainId,
+            deploymentId: route.deploymentId,
+            amount: `${amount} ${source.symbol}`,
+            sendTransaction: wallet.sendEvmTransaction,
+            describeError: (cause) =>
+              cause instanceof Error ? cause.message : "The transaction failed.",
           });
-          if (tokenAllowance < parsedAmount) {
-            await executeProtocolTransaction({
-              publicClient,
-              wallet: account,
-              chainId: launch.descriptor.chainId,
-              deploymentId: launch.descriptor.deploymentId,
+        };
+        if (source.kind !== "native") {
+          const key = [
+            "direct-swap-allowances",
+            route.deploymentId,
+            selectedChainId,
+            account,
+            route.inputToken,
+            route.permit2,
+            route.router,
+          ] as const;
+          const allowance = await queryClient.fetchQuery({
+            queryKey: key,
+            staleTime: 0,
+            queryFn: async () => {
+              const [token, permit] = await Promise.all([
+                publicClient.readContract({
+                  address: route.inputToken,
+                  abi: dopplerStaticsTokenAbi,
+                  functionName: "allowance",
+                  args: [account, route.permit2],
+                }),
+                publicClient.readContract({
+                  address: route.permit2,
+                  abi: permit2AllowanceAbi,
+                  functionName: "allowance",
+                  args: [account, route.inputToken, route.router],
+                }),
+              ]);
+              return { token, permit };
+            },
+          });
+          if (allowance.token < parsedAmount) {
+            await send({
+              to: route.inputToken,
+              data: maximumTokenApproval(route.permit2),
               kind: "approve-swap",
               label: `Enable ${source.symbol} swaps`,
-              amount: `Maximum ${source.symbol}`,
-              to: inputToken,
-              data: maximumTokenApproval(launch.contracts.permit2),
-              sendTransaction: wallet.sendEvmTransaction,
-              describeError: (cause) =>
-                cause instanceof Error ? cause.message : "The approval failed.",
             });
           }
-          const permit2 = await publicClient.readContract({
-            address: launch.contracts.permit2,
-            abi: permit2AllowanceAbi,
-            functionName: "allowance",
-            args: [account, inputToken, launch.contracts.universalRouter],
-          });
+          const block = await publicClient.getBlock();
+          const now = Number(
+            swapDeadlineBase(block.timestamp, null, BigInt(Math.floor(Date.now() / 1000)))
+          );
           if (
-            !hasUsablePermit2Allowance(
-              permit2[0],
-              permit2[1],
-              parsedAmount,
-              // Execution time, not last-block time: a stale latest block makes
-              // an expired Permit2 allowance look usable.
-              Number(deadlineBase)
-            )
+            !hasUsablePermit2Allowance(allowance.permit[0], allowance.permit[1], parsedAmount, now)
           ) {
-            await executeProtocolTransaction({
-              publicClient,
-              wallet: account,
-              chainId: launch.descriptor.chainId,
-              deploymentId: launch.descriptor.deploymentId,
-              kind: "approve-permit2",
-              label: `Authorize ${source.symbol} swaps`,
-              amount: `Maximum ${source.symbol}`,
-              to: launch.contracts.permit2,
+            await send({
+              to: route.permit2,
               data: encodeFunctionData({
                 abi: permit2AllowanceAbi,
                 functionName: "approve",
                 args: [
-                  inputToken,
-                  launch.contracts.universalRouter,
+                  route.inputToken,
+                  route.router,
                   MAX_PERMIT2_ALLOWANCE,
                   MAX_PERMIT2_EXPIRATION,
                 ],
               }),
-              sendTransaction: wallet.sendEvmTransaction,
-              describeError: (cause) =>
-                cause instanceof Error ? cause.message : "The authorization failed.",
+              kind: "approve-permit2",
+              label: `Authorize ${source.symbol} swaps`,
             });
           }
+          await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
         }
-        setSubmitState("swapping");
+        await refreshQuote();
+        const [block, pendingBlock] = await Promise.all([
+          publicClient.getBlock(),
+          publicClient.getBlock({ blockTag: "pending" }).catch(() => null),
+        ]);
+        const deadline =
+          swapDeadlineBase(
+            block.timestamp,
+            pendingBlock?.timestamp ?? null,
+            BigInt(Math.floor(Date.now() / 1000))
+          ) + PERMIT_TTL;
         const execution = buildV4ExactInputSingleSwap({
-          router: launch.contracts.universalRouter,
-          poolKey: poolKeyForLaunch(launch),
-          zeroForOne: zeroForTrade(launch, directDirection.input),
+          router: route.router,
+          poolKey: route.poolKey,
+          zeroForOne: route.zeroForOne,
           amountIn: parsedAmount,
-          amountOutMinimum: reviewedMinimum,
-          deadline: deadlineBase + PERMIT_TTL,
-          settlement: settlementForTrade(launch, directDirection),
+          amountOutMinimum: accepted.minimum,
+          deadline,
+          settlement: route.settlement,
         });
-        await executeProtocolTransaction({
-          publicClient,
-          wallet: account,
-          chainId: launch.descriptor.chainId,
-          deploymentId: launch.descriptor.deploymentId,
-          kind: "swap",
-          label: `${source.symbol} to ${destination.symbol}`,
-          amount: `${amount} ${source.symbol}`,
+        setSubmitState("swapping");
+        await send({
           to: execution.target,
           data: execution.calldata,
           value: execution.value,
-          sendTransaction: wallet.sendEvmTransaction,
-          describeError: (cause) =>
-            cause instanceof Error ? cause.message : "The canonical swap failed.",
+          kind: route.phaseOne ? "phase-one-swap" : "swap",
+          label: `${source.symbol} to ${destination.symbol}`,
         });
-        setAmount("");
-        setQuote(null);
-        setReviewing(false);
-        return;
-      }
-      if (source.kind === "erc20") {
-        const response = await fetch("/api/uniswap/check-approval", {
+      } else {
+        if (source.kind === "erc20") {
+          const response = await fetch("/api/uniswap/check-approval", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              chainId: selectedChainId,
+              token: source.address,
+              tokenOut: destination.address,
+              amount: parsedAmount.toString(),
+              walletAddress: wallet.address,
+            }),
+          });
+          const approval = (await readJson(response)) as { cancel?: unknown; approval?: unknown };
+          if (!response.ok) throw new Error(uniswapError(approval, "Approval check failed."));
+          assertCurrent();
+          if (approval.cancel)
+            await sendTransaction(approval.cancel, "approve-swap", "Reset swap approval");
+          assertCurrent();
+          if (approval.approval)
+            await sendTransaction(approval.approval, "approve-swap", `Approve ${source.symbol}`);
+        }
+        const fresh = await refreshQuote();
+        // The API's quote is opaque. Only accept its unchanged executable minimum
+        // when it still protects the floor the user reviewed, including fee outputs.
+        const provider = await wallet.getEthereumProvider();
+        const network = getFundingNetwork(selectedChainId);
+        if (!provider || !network) throw new Error("The selected wallet is unavailable.");
+        const client = createPublicClient({ chain: network.chain, transport: custom(provider) });
+        const [block, pending] = await Promise.all([
+          client.getBlock(),
+          client.getBlock({ blockTag: "pending" }).catch(() => null),
+        ]);
+        const deadline = Number(
+          swapDeadlineBase(
+            block.timestamp,
+            pending?.timestamp ?? null,
+            BigInt(Math.floor(Date.now() / 1000))
+          ) + PERMIT_TTL
+        );
+        setSubmitState("swapping");
+        const response = await fetch("/api/uniswap/swap", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            chainId: selectedChainId,
-            token: source.address,
-            tokenOut: destination.address,
-            amount: parsedAmount.toString(),
-            walletAddress: wallet.address,
-          }),
+          body: JSON.stringify({ quote: fresh.quote, deadline }),
         });
-        const approval = (await readJson(response)) as {
-          cancel?: unknown;
-          approval?: unknown;
-          detail?: string;
-          error?: string;
-        };
-        if (!response.ok) throw new Error(uniswapError(approval, "Approval check failed."));
-        if (approval.cancel)
-          await sendTransaction(approval.cancel, "approve-swap", "Reset swap approval");
-        if (approval.approval)
-          await sendTransaction(approval.approval, "approve-swap", `Approve ${source.symbol}`);
+        const swap = (await readJson(response)) as { swap?: unknown };
+        if (!response.ok || !swap.swap)
+          throw new Error(uniswapError(swap, "Uniswap could not build the swap transaction."));
+        assertCurrent();
+        await sendTransaction(swap.swap, "swap", `${source.symbol} to ${destination.symbol}`);
       }
-      setSubmitState("swapping");
-      const response = await fetch("/api/uniswap/swap", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ quote: fresh.quote }),
-      });
-      const swap = (await readJson(response)) as {
-        swap?: unknown;
-        detail?: string;
-        error?: string;
-      };
-      if (!response.ok || !swap.swap) {
-        throw new Error(uniswapError(swap, "Uniswap could not build the swap transaction."));
-      }
-      await sendTransaction(swap.swap, "swap", `${source.symbol} to ${destination.symbol}`);
       setAmount("");
       setQuote(null);
+      setReview(null);
       setReviewing(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Swap failed.");
@@ -566,11 +632,14 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
     if (walletRecovery === "create-wallet") return void wallet.createWallet();
     if (wallet.status !== "ready") return;
     if (wallet.address && !walletOnSelectedChain) {
-      return canonicalOnly
+      return staticsNetwork
         ? void wallet.switchNetwork()
         : void wallet.selectFundingNetwork(selectedChainId);
     }
-    if (quote?.quote) setReviewing(true);
+    if (quote?.quote && route && minimumRaw) {
+      setReview({ identity, minimum: BigInt(minimumRaw) });
+      setReviewing(true);
+    }
   };
 
   const actionLabel =
@@ -594,95 +663,97 @@ export function EvmSwapPanel({ canonicalOnly = false }: { canonicalOnly?: boolea
 
   return (
     <div className="portal-panel" role="tabpanel">
-      {settingsOpen && (
-        <SlippageSettingsDialog
-          value={slippage}
-          onApply={writePortalSlippage}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
-      {!canonicalOnly && (
-        <label className="portal-field">
-          <span>{t("fundingNetwork")}</span>
-          <select
-            value={wallet.fundingChainId}
-            onChange={(event) => {
-              setQuote(null);
-              setReviewing(false);
-              setError(null);
-              void wallet.selectFundingNetwork(Number(event.target.value));
-            }}
-          >
-            {wallet.fundingNetworks.map((network) => (
-              <option key={network.chainId} value={network.chainId}>
-                {network.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <SwapAssetField
-        label={t("youPay")}
-        slippage={slippage}
-        onEditSlippage={() => setSettingsOpen(true)}
-        tokens={tokens}
-        selected={source}
-        excluded={destination?.address}
-        amount={amount}
-        balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
-        onMax={
-          balance === null || balance === 0n || !source || source.kind === "native"
-            ? undefined
-            : () => {
-                setAmount(displayAmount(balance.toString(), source));
+      <fieldset disabled={submitting} className="portal-swap-fields">
+        {settingsOpen && (
+          <SlippageSettingsDialog
+            value={slippage}
+            onApply={writePortalSlippage}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+        {!staticsNetwork && (
+          <label className="portal-field">
+            <span>{t("fundingNetwork")}</span>
+            <select
+              value={wallet.fundingChainId}
+              onChange={(event) => {
                 setQuote(null);
                 setReviewing(false);
                 setError(null);
-              }
-        }
-        onAmount={(value) => {
-          setAmount(value);
-          setQuote(null);
-          setReviewing(false);
-          setError(null);
-        }}
-        onToken={(address) => {
-          setSourceAddress(address);
-          setQuote(null);
-          setReviewing(false);
-          setError(null);
-        }}
-      />
-      <button
-        className="portal-switch-assets"
-        type="button"
-        aria-label={t("switchSwapDirection")}
-        disabled={!source || !destination}
-        onClick={() => {
-          setSourceAddress(destination!.address);
-          setDestinationAddress(source!.address);
-          setQuote(null);
-          setReviewing(false);
-          setError(null);
-        }}
-      >
-        ⇅
-      </button>
-      <SwapAssetField
-        label={t("youReceive")}
-        tokens={tokens}
-        selected={destination}
-        excluded={source?.address}
-        amount={displayAmount(outputRaw, destination)}
-        balance="--"
-        readOnly
-        onToken={(address) => {
-          setDestinationAddress(address);
-          setQuote(null);
-          setReviewing(false);
-          setError(null);
-        }}
-      />
+                void wallet.selectFundingNetwork(Number(event.target.value));
+              }}
+            >
+              {wallet.fundingNetworks.map((network) => (
+                <option key={network.chainId} value={network.chainId}>
+                  {network.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <SwapAssetField
+          label={t("youPay")}
+          slippage={slippage}
+          onEditSlippage={() => setSettingsOpen(true)}
+          tokens={tokens}
+          selected={source}
+          excluded={destination?.address}
+          amount={amount}
+          balance={balance === null || !source ? "--" : displayAmount(balance.toString(), source)}
+          onMax={
+            balance === null || balance === 0n || !source || source.kind === "native"
+              ? undefined
+              : () => {
+                  setAmount(displayAmount(balance.toString(), source));
+                  setQuote(null);
+                  setReviewing(false);
+                  setError(null);
+                }
+          }
+          onAmount={(value) => {
+            setAmount(value);
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+          }}
+          onToken={(address) => {
+            setSourceAddress(address);
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+          }}
+        />
+        <button
+          className="portal-switch-assets"
+          type="button"
+          aria-label={t("switchSwapDirection")}
+          disabled={submitting || !source || !destination}
+          onClick={() => {
+            setSourceAddress(destination!.address);
+            setDestinationAddress(source!.address);
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+          }}
+        >
+          ⇅
+        </button>
+        <SwapAssetField
+          label={t("youReceive")}
+          tokens={tokens}
+          selected={destination}
+          excluded={source?.address}
+          amount={displayAmount(outputRaw, destination)}
+          balance="--"
+          readOnly
+          onToken={(address) => {
+            setDestinationAddress(address);
+            setQuote(null);
+            setReviewing(false);
+            setError(null);
+          }}
+        />
+      </fieldset>
       {quote?.quote && (
         <dl className="portal-quote-grid">
           <QuoteDatum

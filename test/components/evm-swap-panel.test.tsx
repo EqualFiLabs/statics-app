@@ -1,18 +1,47 @@
-import { fireEvent, render, screen } from "@/test/render";
-import { getAddress, zeroAddress } from "viem";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { decodeFunctionData, encodeFunctionResult, getAddress, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ walletTokenChains: [] as number[] }));
+const mocks = vi.hoisted(() => ({
+  walletTokenChains: [] as number[],
+  tokens: [],
+  call: vi.fn(),
+  readContract: vi.fn(),
+  getBalance: vi.fn(),
+  getBlock: vi.fn(),
+  execute: vi.fn(),
+}));
+vi.mock("viem", async (original) => ({
+  ...(await original<typeof import("viem")>()),
+  createPublicClient: () => ({
+    call: mocks.call,
+    readContract: mocks.readContract,
+    getBalance: mocks.getBalance,
+    getBlock: mocks.getBlock,
+  }),
+}));
+vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
+import {
+  buildV4ExactInputSingleSwap,
+  universalRouterAbi,
+  v4QuoterAbi,
+} from "@statics-protocol/sdk";
 
 vi.mock("@/hooks/useWalletTokens", () => ({
   useWalletTokens: (chainId: number) => {
     mocks.walletTokenChains.push(chainId);
-    return { tokens: [] };
+    return { tokens: mocks.tokens };
   },
 }));
 
+import { selectSwapRoute } from "@/lib/trade/swap-routing";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
-import type { DeploymentOption, LaunchDeployment } from "@/lib/deployments/types";
+import type {
+  DeploymentOption,
+  LaunchDeployment,
+  PhaseOneDeployment,
+} from "@/lib/deployments/types";
 import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
@@ -65,7 +94,7 @@ const option = {
   protocol: null,
 } satisfies DeploymentOption;
 
-function renderCanonicalTrade(chainId: number) {
+function renderCanonicalTrade(chainId: number, connected = false) {
   const switchNetwork = vi.fn().mockResolvedValue(undefined);
   const selectFundingNetwork = vi.fn().mockResolvedValue(undefined);
   render(
@@ -86,10 +115,13 @@ function renderCanonicalTrade(chainId: number) {
           fundingWalletOnSelectedChain: chainId === 42_161,
           switchNetwork,
           selectFundingNetwork,
-          getEthereumProvider: async () => null,
+          getEthereumProvider: async () =>
+            connected ? { request: vi.fn(), on: vi.fn(), removeListener: vi.fn() } : null,
         }}
       >
-        <EvmSwapPanel canonicalOnly />
+        <QueryClientProvider client={new QueryClient()}>
+          <EvmSwapPanel staticsNetwork />
+        </QueryClientProvider>
       </WalletContext.Provider>
     </DeploymentContext.Provider>
   );
@@ -97,7 +129,18 @@ function renderCanonicalTrade(chainId: number) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.walletTokenChains.length = 0;
+  mocks.getBalance.mockResolvedValue(100n * 10n ** 18n);
+  mocks.getBlock.mockResolvedValue({ timestamp: BigInt(Math.floor(Date.now() / 1000)) });
+  mocks.call.mockResolvedValue({
+    data: encodeFunctionResult({
+      abi: v4QuoterAbi,
+      functionName: "quoteExactInputSingle",
+      result: [10000n * 10n ** 18n, 100000n],
+    }),
+  });
+  mocks.execute.mockResolvedValue(`0x${"a".repeat(64)}`);
 });
 
 describe("canonical Trade network", () => {
@@ -116,5 +159,136 @@ describe("canonical Trade network", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Switch to Robinhood Chain" }));
     expect(switchNetwork).toHaveBeenCalledTimes(1);
     expect(selectFundingNetwork).not.toHaveBeenCalled();
+  });
+});
+
+describe("integrated swap execution", () => {
+  it("debounces direct quotes without deployment, gauge or reward reads", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    renderCanonicalTrade(descriptor.chainId, true);
+    const input = await screen.findByRole("textbox", { name: "You pay amount" });
+    await waitFor(() => expect(input).toHaveValue(""));
+    fireEvent.change(input, { target: { value: "1" } });
+    fireEvent.change(input, { target: { value: "2" } });
+    expect(mocks.call).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+    expect(mocks.readContract).not.toHaveBeenCalled();
+    expect(mocks.getBlock).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("requires a new review after a quote falls below the accepted minimum", async () => {
+    renderCanonicalTrade(descriptor.chainId, true);
+    const input = await screen.findByRole("textbox", { name: "You pay amount" });
+    await waitFor(() => expect(input).toHaveValue(""));
+    fireEvent.change(input, { target: { value: "1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    mocks.call.mockResolvedValue({
+      data: encodeFunctionResult({
+        abi: v4QuoterAbi,
+        functionName: "quoteExactInputSingle",
+        result: [8000n * 10n ** 18n, 100000n],
+      }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Confirm swap" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the reviewed floor and wraps native input after refreshing", async () => {
+    renderCanonicalTrade(descriptor.chainId, true);
+    const input = await screen.findByRole("textbox", { name: "You pay amount" });
+    await waitFor(() => expect(input).toHaveValue(""));
+    fireEvent.change(input, { target: { value: "1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    mocks.call.mockResolvedValue({
+      data: encodeFunctionResult({
+        abi: v4QuoterAbi,
+        functionName: "quoteExactInputSingle",
+        result: [11000n * 10n ** 18n, 100000n],
+      }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const execution = mocks.execute.mock.calls[0]![0];
+    const decoded = decodeFunctionData({ abi: universalRouterAbi, data: execution.data });
+    const deadline = decoded.args![2]!;
+    expect(deadline).toBeGreaterThanOrEqual(
+      (await mocks.getBlock.mock.results[0]!.value).timestamp + 1200n
+    );
+    const expected = buildV4ExactInputSingleSwap({
+      router: deployment.contracts.universalRouter,
+      poolKey: deployment.market.poolKey,
+      zeroForOne: false,
+      amountIn: 10n ** 18n,
+      amountOutMinimum: 9950n * 10n ** 18n,
+      deadline,
+      settlement: { input: "native", output: "erc20", wrappedNative: deployment.contracts.weth },
+    });
+    expect(mocks.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expected.calldata,
+        value: expected.value,
+      })
+    );
+  });
+});
+
+describe("route precedence", () => {
+  const native = {
+    address: zeroAddress,
+    decimals: 18,
+    kind: "native" as const,
+    name: "Ether",
+    symbol: "ETH",
+  };
+  const statics = {
+    ...native,
+    address: deployment.contracts.statics,
+    kind: "erc20" as const,
+    symbol: "STATICS",
+  };
+  const other = { ...statics, address: getAddress("0x8888888888888888888888888888888888888888") };
+  const pool = {
+    poolId: `0x${"2".repeat(64)}` as const,
+    poolKey: deployment.market.poolKey,
+    enabled: true,
+    token0: { ...statics, metadataSource: "reviewed-manifest" as const },
+    token1: { ...other, metadataSource: "reviewed-manifest" as const },
+    provenance: { deploymentId: "phase-one", protocolCommit: "fixture", registrationBlock: 1n },
+  };
+  const phaseOne = {
+    descriptor: { ...descriptor, deploymentId: "phase-one" },
+    contracts: deployment.contracts,
+    supportedPools: [pool],
+  } as unknown as PhaseOneDeployment;
+  it("prefers Genesis when both deployments support the canonical pair", () => {
+    expect(
+      selectSwapRoute({ ...option, phaseOne }, descriptor.chainId, native, statics)
+    ).toMatchObject({ kind: "direct", phaseOne: false });
+  });
+  it("selects the first enabled exact Phase 1 pair and uses API only for unsupported pairs", () => {
+    const publicPool = { ...pool, poolKey: { ...pool.poolKey, currency0: other.address } };
+    const active = {
+      ...option,
+      phaseOne: { ...phaseOne, supportedPools: [{ ...publicPool, enabled: false }, publicPool] },
+    };
+    expect(selectSwapRoute(active, descriptor.chainId, native, other)).toMatchObject({
+      kind: "direct",
+      phaseOne: true,
+      settlement: { input: "native" },
+    });
+    expect(selectSwapRoute(active, descriptor.chainId, statics, other)).toMatchObject({
+      kind: "uniswap",
+    });
+    expect(selectSwapRoute(active, 8453, native, statics)).toMatchObject({
+      kind: "uniswap",
+      chainId: 8453,
+    });
   });
 });
