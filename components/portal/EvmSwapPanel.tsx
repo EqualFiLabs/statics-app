@@ -165,6 +165,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
   );
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState<bigint | null>(null);
+  const [balanceVersion, setBalanceVersion] = useState(0);
   const [quote, setQuote] = useState<QuotePayload | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -267,7 +268,14 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
       active = false;
       window.clearTimeout(reset);
     };
-  }, [source, walletAddress, selectedChainId, walletOnSelectedChain, getEthereumProvider]);
+  }, [
+    source,
+    walletAddress,
+    selectedChainId,
+    walletOnSelectedChain,
+    getEthereumProvider,
+    balanceVersion,
+  ]);
 
   const requestQuote = async (signal?: AbortSignal): Promise<QuotePayload> => {
     if (!wallet.address || !source || !destination || !route || parsedAmount <= 0n) {
@@ -495,7 +503,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
             route.permit2,
             route.router,
           ] as const;
-          const allowance = await queryClient.fetchQuery({
+          const allowanceQuery = {
             queryKey: key,
             staleTime: 0,
             queryFn: async () => {
@@ -515,7 +523,9 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
               ]);
               return { token, permit };
             },
-          });
+          };
+          const allowance = await queryClient.fetchQuery(allowanceQuery);
+          let approved = false;
           if (allowance.token < parsedAmount) {
             await send({
               to: route.inputToken,
@@ -523,6 +533,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
               kind: "approve-swap",
               label: `Enable ${source.symbol} swaps`,
             });
+            approved = true;
           }
           const [block, pending] = await Promise.all([
             publicClient.getBlock(),
@@ -553,8 +564,9 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
               kind: "approve-permit2",
               label: `Authorize ${source.symbol} swaps`,
             });
+            approved = true;
           }
-          await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+          if (approved) await queryClient.fetchQuery(allowanceQuery);
         }
         await refreshQuote();
         const [block, pendingBlock] = await Promise.all([
@@ -651,6 +663,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
           assertCurrent
         );
       }
+      setBalanceVersion((version) => version + 1);
       setAmount("");
       setQuote(null);
       setReview(null);

@@ -248,6 +248,7 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       });
     } catch (cause) {
       setError(describeTransactionError(cause));
+      if (/GenesisNotInVault/.test(String(cause))) await nextAvailable.refetch();
     } finally {
       setBusy(null);
     }
@@ -303,6 +304,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       setSelectedOwnedId("");
     } catch (cause) {
       setError(describeTransactionError(cause));
+      if (/GenesisLocked|CreditAlreadyActive|IncorrectOwner|NotOwner/.test(String(cause)))
+        await walletOperators.refetch();
     } finally {
       setBusy(null);
     }

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@/test/render";
-import { getAddress, parseEther, zeroAddress } from "viem";
+import { getAddress, maxUint256, parseEther, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
@@ -207,6 +207,24 @@ describe("Genesis Vault trade card", () => {
     expect(
       await screen.findByRole("button", { name: "Acquire Operators #4913" })
     ).not.toBeDisabled();
+  });
+
+  it("refreshes inventory after another buyer acquires the cached Operator", async () => {
+    reads();
+    const original = readContract.getMockImplementation()!;
+    readContract.mockImplementation(async (input) => {
+      if (input.functionName === "balanceOf") return parseEther("264120.55");
+      if (input.functionName === "allowance") return maxUint256;
+      if (input.functionName === "isVaultInventory") return false;
+      return original(input);
+    });
+    discoverNextAvailableGenesisId.mockResolvedValueOnce(4913n).mockResolvedValue(4914n);
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Acquire Operators #4913" }));
+    expect(
+      await screen.findByRole("button", { name: "Acquire Operators #4914" })
+    ).toBeInTheDocument();
+    expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(2);
   });
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {
