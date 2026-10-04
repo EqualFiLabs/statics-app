@@ -18,6 +18,7 @@ import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 import { EmptyState } from "@/components/common/EmptyState";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
 import type { LaunchDeployment } from "@/lib/deployments/types";
+import { genesisVaultErrorName } from "@/lib/genesis/vault-errors";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
   discoverNextAvailableGenesisId,
@@ -42,7 +43,8 @@ type ErrorCopy = Readonly<{
 }>;
 
 function describeError(error: unknown, copy: ErrorCopy): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    genesisVaultErrorName(error) ?? (error instanceof Error ? error.message : String(error));
   if (/rejected/i.test(message)) return copy.walletRejected;
   if (message.includes("GenesisNotInVault")) return copy.justAcquired;
   if (message.includes("CreditAlreadyActive")) return copy.repayCredit;
@@ -248,7 +250,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       });
     } catch (cause) {
       setError(describeTransactionError(cause));
-      if (/GenesisNotInVault/.test(String(cause))) await nextAvailable.refetch();
+      if (/GenesisNotInVault/.test(genesisVaultErrorName(cause) ?? String(cause)))
+        await nextAvailable.refetch();
     } finally {
       setBusy(null);
     }
@@ -304,7 +307,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       setSelectedOwnedId("");
     } catch (cause) {
       setError(describeTransactionError(cause));
-      if (/GenesisLocked|CreditAlreadyActive|IncorrectOwner|NotOwner/.test(String(cause)))
+      if (
+        /GenesisLocked|CreditAlreadyActive|IncorrectOwner|NotOwner/.test(
+          genesisVaultErrorName(cause) ?? String(cause)
+        )
+      )
         await walletOperators.refetch();
     } finally {
       setBusy(null);

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@/test/render";
-import { getAddress, maxUint256, parseEther, zeroAddress } from "viem";
+import { encodeErrorResult, getAddress, maxUint256, parseEther, zeroAddress } from "viem";
+import { genesisVaultRecoveryErrors } from "@/lib/genesis/vault-errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
@@ -218,6 +219,35 @@ describe("Genesis Vault trade card", () => {
       if (input.functionName === "isVaultInventory") return false;
       return original(input);
     });
+    discoverNextAvailableGenesisId.mockResolvedValueOnce(4913n).mockResolvedValue(4914n);
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Acquire Operators #4913" }));
+    expect(
+      await screen.findByRole("button", { name: "Acquire Operators #4914" })
+    ).toBeInTheDocument();
+    expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes inventory after an encoded competing-acquisition revert", async () => {
+    reads();
+    const original = readContract.getMockImplementation()!;
+    readContract.mockImplementation(
+      async (input: { functionName: string; args?: readonly unknown[] }) => {
+        if (input.functionName === "balanceOf") return parseEther("264120.55");
+        if (input.functionName === "allowance") return maxUint256;
+        if (input.functionName === "isVaultInventory")
+          throw Object.assign(new Error("CallExecutionError"), {
+            cause: {
+              data: encodeErrorResult({
+                abi: genesisVaultRecoveryErrors,
+                errorName: "GenesisNotInVault",
+                args: [4913n],
+              }),
+            },
+          });
+        return original(input);
+      }
+    );
     discoverNextAvailableGenesisId.mockResolvedValueOnce(4913n).mockResolvedValue(4914n);
     renderPanel();
     fireEvent.click(await screen.findByRole("button", { name: "Acquire Operators #4913" }));
