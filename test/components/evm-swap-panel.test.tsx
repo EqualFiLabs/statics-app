@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { act, fireEvent, render, screen, waitFor } from "@/test/render";
 import {
   decodeFunctionData,
   encodeFunctionResult,
@@ -7,11 +7,11 @@ import {
   maxUint256,
   zeroAddress,
 } from "viem";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   walletTokenChains: [] as number[],
-  tokens: [],
+  tokens: [] as { address: `0x${string}`; decimals: number; name: string; symbol: string }[],
   call: vi.fn(),
   readContract: vi.fn(),
   getBalance: vi.fn(),
@@ -143,6 +143,7 @@ function renderCanonicalTrade(chainId: number, connected = false) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.walletTokenChains.length = 0;
+  mocks.tokens = [];
   mocks.getBalance.mockResolvedValue(100n * 10n ** 18n);
   mocks.getBlock.mockResolvedValue({ timestamp: BigInt(Math.floor(Date.now() / 1000)) });
   mocks.call.mockResolvedValue({
@@ -154,6 +155,7 @@ beforeEach(() => {
   });
   mocks.execute.mockResolvedValue(`0x${"a".repeat(64)}`);
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("canonical Trade network", () => {
   it("ignores a remembered Arbitrum funding selection on Robinhood", async () => {
@@ -175,6 +177,98 @@ describe("canonical Trade network", () => {
 });
 
 describe("integrated swap execution", () => {
+  const usd = getAddress("0x8888888888888888888888888888888888888888");
+  const apiQuote = (minimum = "199000000", output = "200000000") => ({
+    quote: {
+      input: { amount: "1000000000000000000", token: zeroAddress },
+      output: { amount: output, token: usd },
+      aggregatedOutputs: [{ amount: output, minAmount: minimum, token: usd }],
+    },
+  });
+  const unsupported = async () => {
+    mocks.tokens = [{ address: usd, decimals: 6, name: "Dollar", symbol: "USD" }];
+    renderCanonicalTrade(descriptor.chainId, true);
+    fireEvent.change(await screen.findByRole("combobox", { name: "You receive asset" }), {
+      target: { value: usd },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "1" },
+    });
+  };
+  it("executes unsupported-pair API fixtures on the selected chain and preserves the reviewed floor", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+      Response.json(
+        String(url) === "/api/uniswap/swap"
+          ? {
+              swap: {
+                to: usd,
+                from: walletAddress,
+                chainId: 4663,
+                data: "0x1234",
+                value: "1000000000000000000",
+              },
+            }
+          : apiQuote()
+      )
+    );
+    await unsupported();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    expect(mocks.call).not.toHaveBeenCalled();
+    const requests = fetchSpy.mock.calls.map(([url, options]) => ({
+      url,
+      body: JSON.parse(options!.body as string),
+    }));
+    expect(
+      requests.filter((r) => r.url === "/api/uniswap/quote").every((r) => r.body.chainId === 4663)
+    ).toBe(true);
+    expect(
+      requests.find((r) => r.url === "/api/uniswap/swap")?.body.quote.aggregatedOutputs[0].minAmount
+    ).toBe("199000000");
+    expect(mocks.execute.mock.calls[0][0]).toMatchObject({
+      chainId: 4663,
+      to: usd,
+      data: "0x1234",
+    });
+  });
+  it("aborts obsolete API requests and discards responses even when the transport ignores cancellation", async () => {
+    let finish!: (response: Response) => void;
+    let signal: AbortSignal | undefined;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementationOnce(async (_url, options) => {
+        signal = options!.signal as AbortSignal;
+        return new Promise<Response>((resolve) => {
+          finish = resolve;
+        });
+      })
+      .mockResolvedValue(Response.json(apiQuote("398000000", "400000000")));
+    await unsupported();
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "2" },
+    });
+    expect(signal?.aborted).toBe(true);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "You receive amount" })).toHaveValue("400")
+    );
+    await act(async () => finish(Response.json(apiQuote())));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "You receive amount" })).toHaveValue("400")
+    );
+  });
+  it("does not fall back to API when a supported direct quote fails", async () => {
+    mocks.call.mockRejectedValueOnce(new Error("Pool quote failed"));
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    renderCanonicalTrade(descriptor.chainId, true);
+    fireEvent.change(await screen.findByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "1" },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Pool quote failed");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
   it("debounces direct quotes without deployment, gauge or reward reads", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     renderCanonicalTrade(descriptor.chainId, true);

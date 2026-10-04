@@ -347,6 +347,27 @@ STATICS_PROTOCOL_REPOSITORY=/path/to/statics npm run test:integration:local
 It deploys ephemeral local contracts and exercises value-moving lifecycles with confirmed receipts.
 It is local execution evidence, not Robinhood testnet transaction evidence.
 
+For an already-running Phase 1 fork, configure the app with both Genesis and Phase 1 manifests,
+then run the additive acceptance checks:
+
+```bash
+STATICS_FORK_ROOT=/path/to/existing-phase-one-fork \
+  npx vitest run --config vitest.phase-one-fork.config.ts
+CONNECTED_DAPP_URL=http://127.0.0.1:3000 \
+  npx playwright test --config playwright.genesis-fork.config.ts phase-one-fork.spec.ts
+```
+
+The transaction suite requires `manifest.json` and `cleanup-launch-manifest.json` in that folder,
+uses only loopback Anvil at port `8663` with chain ID `31337`, and reuses its existing contracts.
+It submits local transactions, funds fixture accounts, advances the fork clock, and configures a
+reward slot through local impersonation. It does not start another Anvil or map Uniswap API
+execution to a mainnet chain. Uniswap execution uses component fixtures; production integration
+is checked with read-only quotes. The browser suite checks the configured page layouts and
+disconnected states; wallet signing is covered separately by component and fork transaction tests.
+
+Use a separate recoverable indexer database for this rehearsal, as described in
+[`docs/phase-one-indexer-replay.md`](docs/phase-one-indexer-replay.md).
+
 ## Deployment manifests and SDK
 
 - [`deployments/README.md`](deployments/README.md) documents public deployment generation and
