@@ -6,7 +6,7 @@ import { erc20Abi, formatUnits, getAddress, parseUnits, type Address } from "vie
 import { usePublicClient } from "wagmi";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
-import { loadIndexedPhaseOnePositions } from "@/lib/indexer/phase-one";
+import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
 import {
   buildGaugeAllocationTransaction,
   buildGaugeRewardResolution,
@@ -46,18 +46,8 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const positions = useQuery({
-    queryKey: protocolQueryKeys.phaseOnePositions(deployment.descriptor.deploymentId, wallet),
-    enabled: Boolean(wallet),
-    retry: false,
-    queryFn: async () => {
-      if (!wallet || !publicClient) throw new Error("Connect a wallet to load PositionNFTs.");
-      return loadIndexedPhaseOnePositions(wallet, deployment.descriptor.deploymentId);
-    },
-  });
-  const positionId = selectedId
-    ? BigInt(selectedId)
-    : (positions.data?.items[0]?.positionId ?? null);
+  const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, wallet);
+  const positionId = selectedId ? BigInt(selectedId) : (positions.items[0]?.positionId ?? null);
   const live = useQuery({
     queryKey: protocolQueryKeys.phaseOnePosition(
       deployment.descriptor.deploymentId,
@@ -320,15 +310,15 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
       <h2>PositionNFT staking and gauges</h2>
       {!wallet && <p>Connect a wallet to load your Phase 1 positions.</p>}
       {positions.isError && <p role="alert">{describeError(positions.error)}</p>}
-      {positions.data && positions.data.items.length === 0 && <p>No PositionNFTs found.</p>}
-      {positions.data && positions.data.items.length > 0 && (
+      {positions.data && positions.items.length === 0 && <p>No PositionNFTs found.</p>}
+      {positions.data && positions.items.length > 0 && (
         <label>
           PositionNFT
           <select
             value={positionId?.toString() ?? ""}
             onChange={(event) => setSelectedId(event.target.value)}
           >
-            {positions.data.items.map((position) => (
+            {positions.items.map((position) => (
               <option key={position.positionId.toString()} value={position.positionId.toString()}>
                 #{position.positionId.toString()} | {formatUnits(position.stakedBalance, 18)}{" "}
                 STATICS | {position.activeLegCount.toString()} active legs
@@ -336,6 +326,15 @@ export function PhaseOnePositionsPanel({ deployment }: { deployment: PhaseOneDep
             ))}
           </select>
         </label>
+      )}
+      {positions.hasNextPage && (
+        <button
+          type="button"
+          disabled={positions.isFetchingNextPage}
+          onClick={() => void positions.fetchNextPage()}
+        >
+          Load more positions
+        </button>
       )}
       {live.data && (
         <dl>

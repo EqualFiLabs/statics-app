@@ -41,7 +41,8 @@ import {
   allocationSnapshotJson,
   normalizeGaugeAllocationSnapshot,
   phaseOneEntityKey,
-  reconcileGaugeAllocation,
+  phaseOneMinuteCandle,
+  mergeMinuteCandle,
   unpackBalanceDelta,
   unpackUint128Pair,
 } from "./phase-one";
@@ -555,6 +556,23 @@ onPhaseOne("PhaseOneStatics:MarketSwapRecorded", async ({ event, context }) => {
     blockTimestamp: event.block.timestamp,
     logIndex: event.log.logIndex,
   });
+  const minute = phaseOneMinuteCandle({
+    ...delta,
+    finalTick: event.args.finalTick,
+    flags: event.args.flags,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+  });
+  if (minute)
+    await context.db
+      .insert(marketCandle)
+      .values({
+        ...minute,
+        key: marketCandleKey(phaseOneDeploymentId!, event.args.poolId, event.block.timestamp),
+        deploymentId: phaseOneDeploymentId!,
+        poolId: event.args.poolId,
+      })
+      .onConflictDoUpdate((row) => mergeMinuteCandle(row, minute));
 });
 
 onPhaseOne("PhaseOneStatics:MarketObservationCommitted", async ({ event, context }) => {
@@ -655,11 +673,7 @@ onPhaseOne("PhaseOneStatics:PositionStateChanged", async ({ event, context }) =>
 
 for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"] as const) {
   onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
-    await context.db.insert(managedGaugePosition).values({
-      key: managedPositionKey(event.args.positionId, event.args.poolId),
-      deploymentId: phaseOneDeploymentId!,
-      positionId: event.args.positionId,
-      poolId: event.args.poolId,
+    const state = {
       posmTokenId: event.args.posmTokenId,
       manager: getAddress(event.args.manager),
       tickLower: event.args.tickLower,
@@ -667,7 +681,17 @@ for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"]
       liquidity: event.args.liquidity,
       active: true,
       updatedAtBlock: event.block.number,
-    });
+    };
+    await context.db
+      .insert(managedGaugePosition)
+      .values({
+        key: managedPositionKey(event.args.positionId, event.args.poolId),
+        deploymentId: phaseOneDeploymentId!,
+        positionId: event.args.positionId,
+        poolId: event.args.poolId,
+        ...state,
+      })
+      .onConflictDoUpdate(state);
   });
 }
 
@@ -920,7 +944,7 @@ onPhaseOne("PhaseOneStatics:PositionGaugeAllocationsSet", async ({ event, contex
       blockNumber: event.block.number,
     })
   );
-  reconcileGaugeAllocation(event.transaction.input, event.args.positionId, snapshot);
+  // eth_call at this block returns its ending state, including later transactions.
   const serialized = allocationSnapshotJson(snapshot);
   await context.db
     .insert(positionGaugeState)

@@ -56,6 +56,7 @@ export type PhaseOneIndexedPage<T> = Readonly<{
   deploymentId: string;
   indexedAtBlock: bigint;
   items: readonly T[];
+  nextCursor?: string | null;
 }>;
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -192,8 +193,15 @@ export function parseIndexedPositions(
   deploymentId: string
 ): PhaseOneIndexedPage<IndexedPhaseOnePosition> {
   const body = page(value, deploymentId);
+  if (
+    body.nextCursor !== undefined &&
+    body.nextCursor !== null &&
+    typeof body.nextCursor !== "string"
+  )
+    throw new Error("The Phase 1 indexer returned an invalid cursor.");
   return {
     deploymentId,
+    nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
     indexedAtBlock: unsignedBigint(body.indexedAtBlock, "indexed block"),
     items: (body.items as unknown[]).map((item) => {
       const row = record(item, "position");
@@ -238,10 +246,15 @@ export async function loadIndexedPublicPools(
 export async function loadIndexedPhaseOnePositions(
   owner: Address,
   deploymentId: string,
-  indexerUrl?: string | null
+  indexerUrl?: string | null,
+  cursor?: string | null
 ): Promise<PhaseOneIndexedPage<IndexedPhaseOnePosition>> {
   return parseIndexedPositions(
-    await load(deploymentId, `/phase-one/wallets/${getAddress(owner)}/positions`, indexerUrl),
+    await load(
+      deploymentId,
+      `/phase-one/wallets/${getAddress(owner)}/positions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      indexerUrl
+    ),
     deploymentId
   );
 }

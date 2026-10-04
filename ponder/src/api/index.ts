@@ -29,7 +29,6 @@ import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
 import { nextAvailableGenesisId } from "../genesis";
 import { aggregateMarketCandles, readMarketResolution } from "../market";
-import { aggregatePhaseOneSwapCandles } from "../phase-one";
 
 const app = new Hono();
 app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
@@ -616,36 +615,24 @@ app.get("/phase-one/market/candles", async (context) => {
     return context.json({ error: "Invalid Phase 1 candle query." }, 400);
   }
   const rows = await db
-    .select({
-      finalTick: phaseOneMarketSwap.finalTick,
-      amount0: phaseOneMarketSwap.amount0,
-      amount1: phaseOneMarketSwap.amount1,
-      flags: phaseOneMarketSwap.flags,
-      blockNumber: phaseOneMarketSwap.blockNumber,
-      blockTimestamp: phaseOneMarketSwap.blockTimestamp,
-    })
-    .from(phaseOneMarketSwap)
+    .select()
+    .from(marketCandle)
     .where(
       and(
-        eq(phaseOneMarketSwap.deploymentId, phaseOneDeploymentId),
-        eq(phaseOneMarketSwap.poolId, poolId),
-        eq(phaseOneMarketSwap.internal, false),
-        gte(phaseOneMarketSwap.blockTimestamp, range.from),
-        lte(phaseOneMarketSwap.blockTimestamp, range.to)
+        eq(marketCandle.deploymentId, phaseOneDeploymentId),
+        eq(marketCandle.poolId, poolId),
+        gte(marketCandle.bucketTimestamp, (range.from / 60n) * 60n),
+        lte(marketCandle.bucketTimestamp, (range.to / 60n) * 60n)
       )
     )
-    .orderBy(
-      asc(phaseOneMarketSwap.blockTimestamp),
-      asc(phaseOneMarketSwap.blockNumber),
-      asc(phaseOneMarketSwap.logIndex)
-    )
+    .orderBy(asc(marketCandle.bucketTimestamp))
     .limit(44_641);
-  const items = aggregatePhaseOneSwapCandles(rows, resolution);
+  const items = aggregateMarketCandles(rows, resolution);
   context.header("Cache-Control", "public, max-age=5, stale-while-revalidate=30");
   return context.json({
     deploymentId: phaseOneDeploymentId,
     poolId,
-    indexedAtBlock: rows.at(-1)?.blockNumber.toString() ?? null,
+    indexedAtBlock: rows.at(-1)?.lastBlock.toString() ?? null,
     resolution,
     items: items.map((row) => ({
       timestamp: row.bucketTimestamp.toString(),
@@ -744,7 +731,9 @@ app.get("/phase-one/market/observations", async (context) => {
 app.get("/phase-one/wallets/:owner/positions", async (context) => {
   const rawOwner = context.req.param("owner");
   const limit = readLimit(context.req.query("limit"));
-  if (!isAddress(rawOwner) || limit === 0) {
+  const rawCursor = context.req.query("cursor");
+  const cursor = decodeCursor(rawCursor);
+  if (!isAddress(rawOwner) || limit === 0 || (rawCursor !== undefined && cursor === null)) {
     return context.json({ error: "Invalid owner or limit." }, 400);
   }
   const rows = await db
@@ -753,17 +742,20 @@ app.get("/phase-one/wallets/:owner/positions", async (context) => {
     .where(
       and(
         eq(positionNft.deploymentId, phaseOneDeploymentId),
-        eq(positionNft.owner, getAddress(rawOwner))
+        eq(positionNft.owner, getAddress(rawOwner)),
+        cursor === null ? undefined : gt(positionNft.positionId, cursor)
       )
     )
     .orderBy(asc(positionNft.positionId))
-    .limit(limit);
+    .limit(limit + 1);
+  const items = rows.slice(0, limit);
   return context.json({
     deploymentId: phaseOneDeploymentId,
     indexedAtBlock: rows
       .reduce((latest, row) => (row.updatedAtBlock > latest ? row.updatedAtBlock : latest), 0n)
       .toString(),
-    items: rows.map((row) => ({
+    nextCursor: rows.length > limit ? encodeCursor(items.at(-1)!.positionId) : null,
+    items: items.map((row) => ({
       positionId: row.positionId.toString(),
       owner: row.owner,
       stakedBalance: row.stakedBalance.toString(),

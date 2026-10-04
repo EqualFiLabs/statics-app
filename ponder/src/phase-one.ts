@@ -1,6 +1,6 @@
-import { decodeFunctionData, type Address, type Hex } from "viem";
+import { type Address, type Hex } from "viem";
 
-import { getSqrtPriceAtTick, staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
+import { getSqrtPriceAtTick } from "@statics-protocol/sdk/phase-one";
 
 import {
   absoluteAmount,
@@ -64,52 +64,6 @@ export function normalizeGaugeAllocationSnapshot(
   };
 }
 
-export function decodeGaugeAllocationInput(input: Hex): Readonly<{
-  positionId: bigint;
-  poolIds: readonly Hex[];
-  amounts: readonly bigint[];
-}> {
-  const decoded = decodeFunctionData({ abi: staticsGaugeIncentivesAbi, data: input });
-  if (decoded.functionName !== "setGaugeAllocations") {
-    throw new Error("PositionGaugeAllocationsSet transaction did not call setGaugeAllocations.");
-  }
-  const [positionId, poolIds, amounts] = decoded.args;
-  return { positionId, poolIds, amounts };
-}
-
-export function reconcileGaugeAllocation(
-  input: Hex,
-  eventPositionId: bigint,
-  snapshot: GaugeAllocationSnapshot
-): void {
-  const decoded = decodeGaugeAllocationInput(input);
-  if (decoded.positionId !== eventPositionId) {
-    throw new Error("Gauge allocation calldata position does not match the emitted position.");
-  }
-  if (decoded.poolIds.length !== decoded.amounts.length) {
-    throw new Error("Gauge allocation calldata arrays have different lengths.");
-  }
-  if (decoded.poolIds.length !== snapshot.active.length) {
-    throw new Error("Gauge allocation calldata does not match same-block onchain state.");
-  }
-  let total = 0n;
-  for (let index = 0; index < snapshot.active.length; index += 1) {
-    const expectedPool = decoded.poolIds[index];
-    const expectedAmount = decoded.amounts[index];
-    const actual = snapshot.active[index];
-    if (
-      expectedPool.toLowerCase() !== actual.poolId.toLowerCase() ||
-      expectedAmount !== actual.amount
-    ) {
-      throw new Error("Gauge allocation calldata does not match same-block onchain state.");
-    }
-    total += actual.amount;
-  }
-  if (total !== snapshot.totalAllocated || snapshot.lockedStake !== snapshot.totalAllocated) {
-    throw new Error("Gauge allocation totals do not match same-block onchain state.");
-  }
-}
-
 export function allocationSnapshotJson(snapshot: GaugeAllocationSnapshot): Readonly<{
   poolIdsJson: string;
   amountsJson: string;
@@ -171,23 +125,48 @@ export function aggregatePhaseOneSwapCandles(
   swaps: readonly PhaseOneSwapCandleInput[],
   resolution: MarketResolution
 ): MarketCandleRow[] {
-  const minutes = swaps.map((swap): MarketCandleRow => {
-    const sqrtPriceX96 = getSqrtPriceAtTick(swap.finalTick);
-    const zeroForOne = (swap.flags & 1) !== 0;
-    return {
-      bucketTimestamp: candleBucket(swap.blockTimestamp),
-      openSqrtPriceX96: sqrtPriceX96,
-      highSqrtPriceX96: sqrtPriceX96,
-      lowSqrtPriceX96: sqrtPriceX96,
-      closeSqrtPriceX96: sqrtPriceX96,
-      volume0: absoluteAmount(swap.amount0),
-      volume1: absoluteAmount(swap.amount1),
-      zeroForOneCount: zeroForOne ? 1 : 0,
-      oneForZeroCount: zeroForOne ? 0 : 1,
-      swapCount: 1,
-      firstBlock: swap.blockNumber,
-      lastBlock: swap.blockNumber,
-    };
+  const minutes = swaps.flatMap((swap) => {
+    const minute = phaseOneMinuteCandle(swap);
+    return minute ? [minute] : [];
   });
   return aggregateMarketCandles(minutes, resolution);
+}
+
+export function phaseOneMinuteCandle(swap: PhaseOneSwapCandleInput): MarketCandleRow | null {
+  if ((swap.flags & 4) !== 0) return null;
+  const sqrtPriceX96 = getSqrtPriceAtTick(swap.finalTick);
+  const zeroForOne = (swap.flags & 1) !== 0;
+  return {
+    bucketTimestamp: candleBucket(swap.blockTimestamp),
+    openSqrtPriceX96: sqrtPriceX96,
+    highSqrtPriceX96: sqrtPriceX96,
+    lowSqrtPriceX96: sqrtPriceX96,
+    closeSqrtPriceX96: sqrtPriceX96,
+    volume0: absoluteAmount(swap.amount0),
+    volume1: absoluteAmount(swap.amount1),
+    zeroForOneCount: zeroForOne ? 1 : 0,
+    oneForZeroCount: zeroForOne ? 0 : 1,
+    swapCount: 1,
+    firstBlock: swap.blockNumber,
+    lastBlock: swap.blockNumber,
+  };
+}
+
+export function mergeMinuteCandle(row: MarketCandleRow, next: MarketCandleRow): MarketCandleRow {
+  return {
+    bucketTimestamp: row.bucketTimestamp,
+    openSqrtPriceX96: row.openSqrtPriceX96,
+    firstBlock: row.firstBlock,
+    highSqrtPriceX96:
+      row.highSqrtPriceX96 > next.highSqrtPriceX96 ? row.highSqrtPriceX96 : next.highSqrtPriceX96,
+    lowSqrtPriceX96:
+      row.lowSqrtPriceX96 < next.lowSqrtPriceX96 ? row.lowSqrtPriceX96 : next.lowSqrtPriceX96,
+    closeSqrtPriceX96: next.closeSqrtPriceX96,
+    volume0: row.volume0 + next.volume0,
+    volume1: row.volume1 + next.volume1,
+    zeroForOneCount: row.zeroForOneCount + next.zeroForOneCount,
+    oneForZeroCount: row.oneForZeroCount + next.oneForZeroCount,
+    swapCount: row.swapCount + next.swapCount,
+    lastBlock: next.lastBlock,
+  };
 }

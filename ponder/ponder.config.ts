@@ -19,6 +19,7 @@ import {
   staticsSwapFeeHookAbi,
 } from "@statics-protocol/sdk/phase-one";
 
+import { uniqueAbi } from "./src/abi";
 import { configuredAddress, configuredCanonicalPool } from "./src/source-config";
 
 function required(name: string): string {
@@ -99,13 +100,13 @@ export default createConfig({
     },
     PhaseOneStatics: {
       chain: "active",
-      abi: [
+      abi: uniqueAbi([
         ...phaseOneStaticsAbi,
         ...staticsGaugeIncentivesAbi,
         ...staticsMarketTapeAbi,
         ...staticsRangeGaugeAbi,
         ...phaseOnePolicyEventsAbi,
-      ],
+      ]),
       address: staticsAddress ?? zeroAddress,
       startBlock: optionalStartBlock(
         "PONDER_PHASE_ONE_START_BLOCK",

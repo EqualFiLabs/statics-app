@@ -1,0 +1,7 @@
+# Phase 1 indexer replay
+
+Genesis and Phase 1 use separate deployment namespaces in the existing schema. Phase 1 minute candles now populate `market_candle` as external swaps are indexed. The candle API preserves its fields; `indexedAtBlock` describes the last market block represented by those rows. Indexer freshness comes from Ponder's `/status` checkpoint.
+
+Correcting historical Phase 1 candles, allocation snapshots and reused managed legs requires replaying Phase 1 from its configured start block. Keep the current database intact and replay into a separate database directory or schema, with both Genesis and Phase 1 sources configured. Validate readiness, ownership, allocation snapshots, leg reuse and candle totals before switching the development indexer URL. Do not reset the existing Genesis database or delete its records.
+
+Owned positions retain the 100-item page limit. The response adds `nextCursor`; additional pages use ascending PositionNFT IDs, so callers request the cursor returned by the previous page.
