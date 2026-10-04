@@ -196,6 +196,9 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
       : null;
   const identity = [
     wallet.address,
+    wallet.chainId,
+    wallet.status,
+    wallet.walletKind,
     selectedChainId,
     route?.id,
     source?.address,
@@ -373,7 +376,12 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     slippage,
   ]);
 
-  const sendTransaction = async (raw: unknown, kind: "approve-swap" | "swap", label: string) => {
+  const sendTransaction = async (
+    raw: unknown,
+    kind: "approve-swap" | "swap",
+    label: string,
+    assertCurrent: () => void
+  ) => {
     if (!wallet.address) throw new Error("Connect a wallet first.");
     const provider = await wallet.getEthereumProvider();
     const network = getFundingNetwork(selectedChainId);
@@ -398,7 +406,10 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
       to: transaction.to,
       data: transaction.data,
       value: transaction.value,
-      sendTransaction: wallet.sendEvmTransaction,
+      sendTransaction: (request) => {
+        assertCurrent();
+        return wallet.sendEvmTransaction(request);
+      },
       describeError: (cause) =>
         cause instanceof Error ? cause.message : "The wallet transaction failed.",
     });
@@ -466,7 +477,10 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
             chainId: selectedChainId,
             deploymentId: route.deploymentId,
             amount: `${amount} ${source.symbol}`,
-            sendTransaction: wallet.sendEvmTransaction,
+            sendTransaction: (request) => {
+              assertCurrent();
+              return wallet.sendEvmTransaction(request);
+            },
             describeError: (cause) =>
               cause instanceof Error ? cause.message : "The transaction failed.",
           });
@@ -580,10 +594,20 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
           if (!response.ok) throw new Error(uniswapError(approval, "Approval check failed."));
           assertCurrent();
           if (approval.cancel)
-            await sendTransaction(approval.cancel, "approve-swap", "Reset swap approval");
+            await sendTransaction(
+              approval.cancel,
+              "approve-swap",
+              "Reset swap approval",
+              assertCurrent
+            );
           assertCurrent();
           if (approval.approval)
-            await sendTransaction(approval.approval, "approve-swap", `Approve ${source.symbol}`);
+            await sendTransaction(
+              approval.approval,
+              "approve-swap",
+              `Approve ${source.symbol}`,
+              assertCurrent
+            );
         }
         const fresh = await refreshQuote();
         // The API's quote is opaque. Only accept its unchanged executable minimum
@@ -613,7 +637,12 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
         if (!response.ok || !swap.swap)
           throw new Error(uniswapError(swap, "Uniswap could not build the swap transaction."));
         assertCurrent();
-        await sendTransaction(swap.swap, "swap", `${source.symbol} to ${destination.symbol}`);
+        await sendTransaction(
+          swap.swap,
+          "swap",
+          `${source.symbol} to ${destination.symbol}`,
+          assertCurrent
+        );
       }
       setAmount("");
       setQuote(null);

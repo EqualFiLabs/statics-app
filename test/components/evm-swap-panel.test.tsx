@@ -97,7 +97,8 @@ const option = {
 function renderCanonicalTrade(chainId: number, connected = false) {
   const switchNetwork = vi.fn().mockResolvedValue(undefined);
   const selectFundingNetwork = vi.fn().mockResolvedValue(undefined);
-  render(
+  const client = new QueryClient();
+  const element = (chainId: number) => (
     <DeploymentContext.Provider
       value={{ active: option, options: [option], selectNetwork: vi.fn() }}
     >
@@ -119,13 +120,18 @@ function renderCanonicalTrade(chainId: number, connected = false) {
             connected ? { request: vi.fn(), on: vi.fn(), removeListener: vi.fn() } : null,
         }}
       >
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={client}>
           <EvmSwapPanel staticsNetwork />
         </QueryClientProvider>
       </WalletContext.Provider>
     </DeploymentContext.Provider>
   );
-  return { switchNetwork, selectFundingNetwork };
+  const view = render(element(chainId));
+  return {
+    switchNetwork,
+    selectFundingNetwork,
+    changeChain: (next: number) => view.rerender(element(next)),
+  };
 }
 
 beforeEach(() => {
@@ -197,6 +203,32 @@ describe("integrated swap execution", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Confirm swap" })).not.toBeInTheDocument();
+  });
+
+  it("discards a pending quote when the wallet changes networks", async () => {
+    let resolve!: (value: { data: `0x${string}` }) => void;
+    mocks.call.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    const view = renderCanonicalTrade(descriptor.chainId, true);
+    const input = await screen.findByRole("textbox", { name: "You pay amount" });
+    fireEvent.change(input, { target: { value: "1" } });
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledTimes(1));
+    view.changeChain(42161);
+    resolve({
+      data: encodeFunctionResult({
+        abi: v4QuoterAbi,
+        functionName: "quoteExactInputSingle",
+        result: [10000n, 1n],
+      }),
+    });
+    expect(
+      await screen.findByRole("button", { name: "Switch to Robinhood Chain" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Minimum received")).not.toBeInTheDocument();
   });
 
   it("keeps the reviewed floor and wraps native input after refreshing", async () => {
