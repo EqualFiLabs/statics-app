@@ -50,8 +50,8 @@ const deployment = {
   contracts: {
     statics,
     weth,
-    genesis: zeroAddress,
-    vault: zeroAddress,
+    genesis: getAddress("0x3333333333333333333333333333333333333333"),
+    vault: getAddress("0x4444444444444444444444444444444444444444"),
     activationRegistry: zeroAddress,
     feeReceiver: zeroAddress,
     launchDistributor: zeroAddress,
@@ -268,7 +268,7 @@ describe("Genesis Vault trade card", () => {
         input.functionName === "getApproved"
           ? timing === "before approval"
             ? statics
-            : zeroAddress
+            : deployment.contracts.vault
           : original(input)
       );
       const encoded =
@@ -294,6 +294,9 @@ describe("Genesis Vault trade card", () => {
       fireEvent.click(await screen.findByRole("button", { name: "Redeem Operator #1204" }));
       await screen.findByText("No Operators NFTs to redeem");
       expect(call).toHaveBeenCalledTimes(1);
+      expect(call.mock.calls[0][0].to).toBe(
+        timing === "before approval" ? deployment.contracts.genesis : deployment.contracts.vault
+      );
       expect(discoverWalletGenesisSnapshot).toHaveBeenCalledTimes(2);
     }
   );
