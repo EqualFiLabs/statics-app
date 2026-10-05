@@ -249,4 +249,9 @@ export async function verifyAnvil(profile, url = urls(profile).rpc) {
     Number(info?.forkConfig?.forkBlockNumber) !== Number(profile.snapshot.number)
   )
     throw new Error("Anvil chain/snapshot identity does not match the owned profile.");
+  if (profile.identityMarker) {
+    const code = await rpc(url, "eth_getCode", [profile.identityMarker.address, "latest"]);
+    if (code !== profile.identityMarker.code)
+      throw new Error("Anvil belongs to a different profile.");
+  }
 }

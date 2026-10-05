@@ -137,6 +137,11 @@ export async function deploy(profile, path, children) {
   await stage(profile, path, "initialize", async () => {
     if (BigInt(profile.snapshot.number) < BigInt(genesis.network.finalizeEndBlock))
       throw new Error("Snapshot predates Genesis finalization.");
+    profile.identityMarker = {
+      address: `0x${keccak256(stringToHex(profile.id)).slice(-40)}`,
+      code: keccak256(stringToHex(`statics-fork-${profile.id}`)),
+    };
+    await rpc(url, "anvil_setCode", [profile.identityMarker.address, profile.identityMarker.code]);
     for (let i = 0; i < 20; i++) await rpc(url, "anvil_setCode", [account(i).address, "0x"]);
     await rpc(url, "anvil_impersonateAccount", [genesis.roles.governance]);
     await rpc(url, "anvil_setBalance", [
