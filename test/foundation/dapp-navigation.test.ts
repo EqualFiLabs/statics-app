@@ -21,7 +21,7 @@ describe("DApp route presentation", () => {
     ["/app/create", "Create basket", "Launch an index basket"],
     ["/app/positions", "Position NFT", "Your Position NFTs"],
     ["/app/loans", "Loans", "Your loans"],
-    ["/app/rewards", "Rewards", "Your rewards"],
+    ["/app/rewards", "Earn", "Earn"],
     ["/app/genesis", "Operator NFT", "Manage your Operators NFTs"],
     ["/app/liquidity", "Liquidity", "Provide liquidity"],
     ["/app/activity", "Activity", "Your activity"],

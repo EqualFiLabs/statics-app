@@ -126,11 +126,10 @@ const routePresentations = {
       "Money you have borrowed against locked collateral. Review what you owe, what is locked, and when each loan is due.",
   },
   rewards: {
-    label: "Rewards",
-    status: "Rewards",
-    title: "Your rewards",
-    description:
-      "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
+    label: "Earn",
+    status: "Earn",
+    title: "Earn",
+    description: "Stake STATICS, choose your reward assets, and collect rewards.",
   },
   genesis: {
     label: "Operator NFT",

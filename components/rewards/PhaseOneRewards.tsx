@@ -9,7 +9,6 @@ import { staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
 import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
 import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { ActionReview } from "@/components/phase-one/ActionReview";
-import { RewardSelectionEditor } from "@/components/positions/RewardSelectionEditor";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { loadIndexedPhaseOnePosition } from "@/lib/indexer/phase-one";
 import {
@@ -39,6 +38,7 @@ export function PhaseOneRewards({
   initialPositionId: bigint | null;
 }) {
   const t = useTranslations("rewards");
+  const e = useTranslations("earn");
   const p = useTranslations("phaseOne");
   const action = usePhaseOneAction(deployment);
   const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, action.wallet);
@@ -66,29 +66,27 @@ export function PhaseOneRewards({
     ).values(),
   ];
   const [selection, setSelection] = useState<string | null>(null);
-  const [poolId, setPoolId] = useState(
-    deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? ""
-  );
   const selected =
     items.find((item) => String(item.positionId) === selection) ?? ownInitial ?? items[0];
   return (
-    <div className="rewards-page">
-      <section className="position-panel">
-        <div className="position-section-heading">
-          <div>
-            <p className="dapp-section-label">{t("startEarning")}</p>
-            <h2>{t("createAndStakeTitle")}</h2>
-            <p>{t("createAndStakeDescription")}</p>
-          </div>
+    <div className="earn-page">
+      <section className="earn-toolbar" aria-label={e("positionContext")}>
+        <div>
+          <p className="dapp-section-label">{e("positionContext")}</p>
+          <p className="earn-muted">{e("positionHelp")}</p>
         </div>
         <ActionReview action={action} />
         {positions.isError && <p role="alert">{positions.error.message}</p>}
-        {items.length === 0 ? (
-          <Link className="dollar-submit" href="/app/positions">
+        {positions.isLoading || (initialPositionId !== null && initial.isLoading) ? (
+          <p role="status" className="earn-muted">
+            {e("loadingPositions")}
+          </p>
+        ) : items.length === 0 ? (
+          <Link className="ui-button ui-button--primary" href="/app/positions">
             {p("newPosition")}
           </Link>
         ) : (
-          <label className="basket-field">
+          <label className="basket-field earn-position-select">
             {p("choosePosition")}
             <select
               value={String(selected?.positionId ?? "")}
@@ -104,6 +102,7 @@ export function PhaseOneRewards({
         )}
         {positions.hasNextPage && (
           <button
+            className="ui-button ui-button--secondary ui-button--sm"
             type="button"
             disabled={positions.isFetchingNextPage}
             onClick={() => void positions.fetchNextPage()}
@@ -111,30 +110,12 @@ export function PhaseOneRewards({
             {p("loadMore")}
           </button>
         )}
-        {deployment.supportedPools.some((pool) => pool.enabled) && (
-          <label className="basket-field">
-            {p("pool")}
-            <select
-              value={poolId}
-              onChange={(event) => setPoolId(event.target.value as `0x${string}`)}
-            >
-              {deployment.supportedPools
-                .filter((pool) => pool.enabled)
-                .map((pool) => (
-                  <option key={pool.poolId} value={pool.poolId}>
-                    {pool.token0.symbol}/{pool.token1.symbol}
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
       </section>
       {selected && (
         <PositionRewards
-          key={`${deployment.descriptor.deploymentId}:${action.wallet}:${selected.positionId}:${poolId}`}
+          key={`${deployment.descriptor.deploymentId}:${action.wallet}:${selected.positionId}`}
           deployment={deployment}
           positionId={selected.positionId}
-          poolId={poolId as `0x${string}`}
         />
       )}
     </div>
@@ -144,17 +125,24 @@ export function PhaseOneRewards({
 function PositionRewards({
   deployment,
   positionId,
-  poolId,
 }: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
-  poolId: `0x${string}`;
 }) {
   const t = useTranslations("rewards");
   const d = useTranslations("positionDetail");
+  const e = useTranslations("earn");
   const p = useTranslations("phaseOne");
   const locale = useAppLocale();
-  const action = usePhaseOneAction(deployment, `${positionId}:${poolId}`);
+  const action = usePhaseOneAction(deployment, String(positionId));
+  const [poolId, setPoolId] = useState<`0x${string}`>(
+    deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? "0x"
+  );
+  const [mode, setMode] = useState<"stake" | "unstake">("stake");
+  type Scope = "stake" | "selection" | "allocation" | "global" | "lp" | "allocator";
+  const [scope, setScope] = useState<Scope | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [success, setSuccess] = useState<Scope | null>(null);
   const queryClient = useQueryClient();
   const [amountInput, setAmountInput] = useState("");
   const [allocationInput, setAllocationInput] = useState<string | null>(null);
@@ -186,6 +174,48 @@ function PositionRewards({
       return { staking, gauges };
     },
   });
+  const balance = useQuery({
+    queryKey: [
+      "earn-wallet-balance",
+      deployment.descriptor.deploymentId,
+      deployment.descriptor.chainId,
+      action.wallet,
+      deployment.contracts.statics,
+    ],
+    enabled: action.ready,
+    queryFn: () =>
+      action.publicClient!.readContract({
+        address: deployment.contracts.statics,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [action.wallet!],
+      }),
+  });
+  const prepare = (nextScope: Scope, build: Parameters<typeof action.prepare>[0]) => {
+    setScope(nextScope);
+    setSuccess(null);
+    setProgress(null);
+    return action.prepare(async () => {
+      const review = await build();
+      return {
+        ...review,
+        details: [t("positionNumber", { id: String(positionId) }), ...review.details],
+        execute: async () => {
+          setProgress(e("confirmInWallet"));
+          await review.execute();
+          setProgress(null);
+          setSuccess(nextScope);
+          if (nextScope === "stake") void balance.refetch();
+        },
+      };
+    });
+  };
+  const clearReview = () => {
+    action.cancel();
+    setScope(null);
+    setSuccess(null);
+    setProgress(null);
+  };
   const rewards = useQuery({
     queryKey: protocolQueryKeys.phaseOneRewards(
       deployment.descriptor.deploymentId,
@@ -222,8 +252,10 @@ function PositionRewards({
   const selectedAssets = assetDraft ?? live.data?.staking.selectedAssets ?? [];
   const confirmedAssets = live.data?.staking.selectedAssets ?? [];
   const claimAssets = live.data?.staking.claimAssets ?? [];
-  const additions = selectedAssets.filter((asset) => !confirmedAssets.includes(asset));
-  const removals = confirmedAssets.filter((asset) => !selectedAssets.includes(asset));
+  const hasAsset = (assets: readonly Address[], asset: Address) =>
+    assets.some((entry) => entry.toLowerCase() === asset.toLowerCase());
+  const additions = selectedAssets.filter((asset) => !hasAsset(confirmedAssets, asset));
+  const removals = confirmedAssets.filter((asset) => !hasAsset(selectedAssets, asset));
   const allocation =
     live.data?.gauges.allocations.active.find(
       (entry) => entry.poolId.toLowerCase() === poolId.toLowerCase()
@@ -242,9 +274,12 @@ function PositionRewards({
       });
   };
   const stake = (kind: "stake" | "unstake") =>
-    action.prepare(async () => {
+    prepare("stake", async () => {
       if (!live.data || !action.publicClient || !action.wallet) throw new Error(p("selection"));
       const amount = parseLocalizedUnits(amountInput, 18, locale);
+      if (kind === "stake" && (balance.data === undefined || amount > balance.data))
+        throw new Error(e("insufficientBalance"));
+      if (kind === "unstake" && amount > availableUnstake) throw new Error(e("insufficientStake"));
       const transaction = buildPositionStakingTransaction({
         deployment,
         positionId,
@@ -252,7 +287,10 @@ function PositionRewards({
       });
       return {
         label: kind === "stake" ? p("stake") : p("unstake"),
-        details: [`${formatUnits(amount, 18)} STATICS`],
+        details: [
+          `${formatUnits(amount, 18)} STATICS`,
+          ...(kind === "stake" ? [e("approvalHelp")] : []),
+        ],
         execute: async () => {
           if (kind === "stake") {
             const key = [
@@ -277,6 +315,7 @@ function PositionRewards({
             });
             const approval = buildStaticsStakeApproval({ deployment, allowance, required: amount });
             if (approval.needed) {
+              setProgress(e("approveInWallet"));
               await action.send({
                 kind: "phase-one-approve-token",
                 label: p("stake"),
@@ -287,6 +326,7 @@ function PositionRewards({
               await queryClient.fetchQuery({ queryKey: key, staleTime: 0, queryFn: read });
             }
           }
+          setProgress(e("confirmInWallet"));
           await action.send({
             kind: kind === "stake" ? "phase-one-stake" : "phase-one-unstake",
             label: kind === "stake" ? p("stake") : p("unstake"),
@@ -299,7 +339,7 @@ function PositionRewards({
       };
     });
   const saveSelection = () =>
-    action.prepare(async () => {
+    prepare("selection", async () => {
       if (!action.publicClient || !live.data) throw new Error(p("selection"));
       if (BigInt(selectedAssets.length) > live.data.staking.maximumRewardAssets)
         throw new Error(
@@ -346,7 +386,7 @@ function PositionRewards({
       };
     });
   const saveAllocation = () =>
-    action.prepare(async () => {
+    prepare("allocation", async () => {
       if (!action.publicClient || !action.wallet) throw new Error(p("selection"));
       const prerequisites = await gaugePrerequisites(action.publicClient, deployment);
       const block = await action.publicClient.getBlock({ blockTag: "pending" });
@@ -407,7 +447,7 @@ function PositionRewards({
       };
     });
   const claim = (kind: "global" | "lp" | "allocator") =>
-    action.prepare(async () => {
+    prepare(kind, async () => {
       if (!action.publicClient || !action.wallet) throw new Error(p("selection"));
       const activeLp =
         kind === "lp"
@@ -506,146 +546,398 @@ function PositionRewards({
       };
     });
   const disabled = !action.ready || action.busy || !live.data;
+  const stakeBalance = live.data?.staking.stakedBalance;
+  const lockedStake = live.data?.gauges.allocations.lockedStake ?? 0n;
+  const availableUnstake =
+    stakeBalance === undefined ? 0n : stakeBalance > lockedStake ? stakeBalance - lockedStake : 0n;
+  const availableAmount =
+    mode === "stake" ? balance.data : live.data ? availableUnstake : undefined;
+  let amount: bigint | null = null;
+  try {
+    amount = parseLocalizedUnits(amountInput, 18, locale);
+  } catch {
+    /* Inline validation below. */
+  }
+  const amountError =
+    amountInput.trim() &&
+    (amount === null
+      ? e("invalidAmount")
+      : amount <= 0n
+        ? e("positiveAmount")
+        : availableAmount !== undefined && amount > availableAmount
+          ? mode === "stake"
+            ? e("insufficientBalance")
+            : e("insufficientStake")
+          : null);
+  const displayBalance = (value: bigint | undefined) =>
+    value === undefined
+      ? "—"
+      : new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(
+          Number(formatUnits(value, 18))
+        );
+  const unallocated =
+    stakeBalance === undefined
+      ? undefined
+      : stakeBalance > (live.data?.gauges.allocations.totalAllocated ?? 0n)
+        ? stakeBalance - live.data!.gauges.allocations.totalAllocated
+        : 0n;
+  const reviewFor = (target: Scope) => (
+    <div className="earn-review">
+      {scope === target && <ActionReview action={action} />}
+      {scope === target && action.busy && <p role="status">{progress ?? e("preparing")}</p>}
+      {success === target && (
+        <p role="status" className="earn-success">
+          {e("confirmed")}
+        </p>
+      )}
+    </div>
+  );
+  const rewardGroups = [
+    {
+      kind: "global" as const,
+      title: e("staking"),
+      help: e("stakingHelp"),
+      amounts: claimAssets.map((asset, index) => ({
+        asset,
+        amount: live.data?.staking.pendingRewards[index] ?? 0n,
+      })),
+      loaded: Boolean(live.data),
+      failed: live.isError,
+      button: e("claimStaking"),
+    },
+    {
+      kind: "lp" as const,
+      title: e("liquidity"),
+      help: e("liquidityHelp"),
+      amounts:
+        rewards.data?.lp.amounts
+          .slice(0, rewards.data.lp.slotCount)
+          .map((amount, slot) => ({ asset: rewards.data!.lp.assets[slot], amount })) ?? [],
+      loaded: Boolean(rewards.data),
+      failed: rewards.isError,
+      button: e("claimLiquidity"),
+    },
+    {
+      kind: "allocator" as const,
+      title: e("allocation"),
+      help: e("allocationRewardsHelp"),
+      amounts: rewards.data?.allocator ?? [],
+      loaded: Boolean(rewards.data),
+      failed: rewards.isError,
+      button: e("claimAllocation"),
+    },
+  ];
+  const selectedPool = deployment.supportedPools.find((pool) => pool.poolId === poolId);
+  const poolPicker = (
+    <>
+      <label className="basket-field earn-pool-select">
+        {p("pool")}
+        <select
+          value={poolId}
+          disabled={action.busy}
+          onChange={(event) => {
+            if (scope === "lp" || scope === "allocator" || scope === "allocation") clearReview();
+            setAllocationInput(null);
+            setPoolId(event.target.value as `0x${string}`);
+          }}
+        >
+          {deployment.supportedPools
+            .filter((pool) => pool.enabled)
+            .map((pool) => (
+              <option key={pool.poolId} value={pool.poolId}>
+                {pool.token0.symbol}/{pool.token1.symbol}
+              </option>
+            ))}
+        </select>
+      </label>
+      <p className="earn-muted earn-pool-help">{e("poolHelp")}</p>
+    </>
+  );
   return (
     <>
-      <section className="position-panel">
-        <div className="position-section-heading">
+      <div className="earn-main">
+        <section className="ui-card earn-stake-card" aria-label={p("stake")}>
+          <div className="earn-card-heading">
+            <div>
+              <p className="dapp-section-label">{e("staking")}</p>
+              <h2>{p("stake")}</h2>
+            </div>
+            <h3 className="earn-position-badge">
+              {t("positionNumber", { id: String(positionId) })}
+            </h3>
+          </div>
+          <div className="earn-balances">
+            <div>
+              <span>{e("walletBalance")}</span>
+              <strong className="is-numeric">
+                {displayBalance(balance.data)} <small>STATICS</small>
+              </strong>
+            </div>
+            <div>
+              <span>{p("staked")}</span>
+              <strong className="is-numeric">
+                {displayBalance(stakeBalance)} <small>STATICS</small>
+              </strong>
+            </div>
+          </div>
+          {live.isError && (
+            <p className="dapp-inline-error" role="alert">
+              {live.error.message}
+            </p>
+          )}
+          {balance.isError && (
+            <p className="dapp-inline-error" role="alert">
+              {e("balanceUnavailable")}
+            </p>
+          )}
+          {scope === "stake" && action.review ? (
+            reviewFor("stake")
+          ) : (
+            <>
+              <div className="earn-mode" role="group" aria-label={e("stakeAction")}>
+                {(["stake", "unstake"] as const).map((kind) => (
+                  <button
+                    className="ui-button"
+                    type="button"
+                    key={kind}
+                    aria-pressed={mode === kind}
+                    disabled={action.busy}
+                    onClick={() => {
+                      clearReview();
+                      setMode(kind);
+                      setAmountInput("");
+                    }}
+                  >
+                    {kind === "stake" ? e("stake") : e("unstake")}
+                  </button>
+                ))}
+              </div>
+              <label className="basket-field">
+                {p("amount")}
+                <div className="earn-amount-field">
+                  <input
+                    aria-label={p("amount")}
+                    value={amountInput}
+                    placeholder="0"
+                    disabled={action.busy}
+                    aria-invalid={Boolean(amountError)}
+                    aria-describedby="earn-amount-help"
+                    onChange={(event) => {
+                      clearReview();
+                      setAmountInput(event.target.value);
+                    }}
+                    inputMode="decimal"
+                  />
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={disabled || availableAmount === undefined || availableAmount === 0n}
+                    onClick={() => {
+                      clearReview();
+                      setAmountInput(formatUnits(availableAmount!, 18));
+                    }}
+                  >
+                    {e("max")}
+                  </button>
+                </div>
+              </label>
+              <p id="earn-amount-help" className={amountError ? "dapp-inline-error" : "earn-muted"}>
+                {amountError ||
+                  (mode === "unstake"
+                    ? e("unstakeAvailable", {
+                        amount: displayBalance(live.data ? availableUnstake : undefined),
+                      })
+                    : e("stakeHelp"))}
+              </p>
+              <button
+                className="ui-button ui-button--primary ui-button--block"
+                type="button"
+                disabled={
+                  disabled ||
+                  amount === null ||
+                  amount <= 0n ||
+                  Boolean(amountError) ||
+                  availableAmount === undefined
+                }
+                onClick={() => void stake(mode)}
+              >
+                {scope === "stake" && action.busy
+                  ? e("preparing")
+                  : mode === "stake"
+                    ? p("reviewStake")
+                    : p("reviewUnstake")}
+              </button>
+              {reviewFor("stake")}
+            </>
+          )}
+          <div className="earn-asset-selection">
+            <h3>{e("rewardAssets")}</h3>
+            <p className="earn-muted">{e("assetHelp")}</p>
+            <div className="earn-assets" role="group" aria-label={e("rewardAssets")}>
+              {tokens.map((token) => {
+                const checked = selectedAssets.some(
+                  (asset) => asset.toLowerCase() === token.address.toLowerCase()
+                );
+                return (
+                  <button
+                    key={token.address}
+                    type="button"
+                    className="ui-button ui-button--secondary"
+                    aria-pressed={checked}
+                    disabled={
+                      disabled ||
+                      (!checked &&
+                        BigInt(selectedAssets.length) >=
+                          (live.data?.staking.maximumRewardAssets ?? 0n))
+                    }
+                    onClick={() => {
+                      clearReview();
+                      setAssetDraft(
+                        checked
+                          ? selectedAssets.filter(
+                              (entry) => entry.toLowerCase() !== token.address.toLowerCase()
+                            )
+                          : [...selectedAssets, token.address]
+                      );
+                    }}
+                  >
+                    <span aria-hidden="true" className="earn-asset-check">
+                      {checked ? "✓" : "+"}
+                    </span>
+                    {token.symbol}
+                  </button>
+                );
+              })}
+            </div>
+            {additions.length + removals.length > 0 &&
+              !(scope === "selection" && action.review) && (
+                <button
+                  className="ui-button ui-button--secondary ui-button--block"
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => void saveSelection()}
+                >
+                  {e("saveAssets")}
+                </button>
+              )}
+            {reviewFor("selection")}
+          </div>
+        </section>
+        <section className="ui-card earn-rewards-card" aria-label={e("yourRewards")}>
+          <div className="earn-card-heading">
+            <div>
+              <p className="dapp-section-label">{e("readyToClaim")}</p>
+              <h2>{e("yourRewards")}</h2>
+            </div>
+          </div>
+          <p className="earn-muted">{e("rewardsHelp")}</p>
+          {rewards.isError && (
+            <p className="dapp-inline-error" role="alert">
+              {rewards.error.message}
+            </p>
+          )}
+          <div className="earn-reward-groups">
+            {rewardGroups.map((group) => {
+              const positive = group.amounts.filter((entry) => entry.amount > 0n);
+              return (
+                <article key={group.kind} className="earn-reward-group">
+                  {group.kind === "lp" && poolPicker}
+                  <div className="earn-reward-heading">
+                    <h3>{group.title}</h3>
+                    {positive.length > 0 && !(scope === group.kind && action.review) && (
+                      <button
+                        className="ui-button ui-button--secondary ui-button--sm"
+                        type="button"
+                        disabled={disabled || !group.loaded}
+                        onClick={() => void claim(group.kind)}
+                      >
+                        {group.button}
+                      </button>
+                    )}
+                  </div>
+                  <p className="earn-muted">{group.help}</p>
+                  {positive.length ? (
+                    positive.map((entry) => (
+                      <p key={entry.asset} className="earn-reward-value is-numeric">
+                        {describeAmount(entry.asset, entry.amount)}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="earn-reward-empty">
+                      {group.failed
+                        ? e("rewardsUnavailable")
+                        : group.loaded
+                          ? e("noRewards")
+                          : e("loadingRewards")}
+                    </p>
+                  )}
+                  {reviewFor(group.kind)}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+      <details className="ui-card earn-allocation">
+        <summary>
+          <span>{e("allocateTitle")}</span>
+          <span className="earn-muted">{e("optional")}</span>
+        </summary>
+        <p className="earn-muted">{e("allocationHelp")}</p>
+        <div className="earn-allocation-content">
           <div>
-            <p className="dapp-section-label">{t("stakingSource")}</p>
-            <h3>{t("positionNumber", { id: String(positionId) })}</h3>
+            <p className="earn-muted">{e("unallocated")}</p>
+            <strong className="is-numeric">{displayBalance(unallocated)} STATICS</strong>
+            <p className="earn-muted">
+              {e("allocationPool", {
+                pool: selectedPool
+                  ? `${selectedPool.token0.symbol}/${selectedPool.token1.symbol}`
+                  : "—",
+              })}
+            </p>
+            {live.data?.gauges.coolingDown && (
+              <p className="earn-muted">
+                {p("cooldown")}{" "}
+                {e("cooldownUntil", {
+                  time: new Intl.DateTimeFormat(locale, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(live.data.gauges.allocations.nextAllocationAt * 1000)),
+                })}
+              </p>
+            )}
+          </div>
+          <div>
+            {scope === "allocation" && action.review ? (
+              reviewFor("allocation")
+            ) : (
+              <>
+                <label className="basket-field">
+                  {p("allocationAmount")}
+                  <input
+                    value={allocationValue}
+                    inputMode="decimal"
+                    disabled={action.busy}
+                    onChange={(event) => {
+                      clearReview();
+                      setAllocationInput(event.target.value);
+                    }}
+                  />
+                </label>
+                <button
+                  className="ui-button ui-button--secondary ui-button--block"
+                  type="button"
+                  disabled={disabled || poolId === "0x" || allocationInput === null}
+                  onClick={() => void saveAllocation()}
+                >
+                  {p("saveAllocation")}
+                </button>
+                {reviewFor("allocation")}
+              </>
+            )}
           </div>
         </div>
-        {live.isError && <p role="alert">{live.error.message}</p>}
-        <p>
-          {p("staked")}: {formatUnits(live.data?.staking.stakedBalance ?? 0n, 18)}
-        </p>
-        <label className="basket-field">
-          {p("amount")}
-          <input
-            value={amountInput}
-            disabled={action.busy}
-            onChange={(event) => {
-              action.cancel();
-              setAmountInput(event.target.value);
-            }}
-            inputMode="decimal"
-          />
-        </label>
-        <button
-          className="dollar-submit"
-          type="button"
-          disabled={disabled || !amountInput}
-          onClick={() => void stake("stake")}
-        >
-          {p("reviewStake")}
-        </button>
-        <button
-          type="button"
-          disabled={disabled || !amountInput}
-          onClick={() => void stake("unstake")}
-        >
-          {p("reviewUnstake")}
-        </button>
-      </section>
-      <section className="position-panel">
-        <RewardSelectionEditor
-          candidates={tokens.map((token) => ({ token, sources: [t("stakingSource")] }))}
-          confirmed={confirmedAssets}
-          selected={selectedAssets}
-          rewards={tokens.map((token) => ({
-            token,
-            pending: live.data?.staking.pendingRewards[claimAssets.indexOf(token.address)] ?? 0n,
-          }))}
-          maximum={live.data?.staking.maximumRewardAssets ?? 0n}
-          chainId={deployment.descriptor.chainId}
-          changeCount={additions.length + removals.length}
-          disabled={disabled}
-          saving={action.busy}
-          onToggle={(asset) => {
-            action.cancel();
-            setAssetDraft(
-              selectedAssets.includes(asset)
-                ? selectedAssets.filter((entry) => entry !== asset)
-                : [...selectedAssets, asset]
-            );
-          }}
-          onSave={() => void saveSelection()}
-        />
-      </section>
-      <section className="position-panel">
-        <h3>{p("allocation")}</h3>
-        <p>{p("allocationHelp")}</p>
-        {live.data?.gauges.coolingDown && <p>{p("cooldown")}</p>}
-        <label className="basket-field">
-          {p("allocationAmount")}
-          <input
-            value={allocationValue}
-            inputMode="decimal"
-            disabled={action.busy}
-            onChange={(event) => {
-              action.cancel();
-              setAllocationInput(event.target.value);
-            }}
-          />
-        </label>
-        <button
-          className="dollar-submit"
-          type="button"
-          disabled={disabled || !poolId}
-          onClick={() => void saveAllocation()}
-        >
-          {p("saveAllocation")}
-        </button>
-      </section>
-      <section className="position-panel">
-        <h3>{t("multiAssetClaims")}</h3>
-        <div className="reward-position-list">
-          <article className="reward-position">
-            <h4>{t("stakingSource")}</h4>
-            {claimAssets.map((asset, index) => (
-              <p key={asset}>
-                {describeAmount(asset, live.data?.staking.pendingRewards[index] ?? 0n)}
-              </p>
-            ))}
-            <button
-              className="dollar-submit"
-              type="button"
-              disabled={
-                disabled || !live.data?.staking.pendingRewards.some((amount) => amount > 0n)
-              }
-              onClick={() => void claim("global")}
-            >
-              {p("globalClaim")}
-            </button>
-          </article>
-          <article className="reward-position">
-            <h4>{t("liquiditySource")}</h4>
-            {rewards.isError && <p role="alert">{rewards.error.message}</p>}
-            {rewards.data?.lp.amounts.slice(0, rewards.data.lp.slotCount).map((amount, slot) => (
-              <p key={slot}>{describeAmount(rewards.data!.lp.assets[slot], amount)}</p>
-            ))}
-            <button
-              className="dollar-submit"
-              type="button"
-              disabled={disabled || !rewards.data?.lp.amounts.some((amount) => amount > 0n)}
-              onClick={() => void claim("lp")}
-            >
-              {p("lpClaim")}
-            </button>
-            {rewards.data?.allocator.map((entry) => (
-              <p key={entry.slot}>{describeAmount(entry.asset, entry.amount)}</p>
-            ))}
-            <button
-              type="button"
-              disabled={disabled || !rewards.data?.allocator.some((entry) => entry.amount > 0n)}
-              onClick={() => void claim("allocator")}
-            >
-              {p("allocatorClaim")}
-            </button>
-          </article>
-        </div>
-      </section>
-      <ActionReview action={action} />
+      </details>
     </>
   );
 }

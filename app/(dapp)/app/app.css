@@ -7791,3 +7791,285 @@
 .vault-strip a:hover {
   text-decoration: underline;
 }
+
+/* Earn: staking and claims share a position, while pool controls stay scoped. */
+.earn-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.earn-toolbar,
+.earn-card-heading,
+.earn-reward-heading,
+.earn-allocation summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.earn-toolbar {
+  padding: 0.25rem 0;
+  flex-wrap: wrap;
+}
+
+.earn-page h2,
+.earn-page h3,
+.earn-page p {
+  margin: 0;
+}
+
+.earn-page h2 {
+  font-size: var(--text-xl);
+}
+
+.earn-page .earn-muted {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.earn-position-select {
+  width: min(100%, 16rem);
+}
+
+.earn-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.earn-stake-card,
+.earn-rewards-card {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.75rem;
+}
+
+.earn-page .earn-position-badge {
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.earn-balances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.earn-balances > div {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.earn-balances span,
+.earn-balances small {
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.earn-balances strong {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.earn-mode {
+  display: flex;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+
+.earn-mode button {
+  flex: 1;
+  background: transparent;
+  color: var(--app-text-secondary);
+}
+
+.earn-mode button[aria-pressed="true"] {
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.earn-amount-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.5rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+
+.earn-amount-field:focus-within {
+  border-color: var(--accent);
+}
+
+.earn-amount-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+}
+
+.earn-asset-selection {
+  display: grid;
+  gap: 0.875rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.earn-assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.earn-assets button[aria-pressed="true"] {
+  border-color: var(--app-text-secondary);
+  background: var(--app-raised);
+}
+
+.earn-asset-check {
+  width: 1rem;
+}
+
+.earn-reward-groups {
+  display: grid;
+}
+
+.earn-reward-group {
+  display: grid;
+  gap: 0.625rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.earn-page .earn-reward-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.earn-page .earn-reward-empty {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.earn-review:empty {
+  display: none;
+}
+
+.earn-review {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.earn-review .position-panel {
+  margin: 0;
+  padding: 1rem;
+  background: var(--app-raised);
+  box-shadow: none;
+}
+
+.earn-review ul {
+  padding-left: 1.25rem;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.earn-review button:not(.dollar-submit) {
+  min-height: var(--control-height-sm);
+  margin-top: 0.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.earn-success {
+  color: var(--accent);
+  font-size: var(--text-sm);
+}
+
+.earn-allocation {
+  padding: 1.25rem 1.75rem;
+}
+
+.earn-allocation summary {
+  min-height: var(--control-height-sm);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.earn-allocation summary::before {
+  content: "+";
+  color: var(--app-text-secondary);
+}
+
+.earn-allocation[open] summary::before {
+  content: "−";
+}
+
+.earn-allocation summary > span:first-child {
+  flex: 1;
+}
+
+.earn-allocation[open] > p {
+  margin-top: 0.75rem;
+}
+
+.earn-allocation-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.25rem;
+}
+
+.earn-allocation-content > div {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+@media (width <= 800px) {
+  .earn-main,
+  .earn-allocation-content {
+    grid-template-columns: 1fr;
+  }
+
+  .earn-stake-card,
+  .earn-rewards-card,
+  .earn-allocation {
+    padding: 1.25rem;
+  }
+}
+
+.earn-page .basket-field {
+  margin-top: 0;
+}
+
+.earn-page .basket-field input {
+  font-size: var(--text-base);
+}
+
+@media (width <= 800px) {
+  .earn-position-select {
+    width: 100%;
+  }
+}

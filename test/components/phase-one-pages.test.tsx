@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeFunctionData, getAddress, maxUint256, parseEther, zeroAddress } from "viem";
 import { staticsGaugeIncentivesAbi, staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
@@ -139,6 +139,7 @@ beforeEach(() => {
       return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
     if (functionName === "maxGaugeCatchupPeriods") return 10;
     if (functionName === "lpLeg") return { liquidity: 0n };
+    if (functionName === "balanceOf") return parseEther("500");
     if (functionName === "allowance") return maxUint256;
     if (functionName === "rewardBookNeedsCheckpoint") return false;
     if (functionName === "unfundedSwapRewards") return 0n;
@@ -179,15 +180,15 @@ describe("additive Phase 1 screens", () => {
   });
   it("claims rewards from the newly selected pool", async () => {
     withPhaseOne(<RewardsPage />);
-    const claim = await screen.findByRole("button", { name: "Review LP rewards" });
+    const claim = await screen.findByRole("button", { name: "Claim liquidity rewards" });
     await waitFor(() => expect(claim).toBeEnabled());
     fireEvent.change(screen.getByRole("combobox", { name: "Pool" }), {
       target: { value: hash("2") },
     });
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Review LP rewards" })).toBeEnabled()
+      expect(screen.getByRole("button", { name: "Claim liquidity rewards" })).toBeEnabled()
     );
-    fireEvent.click(screen.getByRole("button", { name: "Review LP rewards" }));
+    fireEvent.click(screen.getByRole("button", { name: "Claim liquidity rewards" }));
     await screen.findByText("Minimum payout: 8.955 STATICS");
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
     await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
@@ -211,7 +212,7 @@ describe("additive Phase 1 screens", () => {
         return original(input);
       });
       withPhaseOne(<RewardsPage />);
-      const button = await screen.findByRole("button", { name: "Review global rewards" });
+      const button = await screen.findByRole("button", { name: "Claim staking rewards" });
       await waitFor(() => expect(button).toBeEnabled());
       fireEvent.click(button);
       await screen.findByText("Minimum payout: 2.985 STATICS");
@@ -229,7 +230,10 @@ describe("additive Phase 1 screens", () => {
   it("editing and clearing one allocation preserves the other pool", async () => {
     withPhaseOne(<RewardsPage />);
     const save = await screen.findByRole("button", { name: "Review allocation" });
-    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(screen.getByText("Allocate staked STATICS to pools"));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Allocated STATICS" })).toHaveValue("10")
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "Allocated STATICS" }), {
       target: { value: "0" },
     });
@@ -246,5 +250,95 @@ describe("additive Phase 1 screens", () => {
       screen.queryByLabelText("Reward assets (comma-separated addresses)")
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/maintenance console/i)).not.toBeInTheDocument();
+  });
+  it("uses wallet Max and keeps staking review inside its card without sending", async () => {
+    withPhaseOne(<RewardsPage />);
+    const card = await screen.findByRole("region", { name: "Stake STATICS" });
+    const max = within(card).getByRole("button", { name: "Max" });
+    await waitFor(() => expect(max).toBeEnabled());
+    fireEvent.click(max);
+    expect(within(card).getByRole("textbox", { name: "STATICS amount" })).toHaveValue("500");
+    fireEvent.click(within(card).getByRole("button", { name: "Review stake" }));
+    const review = await within(card).findByRole("region", { name: "Review transaction" });
+    expect(within(review).getByText("500 STATICS")).toBeInTheDocument();
+    expect(within(review).getByText(/approve STATICS first/)).toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(within(review).getByRole("button", { name: "Cancel" }));
+    expect(within(card).getByRole("textbox", { name: "STATICS amount" })).toHaveValue("500");
+  });
+  it("uses the unstake toggle and excludes gauge-locked stake from Max", async () => {
+    withPhaseOne(<RewardsPage />);
+    const card = await screen.findByRole("region", { name: "Stake STATICS" });
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.click(within(card).getByRole("button", { name: "Unstake" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Max" }));
+    expect(within(card).getByRole("textbox", { name: "STATICS amount" })).toHaveValue("70");
+    expect(within(card).getByRole("button", { name: "Review unstake" })).toBeEnabled();
+    expect(within(card).queryByRole("button", { name: "Review stake" })).not.toBeInTheDocument();
+  });
+  it("prevents unstaking when the position has no stake", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) =>
+      input.functionName === "stakePosition"
+        ? { stakedBalance: 0n, rewardMultiplierBps: 10000 }
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage />);
+    const card = await screen.findByRole("region", { name: "Stake STATICS" });
+    fireEvent.click(within(card).getByRole("button", { name: "Unstake" }));
+    fireEvent.change(within(card).getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    await waitFor(() =>
+      expect(
+        within(card).getByText("Amount exceeds stake available after pool locks.")
+      ).toBeInTheDocument()
+    );
+    expect(within(card).getByRole("button", { name: "Review unstake" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Max" })).toBeDisabled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it.each(["0", "-1", "invalid", "501"])(
+    "disables review for invalid or excessive amount %s",
+    async (value) => {
+      withPhaseOne(<RewardsPage />);
+      const card = await screen.findByRole("region", { name: "Stake STATICS" });
+      await waitFor(() => expect(within(card).getByRole("button", { name: "Max" })).toBeEnabled());
+      fireEvent.change(within(card).getByRole("textbox", { name: "STATICS amount" }), {
+        target: { value },
+      });
+      expect(within(card).getByRole("button", { name: "Review stake" })).toBeDisabled();
+      expect(mocks.execute).not.toHaveBeenCalled();
+    }
+  );
+  it("preserves stake input and reward asset drafts when the pool changes", async () => {
+    withPhaseOne(<RewardsPage />);
+    const card = await screen.findByRole("region", { name: "Stake STATICS" });
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.change(within(card).getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "25" },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "WETH" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Pool" }), {
+      target: { value: hash("2") },
+    });
+    expect(within(card).getByRole("textbox", { name: "STATICS amount" })).toHaveValue("25");
+    expect(within(card).getByRole("button", { name: "WETH" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(within(card).getByRole("button", { name: "Save reward assets" })).toBeInTheDocument();
+  });
+  it("clears only the pool review when the pool changes", async () => {
+    withPhaseOne(<RewardsPage />);
+    const claim = await screen.findByRole("button", { name: "Claim liquidity rewards" });
+    await waitFor(() => expect(claim).toBeEnabled());
+    fireEvent.click(claim);
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Pool" }), {
+      target: { value: hash("2") },
+    });
+    expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
 });
