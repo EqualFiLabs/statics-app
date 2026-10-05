@@ -99,6 +99,22 @@ Server-only configuration:
 The server integrations read these values only from their process environment. They are never
 copied into browser configuration.
 
+### Local Robinhood mainnet fork
+
+Anvil can keep Robinhood's mainnet chain ID while serving the app entirely on localhost. Set
+`NEXT_PUBLIC_APP_ENV=development`, `NEXT_PUBLIC_APP_NETWORK=anvil`,
+`NEXT_PUBLIC_ANVIL_CHAIN_ID=4663`, and `NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8663`.
+Both local Genesis and Phase 1 manifests must identify chain `4663`; point the local indexer
+at the same fork and use a dedicated database. Without the chain override, existing local
+deployments continue to use `31337`.
+
+This configuration uses the local RPC for app reads and Privy wallet submissions. The network
+selector offers the fork once rather than also offering mainnet under the same chain ID.
+If the same-origin Robinhood proxies are used, configure their server-only read and wallet
+upstreams to the local Anvil URL too. External wallets must have their Robinhood RPC changed
+to that URL; selecting chain `4663` alone does not change an existing wallet's endpoint.
+A public RPC host is only needed for clients connecting from another machine.
+
 The `STATICS_ROBINHOOD_*` values back the same-origin, read-only browser RPC proxy. Use a dedicated
 authenticated provider application/key for them. Ponder must use a different provider key so
 browser request bursts cannot consume the indexer's quota.

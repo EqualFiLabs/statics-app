@@ -51,6 +51,7 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
+  NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
 });
 const transports = createWalletTransports(walletEnvironment);
 const wagmiConfig = createConfig({
@@ -236,7 +237,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
       fundingChainId,
-      fundingNetworkName: localFork ? "Local Anvil" : fundingNetwork.label,
+      fundingNetworkName: localFork ? targetChain.name : fundingNetwork.label,
       fundingWalletOnSelectedChain: chainId === fundingChainId,
       fundingNetworks: activeFundingNetworks,
       explorerUrl: address && !localFork ? getAddressExplorerUrl(targetChain, address) : null,
@@ -296,7 +297,11 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }),
       getEthereumProvider: async () => {
         if (!selectedWallet) return null;
-        return selectedWallet.getEthereumProvider();
+        const provider = await selectedWallet.getEthereumProvider();
+        if (localFork && active.launch && chainId === active.descriptor.chainId) {
+          await verifyLocalForkWalletProvider(provider, active.launch);
+        }
+        return provider;
       },
       sendEvmTransaction: async (request) => {
         if (!selectedWallet || !address) throw new Error("Connect a wallet before continuing.");

@@ -74,9 +74,10 @@ const launch = parseLaunchDeploymentManifest(
   "development-fixture"
 );
 const transport = http("http://127.0.0.1:8663");
-const client = createPublicClient({ chain: anvil, transport });
+const forkChain = { ...anvil, id: phaseOne.descriptor.chainId };
+const client = createPublicClient({ chain: forkChain, transport });
 const account = mnemonicToAccount("test test test test test test test test test test test junk");
-const wallet = createWalletClient({ chain: anvil, transport, account });
+const wallet = createWalletClient({ chain: forkChain, transport, account });
 const pool = listedPublicPool(phaseOne.supportedPools.find((entry) => entry.enabled)!);
 const option = {
   networkId: "anvil" as const,
@@ -163,9 +164,11 @@ async function createPosition() {
   return event!.args.positionId;
 }
 beforeAll(async () => {
-  expect(await client.getChainId()).toBe(31337);
-  expect(phaseOne.descriptor.chainId).toBe(31337);
-  expect(launch.descriptor.chainId).toBe(31337);
+  expect(await client.getChainId()).toBe(forkChain.id);
+  expect([31_337, 4_663]).toContain(forkChain.id);
+  await client.request({ method: "anvil_getAutomine" as never });
+  expect(phaseOne.descriptor.chainId).toBe(forkChain.id);
+  expect(launch.descriptor.chainId).toBe(forkChain.id);
   expect(phaseOne.descriptor.deploymentId).toContain("local");
   await client.request({
     method: "anvil_setBalance" as never,
@@ -176,7 +179,7 @@ beforeAll(async () => {
     account.address,
   ]);
   if (balance < parseEther("100000")) {
-    const route = selectSwapRoute(option, 31337, eth, statics);
+    const route = selectSwapRoute(option, forkChain.id, eth, statics);
     if (route.kind !== "direct") throw new Error("Expected configured Genesis funding route.");
     const amountIn = parseEther("1");
     const quoted = await quoteDirectSwap(client, route, amountIn, account.address);
@@ -195,7 +198,7 @@ beforeAll(async () => {
 
 it("executes Genesis and Phase 1 native input/output swaps using the configured pool routes", async () => {
   for (const active of [option, { ...option, launch: null }]) {
-    const route = selectSwapRoute(active, 31337, eth, statics);
+    const route = selectSwapRoute(active, forkChain.id, eth, statics);
     if (route.kind !== "direct") throw new Error("Expected configured direct pool.");
     const amountIn = parseEther("0.00001");
     const amountOut = await quoteDirectSwap(client, route, amountIn, account.address);
@@ -209,7 +212,7 @@ it("executes Genesis and Phase 1 native input/output swaps using the configured 
       settlement: route.settlement,
     });
     await send(tx.target, tx.calldata, tx.value);
-    const reverse = selectSwapRoute(active, 31337, statics, eth);
+    const reverse = selectSwapRoute(active, forkChain.id, statics, eth);
     if (reverse.kind !== "direct") throw new Error("Expected native output route.");
     await approve(statics.address, reverse.permit2);
     await send(
@@ -716,7 +719,7 @@ it("claims funded global, LP and allocator rewards and preserves the global port
   );
   await client.request({ method: "evm_increaseTime" as never, params: [25 * 3600] as never });
   await client.request({ method: "evm_mine" as never });
-  const route = selectSwapRoute({ ...option, launch: null }, 31337, eth, statics);
+  const route = selectSwapRoute({ ...option, launch: null }, forkChain.id, eth, statics);
   if (route.kind !== "direct") throw new Error("Expected Phase 1 route.");
   const amountIn = parseEther("0.0001");
   const quoted = await quoteDirectSwap(client, route, amountIn, account.address);

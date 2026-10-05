@@ -62,4 +62,21 @@ describe("local fork wallet provider", () => {
       verifyLocalForkWalletProvider({ request }, deployment("0x6001600055"))
     ).rejects.toThrow("not connected to Local Anvil");
   });
+
+  it("rejects a mainnet wallet endpoint when the fork shares its chain ID", async () => {
+    const fixture = deployment("0x6001600055");
+    const fork = { ...fixture, descriptor: { ...fixture.descriptor, chainId: 4_663 } };
+    const request = vi.fn().mockResolvedValueOnce("0x1237").mockResolvedValueOnce("Arbitrum/v1");
+    await expect(verifyLocalForkWalletProvider({ request }, fork)).rejects.toThrow(
+      "Point your wallet's Robinhood RPC"
+    );
+    const localRequest = vi
+      .fn()
+      .mockResolvedValueOnce("0x1237")
+      .mockResolvedValueOnce("anvil/v1.8.2");
+    await expect(
+      verifyLocalForkWalletProvider({ request: localRequest }, fork)
+    ).resolves.toBeUndefined();
+    expect(localRequest).toHaveBeenCalledWith({ method: "web3_clientVersion" });
+  });
 });

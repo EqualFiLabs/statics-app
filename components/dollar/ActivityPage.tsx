@@ -73,10 +73,12 @@ function protocolStatus(activity: ProtocolActivity): string {
 
 function chainName(chainId: number): string {
   if (chainId === ACROSS_SOLANA_CHAIN_ID) return "Solana";
+  const network = getFundingNetwork(chainId);
+  if (network) return network.label;
   if (chainId === robinhoodMainnet.id) return robinhoodMainnet.name;
   if (chainId === robinhoodTestnet.id) return robinhoodTestnet.name;
   if (chainId === anvil.id) return anvil.name;
-  return getFundingNetwork(chainId)?.label ?? `Chain ${chainId}`;
+  return `Chain ${chainId}`;
 }
 
 function evmExplorerUrl(chainId: number, hash: string): string | null {

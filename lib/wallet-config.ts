@@ -1,4 +1,5 @@
 import { defineChain, http, type Chain, type Transport } from "viem";
+import { localChainId } from "@/lib/wallet/local-chain";
 
 export type WalletAppEnvironment = "development" | "staging" | "production";
 export type WalletNetwork = "robinhood" | "robinhood-testnet" | "anvil";
@@ -100,6 +101,7 @@ export type WalletEnvironment = Readonly<{
   robinhoodRpcUrl: string;
   robinhoodTestnetRpcUrl: string;
   anvilRpcUrl: string;
+  anvilChain: Chain;
   defaultChain: Chain;
   supportedChains: readonly [Chain, ...Chain[]];
   privyDefaultChain: Chain;
@@ -128,7 +130,14 @@ function chainWithPrivyWalletRpc(chain: Chain, rpcUrl: string): Chain {
 }
 
 export function readWalletEnvironment(
-  environment: Record<string, string | undefined> = process.env
+  environment: Record<string, string | undefined> = {
+    NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+    NEXT_PUBLIC_APP_NETWORK: process.env.NEXT_PUBLIC_APP_NETWORK,
+    NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+    NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
+    NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
+    NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
+  }
 ): WalletEnvironment {
   const appEnvironment = parseEnvironment(environment.NEXT_PUBLIC_APP_ENV);
   const network = parseNetwork(environment.NEXT_PUBLIC_APP_NETWORK, appEnvironment);
@@ -142,12 +151,20 @@ export function readWalletEnvironment(
   if (appEnvironment !== "development" && !appId) {
     throw new Error("NEXT_PUBLIC_PRIVY_APP_ID is required outside development.");
   }
-  if (network === "anvil" && configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
+  if (configuredAnvilRpc && !isLoopbackUrl(configuredAnvilRpc)) {
     throw new Error("NEXT_PUBLIC_ANVIL_RPC_URL must be loopback-only.");
   }
 
   const anvilRpcUrl = configuredAnvilRpc ?? "http://127.0.0.1:8545/";
-  const configuredAnvil = chainWithRpc(anvil, anvilRpcUrl);
+  const anvilChainId = localChainId(environment);
+  const configuredAnvil = chainWithRpc(
+    {
+      ...anvil,
+      id: anvilChainId,
+      name: anvilChainId === 4_663 ? "Robinhood mainnet fork" : anvil.name,
+    },
+    anvilRpcUrl
+  );
   const defaultChain =
     network === "anvil"
       ? configuredAnvil
@@ -161,7 +178,9 @@ export function readWalletEnvironment(
   ];
   const privyDefaultChain =
     network === "anvil"
-      ? configuredAnvil
+      ? anvilChainId === 4_663
+        ? chainWithPrivyWalletRpc(configuredAnvil, anvilRpcUrl)
+        : configuredAnvil
       : privyRobinhoodChains.find((chain) => chain.id === defaultChain.id)!;
   return {
     appEnvironment,
@@ -171,11 +190,12 @@ export function readWalletEnvironment(
     robinhoodRpcUrl: ROBINHOOD_MAINNET_RPC_PROXY,
     robinhoodTestnetRpcUrl: ROBINHOOD_TESTNET_RPC_PROXY,
     anvilRpcUrl,
+    anvilChain: configuredAnvil,
     defaultChain,
     supportedChains: [
       defaultChain,
       ...publicRobinhoodChains.filter((chain) => chain.id !== defaultChain.id),
-      ...(appEnvironment === "development" && defaultChain.id !== anvil.id
+      ...(appEnvironment === "development" && defaultChain.id !== configuredAnvil.id
         ? [configuredAnvil]
         : []),
     ] as [Chain, ...Chain[]],
@@ -183,7 +203,7 @@ export function readWalletEnvironment(
     privySupportedChains: [
       privyDefaultChain,
       ...privyRobinhoodChains.filter((chain) => chain.id !== privyDefaultChain.id),
-      ...(appEnvironment === "development" && privyDefaultChain.id !== anvil.id
+      ...(appEnvironment === "development" && privyDefaultChain.id !== configuredAnvil.id
         ? [configuredAnvil]
         : []),
     ] as [Chain, ...Chain[]],
@@ -203,7 +223,7 @@ export function createWalletTransports(environment: WalletEnvironment): Record<n
     [robinhoodTestnet.id]: batchedHttp(environment.robinhoodTestnetRpcUrl),
   };
   if (environment.appEnvironment === "development") {
-    transports[anvil.id] = batchedHttp(environment.anvilRpcUrl);
+    transports[environment.anvilChain.id] = batchedHttp(environment.anvilRpcUrl);
   }
   return transports;
 }
@@ -214,6 +234,10 @@ export function getAddressExplorerUrl(chain: Chain, address: string): string | n
 }
 
 export function getTransactionExplorerUrl(chainId: number, hash: string): string | null {
+  const environment = readWalletEnvironment();
+  if (environment.appEnvironment === "development" && environment.anvilChain.id === chainId) {
+    return null;
+  }
   const chain =
     chainId === robinhoodMainnet.id
       ? robinhoodMainnet
@@ -224,6 +248,10 @@ export function getTransactionExplorerUrl(chainId: number, hash: string): string
 }
 
 export function getAddressExplorerUrlForChain(chainId: number, address: string): string | null {
+  const environment = readWalletEnvironment();
+  if (environment.appEnvironment === "development" && environment.anvilChain.id === chainId) {
+    return null;
+  }
   const chain =
     chainId === robinhoodMainnet.id
       ? robinhoodMainnet

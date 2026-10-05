@@ -11,6 +11,7 @@ import {
 } from "@/lib/deployments/phase-one-manifest";
 import { clientDollarEnvironment, readDollarDeployment } from "@/lib/dollar/deployment";
 import { parseDeploymentManifest } from "@/lib/dollar/manifest";
+import { localChainId } from "@/lib/wallet/local-chain";
 import type {
   DeploymentCapability,
   DeploymentDescriptor,
@@ -101,7 +102,7 @@ function localLaunch(environment: Record<string, string | undefined>): LaunchDep
   }
   if (
     manifest.deploymentId !== LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID ||
-    manifest.chainId !== 31_337
+    manifest.chainId !== localChainId(environment)
   ) {
     throw new Error("The local launch manifest must identify the Anvil deployment.");
   }
@@ -131,7 +132,10 @@ function localPhaseOne(environment: Record<string, string | undefined>): PhaseOn
   } catch {
     throw new Error("NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST must be valid JSON.");
   }
-  if (manifest.deploymentId !== LOCAL_PHASE_ONE_DEPLOYMENT_ID || manifest.chainId !== 31_337) {
+  if (
+    manifest.deploymentId !== LOCAL_PHASE_ONE_DEPLOYMENT_ID ||
+    manifest.chainId !== localChainId(environment)
+  ) {
     throw new Error("The local Phase 1 manifest must identify the Anvil deployment.");
   }
   return parsePhaseOneDeploymentManifest(manifest, "development-fixture");
@@ -186,6 +190,7 @@ function publicEnvironment(): Record<string, string | undefined> {
     ...clientDollarEnvironment(),
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_APP_NETWORK: process.env.NEXT_PUBLIC_APP_NETWORK,
+    NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
     NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST:
       process.env.NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST,
     NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST:
@@ -208,14 +213,15 @@ export function deploymentRegistry(
     throw new Error("A local Phase 1 manifest is only allowed in development.");
   }
   if (appEnvironment === "development") {
+    const chainId = localChainId(environment);
     options.push(
       target(
         "anvil",
-        "Local Anvil",
-        31_337,
+        chainId === 4_663 ? "Robinhood mainnet fork" : "Local Anvil",
+        chainId,
         localLaunch(environment),
         localPhaseOne(environment),
-        protocolDeployment(31_337, environment)
+        chainId === 31_337 ? protocolDeployment(31_337, environment) : null
       )
     );
   }
@@ -237,7 +243,14 @@ export function deploymentRegistry(
       protocolDeployment(46_630, environment)
     )
   );
-  return options;
+  // A chain ID can target only one RPC in a wallet session. Keep the local
+  // fork's manifests when it shares Robinhood's ID; do not offer mainnet with it.
+  return options.filter(
+    (option, index) =>
+      options.findIndex(
+        (candidate) => candidate.descriptor.chainId === option.descriptor.chainId
+      ) === index
+  );
 }
 
 export function defaultNetworkId(

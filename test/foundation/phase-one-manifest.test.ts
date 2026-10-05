@@ -174,4 +174,17 @@ describe("Phase 1 deployment manifest", () => {
     expect(local?.descriptor.stage).toBe("phase-one");
     expect(local?.descriptor.capabilities).toContain("market-tape");
   });
+
+  it("loads local Phase 1 on the mainnet fork chain ID", () => {
+    const phaseOne = { ...manifest(), chainId: 4_663 };
+    const options = deploymentRegistry({
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
+      NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663",
+      NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST: JSON.stringify(phaseOne),
+    });
+    expect(options[0].phaseOne?.descriptor.chainId).toBe(4_663);
+    expect(options[0].phaseOne?.source).toBe("development-fixture");
+    expect(options[0].descriptor.capabilities).toContain("market-tape");
+  });
 });
