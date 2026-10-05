@@ -94,24 +94,25 @@ describe("DappRouteGuard", () => {
     }
   );
 
-  it("leaves full-protocol Positions untouched", () => {
-    pathname = "/app/positions";
-    renderGuard(fullDescriptor);
-    expect(screen.getByText("Route content")).toBeInTheDocument();
-    expect(replace).not.toHaveBeenCalled();
-  });
+  it.each(["/app/positions", "/app/positions/1042"])(
+    "leaves full-protocol Positions route %s untouched",
+    (route) => {
+      pathname = route;
+      renderGuard(fullDescriptor);
+      expect(screen.getByText("Route content")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    }
+  );
 
-  it("allows the Phase 1 position dashboard but rejects legacy position details", async () => {
-    pathname = "/app/positions";
-    const rendered = renderGuard(phaseOneDescriptor);
-    expect(screen.getByText("Route content")).toBeInTheDocument();
-    rendered.unmount();
-
-    pathname = "/app/positions/1042";
-    renderGuard(phaseOneDescriptor);
-    expect(screen.queryByText("Route content")).not.toBeInTheDocument();
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/app"));
-  });
+  it.each(["/app/positions", "/app/positions/1042"])(
+    "allows Phase 1 Positions route %s without redirecting",
+    (route) => {
+      pathname = route;
+      renderGuard(phaseOneDescriptor);
+      expect(screen.getByText("Route content")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    }
+  );
 
   it("leaves unknown routes to Next.js instead of treating them as Overview", () => {
     pathname = "/app/unknown";
