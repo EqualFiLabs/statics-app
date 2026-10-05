@@ -11,7 +11,11 @@ import {
 } from "@statics-protocol/sdk/phase-one";
 import { getAddress, zeroAddress, type Hex } from "viem";
 import { activeGenesisCreditMutation } from "./genesis-credit";
-import { genesisTransferMutation, genesisWeightChangedMutation } from "./genesis";
+import {
+  genesisConsecutiveTransferMutations,
+  genesisTransferMutation,
+  genesisWeightChangedMutation,
+} from "./genesis";
 import { configuredAddress } from "./source-config";
 
 import {
@@ -210,6 +214,25 @@ onPositionManager("PositionManager:Transfer", async ({ event, context }) => {
       owner: getAddress(event.args.to),
       updatedAtBlock: event.block.number,
     });
+});
+
+ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
+  const mutations = genesisConsecutiveTransferMutations({
+    deploymentId,
+    fromTokenId: event.args.fromTokenId,
+    toTokenId: event.args.toTokenId,
+    from: event.args.fromAddress,
+    to: event.args.toAddress,
+    vault: genesisVault,
+    blockNumber: event.block.number,
+  });
+  for (const mutation of mutations) {
+    if (mutation.type === "delete") {
+      await context.db.delete(genesisNft, { key: mutation.key });
+    } else {
+      await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
+    }
+  }
 });
 
 ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
