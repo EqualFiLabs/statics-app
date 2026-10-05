@@ -1,0 +1,4 @@
+interface:
+  display_name: "Statics Fork Setup"
+  short_description: "Set up and resume a contributor mainnet fork"
+  default_prompt: "Use $statics-fork-setup to prepare my local Statics contributor fork."
