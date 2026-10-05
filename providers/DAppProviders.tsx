@@ -245,7 +245,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
       fundingChainId,
-      fundingNetworkName: localFork ? targetChain.name : fundingNetwork.label,
+      fundingNetworkName: fundingNetwork.label,
       fundingWalletOnSelectedChain: chainId === fundingChainId,
       fundingNetworks: activeFundingNetworks,
       explorerUrl: address && !localFork ? getAddressExplorerUrl(targetChain, address) : null,
