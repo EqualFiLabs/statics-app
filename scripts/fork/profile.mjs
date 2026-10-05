@@ -188,6 +188,10 @@ export function compatible(profile, options, environment, source) {
   ])
     if (environment[name] && environment[name] !== value)
       throw new Error(`Saved profile conflicts with ${name}.`);
+  if (profile.controlMutation)
+    throw new Error(
+      "Uncertain local control: preserve receipts and state; inspect the transaction outcome before recovery. Nothing was repeated."
+    );
   const uncertain = Object.entries(profile.stages).find(([, stage]) => stage.status === "started");
   if (uncertain)
     throw new Error(

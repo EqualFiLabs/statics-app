@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import {
   createPublicClient,
   createWalletClient,
@@ -49,18 +50,23 @@ export async function confirmed(context, sender, transaction, profile, path) {
   if (receipt.status !== "success") throw new Error(`Local transaction reverted: ${hash}`);
   return receipt;
 }
+export async function checkpoint(profile, path) {
+  const encoded = await rpc(urls(profile).rpc, "anvil_dumpState", [true]);
+  let buffer = Buffer.from(encoded.slice(2), "hex");
+  if (buffer[0] === 31 && buffer[1] === 139) buffer = gunzipSync(buffer);
+  save(resolve(path, "state.json"), JSON.parse(buffer.toString("utf8")));
+}
 export async function stage(profile, path, name, operation) {
   if (profile.stages[name]?.status === "complete") return;
   profile.stages[name] = { status: "started", startedAt: new Date().toISOString() };
   save(resolve(path, "profile.json"), profile);
   console.log(`Fork stage: ${name}`);
   await operation();
+  await checkpoint(profile, path);
   profile.stages[name].status = "complete";
   save(resolve(path, "profile.json"), profile);
-  // Save with historical states after every completed mutation stage.
-  const state = await rpc(urls(profile).rpc, "anvil_dumpState", [true]);
-  save(resolve(path, "checkpoint-state.json"), state);
 }
+
 function label(log, name) {
   const match = log.match(new RegExp(`${name}\\s*:?\\s*(0x[0-9a-fA-F]+|[0-9]+)`));
   if (!match)

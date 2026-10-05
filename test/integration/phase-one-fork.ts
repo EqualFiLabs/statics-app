@@ -73,7 +73,15 @@ const launch = parseLaunchDeploymentManifest(
   JSON.parse(readFileSync(resolve(root, "cleanup-launch-manifest.json"), "utf8")),
   "development-fixture"
 );
-const transport = http("http://127.0.0.1:8663");
+const rpcUrl = process.env.STATICS_FORK_RPC_URL ?? "http://127.0.0.1:8663";
+const endpoint = new URL(rpcUrl);
+if (
+  endpoint.protocol !== "http:" ||
+  !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname)
+) {
+  throw new Error("Fork lifecycle RPC must be loopback Anvil.");
+}
+const transport = http(rpcUrl);
 const forkChain = { ...anvil, id: phaseOne.descriptor.chainId };
 const client = createPublicClient({ chain: forkChain, transport });
 const account = mnemonicToAccount("test test test test test test test test test test test junk");
@@ -164,6 +172,16 @@ async function createPosition() {
   return event!.args.positionId;
 }
 beforeAll(async () => {
+  if (process.env.STATICS_FORK_PROFILE_ID) {
+    const profile = JSON.parse(readFileSync(resolve(root, "profile.json"), "utf8"));
+    if (profile.id !== process.env.STATICS_FORK_PROFILE_ID || !profile.profile.startsWith("test-"))
+      throw new Error("Lifecycle suite requires its isolated owned test profile");
+    const { verifyAnvil } = await import(
+      /* @vite-ignore */ new URL("../../scripts/fork/profile.mjs", import.meta.url).href
+    );
+    await verifyAnvil(profile, rpcUrl);
+  }
+
   expect(await client.getChainId()).toBe(forkChain.id);
   expect([31_337, 4_663]).toContain(forkChain.id);
   await client.request({ method: "anvil_getAutomine" as never });
@@ -567,22 +585,41 @@ it("preserves Operator acquisition, activation, rewards, redemption and closed-e
   );
 });
 
-it("repays an existing forked Operator credit and executes permissionless recovery after its grace period", async () => {
-  let id = 1n;
-  let state;
-  for (; id <= 100n; id++) {
-    const credit = await read<{ principal: bigint; recoverableAt: number; active: boolean }>(
-      launch.contracts.vault,
-      staticsGenesisCreditAbi,
-      "credit",
-      [id]
-    );
-    if (credit.active && credit.principal > parseEther("1")) {
-      state = credit;
-      break;
-    }
+it("repays an existing forked Operator credit and executes permissionless recovery after its grace period", async (context) => {
+  let id = 0n;
+  let state: { principal: bigint; recoverableAt: number; active: boolean } | undefined;
+  const indexer = process.env.STATICS_FORK_INDEXER_URL;
+  if (!indexer) {
+    context.skip("Snapshot prerequisite unavailable: indexed credit discovery URL");
+    return;
   }
-  expect(state).toBeDefined();
+  let cursor: string | null = null;
+  do {
+    const response: Response = await fetch(
+      `${indexer}/genesis/credits/recoverable?asOf=1099511627776&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+    );
+    if (!response.ok) throw new Error("Indexed credit discovery failed");
+    const page: { items: { genesisId: string }[]; nextCursor: string | null } =
+      await response.json();
+    for (const row of page.items) {
+      const credit = await read<{ principal: bigint; recoverableAt: number; active: boolean }>(
+        launch.contracts.vault,
+        staticsGenesisCreditAbi,
+        "credit",
+        [BigInt(row.genesisId)]
+      );
+      if (credit.active && credit.principal > parseEther("1")) {
+        id = BigInt(row.genesisId);
+        state = credit;
+        break;
+      }
+    }
+    cursor = page.nextCursor;
+  } while (cursor && !state);
+  if (!state) {
+    context.skip("Snapshot prerequisite unavailable: active Operator credit above 1 ETH");
+    return;
+  }
   await approve(launch.contracts.statics, launch.contracts.vault);
   await send(launch.contracts.vault, buildRepayGenesisCreditCall(id, parseEther("1")));
   const repaid = await read<{ principal: bigint; recoverableAt: number }>(

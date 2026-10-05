@@ -44,7 +44,15 @@
     "test:e2e": "node scripts/without-statics-env.mjs npm run build && playwright test",
     "verify:connected:local": "node scripts/verify-connected-local.mjs",
     "test:integration:local": "node test/integration/local-dollar.mjs",
-    "verify": "npm run verify:assets && npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
+    "verify": "npm run verify:assets && npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e",
+    "dev:fork": "node scripts/fork.mjs start",
+    "fork:status": "node scripts/fork.mjs status",
+    "fork:fund-wallet": "node scripts/fork.mjs fund-wallet",
+    "fork:advance-time": "node scripts/fork.mjs advance-time",
+    "fork:stop": "node scripts/fork.mjs stop",
+    "verify:fork": "node scripts/fork.mjs verify",
+    "test:fork": "node scripts/fork.mjs test",
+    "test:fork-tooling": "node --test scripts/fork/*.test.mjs"
   },
   "dependencies": {
     "@privy-io/react-auth": "3.38.0",
