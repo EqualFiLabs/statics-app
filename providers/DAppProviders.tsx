@@ -31,7 +31,7 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
-import { verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
+import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
 import {
   queryMatchesProtocolReconciliation,
@@ -122,7 +122,15 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const targetChain =
     walletEnvironment.supportedChains.find((chain) => chain.id === active.descriptor.chainId) ??
     walletEnvironment.defaultChain;
-  const localFork = active.launch?.source === "development-fixture";
+  const localFork = active.networkId === "anvil";
+  const localForkOption = options.find((option) => option.networkId === "anvil");
+  const localForkDeployment = useMemo(
+    () =>
+      localForkOption
+        ? { source: "development-fixture" as const, descriptor: localForkOption.descriptor }
+        : null,
+    [localForkOption]
+  );
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
   const activeFundingNetworks = fundingNetworkSummaries;
 
@@ -298,8 +306,12 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       getEthereumProvider: async () => {
         if (!selectedWallet) return null;
         const provider = await selectedWallet.getEthereumProvider();
-        if (localFork && active.launch && chainId === active.descriptor.chainId) {
-          await verifyLocalForkWalletProvider(provider, active.launch);
+        if (localForkDeployment && chainId === localForkDeployment.descriptor.chainId) {
+          return localForkWalletProvider(
+            provider,
+            localForkDeployment,
+            walletEnvironment.anvilRpcUrl
+          );
         }
         return provider;
       },
@@ -313,8 +325,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }
 
         const provider = await selectedWallet.getEthereumProvider();
-        if (localFork && active.launch) {
-          await verifyLocalForkWalletProvider(provider, active.launch);
+        if (localForkDeployment) {
+          await verifyLocalForkWalletProvider(provider, localForkDeployment, request.chainId);
         }
 
         if (walletKind === "embedded") {
@@ -390,7 +402,6 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
-      active.launch,
       active.descriptor.chainId,
       active.descriptor.deploymentId,
       promptExternalWallet,
@@ -402,6 +413,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       status,
       targetChain,
       localFork,
+      localForkDeployment,
       activeFundingNetworks,
       walletKind,
       options,

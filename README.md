@@ -289,8 +289,10 @@ npm run launch-fork:generate-volume -- --eth 1 --cycles 5
 ```
 
 These are fork-local balances and transactions. They do not move real ETH or change Robinhood
-mainnet. Deployment runs under Robinhood identity, then the interactive fork changes to Local
-Anvil chain `31337`. The app's existing network selector can therefore move among Local Anvil,
+mainnet. This Genesis-only launcher deploys under Robinhood identity, then changes to Local
+Anvil chain `31337`. For an integrated Genesis and Phase 1 fork that retains `4663`, use the
+configuration described in **Local Robinhood mainnet fork** above. The default launch helper's
+network selector can move among Local Anvil,
 Robinhood mainnet, and Robinhood testnet without a second deployment control. Canonical
 STATICS/WETH trades still use the real Robinhood V4 contracts copied into the fork. The controls
 accept a fixed set of bounded operations and cannot submit arbitrary calldata.
@@ -374,7 +376,8 @@ CONNECTED_DAPP_URL=http://127.0.0.1:3000 \
 ```
 
 The transaction suite requires `manifest.json` and `cleanup-launch-manifest.json` in that folder,
-uses only loopback Anvil at port `8663` with chain ID `31337`, and reuses its existing contracts.
+uses only loopback Anvil at port `8663` with chain ID `31337` or `4663` matching both manifests,
+and reuses its existing contracts.
 It submits local transactions, funds fixture accounts, advances the fork clock, and configures a
 reward slot through local impersonation. It does not start another Anvil or map Uniswap API
 execution to a mainnet chain. Uniswap execution uses component fixtures. A live production
