@@ -1,5 +1,13 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+  readdirSync,
+} from "node:fs";
+import { resolve, relative } from "node:path";
 import { appRoot, childEnvironment, digest, json, save, sleep, urls } from "./profile.mjs";
 import { transactionContext } from "./deploy.mjs";
 import { ownedProcess, waitHttp } from "./processes.mjs";
@@ -73,28 +81,28 @@ export async function manifests(profile, path) {
   return { launch, phaseOne };
 }
 export function indexerFingerprint(root = resolve(appRoot, "ponder")) {
-  return ["ponder.config.ts", "ponder.schema.ts", "package-lock.json"]
-    .map((file) => digest(readFileSync(resolve(root, file))))
-    .join(":");
+  function files(dir) {
+    return readdirSync(dir, { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? files(resolve(dir, e.name)) : [resolve(dir, e.name)]))
+      .sort();
+  }
+  return digest(
+    [
+      "ponder.config.ts",
+      "ponder.schema.ts",
+      "package-lock.json",
+      ...files(resolve(root, "src")).map((file) => relative(root, file)),
+    ]
+      .map((file) => `${file}:${digest(readFileSync(resolve(root, file)))}`)
+      .join("\n")
+  );
 }
 export async function startIndexer(profile, path, historyUrl, children) {
   const { launch, phaseOne } = await manifests(profile, path),
     c = phaseOne.contracts,
     g = launch.contracts;
   const origin = urls(profile).app;
-  // Include handler sources, not just the schema, when deciding to replay.
-  const { readdirSync } = await import("node:fs");
-  function files(dir) {
-    return readdirSync(dir, { withFileTypes: true })
-      .flatMap((e) => (e.isDirectory() ? files(resolve(dir, e.name)) : [resolve(dir, e.name)]))
-      .sort();
-  }
-  const sourceDigest = digest(
-    [
-      indexerFingerprint(),
-      ...files(resolve(appRoot, "ponder/src")).map((file) => digest(readFileSync(file))),
-    ].join("\n")
-  );
+  const sourceDigest = indexerFingerprint();
   if (profile.indexer?.sourceDigest !== sourceDigest) {
     profile.indexer = {
       sourceDigest,
@@ -164,7 +172,8 @@ export async function startIndexer(profile, path, historyUrl, children) {
   await waitHttp(`${urls(profile).indexer}/ready`, child, 3600);
   const { client } = transactionContext(profile);
   for (let attempt = 0; attempt < 3600; attempt++) {
-    if (child.exitCode !== null) throw new Error("Indexer exited during catch-up.");
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error("Indexer exited during catch-up.");
     const status = await fetch(`${urls(profile).indexer}/status`).then((r) => r.json());
     const indexed = BigInt(status.active?.block?.number ?? 0),
       head = await client.getBlockNumber();
@@ -202,6 +211,11 @@ export async function startApp(profile, path, launch, phaseOne, children) {
   symlinkSync(resolve(appRoot, "node_modules"), resolve(project, "node_modules"), "dir");
   symlinkSync(resolve(appRoot, "public"), resolve(project, "public"), "dir");
   symlinkSync(resolve(appRoot, "vendor"), resolve(project, "vendor"), "dir");
+  const { execFileSync } = await import("node:child_process");
+  profile.appRevision = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: appRoot,
+    encoding: "utf8",
+  }).trim();
   profile.appProject = project;
   save(resolve(path, "profile.json"), profile);
 

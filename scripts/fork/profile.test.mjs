@@ -176,3 +176,53 @@ test("atomic profile writes do not serialize private upstream configuration", as
   save(resolve(path, "profile.json"), p);
   assert.ok(!(await readFile(resolve(path, "profile.json"), "utf8")).includes("ROBINHOOD_MAINNET"));
 });
+
+test("process completion waits for log flush and cancellation prevents late child starts", async () => {
+  const { run, waitRpc, waitHttp } = await import("./processes.mjs");
+  const path = await directory(),
+    children = new Set(),
+    log = resolve(path, "flush.log");
+  await run(
+    process.execPath,
+    [
+      "-e",
+      'process.stdout.write("x".repeat(1024*1024));process.stdout.write("\\nFINAL_DEPLOYMENT_LABEL\\n");',
+    ],
+    { cwd: process.cwd(), log, children }
+  );
+  assert.ok((await readFile(log, "utf8")).endsWith("FINAL_DEPLOYMENT_LABEL\n"));
+  const controller = new AbortController();
+  children.signal = controller.signal;
+  controller.abort();
+  assert.throws(
+    () =>
+      ownedProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+        cwd: process.cwd(),
+        log,
+        children,
+      }),
+    /aborted/
+  );
+  assert.equal(children.size, 0);
+  const child = { exitCode: null, signalCode: "SIGTERM", spawnFailed: false };
+  await assert.rejects(() => waitRpc("http://unused.invalid", child), /exited/);
+  await assert.rejects(() => waitHttp("http://unused.invalid", child), /exited/);
+});
+test("handler renames invalidate indexer replay and uncertain final saves block resume", async () => {
+  const { indexerFingerprint } = await import("./app.mjs");
+  const { writeFile, mkdir, rename } = await import("node:fs/promises");
+  const path = await directory();
+  await mkdir(resolve(path, "src"));
+  for (const file of ["ponder.config.ts", "ponder.schema.ts", "package-lock.json"])
+    await writeFile(resolve(path, file), "config");
+  await writeFile(resolve(path, "src/one.ts"), "handler");
+  const first = indexerFingerprint(path);
+  await rename(resolve(path, "src/one.ts"), resolve(path, "src/two.ts"));
+  assert.notEqual(indexerFingerprint(path), first);
+  const p = fixture();
+  p.status = "uncertain-stop";
+  assert.throws(() => compatible(p, {}, {}, source), /Refusing automatic resume/);
+  p.status = "ready";
+  p.controlMutation = { status: "started" };
+  assert.throws(() => compatible(p, {}, {}, source), /Nothing was repeated/);
+});

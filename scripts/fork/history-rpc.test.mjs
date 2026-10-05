@@ -9,11 +9,22 @@ const anchor = "0x" + "a".repeat(64),
   futureTx = "0x" + "d".repeat(64);
 test("history relay pins reads, splits ranges, caches hashes and excludes unproven history", async () => {
   const seen = [];
+  let activeAnchor = anchor;
   async function mock(label) {
     const server = createServer(async (req, res) => {
       let body = "";
       for await (const b of req) body += b;
       const r = JSON.parse(body);
+      if (r.method === "eth_call" && r.params[0]?.fault) {
+        res.end(
+          JSON.stringify({
+            id: r.id,
+            error: { code: -1, message: "API secret=bare-private-credential" },
+          })
+        );
+        return;
+      }
+
       seen.push([label, r.method, r.params]);
       let result = null;
       if (r.method === "eth_chainId") result = "0x1237";
@@ -24,7 +35,7 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
             : ["safe", "finalized"].includes(r.params[0])
               ? "0x68"
               : r.params[0],
-          hash: anchor,
+          hash: activeAnchor,
         };
       else if (r.method === "eth_blockNumber") result = "0x70";
       else if (r.method === "eth_getLogs")
@@ -103,6 +114,22 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
     prior = relay.stats.mainnet;
     assert.equal((await relay.route("eth_getTransactionReceipt", [oldTx])).blockNumber, "0x60");
     assert.equal(relay.stats.mainnet, prior);
+    await assert.rejects(() => relay.route("eth_call", [{ fault: true }, "0x60"]), /RPC rejected/);
+    await new Promise((r) => relay.server.close(r));
+    const differentHash = "0x" + "e".repeat(64);
+    activeAnchor = differentHash;
+    relay = await startForkHistoryRpc({ ...options, snapshotHash: differentHash });
+    prior = relay.stats.mainnet;
+    assert.equal(await relay.route("eth_getCode", ["addr", "0x60"]), "0x01");
+    assert.equal(
+      relay.stats.mainnet,
+      prior + 1,
+      "Different snapshot hashes cannot share cached responses"
+    );
+    await assert.rejects(
+      () => startForkHistoryRpc({ ...options, snapshotHash: anchor }),
+      /boundary/
+    );
   } finally {
     if (relay?.server.listening) await new Promise((r) => relay.server.close(r));
     main.server.close();

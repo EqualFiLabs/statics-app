@@ -17,7 +17,7 @@ import {
   verifyAnvil,
 } from "./profile.mjs";
 import { ownedProcess, stopChild, upstreamRelay, waitRpc } from "./processes.mjs";
-import { deploy, transactionContext } from "./deploy.mjs";
+import { deploy, transactionContext, checkpoint } from "./deploy.mjs";
 import { startForkHistoryRpc } from "./history-rpc.mjs";
 import { startApp, startIndexer } from "./app.mjs";
 import { applyControl, lightweightStatus } from "./controls.mjs";
@@ -89,10 +89,19 @@ export async function launch(options, environment) {
   });
   const children = new Set(),
     relays = [];
+  const controller = new AbortController();
+  children.signal = controller.signal;
+  Object.defineProperty(profile, "signal", { value: controller.signal, enumerable: false });
+  let startupDoneResolve;
+  const startupDone = new Promise((r) => {
+    startupDoneResolve = r;
+  });
+
   let control,
     anvil,
     stopping = false,
     stopResolve;
+  let queue = Promise.resolve();
   const stopped = new Promise((r) => {
     stopResolve = r;
   });
@@ -100,11 +109,32 @@ export async function launch(options, environment) {
   const stop = async () => {
     if (stopping) return stopped;
     stopping = true;
+    controller.abort();
     control?.close();
+    await startupDone;
     for (const child of [...children].filter((c) => c !== anvil)) await stopChild(child);
-    if (anvil) await stopChild(anvil); // --state saves historical snapshots on SIGTERM.
+    await queue;
+    let uncertainStop = false;
+    if (anvil) {
+      try {
+        await checkpoint(profile, path);
+      } catch {
+        uncertainStop = true;
+      }
+      const outcome = await stopChild(anvil, 60000);
+      if (outcome.forced) uncertainStop = true;
+      try {
+        if (
+          BigInt(json(resolve(path, "state.json")).best_block_number) <
+          BigInt(profile.savedStateBlock)
+        )
+          uncertainStop = true;
+      } catch {
+        uncertainStop = true;
+      }
+    }
     for (const relay of relays) relay.server.close();
-    profile.status = "stopped";
+    profile.status = uncertainStop ? "uncertain-stop" : "stopped";
     delete profile.owner;
     persist();
     if (existsSync(lock) && json(lock).id === profile.id) unlinkSync(lock);
@@ -115,7 +145,6 @@ export async function launch(options, environment) {
   try {
     profile.status = "starting";
     profile.owner = { pid: process.pid, token: randomBytes(32).toString("hex") };
-    let queue = Promise.resolve();
     control = createServer(async (req, res) => {
       if (req.method !== "POST" || req.headers.authorization !== `Bearer ${profile.owner?.token}`)
         return res.writeHead(403).end();
@@ -159,6 +188,10 @@ export async function launch(options, environment) {
     profile.owner.controlPort = control.address().port;
     persist();
     const upstream = await upstreamRelay(environment.ROBINHOOD_MAINNET);
+    if (stopping) {
+      upstream.server.close();
+      throw new Error("Startup interrupted.");
+    }
     relays.push(upstream);
     if (Number(BigInt(await rpc(upstream.url, "eth_chainId"))) !== 4663)
       throw new Error("ROBINHOOD_MAINNET is not chain 4663.");
@@ -177,6 +210,17 @@ export async function launch(options, environment) {
         ])) === "0x"
       )
         throw new Error("Snapshot has no Genesis vault code.");
+      const { encodeFunctionData, parseAbi } = await import("viem");
+      await rpc(upstream.url, "eth_call", [
+        {
+          to: genesis.contracts.vault.address,
+          data: encodeFunctionData({
+            abi: parseAbi(["function totalOutstandingGenesisCredit() view returns (uint256)"]),
+            functionName: "totalOutstandingGenesisCredit",
+          }),
+        },
+        block.number,
+      ]);
       profile.snapshot = { number: String(BigInt(block.number)), hash: block.hash };
       persist();
     } else if (!existsSync(resolve(path, "state.json")))
@@ -212,10 +256,23 @@ export async function launch(options, environment) {
         resolve(path, "anvil-cache"),
         "--silent",
       ],
-      { cwd: path, env: childEnvironment(), log: resolve(path, "anvil.log"), children }
+      {
+        cwd: path,
+        env: childEnvironment(),
+        log: resolve(path, "anvil.log"),
+        children,
+        abortable: false,
+      }
     );
     await waitRpc(urls(profile).rpc, anvil);
     await verifyAnvil(profile);
+    if (
+      profile.savedStateBlock &&
+      BigInt(await rpc(urls(profile).rpc, "eth_blockNumber")) < BigInt(profile.savedStateBlock)
+    )
+      throw new Error(
+        "Saved Anvil state is older than its confirmed checkpoint; preserve it for recovery."
+      );
     if (stopping) throw new Error("Startup interrupted.");
     await deploy(profile, path, children);
     if (!profile.stages.finalize) {
@@ -256,6 +313,10 @@ export async function launch(options, environment) {
       snapshotHash: profile.snapshot.hash,
       cacheDirectory: resolve(path, "history-cache"),
     });
+    if (stopping) {
+      history.server.close();
+      throw new Error("Startup interrupted.");
+    }
     relays.push(history);
     const indexed = await startIndexer(profile, path, history.url, children);
     await startApp(profile, path, indexed.launch, indexed.phaseOne, children);
@@ -272,8 +333,10 @@ export async function launch(options, environment) {
           void stop();
         }
       });
+    startupDoneResolve();
     await stopped;
   } finally {
+    startupDoneResolve();
     await stop();
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);

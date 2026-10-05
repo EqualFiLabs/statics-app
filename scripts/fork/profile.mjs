@@ -114,7 +114,18 @@ export function provenance(protocol, root = appRoot) {
   }
   const changed = execFileSync(
     "git",
-    ["diff", "HEAD", "--", "src", "script", "lib", "foundry.toml"],
+    [
+      "diff",
+      "HEAD",
+      "--",
+      "src",
+      "script",
+      "lib",
+      "foundry.toml",
+      "remappings.txt",
+      "deployments/robinhood-chain-4663.json",
+      "deployments/robinhood-mainnet-genesis.json",
+    ],
     { cwd: protocol, encoding: "utf8" }
   );
   if (changed)
@@ -124,6 +135,12 @@ export function provenance(protocol, root = appRoot) {
   const sdk = json(resolve(root, "vendor/statics-sdk/provenance.json"));
   if (sdk.phaseOneSource?.commit !== sdkCommit)
     throw new Error("Vendored SDK is incompatible; do not synchronize it automatically.");
+  for (const [file, expected] of Object.entries(sdk.checksums)) {
+    if (digest(readFileSync(resolve(root, "vendor/statics-sdk", file))) !== expected)
+      throw new Error(
+        `Vendored SDK checksum mismatch: ${file}. Preserve changes; do not synchronize automatically.`
+      );
+  }
   return {
     protocol: revision,
     sdk,
@@ -188,6 +205,10 @@ export function compatible(profile, options, environment, source) {
   ])
     if (environment[name] && environment[name] !== value)
       throw new Error(`Saved profile conflicts with ${name}.`);
+  if (profile.status === "uncertain-stop")
+    throw new Error(
+      "Anvil final state save is uncertain; preserve state and receipts for recovery. Refusing automatic resume."
+    );
   if (profile.controlMutation)
     throw new Error(
       "Uncertain local control: preserve receipts and state; inspect the transaction outcome before recovery. Nothing was repeated."

@@ -55,7 +55,8 @@ test("funding sends exact transfers and wrap amounts, and insufficiency sends no
     for await (const c of req) b += c;
     const q = JSON.parse(b);
     let result;
-    if (q.method === "anvil_dumpState") result = "0x7b7d";
+    if (q.method === "anvil_dumpState")
+      result = `0x${Buffer.from(JSON.stringify({ best_block_number: 101 })).toString("hex")}`;
     else if (q.method === "web3_clientVersion") result = "anvil";
     else if (q.method === "anvil_nodeInfo") result = { forkConfig: { forkBlockNumber: 100 } };
     else if (q.method === "eth_chainId") result = "0x1237";
@@ -132,8 +133,12 @@ test("funding sends exact transfers and wrap amounts, and insufficiency sends no
       })
     );
     assert.ok(profile.receipts.every((row) => row.status === "success"));
+    assert.equal(profile.controlMutation, undefined);
     balance = 0n;
     await assert.rejects(() => applyControl(command, profile, path), /insufficient/);
+    assert.equal(transactions.length, 4);
+    profile.controlMutation = { action: "fund-wallet", status: "started" };
+    await assert.rejects(() => applyControl(command, profile, path), /Uncertain previous control/);
     assert.equal(transactions.length, 4);
   } finally {
     s.close();

@@ -46,9 +46,28 @@ export async function testFork(options, environment, args) {
     { cwd: appRoot, env: environment, stdio: "inherit" }
   );
   let profile;
+  const children = new Set(),
+    controller = new AbortController();
+  children.signal = controller.signal;
+  let stopping;
+  const teardown = () =>
+    (stopping ??= (async () => {
+      controller.abort();
+      for (const child of [...children]) await stopChild(child);
+      if (profile?.owner)
+        try {
+          await callSession(profile, "stop");
+        } catch {
+          /* stop known child below */
+        }
+      await stopChild(supervisor);
+    })());
+  process.once("SIGINT", teardown);
+  process.once("SIGTERM", teardown);
   try {
     for (let attempt = 0; attempt < 5400; attempt++) {
-      if (supervisor.exitCode !== null)
+      controller.signal.throwIfAborted();
+      if (supervisor.exitCode !== null || supervisor.signalCode !== null)
         throw new Error("Isolated test profile failed during startup; artifacts preserved.");
       if (existsSync(resolve(path, "profile.json"))) {
         profile = json(resolve(path, "profile.json"));
@@ -58,7 +77,6 @@ export async function testFork(options, environment, args) {
     }
     if (profile?.status !== "ready") throw new Error("Isolated test profile did not become ready.");
     await callSession(profile, "status");
-    const children = new Set();
     await run(
       process.execPath,
       [
@@ -92,12 +110,8 @@ export async function testFork(options, environment, args) {
     });
     console.log(`Isolated tests completed; artifacts: ${path}`);
   } finally {
-    if (profile?.owner)
-      try {
-        await callSession(profile, "stop");
-      } catch {
-        /* owned supervisor below */
-      }
-    await stopChild(supervisor);
+    await teardown();
+    process.removeListener("SIGINT", teardown);
+    process.removeListener("SIGTERM", teardown);
   }
 }

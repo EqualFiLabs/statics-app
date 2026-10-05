@@ -9,6 +9,8 @@ export function controlCommand(action, args) {
   return parseLaunchForkControl(action, args);
 }
 export async function applyControl(command, profile, path) {
+  if (profile.controlMutation)
+    throw new Error("Uncertain previous control; inspect receipts before any further mutation.");
   await verifyAnvil(profile);
   const context = transactionContext(profile),
     { client, wallet, url } = context;
@@ -97,6 +99,9 @@ export async function applyControl(command, profile, path) {
       profile,
       path
     );
+  await checkpoint(profile, path);
+  delete profile.controlMutation;
+  save(resolve(path, "profile.json"), profile);
   return { wallet: command.wallet, eth: command.eth, weth: command.weth, statics: command.statics };
 }
 export async function lightweightStatus(profile) {
@@ -106,7 +111,12 @@ export async function lightweightStatus(profile) {
     status: profile.status,
     chainId: profile.chainId,
     snapshot: profile.snapshot,
-    provenance: profile.provenance,
+    revisions: {
+      app: profile.appRevision,
+      protocol: profile.provenance.protocol,
+      sdk: profile.provenance.sdk.phaseOneSource.commit,
+      sdkProvenance: profile.provenance.sdkDigest,
+    },
     urls: local,
     stages: profile.stages,
   };

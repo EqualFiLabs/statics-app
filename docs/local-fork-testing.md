@@ -63,7 +63,7 @@ npm run fork:stop -- --profile contributor
 npm run dev:fork -- --profile contributor
 ```
 
-Ctrl-C also saves and stops the profile. Snapshot or deployment interruptions are retained in the stage journal. An uncertain stage is not automatically retried: inspect receipts and Forge broadcasts in that profile with a maintainer before attempting recovery. Use a differently named profile for a fresh setup; preserve the old profile rather than deleting it.
+Ctrl-C also saves and stops the profile. Shutdown checkpoints the chain before terminating Anvil. An interrupted or forced final state save is marked uncertain and cannot be resumed automatically. Snapshot or deployment interruptions are retained in the stage journal. An uncertain stage is not automatically retried: inspect receipts and Forge broadcasts in that profile with a maintainer before attempting recovery. Use a differently named profile for a fresh setup; preserve the old profile rather than deleting it.
 
 When indexer sources change, a new database and project directory are created within the profile. Previous databases remain recoverable. Cached historical RPC results are scoped by snapshot block/hash.
 

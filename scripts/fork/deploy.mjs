@@ -28,6 +28,7 @@ export function transactionContext(profile) {
   return { client, account, wallet, url };
 }
 export async function confirmed(context, sender, transaction, profile, path) {
+  profile.signal?.throwIfAborted();
   const hash = await sender.sendTransaction({
     ...transaction,
     chain: null,
@@ -54,14 +55,18 @@ export async function checkpoint(profile, path) {
   const encoded = await rpc(urls(profile).rpc, "anvil_dumpState", [true]);
   let buffer = Buffer.from(encoded.slice(2), "hex");
   if (buffer[0] === 31 && buffer[1] === 139) buffer = gunzipSync(buffer);
-  save(resolve(path, "state.json"), JSON.parse(buffer.toString("utf8")));
+  const state = JSON.parse(buffer.toString("utf8"));
+  save(resolve(path, "state.json"), state);
+  profile.savedStateBlock = String(state.best_block_number);
 }
 export async function stage(profile, path, name, operation) {
+  profile.signal?.throwIfAborted();
   if (profile.stages[name]?.status === "complete") return;
   profile.stages[name] = { status: "started", startedAt: new Date().toISOString() };
   save(resolve(path, "profile.json"), profile);
   console.log(`Fork stage: ${name}`);
   await operation();
+  profile.signal?.throwIfAborted();
   await checkpoint(profile, path);
   profile.stages[name].status = "complete";
   save(resolve(path, "profile.json"), profile);

@@ -107,9 +107,7 @@ export async function startForkHistoryRpc({
     if (!response.ok) throw new Error(`${target} RPC HTTP ${response.status} for ${method}.`);
     const data = await response.json();
     if (data.error) {
-      const error = new Error(
-        String(data.error.message).replace(/https?:\/\/[^\s"<>]+/g, "[RPC URL redacted]")
-      );
+      const error = new Error(`${target} RPC rejected ${method}.`);
       error.code = data.error.code;
       throw error;
     }

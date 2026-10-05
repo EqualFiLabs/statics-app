@@ -64,12 +64,14 @@ export async function upstreamRelay(upstream) {
   });
   return { server, url: `http://127.0.0.1:${server.address().port}` };
 }
-export function ownedProcess(command, args, { cwd, env, log, children }) {
+export function ownedProcess(command, args, { cwd, env, log, children, abortable = true }) {
+  children.signal?.throwIfAborted();
   const output = createWriteStream(log, { flags: "a", mode: 0o600 });
   const child = spawn(command, args, {
     cwd,
     env: env ?? childEnvironment(),
     stdio: ["ignore", "pipe", "pipe"],
+    signal: abortable ? children.signal : undefined,
   });
   children.add(child);
   for (const stream of [child.stdout, child.stderr])
@@ -77,34 +79,37 @@ export function ownedProcess(command, args, { cwd, env, log, children }) {
   child.on("error", () => {
     child.spawnFailed = true;
   });
+  child.logFinished = new Promise((r) => output.once("finish", r));
   child.once("close", () => {
     children.delete(child);
     output.end();
   });
   return child;
 }
-export async function stopChild(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
+export async function stopChild(child, timeout = 15000) {
+  if (child.exitCode !== null || child.signalCode !== null) return { forced: false };
   const finished = new Promise((r) => child.once("close", r));
   child.kill("SIGTERM");
-  await Promise.race([finished, sleep(15000)]);
+  await Promise.race([finished, sleep(timeout)]);
   if (child.exitCode === null && child.signalCode === null) {
     child.kill("SIGKILL");
     await finished;
+    return { forced: true };
   }
+  return { forced: false };
 }
 export async function run(command, args, options) {
   const child = ownedProcess(command, args, options);
   const code = await new Promise((r) => {
-    child.once("error", () => r(-1));
-    child.once("exit", r);
+    child.once("close", r);
   });
+  await child.logFinished;
   if (code !== 0)
     throw new Error(`${command} failed (${code}); inspect the profile log ${options.log}.`);
 }
 export async function waitRpc(url, child) {
   for (let i = 0; i < 240; i++) {
-    if (child.exitCode !== null || child.spawnFailed)
+    if (child.exitCode !== null || child.signalCode !== null || child.spawnFailed)
       throw new Error("Anvil exited before readiness; inspect its profile log.");
     try {
       if (await rpc(url, "anvil_nodeInfo")) return;
@@ -117,7 +122,7 @@ export async function waitRpc(url, child) {
 }
 export async function waitHttp(url, child, attempts = 600) {
   for (let i = 0; i < attempts; i++) {
-    if (child.exitCode !== null || child.spawnFailed)
+    if (child.exitCode !== null || child.signalCode !== null || child.spawnFailed)
       throw new Error("Component exited before readiness; inspect its profile log.");
     try {
       if ((await fetch(url, { signal: AbortSignal.timeout(2000) })).ok) return;
