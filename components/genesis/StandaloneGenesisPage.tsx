@@ -21,6 +21,7 @@ import {
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisCarousel } from "@/components/genesis/GenesisCarousel";
+import { GenesisBatchPanel } from "@/components/genesis/GenesisBatchPanel";
 import { GenesisCreditPanel } from "@/components/genesis/GenesisCreditPanel";
 import { GenesisIdentityPanel } from "@/components/genesis/GenesisIdentityPanel";
 import {
@@ -508,6 +509,8 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           {error}
         </p>
       )}
+
+      <GenesisBatchPanel deployment={deployment} items={items} onConfirmed={refresh} />
 
       <GenesisCarousel
         items={items.map((item) => ({

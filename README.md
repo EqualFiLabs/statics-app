@@ -47,6 +47,66 @@ against that manifest.
 - `/app/liquidity` — protocol pools and user LP positions.
 - `/app/activity` — wallet-scoped EVM, Solana, bridge, and protocol activity.
 
+## Atomic Operator batches
+
+The Genesis view includes bulk planning for activation, credit open/draw/extension/repayment,
+redemption, reward registration, and (on full protocol deployments) Position linking and
+unlinking. The planner produces ordered calls to verified deployment addresses. It adds exact
+temporary STATICS or Genesis approvals only when needed, checkpoints Position reward assets before
+multiplier changes, simulates the entire EIP-7702 delegated-EOA self-call, and checks the delegate
+code hash again before submission. It splits selections by estimated gas into atomic chunks; each
+chunk needs its own wallet confirmation and is rechecked against current protocol state. On
+Robinhood Chain 4663, an embedded Privy EOA can activate the pinned Calibur delegate through a
+reviewed, browser-funded temporary relayer, then use the verified ERC-7821 self-call. Funding and
+activation are separate confirmations; delegation remains until revoked. Recoverable relayer ETH
+is returned to the same wallet; a small balance below refund gas cost may remain. Keep the browser
+tab open through the refund. Other delegates,
+external wallets, and `wallet_sendCalls` remain
+gated until their transports pass separate live conformance. The app never falls back to sequential
+sends.
+
+The local Anvil fixture verifies a self-executing first EIP-7702 batch. The installed Privy React
+SDK's unified embedded-wallet path does not currently preserve the authorization list when signing
+that type-4 transaction, so live submission from that wallet is blocked before broadcast. The
+local conformance test exercises this case with a direct EOA signer. The app never replaces an
+existing wallet delegation. Fresh Privy EOAs
+use the browser-funded relayer in the production batch panel. It creates an ephemeral key in
+session storage, caps the funding quote at 0.00005 ETH, checks the signed authorization and type-4
+transaction, and offers recovery for an interrupted refund. Run `npm run test:browser-relay-fork`
+for a fresh-EOA activation and refund on a Robinhood fork. The older local server relayer below is
+restricted to one test wallet. Users retain individual action flows when bulk execution is
+unavailable.
+
+The local `/app/atomic-conformance` page supports a two-transaction test for the same Privy
+wallet against [Uniswap CaliburEntry v1.1.0](https://developers.uniswap.org/docs/protocols/smart-wallet/deployments)
+on Robinhood Chain: it signs a delegation authorization, a narrowly scoped local relayer activates
+that delegation, and the Privy wallet sends the ERC-7821 self-call. The page also exercises the
+browser-funded production activation path. Set the ignored local variables
+`STATICS_LOCAL_7702_RELAYER_PRIVATE_KEY` and `STATICS_LOCAL_7702_TEST_WALLET` to enable the
+relayer. The relayer can only activate the pinned Calibur code hash for that test wallet. This
+tests the embedded wallet after activation; it does not establish that Privy can sign a
+self-executing first type-4 batch. The deployed test fixture has no `receive` function, so an
+ordinary ETH transfer to a wallet delegated to that older fixture reverts. The page offers a
+reviewed wallet-signed revocation through the same local relayer. Do not add that older fixture's
+code hash to the production batch allowlist. Run `npm run test:calibur-readonly` to check Calibur's
+current Robinhood code hash, owner-context batch simulation, ETH receipt, and reverting child call
+without sending a transaction. Run `npm run test:operator-readonly` to simulate the checked-in
+Robinhood Genesis deployment's two-Operator activation through Calibur, including exact temporary
+STATICS approval and its reset. This uses live state with `eth_call`; the selected Operators are
+not changed on chain. Live Privy conformance on chain 4663 confirmed Calibur activation
+([type-4 transaction](https://robinhoodchain.blockscout.com/tx/0x62cbb587dfd9a1d473aed3f4538569ec98cc31d74268dc61a19ff00607b7547d)),
+the owner's atomic self-call with 1 wei and a temporary approval reset, and a deliberately
+reverted batch that left the probe count and allowance unchanged
+([rollback transaction](https://robinhoodchain.blockscout.com/tx/0x1fa7da6335361b2af265d157e1bd37062a21aa642dac9711d669179a0d6b259b)).
+The fresh-wallet browser-funded activation and refund also passed on chain
+([activation](https://robinhoodchain.blockscout.com/tx/0x193187c9a781682c264f40b95b9006258f6ca0c1db6872802577fa6a1945baad),
+[refund](https://robinhoodchain.blockscout.com/tx/0xf51379d8e8b615081218ad5fb83a4259b400d8cbb0187b8800580d8c36b47000)).
+
+Run `npm run test:atomic-conformance` with Foundry installed to verify downstream `msg.sender`,
+per-call native value, approval visibility and revocation, complete rollback when a later call
+reverts, and first-transaction 7702 authorization from a fresh EOA. Other wallet transports still
+need the wallet-specific mainnet checks in issue #79 before being enabled.
+
 ## Requirements
 
 - Node.js `22.13.0` or newer

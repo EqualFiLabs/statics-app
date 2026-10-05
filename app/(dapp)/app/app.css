@@ -7159,6 +7159,51 @@
   font-size: var(--text-sm);
 }
 
+.genesis-batch-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.genesis-browser-relay {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+}
+
+.genesis-browser-relay h4,
+.genesis-browser-relay p {
+  margin: 0;
+}
+
+.genesis-batch-selection label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+
+.genesis-batch-review {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.genesis-batch-review p,
+.genesis-batch-review ol {
+  margin: 0;
+}
+
+.genesis-batch-review ol {
+  padding-left: 1.4rem;
+}
+
 /* ---- Tier ladder ------------------------------------------------------ */
 
 .genesis-ladder {

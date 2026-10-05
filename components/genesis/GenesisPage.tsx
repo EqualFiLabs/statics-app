@@ -17,6 +17,7 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
+import { ProtocolGenesisBatchPanel } from "@/components/genesis/ProtocolGenesisBatchPanel";
 import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { loadWalletGenesis } from "@/lib/indexer/statics";
 import { loadPositionCatalog } from "@/lib/positions/positions";
@@ -247,6 +248,14 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
           {error}
         </div>
       )}
+      <ProtocolGenesisBatchPanel
+        deployment={deployment}
+        operators={portfolio.data.genesis}
+        positions={availablePositions}
+        onConfirmed={async () => {
+          await portfolio.refetch();
+        }}
+      />
       <div className="genesis-grid">
         {portfolio.data.genesis.map(({ id, state }) => {
           const currentTier = Number(state.tier);
