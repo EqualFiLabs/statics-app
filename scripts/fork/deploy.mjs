@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { gunzipSync } from "node:zlib";
+import { saveDump } from "./state.mjs";
 import {
   createPublicClient,
   createWalletClient,
@@ -52,12 +52,7 @@ export async function confirmed(context, sender, transaction, profile, path) {
   return receipt;
 }
 export async function checkpoint(profile, path) {
-  const encoded = await rpc(urls(profile).rpc, "anvil_dumpState", [true]);
-  let buffer = Buffer.from(encoded.slice(2), "hex");
-  if (buffer[0] === 31 && buffer[1] === 139) buffer = gunzipSync(buffer);
-  const state = JSON.parse(buffer.toString("utf8"));
-  save(resolve(path, "state.json"), state);
-  profile.savedStateBlock = String(state.best_block_number);
+  profile.savedStateBlock = await saveDump(urls(profile).rpc, resolve(path, "state.json"));
 }
 export async function stage(profile, path, name, operation) {
   profile.signal?.throwIfAborted();

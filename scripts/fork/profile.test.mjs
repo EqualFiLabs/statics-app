@@ -226,3 +226,39 @@ test("handler renames invalidate indexer replay and uncertain final saves block 
   p.controlMutation = { status: "started" };
   assert.throws(() => compatible(p, {}, {}, source), /Nothing was repeated/);
 });
+
+test("terminal interrupt leaves isolated Anvil child alive until supervisor cleanup", async () => {
+  const { spawn } = await import("node:child_process");
+  const { pathToFileURL } = await import("node:url");
+  const { writeFile } = await import("node:fs/promises");
+  const path = resolve(await directory());
+  const script = resolve(path, "supervisor.mjs"),
+    report = resolve(path, "interrupt.json");
+  await writeFile(
+    script,
+    `
+    import { ownedProcess, stopChild } from ${JSON.stringify(pathToFileURL(resolve("scripts/fork/processes.mjs")).href)};
+    import { writeFileSync } from 'node:fs';
+    const children = new Set();
+    const child = ownedProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      cwd: ${JSON.stringify(path)}, log: ${JSON.stringify(resolve(path, "child.log"))}, children,
+      abortable: false, detached: true
+    });
+    process.once('SIGINT', async () => {
+      await new Promise(r => setTimeout(r, 100));
+      writeFileSync(${JSON.stringify(report)}, JSON.stringify({ aliveBeforeCheckpoint: child.exitCode === null && child.signalCode === null }));
+      await stopChild(child);
+    });
+    child.once('spawn', () => console.log('ready'));
+  `
+  );
+  const supervisor = spawn(process.execPath, [script], {
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const closed = new Promise((r) => supervisor.once("close", r));
+  await new Promise((r) => supervisor.stdout.once("data", r));
+  process.kill(-supervisor.pid, "SIGINT");
+  await closed;
+  assert.equal(JSON.parse(await readFile(report)).aliveBeforeCheckpoint, true);
+});

@@ -4,8 +4,7 @@ import { verifyState } from "./verify-state.mjs";
 import { appRoot, childEnvironment, save, urls } from "./profile.mjs";
 import { run } from "./processes.mjs";
 
-export async function browserChecks(profile, path) {
-  const children = new Set();
+export async function browserChecks(profile, path, children = new Set()) {
   await run(
     process.execPath,
     [

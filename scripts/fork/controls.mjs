@@ -9,6 +9,7 @@ export function controlCommand(action, args) {
   return parseLaunchForkControl(action, args);
 }
 export async function applyControl(command, profile, path) {
+  profile.signal?.throwIfAborted();
   if (profile.controlMutation)
     throw new Error("Uncertain previous control; inspect receipts before any further mutation.");
   await verifyAnvil(profile);
@@ -18,6 +19,7 @@ export async function applyControl(command, profile, path) {
     profile.controlMutation = { action: command.action, status: "started" };
     save(resolve(path, "profile.json"), profile);
     const before = await client.getBlock();
+    profile.signal?.throwIfAborted();
     await rpc(url, "evm_increaseTime", [command.seconds]);
     await rpc(url, "evm_mine");
     await checkpoint(profile, path);
@@ -50,6 +52,7 @@ export async function applyControl(command, profile, path) {
     amounts.eth + amounts.weth + parseEther("0.01")
   )
     throw new Error("Fixture ETH is insufficient including gas.");
+  profile.signal?.throwIfAborted();
   profile.controlMutation = { action: command.action, wallet: command.wallet, status: "started" };
   save(resolve(path, "profile.json"), profile);
   if (amounts.eth)

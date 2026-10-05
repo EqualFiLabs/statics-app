@@ -64,11 +64,16 @@ export async function upstreamRelay(upstream) {
   });
   return { server, url: `http://127.0.0.1:${server.address().port}` };
 }
-export function ownedProcess(command, args, { cwd, env, log, children, abortable = true }) {
+export function ownedProcess(
+  command,
+  args,
+  { cwd, env, log, children, abortable = true, detached = false }
+) {
   children.signal?.throwIfAborted();
   const output = createWriteStream(log, { flags: "a", mode: 0o600 });
   const child = spawn(command, args, {
     cwd,
+    detached,
     env: env ?? childEnvironment(),
     stdio: ["ignore", "pipe", "pipe"],
     signal: abortable ? children.signal : undefined,

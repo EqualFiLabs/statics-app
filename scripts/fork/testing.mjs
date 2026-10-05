@@ -60,7 +60,13 @@ export async function testFork(options, environment, args) {
         } catch {
           /* stop known child below */
         }
-      await stopChild(supervisor);
+      // The supervisor bounds its own writer/checkpoint/Anvil teardown. Do not
+      // SIGKILL it while its non-abortable Anvil is still saving historical state.
+      if (supervisor.exitCode === null && supervisor.signalCode === null) {
+        const closed = new Promise((r) => supervisor.once("close", r));
+        supervisor.kill("SIGTERM");
+        await closed;
+      }
     })());
   process.once("SIGINT", teardown);
   process.once("SIGTERM", teardown);
@@ -101,7 +107,7 @@ export async function testFork(options, environment, args) {
         children,
       }
     );
-    await browserChecks(profile, path);
+    await browserChecks(profile, path, children);
     save(resolve(path, "test-results.json"), {
       profile: name,
       lifecycle: "completed; inspect lifecycle-results.json for skips",

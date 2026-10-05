@@ -17,6 +17,7 @@ import {
   verifyAnvil,
 } from "./profile.mjs";
 import { ownedProcess, stopChild, upstreamRelay, waitRpc } from "./processes.mjs";
+import { savedStateBlock } from "./state.mjs";
 import { deploy, transactionContext, checkpoint } from "./deploy.mjs";
 import { startForkHistoryRpc } from "./history-rpc.mjs";
 import { startApp, startIndexer } from "./app.mjs";
@@ -109,6 +110,8 @@ export async function launch(options, environment) {
   const stop = async () => {
     if (stopping) return stopped;
     stopping = true;
+    profile.status = "stopping";
+    persist();
     controller.abort();
     control?.close();
     await startupDone;
@@ -125,7 +128,7 @@ export async function launch(options, environment) {
       if (outcome.forced) uncertainStop = true;
       try {
         if (
-          BigInt(json(resolve(path, "state.json")).best_block_number) <
+          BigInt(await savedStateBlock(resolve(path, "state.json"))) <
           BigInt(profile.savedStateBlock)
         )
           uncertainStop = true;
@@ -162,7 +165,7 @@ export async function launch(options, environment) {
           result = { stopping: true };
           setTimeout(() => void stop(), 100);
         } else if (request.action === "mutate") {
-          if (profile.status !== "ready")
+          if (stopping || controller.signal.aborted || profile.status !== "ready")
             throw new Error("Profile is still starting; mutations are unavailable.");
           const { validateLaunchForkCommand } = await import("../lib/launch-fork-control.mjs");
           const command = validateLaunchForkCommand(request.command);
@@ -262,6 +265,7 @@ export async function launch(options, environment) {
         log: resolve(path, "anvil.log"),
         children,
         abortable: false,
+        detached: true,
       }
     );
     await waitRpc(urls(profile).rpc, anvil);
@@ -280,7 +284,9 @@ export async function launch(options, environment) {
       profile.stages.finalize = { status: "complete" };
       persist();
     }
-    await rpc(urls(profile).rpc, "anvil_setIntervalMining", [1]);
+    // Retain transaction-driven automining without unbounded empty-block history.
+    await rpc(urls(profile).rpc, "anvil_setIntervalMining", [0]);
+    await rpc(urls(profile).rpc, "evm_setAutomine", [true]);
     if (profile.historyProbe) {
       const result = await rpc(urls(profile).rpc, "eth_call", [
         profile.historyProbe.call,

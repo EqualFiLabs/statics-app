@@ -53,7 +53,7 @@ npm run dev:fork -- --profile contributor --rpc-port 8665 --indexer-port 42072 -
 # npm run dev:fork -- --profile older --snapshot BLOCK_NUMBER --rpc-port 8666 --indexer-port 42073 --app-port 3003
 ```
 
-A new session records the current executable mainnet block and hash. Startup deploys Phase 1, advances its local governance timelocks, seeds a STATICS/WETH pool and funds fixture accounts. Genesis is inherited, never redeployed. Backfill starts at Genesis deployment; canonical market history starts at the snapshot. Readiness requires a caught-up indexer and a responding app. Large historical replay can take time; inspect block progress and the profile's `ponder.log`.
+A new session records the current executable mainnet block and hash. Startup deploys Phase 1, advances its local governance timelocks, seeds a STATICS/WETH pool and funds fixture accounts. Genesis is inherited, never redeployed. Backfill starts at Genesis deployment; canonical market history starts at the snapshot. Readiness requires a caught-up indexer and a responding app. The fork mines transactions immediately and does not mine idle blocks, keeping historical snapshots bounded by actual activity. Large historical replay can take time; inspect block progress and the profile's `ponder.log`.
 
 Keep the launcher running in its terminal. Rerunning the same command reuses a healthy owned session. Conflicting saved settings or occupied foreign ports fail without stopping anything. After graceful stop, the same command loads saved Anvil state and historical contract reads; completed deployment stages are not repeated.
 

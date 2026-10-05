@@ -56,7 +56,7 @@ test("funding sends exact transfers and wrap amounts, and insufficiency sends no
     const q = JSON.parse(b);
     let result;
     if (q.method === "anvil_dumpState")
-      result = `0x${Buffer.from(JSON.stringify({ best_block_number: 101 })).toString("hex")}`;
+      result = `0x${Buffer.from(JSON.stringify({ block: { number: "0x65" }, best_block_number: 101 })).toString("hex")}`;
     else if (q.method === "web3_clientVersion") result = "anvil";
     else if (q.method === "anvil_nodeInfo") result = { forkConfig: { forkBlockNumber: 100 } };
     else if (q.method === "eth_chainId") result = "0x1237";

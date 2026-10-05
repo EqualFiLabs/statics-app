@@ -1,6 +1,6 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { encodeFunctionData, decodeFunctionResult, toEventSelector, parseAbi } from "viem";
-import { appRoot, urls, verifyAnvil } from "./profile.mjs";
+import { urls, verifyAnvil } from "./profile.mjs";
 import assert from "node:assert/strict";
 import {
   staticsGenesisAbi,
@@ -11,8 +11,6 @@ import {
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
 export async function verifyState(profile, root) {
   await verifyAnvil(profile);
-  const app = appRoot;
-  void app;
   const indexer = urls(profile).indexer;
   const rpcUrl = urls(profile).rpc;
   const boundary = BigInt(profile.snapshot.number);
@@ -152,14 +150,27 @@ export async function verifyState(profile, root) {
       let pending = batch;
       const values = new Map();
       for (let attempt = 0; pending.length && attempt < 4; attempt++) {
-        const response = await fetch(rpcUrl, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(pending),
-          signal: AbortSignal.timeout(60000),
-        });
-        if (!response.ok) throw new Error(`Fork RPC HTTP ${response.status}`);
-        const data = await response.json();
+        let data;
+        try {
+          const response = await fetch(rpcUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(pending),
+            signal: AbortSignal.timeout(120000),
+          });
+          if (!response.ok) throw new Error("Fork RPC read transport failed.");
+          data = await response.json();
+        } catch {
+          if (attempt === 3)
+            throw new Error(
+              "Fork storage verification timed out after four read attempts; no state was changed."
+            );
+          console.log(
+            `Retrying ${pending.length} unavailable fork reads (attempt ${attempt + 2}/4).`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+          continue;
+        }
         assert.ok(Array.isArray(data), "Expected a JSON-RPC batch response.");
         const byId = new Map(data.map((row) => [row.id, row]));
         const retry = [];
