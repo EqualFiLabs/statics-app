@@ -190,8 +190,34 @@ describe("activeGenesisCreditMutation", () => {
     });
   });
 
-  it.each(["repaid", "recovered"] as const)("deletes a %s credit", (type) => {
-    expect(activeGenesisCreditMutation({ type, deploymentId, genesisId: 42n })).toEqual({
+  it("keeps a credit indexed through a draw and partial repayment", () => {
+    for (const [type, principal, blockNumber] of [
+      ["drawn", 150n, 8n],
+      ["repaid", 50n, 9n],
+    ] as const) {
+      expect(
+        activeGenesisCreditMutation({ type, deploymentId, genesisId: 42n, principal, blockNumber })
+      ).toEqual({
+        type: "update",
+        key: `${deploymentId}:42`,
+        values: { principal, updatedAtBlock: blockNumber },
+      });
+    }
+  });
+
+  it("deletes a credit only after full repayment or recovery", () => {
+    expect(
+      activeGenesisCreditMutation({
+        type: "repaid",
+        deploymentId,
+        genesisId: 42n,
+        principal: 0n,
+        blockNumber: 10n,
+      })
+    ).toEqual({ type: "delete", key: `${deploymentId}:42` });
+    expect(
+      activeGenesisCreditMutation({ type: "recovered", deploymentId, genesisId: 42n })
+    ).toEqual({
       type: "delete",
       key: `${deploymentId}:42`,
     });

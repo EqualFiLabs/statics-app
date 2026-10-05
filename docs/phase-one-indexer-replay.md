@@ -7,3 +7,5 @@ Correcting historical Phase 1 candles, allocation snapshots and reused managed l
 Owned positions retain the 100-item page limit. The response adds `nextCursor`; additional pages use ascending PositionNFT IDs, so callers request the cursor returned by the previous page.
 
 Genesis ownership also indexes the deployment's ERC-2309 `ConsecutiveTransfer` mints. Replaying from the Genesis deployment block is required to include treasury Operators that have never emitted an ordinary `Transfer`. Existing databases remain readable, but catching up from a recent fork block alone does not restore those initial owners. Replay into a separate database and validate owned IDs, wallet balances, activation state, outstanding credits and vault inventory before switching.
+
+The replay also restores principal changes from `GenesisCreditDrawn` and partial `GenesisCreditRepaid` events. Partial repayments keep the credit active; only repayment to zero or recovery removes it. Verify indexed credit principal against the fork's credit records and aggregate outstanding-credit total.

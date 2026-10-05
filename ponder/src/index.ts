@@ -175,14 +175,32 @@ ponder.on("GenesisVault:GenesisCreditExtended", async ({ event, context }) => {
   }
 });
 
+ponder.on("GenesisVault:GenesisCreditDrawn", async ({ event, context }) => {
+  const mutation = activeGenesisCreditMutation({
+    type: "drawn",
+    deploymentId,
+    genesisId: event.args.genesisId,
+    principal: event.args.newPrincipal,
+    blockNumber: event.block.number,
+  });
+  if (mutation.type === "update") {
+    await context.db.update(activeGenesisCredit, { key: mutation.key }).set(mutation.values);
+  }
+});
+
 ponder.on("GenesisVault:GenesisCreditRepaid", async ({ event, context }) => {
   const mutation = activeGenesisCreditMutation({
     type: "repaid",
     deploymentId,
     genesisId: event.args.genesisId,
+    principal: event.args.remainingPrincipal,
+    blockNumber: event.block.number,
   });
-  if (mutation.type === "delete")
+  if (mutation.type === "delete") {
     await context.db.delete(activeGenesisCredit, { key: mutation.key });
+  } else if (mutation.type === "update") {
+    await context.db.update(activeGenesisCredit, { key: mutation.key }).set(mutation.values);
+  }
 });
 
 ponder.on("GenesisVault:GenesisCreditRecovered", async ({ event, context }) => {
