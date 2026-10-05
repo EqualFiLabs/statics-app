@@ -171,6 +171,31 @@ async function createPosition() {
   expect(event).toBeDefined();
   return event!.args.positionId;
 }
+async function ensureFixtureStatics(minimum: bigint) {
+  let balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
+    account.address,
+  ]);
+  for (let attempt = 0; balance < minimum && attempt < 8; attempt++) {
+    const route = selectSwapRoute(option, forkChain.id, eth, statics);
+    if (route.kind !== "direct") throw new Error("Expected configured Genesis funding route.");
+    const amountIn = parseEther(String(2 ** attempt));
+    const quoted = await quoteDirectSwap(client, route, amountIn, account.address);
+    const tx = buildV4ExactInputSingleSwap({
+      router: route.router,
+      poolKey: route.poolKey,
+      zeroForOne: route.zeroForOne,
+      amountIn,
+      amountOutMinimum: (quoted * 99n) / 100n,
+      deadline: await publicLiquidityDeadline(client),
+      settlement: route.settlement,
+    });
+    await send(tx.target, tx.calldata, tx.value);
+    balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
+      account.address,
+    ]);
+  }
+  expect(balance).toBeGreaterThanOrEqual(minimum);
+}
 beforeAll(async () => {
   if (process.env.STATICS_FORK_PROFILE_ID) {
     const profile = JSON.parse(readFileSync(resolve(root, "profile.json"), "utf8"));
@@ -192,26 +217,7 @@ beforeAll(async () => {
     method: "anvil_setBalance" as never,
     params: [account.address, "0x3635c9adc5dea00000"] as never,
   });
-  // Repeated rehearsals consume activation fees. Replenish through the real Genesis swap path.
-  const balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
-    account.address,
-  ]);
-  if (balance < parseEther("100000")) {
-    const route = selectSwapRoute(option, forkChain.id, eth, statics);
-    if (route.kind !== "direct") throw new Error("Expected configured Genesis funding route.");
-    const amountIn = parseEther("1");
-    const quoted = await quoteDirectSwap(client, route, amountIn, account.address);
-    const tx = buildV4ExactInputSingleSwap({
-      router: route.router,
-      poolKey: route.poolKey,
-      zeroForOne: route.zeroForOne,
-      amountIn,
-      amountOutMinimum: (quoted * 99n) / 100n,
-      deadline: await publicLiquidityDeadline(client),
-      settlement: route.settlement,
-    });
-    await send(tx.target, tx.calldata, tx.value);
-  }
+  await ensureFixtureStatics(parseEther("100000"));
 });
 
 it("executes Genesis and Phase 1 native input/output swaps using the configured pool routes", async () => {
@@ -515,11 +521,19 @@ it("preserves Operator acquisition, activation, rewards, redemption and closed-e
       break;
   }
   expect(id).toBeLessThanOrEqual(5555n);
-  const quote = await read<{ requiredNative: bigint; epochActive: boolean }>(
+  const quote = await read<{ staticsPrice: bigint; requiredNative: bigint; epochActive: boolean }>(
     launch.contracts.vault,
     currentGenesisVaultAbi,
     "quoteGenesisPurchase"
   );
+  const activationCost = await read<bigint>(
+    launch.contracts.activationRegistry,
+    genesisActivationRegistryAbi,
+    "tierCost",
+    [1]
+  );
+  // Earlier groups and the Operator purchase consume the same fixture balance.
+  await ensureFixtureStatics((resume ? 0n : quote.staticsPrice) + activationCost);
   if (!resume) {
     await approve(launch.contracts.statics, launch.contracts.vault);
     const buy = buildBuyGenesisTransaction(id, account.address, quote.requiredNative);

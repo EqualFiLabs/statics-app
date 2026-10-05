@@ -32,13 +32,20 @@ export async function verifyState(profile, root) {
     if (!response.ok) throw new Error(`Indexer ${path}: HTTP ${response.status}`);
     return response.json();
   }
-  const checkpoint = (await api("/status")).active;
-  assert.equal(checkpoint.id, 4663);
-  const anchor = BigInt(checkpoint.block.number);
+  const headBlock = await verificationAnchor(rpc, api);
+  const anchor = BigInt(headBlock.number),
+    head = anchor;
   assert.ok(anchor > boundary, "Backfill must have reached local fork history before acceptance.");
-  const blockTag = `0x${anchor.toString(16)}`;
-  const head = BigInt(await rpc("eth_blockNumber", []));
-  assert.ok(head >= anchor && head - anchor <= 100n, "Indexer must be near current fork head.");
+  const blockTag = headBlock.number;
+  async function unchangedHead() {
+    const current = await rpc("eth_getBlockByNumber", ["latest", false]);
+    assert.equal(
+      current.hash,
+      headBlock.hash,
+      "Fork head changed during verification; retry once activity stops."
+    );
+    assert.equal(current.number, headBlock.number, "Fork head changed during verification.");
+  }
   const logs = new Map();
   for (const file of await readdir(`${root}/history-cache`)) {
     if (!file.endsWith(".json")) continue;
@@ -145,7 +152,9 @@ export async function verifyState(profile, root) {
         jsonrpc: "2.0",
         id: index,
         method: "eth_call",
-        params: [{ to: request.address, data: encodeFunctionData(request) }, blockTag],
+        // Latest is safe only at the exact caught-up checkpoint, guarded after
+        // every batch. Avoid Anvil historical-state locks during cold fork reads.
+        params: [{ to: request.address, data: encodeFunctionData(request) }, "latest"],
       }));
       let pending = batch;
       const values = new Map();
@@ -202,6 +211,7 @@ export async function verifyState(profile, root) {
         }
       }
       assert.equal(values.size, batch.length);
+      await unchangedHead();
       for (const request of batch) results.push(values.get(request.id));
     }
     return results;
@@ -342,6 +352,7 @@ export async function verifyState(profile, root) {
     },
   ]);
   assert.equal(available, true, "Indexer inventory candidate must actually be available.");
+  await unchangedHead();
   const report = {
     indexer,
     indexedBlock: String(anchor),
@@ -365,4 +376,24 @@ export async function verifyState(profile, root) {
   };
   await writeFile(`${root}/genesis-backfill-verification.json`, JSON.stringify(report, null, 2));
   return report;
+}
+
+export async function verificationAnchor(
+  rpc,
+  api,
+  attempts = 120,
+  pause = () => new Promise((r) => setTimeout(r, 1000))
+) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const block = await rpc("eth_getBlockByNumber", ["latest", false]);
+    const checkpoint = (await api("/status")).active;
+    assert.equal(checkpoint.id, 4663);
+    if (BigInt(checkpoint.block.number) === BigInt(block.number)) return block;
+    if (attempt % 15 === 0)
+      console.log(
+        `Verification waiting for checkpoint ${checkpoint.block.number} / ${BigInt(block.number)}`
+      );
+    await pause();
+  }
+  throw new Error("Indexer has not reached the fixed current fork head; no state was changed.");
 }

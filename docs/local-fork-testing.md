@@ -86,7 +86,7 @@ ETH funding **adds** the requested amount through a confirmed local transfer. WE
 npm run verify:fork -- --profile contributor
 ```
 
-Default verification reads full indexed/onchain Operator ownership, activation and reward-registration state, active credits, aggregate principal and vault inventory. It runs the three configured disconnected browser checks with both manifests. It does not submit transactions, pause mining or advance time. Its state comparisons are pinned to the indexer's checkpoint; results and browser artifacts stay in the profile.
+Default verification reads full indexed/onchain Operator ownership, activation and reward-registration state, active credits, aggregate principal and vault inventory. It runs the three configured disconnected browser checks with both manifests. It does not submit transactions, pause mining or advance time. Its state comparisons wait for the indexer's checkpoint to equal the current fork head and abort if that head changes; results and browser artifacts stay in the profile.
 
 Wallet sign-in and authenticated signing remain manual and must be reported separately. The local market overview's `/api/market/spot` can return **503** because it selects production analytics configuration; this separate application issue is outside the tooling PR.
 
