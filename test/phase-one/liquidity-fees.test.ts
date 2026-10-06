@@ -5,9 +5,40 @@ import { readPublicLiquidityFees } from "@/lib/phase-one/liquidity";
 
 const diamond = "0x1111111111111111111111111111111111111111" as const;
 const poolId = `0x${"2".repeat(64)}` as const;
-const deployment = {
-  contracts: { stateView: diamond, positionManager: diamond },
-} as PhaseOneDeployment;
+const deployment: PhaseOneDeployment = {
+  kind: "phase-one",
+  descriptor: {
+    deploymentId: "fee-test",
+    label: "Fee test",
+    network: "anvil",
+    chainId: 4663,
+    stage: "phase-one",
+    capabilities: ["public-lp-positions"],
+    available: true,
+  },
+  deploymentStartBlock: 0n,
+  protocolCommit: "test",
+  sdkCommit: "test",
+  installedPhase: 1,
+  source: "development-fixture",
+  contracts: {
+    diamond,
+    timelock: diamond,
+    publicHook: diamond,
+    liquidityManager: diamond,
+    statics: diamond,
+    weth: diamond,
+    poolManager: diamond,
+    positionManager: diamond,
+    permit2: diamond,
+    quoter: diamond,
+    stateView: diamond,
+    universalRouter: diamond,
+  },
+  runtimeCodeHashes: {},
+  facets: [],
+  supportedPools: [],
+};
 describe("managed liquidity fee estimates", () => {
   it.each([0n, 1n << 128n])(
     "keeps token rounding and zero-fee assets accurate for growth %s",
