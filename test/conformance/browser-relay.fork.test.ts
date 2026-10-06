@@ -7,6 +7,8 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   activateCaliburWithBrowserRelay,
   quoteBrowserCaliburRelay,
+  quoteBrowserCaliburRevocation,
+  revokeCaliburWithBrowserRelay,
 } from "@/lib/genesis/browser-calibur-relay";
 import { ROBINHOOD_CALIBUR } from "@/lib/genesis/calibur";
 import { robinhoodMainnet } from "@/lib/wallet-config";
@@ -85,7 +87,7 @@ suite("browser funded Calibur activation on a Robinhood fork", () => {
 
   afterAll(() => anvil?.kill());
 
-  it("funds its own relayer, activates the original EOA, and refunds unused ETH", async () => {
+  it("activates and removes Calibur from the original EOA through the funded relay", async () => {
     const publicClient = createPublicClient({ chain: robinhoodMainnet, transport: http(rpcUrl) });
     const ownerClient = createWalletClient({
       account: owner,
@@ -113,5 +115,28 @@ suite("browser funded Calibur activation on a Robinhood fork", () => {
       (await publicClient.waitForTransactionReceipt({ hash: outcome.activationHash })).status
     ).toBe("success");
     expect(await publicClient.getBalance({ address: owner.address })).toBeGreaterThan(0n);
+
+    const review = await quoteBrowserCaliburRevocation(publicClient, owner.address);
+    expect(review.delegate).toBe(ROBINHOOD_CALIBUR);
+    const removal = await revokeCaliburWithBrowserRelay({
+      publicClient,
+      wallet: owner.address,
+      review,
+      relayRpcUrl: rpcUrl,
+      sendFunding: (to, value) => ownerClient.sendTransaction({ to, value }),
+      signAuthorization: (input) => ownerClient.signAuthorization(input),
+    });
+    expect(removal.relayer).toBe(quote.relayer);
+    expect(removal.revocationHash).toMatch(/^0x[0-9a-f]{64}$/);
+    const revocation = await publicClient.getTransaction({ hash: removal.revocationHash });
+    expect(revocation.type).toBe("eip7702");
+    expect(revocation.authorizationList?.[0]?.address).toBe(
+      "0x0000000000000000000000000000000000000000"
+    );
+    expect((await publicClient.getCode({ address: owner.address })) ?? "0x").toBe("0x");
+    await expect(quoteBrowserCaliburRevocation(publicClient, owner.address)).rejects.toThrow(
+      "not delegated"
+    );
+    expect(removal.refundHash).toMatch(/^0x[0-9a-f]{64}$/);
   }, 60_000);
 });

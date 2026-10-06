@@ -7,15 +7,22 @@ import {
   parseEther,
   parseTransaction,
   recoverTransactionAddress,
+  zeroAddress,
   type Address,
   type Hex,
   type PublicClient,
   type SignedAuthorization,
+  type TransactionSerializedEIP7702,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { recoverAuthorizationAddress } from "viem/utils";
 
-import { ROBINHOOD_CALIBUR, ROBINHOOD_CALIBUR_CODE_HASH } from "@/lib/genesis/calibur";
+import { delegationFromCode } from "@/lib/genesis/atomic-batch";
+import {
+  REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES,
+  ROBINHOOD_CALIBUR,
+  ROBINHOOD_CALIBUR_CODE_HASH,
+} from "@/lib/genesis/calibur";
 import { robinhoodMainnet } from "@/lib/wallet-config";
 
 const chainId = 4663;
@@ -40,8 +47,6 @@ async function relayerFees(publicClient: PublicClient) {
 
 type RelaySession = {
   privateKey: Hex;
-  fundingHash?: Hex;
-  activationHash?: Hex;
 };
 
 export type BrowserRelayQuote = Readonly<{
@@ -63,6 +68,29 @@ export type BrowserRelayRefund = Readonly<{
   refundHash?: Hex;
   remainingBalance: bigint;
 }>;
+
+export type BrowserRelayRevocationQuote = BrowserRelayQuote &
+  Readonly<{
+    accountCode: Hex;
+    delegate: Address;
+    delegateCodeHash: Hex;
+    walletNonce: number;
+  }>;
+
+export type BrowserRelayRevocationResult = Readonly<{
+  revocationHash: Hex;
+  refundHash?: Hex;
+  relayer: Address;
+  remainingBalance: bigint;
+  relayExecutionReverted: boolean;
+}>;
+
+type DelegationSigner = (
+  input: { contractAddress: Address; chainId: number; nonce: number; executor: Address },
+  options: { address: Address }
+) => Promise<SignedAuthorization>;
+
+type RelayFunding = (to: Address, value: bigint) => Promise<Hex>;
 
 function storageKey(wallet: Address): string {
   return `statics:calibur-browser-relay:${chainId}:${wallet.toLowerCase()}`;
@@ -119,11 +147,55 @@ async function assertCalibur(publicClient: PublicClient, wallet: Address, expect
   }
 }
 
-export async function quoteBrowserCaliburRelay(
-  publicClient: PublicClient,
-  wallet: Address
-): Promise<BrowserRelayQuote> {
-  await assertCalibur(publicClient, wallet, "0x");
+async function revocableCaliburState(publicClient: PublicClient, wallet: Address) {
+  const accountCode = (await publicClient.getCode({ address: wallet })) ?? "0x";
+  const delegate = delegationFromCode(accountCode);
+  if (!delegate || !REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES.some((known) => known === delegate)) {
+    throw new Error("This wallet is not delegated to a recognized Calibur implementation.");
+  }
+  const delegateCode = (await publicClient.getCode({ address: delegate })) ?? "0x";
+  return { accountCode, delegate, delegateCodeHash: keccak256(delegateCode) };
+}
+
+async function settledWalletNonce(publicClient: PublicClient, wallet: Address): Promise<number> {
+  const [latest, pending] = await Promise.all([
+    publicClient.getTransactionCount({ address: wallet, blockTag: "latest" }),
+    publicClient.getTransactionCount({ address: wallet, blockTag: "pending" }),
+  ]);
+  if (latest !== pending) {
+    throw new Error("This wallet has a pending transaction. Wait for it before reviewing removal.");
+  }
+  return latest;
+}
+
+export async function assertBrowserRelayTransaction(
+  raw: Hex,
+  target: Address,
+  walletNonce: number,
+  relayer: Address
+): Promise<void> {
+  const parsed = parseTransaction(raw);
+  if (
+    parsed.type !== "eip7702" ||
+    parsed.chainId !== chainId ||
+    !parsed.to ||
+    getAddress(parsed.to) !== relayer ||
+    (parsed.value ?? 0n) !== 0n ||
+    parsed.authorizationList?.length !== 1 ||
+    getAddress(parsed.authorizationList[0].address) !== target ||
+    parsed.authorizationList[0].chainId !== chainId ||
+    parsed.authorizationList[0].nonce !== walletNonce ||
+    getAddress(
+      await recoverTransactionAddress({
+        serializedTransaction: raw as TransactionSerializedEIP7702,
+      })
+    ) !== relayer
+  ) {
+    throw new Error("The browser relayer did not sign the expected type-4 transaction.");
+  }
+}
+
+async function relayQuote(publicClient: PublicClient, wallet: Address): Promise<BrowserRelayQuote> {
   const session = getSession(wallet);
   const relayer = privateKeyToAccount(session.privateKey).address;
   const [fees, existingBalance] = await Promise.all([
@@ -134,19 +206,38 @@ export async function quoteBrowserCaliburRelay(
   const required = (activationGas + refundGasReserve) * fees.maxFeePerGas;
   const fundingAmount = required > minimumFunding ? required : minimumFunding;
   if (fundingAmount > maximumFunding) {
-    throw new Error("Network fees are too high for the bounded Calibur activation flow.");
+    throw new Error("Network fees are too high for the bounded Calibur relay flow.");
   }
   return { relayer, fundingAmount, existingBalance, maximumActivationFee };
+}
+
+export async function quoteBrowserCaliburRelay(
+  publicClient: PublicClient,
+  wallet: Address
+): Promise<BrowserRelayQuote> {
+  await assertCalibur(publicClient, wallet, "0x");
+  return relayQuote(publicClient, wallet);
+}
+
+export async function quoteBrowserCaliburRevocation(
+  publicClient: PublicClient,
+  wallet: Address
+): Promise<BrowserRelayRevocationQuote> {
+  const [actualChainId, state, walletNonce] = await Promise.all([
+    publicClient.getChainId(),
+    revocableCaliburState(publicClient, wallet),
+    settledWalletNonce(publicClient, wallet),
+  ]);
+  if (actualChainId !== chainId) throw new Error("Connect Robinhood Chain 4663 for removal.");
+  const quote = await relayQuote(publicClient, wallet);
+  return { ...quote, ...state, walletNonce };
 }
 
 export async function activateCaliburWithBrowserRelay(args: {
   publicClient: PublicClient;
   wallet: Address;
-  sendFunding: (to: Address, value: bigint) => Promise<Hex>;
-  signAuthorization: (
-    input: { contractAddress: Address; chainId: number; nonce: number; executor: Address },
-    options: { address: Address }
-  ) => Promise<SignedAuthorization>;
+  sendFunding: RelayFunding;
+  signAuthorization: DelegationSigner;
   onProgress?: (message: string) => void;
   relayRpcUrl?: string;
 }): Promise<BrowserRelayResult> {
@@ -168,7 +259,6 @@ export async function activateCaliburWithBrowserRelay(args: {
     const value = quote.fundingAmount - quote.existingBalance;
     args.onProgress?.("Confirm the gas transfer to your temporary relayer in Privy.");
     const fundingHash = await args.sendFunding(account.address, value);
-    saveSession(wallet, { ...session, fundingHash });
     const receipt = await publicClient.waitForTransactionReceipt({
       hash: fundingHash,
       confirmations: 1,
@@ -228,20 +318,9 @@ export async function activateCaliburWithBrowserRelay(args: {
     maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
     authorizationList: [authorization],
   });
-  const parsed = parseTransaction(raw);
-  if (
-    parsed.type !== "eip7702" ||
-    parsed.authorizationList?.length !== 1 ||
-    getAddress(parsed.authorizationList[0].address) !== ROBINHOOD_CALIBUR ||
-    parsed.authorizationList[0].chainId !== chainId ||
-    parsed.authorizationList[0].nonce !== walletNonce ||
-    getAddress(await recoverTransactionAddress({ serializedTransaction: raw })) !== account.address
-  ) {
-    throw new Error("The browser relayer did not sign the expected type-4 transaction.");
-  }
+  await assertBrowserRelayTransaction(raw, ROBINHOOD_CALIBUR, walletNonce, account.address);
   args.onProgress?.("Broadcasting the Calibur activation and waiting for confirmation.");
   const activationHash = keccak256(raw);
-  saveSession(wallet, { ...session, activationHash });
   const broadcastHash = await broadcaster.sendRawTransaction({ serializedTransaction: raw });
   if (broadcastHash !== activationHash) {
     throw new Error("The RPC returned a different Calibur activation transaction hash.");
@@ -268,6 +347,160 @@ export async function activateCaliburWithBrowserRelay(args: {
     refundHash: refund?.refundHash,
     relayer: account.address,
     remainingBalance: await publicClient.getBalance({ address: account.address }),
+  };
+}
+
+async function assertRevocationReview(
+  publicClient: PublicClient,
+  wallet: Address,
+  review: BrowserRelayRevocationQuote,
+  expectedNonce: number
+): Promise<void> {
+  const [actualChainId, state, nonce] = await Promise.all([
+    publicClient.getChainId(),
+    revocableCaliburState(publicClient, wallet),
+    settledWalletNonce(publicClient, wallet),
+  ]);
+  if (
+    actualChainId !== chainId ||
+    state.accountCode.toLowerCase() !== review.accountCode.toLowerCase() ||
+    state.delegate !== review.delegate ||
+    state.delegateCodeHash !== review.delegateCodeHash ||
+    nonce !== expectedNonce
+  ) {
+    throw new Error(
+      "Wallet delegation, Calibur implementation, or nonce changed. Review removal again."
+    );
+  }
+}
+
+export async function revokeCaliburWithBrowserRelay(args: {
+  publicClient: PublicClient;
+  wallet: Address;
+  review: BrowserRelayRevocationQuote;
+  sendFunding: RelayFunding;
+  signAuthorization: DelegationSigner;
+  onProgress?: (message: string) => void;
+  relayRpcUrl?: string;
+}): Promise<BrowserRelayRevocationResult> {
+  const { publicClient, wallet, review } = args;
+  const current = await quoteBrowserCaliburRevocation(publicClient, wallet);
+  if (
+    current.relayer !== review.relayer ||
+    current.fundingAmount > review.fundingAmount ||
+    current.accountCode.toLowerCase() !== review.accountCode.toLowerCase() ||
+    current.delegate !== review.delegate ||
+    current.delegateCodeHash !== review.delegateCodeHash ||
+    current.walletNonce !== review.walletNonce
+  ) {
+    throw new Error(
+      "Relayer, fees, wallet delegation, implementation, or nonce changed. Review removal again."
+    );
+  }
+  const session = getSession(wallet);
+  const account = privateKeyToAccount(session.privateKey);
+  if (account.address !== review.relayer) throw new Error("Temporary relayer changed.");
+  let expectedNonce = review.walletNonce;
+
+  if (current.existingBalance < current.fundingAmount) {
+    const value = current.fundingAmount - current.existingBalance;
+    args.onProgress?.("Confirm the gas transfer to your temporary relayer in Privy.");
+    const fundingHash = await args.sendFunding(account.address, value);
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: fundingHash,
+      confirmations: 1,
+    });
+    if (receipt.status !== "success") throw new Error(`Relayer funding reverted: ${fundingHash}`);
+    const funding = await publicClient.getTransaction({ hash: fundingHash });
+    if (
+      getAddress(funding.from) !== wallet ||
+      !funding.to ||
+      getAddress(funding.to) !== account.address ||
+      funding.value !== value ||
+      funding.nonce !== expectedNonce
+    ) {
+      throw new Error(`Funding transaction differed from the review: ${fundingHash}`);
+    }
+    expectedNonce += 1;
+  }
+
+  await assertRevocationReview(publicClient, wallet, review, expectedNonce);
+  const [relayerNonce, fees, relayerBalance] = await Promise.all([
+    publicClient.getTransactionCount({ address: account.address, blockTag: "pending" }),
+    relayerFees(publicClient),
+    publicClient.getBalance({ address: account.address }),
+  ]);
+  if (relayerBalance < activationGas * fees.maxFeePerGas) {
+    throw new Error("Temporary relayer balance is below the current maximum removal fee.");
+  }
+  args.onProgress?.("Sign removal of Calibur delegation in Privy.");
+  const authorization = await args.signAuthorization(
+    { contractAddress: zeroAddress, chainId, nonce: expectedNonce, executor: account.address },
+    { address: wallet }
+  );
+  if (
+    getAddress(await recoverAuthorizationAddress({ authorization })) !== wallet ||
+    getAddress(authorization.address) !== zeroAddress ||
+    authorization.chainId !== chainId ||
+    authorization.nonce !== expectedNonce
+  ) {
+    throw new Error("Privy signed a different wallet, chain, nonce, or removal target.");
+  }
+  await assertRevocationReview(publicClient, wallet, review, expectedNonce);
+
+  const walletClient = createWalletClient({
+    account,
+    chain: robinhoodMainnet,
+    transport: http(
+      args.relayRpcUrl ?? new URL(`/api/wallet-rpc/${chainId}`, window.location.origin).toString()
+    ),
+  });
+  const raw = await walletClient.signTransaction({
+    type: "eip7702",
+    chain: robinhoodMainnet,
+    account,
+    to: account.address,
+    value: 0n,
+    gas: activationGas,
+    nonce: relayerNonce,
+    maxFeePerGas: fees.maxFeePerGas,
+    maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+    authorizationList: [authorization],
+  });
+  await assertBrowserRelayTransaction(raw, zeroAddress, expectedNonce, account.address);
+  await assertRevocationReview(publicClient, wallet, review, expectedNonce);
+  args.onProgress?.("Broadcasting removal and waiting for confirmation.");
+  const revocationHash = keccak256(raw);
+  const broadcastHash = await walletRpc(args.relayRpcUrl).sendRawTransaction({
+    serializedTransaction: raw,
+  });
+  if (broadcastHash !== revocationHash) {
+    throw new Error("The RPC returned a different removal transaction hash.");
+  }
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: revocationHash,
+    confirmations: 1,
+  });
+  if (((await publicClient.getCode({ address: wallet })) ?? "0x") !== "0x") {
+    throw new Error(`Calibur removal did not clear the wallet delegation: ${revocationHash}`);
+  }
+  if (receipt.status !== "success") {
+    args.onProgress?.("Delegation cleared, although relay transaction execution reverted.");
+  }
+
+  let refund: BrowserRelayRefund | null = null;
+  try {
+    args.onProgress?.("Returning unused relay ETH to your wallet.");
+    refund = await refundBrowserRelay(publicClient, wallet, args.relayRpcUrl);
+  } catch {
+    // Removal succeeded. Keep the session so the user can recover the refund.
+  }
+  return {
+    revocationHash,
+    refundHash: refund?.refundHash,
+    relayer: account.address,
+    remainingBalance: await publicClient.getBalance({ address: account.address }),
+    relayExecutionReverted: receipt.status !== "success",
   };
 }
 
