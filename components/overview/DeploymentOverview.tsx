@@ -23,7 +23,7 @@ import {
   ownedGenesisQueryKey,
   summariseGenesisRewards,
 } from "@/lib/genesis/owned";
-import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
+import { formatRewardAmount, formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { loadMarketOverview } from "@/lib/market/client";
 import type { StaticsMarketOverview } from "@/lib/market/types";
 import { ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
@@ -449,9 +449,9 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           <div className="ui-stat">
             <span className="ui-stat__label">{t("claimable")}</span>
             <strong className="ui-stat__value is-accent">
-              {formatTokenAmountGrouped(rewards.claimableStatics, 18, 2)} STATICS
+              {formatRewardAmount(rewards.claimableStatics, 18, 2)} STATICS
             </strong>
-            <small>{formatTokenAmountGrouped(rewards.claimableWeth, 18, 4)} WETH</small>
+            <small>{formatRewardAmount(rewards.claimableWeth, 18, 8)} WETH</small>
           </div>
           {/* Names its destination, not an action: claiming is one transaction
               per NFT and asset, and My Operators is where that sequence is priced

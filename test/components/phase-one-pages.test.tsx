@@ -180,15 +180,15 @@ describe("additive Phase 1 screens", () => {
   });
   it("claims rewards from the newly selected pool", async () => {
     withPhaseOne(<RewardsPage />);
-    const claim = await screen.findByRole("button", { name: "Claim liquidity rewards" });
+    const claim = await screen.findByRole("button", { name: "Claim LP Gauge Rewards" });
     await waitFor(() => expect(claim).toBeEnabled());
     fireEvent.change(screen.getByRole("combobox", { name: "Pool" }), {
       target: { value: hash("2") },
     });
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Claim liquidity rewards" })).toBeEnabled()
+      expect(screen.getByRole("button", { name: "Claim LP Gauge Rewards" })).toBeEnabled()
     );
-    fireEvent.click(screen.getByRole("button", { name: "Claim liquidity rewards" }));
+    fireEvent.click(screen.getByRole("button", { name: "Claim LP Gauge Rewards" }));
     await screen.findByText("Minimum payout: 8.955 STATICS");
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
     await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
@@ -197,6 +197,55 @@ describe("additive Phase 1 screens", () => {
       data: mocks.execute.mock.calls.at(-1)![0].data,
     });
     expect(decoded.args?.[1]).toBe(hash("2"));
+  });
+  it.each([
+    ["Claim LP Gauge Rewards", "claimLpRewards", 0, "1.99"],
+    ["Claim LP bribes", "claimLpRewards", 1, "4.975"],
+    ["Claim allocator bribes", "claimGaugeAllocatorRewards", 1, "2.985"],
+  ] as const)("keeps %s scoped to its funding source", async (button, method, slot, minimum) => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "previewLpRewards")
+        return {
+          slotCount: 2,
+          // Direct funding may also use STATICS. Classify by slot, not token symbol.
+          assets: [tokens[0].address, tokens[0].address, zeroAddress, zeroAddress, zeroAddress],
+          amounts: [parseEther("2"), parseEther("5"), 0n, 0n, 0n],
+        };
+      if (input.functionName === "previewGaugeAllocatorRewards")
+        return [
+          {
+            slot: 1,
+            asset: tokens[0].address,
+            allocation: parseEther("10"),
+            amount: parseEther("3"),
+          },
+        ];
+      return original(input);
+    });
+    withPhaseOne(<RewardsPage />);
+    const gauge = await screen.findByRole("article", { name: "LP Gauge Rewards" });
+    await within(gauge).findByText("2 STATICS");
+    expect(within(gauge).queryByText("5 STATICS")).not.toBeInTheDocument();
+    const bribes = screen.getByRole("region", { name: "Bribe Rewards" });
+    expect(within(bribes).getByText("5 STATICS")).toBeInTheDocument();
+    expect(within(bribes).getByText("3 STATICS")).toBeInTheDocument();
+    expect(within(bribes).queryByText("2 STATICS")).not.toBeInTheDocument();
+    const claim = screen.getByRole("button", { name: button });
+    await waitFor(() => expect(claim).toBeEnabled());
+    fireEvent.click(claim);
+    await screen.findByText(`Minimum payout: ${minimum} STATICS`);
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: [...staticsRangeGaugeAbi, ...staticsGaugeIncentivesAbi],
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.functionName).toBe(method);
+    expect(decoded.args?.[2]).toEqual([slot]);
+    expect(decoded.args?.[3]).toEqual([parseEther(minimum)]);
+    expect(decoded.args?.[4]).toBe(wallet);
   });
   it.each(["opt-out", "full unstake"])(
     "keeps accrued global rewards claimable after %s",
@@ -331,7 +380,7 @@ describe("additive Phase 1 screens", () => {
   });
   it("clears only the pool review when the pool changes", async () => {
     withPhaseOne(<RewardsPage />);
-    const claim = await screen.findByRole("button", { name: "Claim liquidity rewards" });
+    const claim = await screen.findByRole("button", { name: "Claim LP Gauge Rewards" });
     await waitFor(() => expect(claim).toBeEnabled());
     fireEvent.click(claim);
     await screen.findByRole("button", { name: "Confirm transaction" });

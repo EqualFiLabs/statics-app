@@ -139,7 +139,8 @@ function PositionRewards({
     deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? "0x"
   );
   const [mode, setMode] = useState<"stake" | "unstake">("stake");
-  type Scope = "stake" | "selection" | "allocation" | "global" | "lp" | "allocator";
+  type ClaimScope = "global" | "gauge" | "lp-bribe" | "allocator";
+  type Scope = "stake" | "selection" | "allocation" | ClaimScope;
   const [scope, setScope] = useState<Scope | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [success, setSuccess] = useState<Scope | null>(null);
@@ -446,11 +447,11 @@ function PositionRewards({
         },
       };
     });
-  const claim = (kind: "global" | "lp" | "allocator") =>
+  const claim = (kind: ClaimScope) =>
     prepare(kind, async () => {
       if (!action.publicClient || !action.wallet) throw new Error(p("selection"));
       const activeLp =
-        kind === "lp"
+        kind === "gauge" || kind === "lp-bribe"
           ? (
               await action.publicClient.readContract({
                 address: deployment.contracts.diamond,
@@ -478,6 +479,7 @@ function PositionRewards({
               positionId,
               poolId,
               account: action.wallet,
+              allocatorSlots: kind === "allocator" ? undefined : [],
             });
       const claims =
         "pendingRewards" in latest
@@ -486,11 +488,12 @@ function PositionRewards({
               slot: index,
               amount: latest.pendingRewards[index],
             }))
-          : kind === "lp"
-            ? latest.lp.amounts
+          : kind === "allocator"
+            ? latest.allocator
+            : latest.lp.amounts
                 .slice(0, latest.lp.slotCount)
                 .map((amount, slot) => ({ amount, slot, asset: latest.lp.assets[slot] }))
-            : latest.allocator;
+                .filter((entry) => (kind === "gauge" ? entry.slot === 0 : entry.slot > 0));
       const positive = claims.filter((entry) => entry.amount > 0n);
       if (!positive.length) throw new Error("No rewards are available to claim.");
       const minimumAmounts = positive.map((entry) => (entry.amount * 995n) / 1000n);
@@ -511,14 +514,20 @@ function PositionRewards({
               positionId,
               poolId,
               action: {
-                kind: kind === "lp" ? "claim-lp" : "claim-allocator",
+                kind: kind === "allocator" ? "claim-allocator" : "claim-lp",
                 slots: positive.map((entry) => entry.slot),
                 minimumAmounts,
                 receiver: action.wallet,
               },
             });
       const label =
-        kind === "global" ? p("globalClaim") : kind === "lp" ? p("lpClaim") : p("allocatorClaim");
+        kind === "global"
+          ? p("globalClaim")
+          : kind === "gauge"
+            ? e("reviewGauge")
+            : kind === "lp-bribe"
+              ? e("reviewLpBribes")
+              : e("reviewAllocatorBribes");
       return {
         label,
         details: [
@@ -534,9 +543,9 @@ function PositionRewards({
             kind:
               kind === "global"
                 ? "phase-one-claim-global-rewards"
-                : kind === "lp"
-                  ? "phase-one-claim-lp-rewards"
-                  : "phase-one-claim-allocator-rewards",
+                : kind === "allocator"
+                  ? "phase-one-claim-allocator-rewards"
+                  : "phase-one-claim-lp-rewards",
             label,
             amount: positive.map((entry) => describeAmount(entry.asset, entry.amount)).join(", "),
             to: transaction.target,
@@ -606,21 +615,33 @@ function PositionRewards({
       button: e("claimStaking"),
     },
     {
-      kind: "lp" as const,
+      kind: "gauge" as const,
       title: e("liquidity"),
       help: e("liquidityHelp"),
       amounts:
         rewards.data?.lp.amounts
-          .slice(0, rewards.data.lp.slotCount)
+          .slice(0, Math.min(1, rewards.data.lp.slotCount))
           .map((amount, slot) => ({ asset: rewards.data!.lp.assets[slot], amount })) ?? [],
       loaded: Boolean(rewards.data),
       failed: rewards.isError,
       button: e("claimLiquidity"),
     },
     {
+      kind: "lp-bribe" as const,
+      title: e("lpBribes"),
+      help: e("lpBribesHelp"),
+      amounts:
+        rewards.data?.lp.amounts
+          .slice(1, rewards.data.lp.slotCount)
+          .map((amount, index) => ({ asset: rewards.data!.lp.assets[index + 1], amount })) ?? [],
+      loaded: Boolean(rewards.data),
+      failed: rewards.isError,
+      button: e("claimLpBribes"),
+    },
+    {
       kind: "allocator" as const,
-      title: e("allocation"),
-      help: e("allocationRewardsHelp"),
+      title: e("allocatorBribes"),
+      help: e("allocatorBribesHelp"),
       amounts: rewards.data?.allocator ?? [],
       loaded: Boolean(rewards.data),
       failed: rewards.isError,
@@ -636,7 +657,13 @@ function PositionRewards({
           value={poolId}
           disabled={action.busy}
           onChange={(event) => {
-            if (scope === "lp" || scope === "allocator" || scope === "allocation") clearReview();
+            if (
+              scope === "gauge" ||
+              scope === "lp-bribe" ||
+              scope === "allocator" ||
+              scope === "allocation"
+            )
+              clearReview();
             setAllocationInput(null);
             setPoolId(event.target.value as `0x${string}`);
           }}
@@ -653,6 +680,44 @@ function PositionRewards({
       <p className="earn-muted earn-pool-help">{e("poolHelp")}</p>
     </>
   );
+  const renderRewardGroup = (group: (typeof rewardGroups)[number], bribe = false) => {
+    const positive = group.amounts.filter((entry) => entry.amount > 0n);
+    return (
+      <article key={group.kind} className="earn-reward-group" aria-label={group.title}>
+        {group.kind === "gauge" && poolPicker}
+        <div className="earn-reward-heading">
+          {bribe ? <h4>{group.title}</h4> : <h3>{group.title}</h3>}
+          {positive.length > 0 && !(scope === group.kind && action.review) && (
+            <button
+              className="ui-button ui-button--secondary ui-button--sm"
+              type="button"
+              disabled={disabled || !group.loaded}
+              onClick={() => void claim(group.kind)}
+            >
+              {group.button}
+            </button>
+          )}
+        </div>
+        <p className="earn-muted">{group.help}</p>
+        {positive.length ? (
+          positive.map((entry) => (
+            <p key={entry.asset} className="earn-reward-value is-numeric">
+              {describeAmount(entry.asset, entry.amount)}
+            </p>
+          ))
+        ) : (
+          <p className="earn-reward-empty">
+            {group.failed
+              ? e("rewardsUnavailable")
+              : group.loaded
+                ? e("noRewards")
+                : e("loadingRewards")}
+          </p>
+        )}
+        {reviewFor(group.kind)}
+      </article>
+    );
+  };
   return (
     <>
       <div className="earn-main">
@@ -837,44 +902,12 @@ function PositionRewards({
             </p>
           )}
           <div className="earn-reward-groups">
-            {rewardGroups.map((group) => {
-              const positive = group.amounts.filter((entry) => entry.amount > 0n);
-              return (
-                <article key={group.kind} className="earn-reward-group">
-                  {group.kind === "lp" && poolPicker}
-                  <div className="earn-reward-heading">
-                    <h3>{group.title}</h3>
-                    {positive.length > 0 && !(scope === group.kind && action.review) && (
-                      <button
-                        className="ui-button ui-button--secondary ui-button--sm"
-                        type="button"
-                        disabled={disabled || !group.loaded}
-                        onClick={() => void claim(group.kind)}
-                      >
-                        {group.button}
-                      </button>
-                    )}
-                  </div>
-                  <p className="earn-muted">{group.help}</p>
-                  {positive.length ? (
-                    positive.map((entry) => (
-                      <p key={entry.asset} className="earn-reward-value is-numeric">
-                        {describeAmount(entry.asset, entry.amount)}
-                      </p>
-                    ))
-                  ) : (
-                    <p className="earn-reward-empty">
-                      {group.failed
-                        ? e("rewardsUnavailable")
-                        : group.loaded
-                          ? e("noRewards")
-                          : e("loadingRewards")}
-                    </p>
-                  )}
-                  {reviewFor(group.kind)}
-                </article>
-              );
-            })}
+            {rewardGroups.slice(0, 2).map((group) => renderRewardGroup(group))}
+            <section className="earn-reward-group" aria-label={e("allocation")}>
+              <h3>{e("allocation")}</h3>
+              <p className="earn-muted">{e("allocationRewardsHelp")}</p>
+              {rewardGroups.slice(2).map((group) => renderRewardGroup(group, true))}
+            </section>
           </div>
         </section>
       </div>

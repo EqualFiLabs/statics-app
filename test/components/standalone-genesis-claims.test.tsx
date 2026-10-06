@@ -164,6 +164,19 @@ beforeEach(() => {
 });
 
 describe("Standalone Genesis batch claims", () => {
+  it("shows small WETH rewards in both the summary and selected Operator", async () => {
+    const portfolio = ownedPortfolio();
+    portfolio.items = [{ ...portfolio.items[0], pendingWeth: 50_411_171_450_737n }];
+    mocks.loadOwnedGenesis.mockResolvedValue(portfolio);
+    renderPage();
+
+    expect(await screen.findByText("0.00005041 WETH")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("tab", { name: /Rewards/ }));
+    expect(await screen.findByText("0.00005041")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Claim all" })).toBeEnabled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
   it("splits 65 Operators and appends the previous-owner claim", async () => {
     mocks.loadOwnedGenesis.mockResolvedValueOnce(ownedPortfolio(1n, 2n));
     renderPage();
