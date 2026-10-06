@@ -10,13 +10,21 @@ import {
   activateCaliburWithBrowserRelay,
   existingBrowserRelayAddress,
   quoteBrowserCaliburRelay,
+  quoteBrowserCaliburRevocation,
   refundBrowserRelay,
+  revokeCaliburWithBrowserRelay,
   type BrowserRelayQuote,
   type BrowserRelayResult,
+  type BrowserRelayRevocationQuote,
+  type BrowserRelayRevocationResult,
 } from "@/lib/genesis/browser-calibur-relay";
 import { delegationFromCode } from "@/lib/genesis/atomic-batch";
-import { ROBINHOOD_CALIBUR } from "@/lib/genesis/calibur";
+import { REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES, ROBINHOOD_CALIBUR } from "@/lib/genesis/calibur";
 import { useWalletState } from "@/providers/wallet-context";
+
+type Review =
+  | { action: "activate"; quote: BrowserRelayQuote }
+  | { action: "revoke"; quote: BrowserRelayRevocationQuote };
 
 export function BrowserCaliburActivationPanel() {
   const t = useTranslations("operators.bulk.activation");
@@ -24,9 +32,13 @@ export function BrowserCaliburActivationPanel() {
   const publicClient = usePublicClient({ chainId: 4663 });
   const { signAuthorization } = useSign7702Authorization();
   const wallet = walletState.address ? getAddress(walletState.address) : null;
-  const [review, setReview] = useState<BrowserRelayQuote | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
   const [reviewWallet, setReviewWallet] = useState<Address | null>(null);
-  const [result, setResult] = useState<BrowserRelayResult | null>(null);
+  const [result, setResult] = useState<
+    | { action: "activate"; value: BrowserRelayResult }
+    | { action: "revoke"; value: BrowserRelayRevocationResult }
+    | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +66,9 @@ export function BrowserCaliburActivationPanel() {
         setDelegation(
           !code || code === "0x"
             ? "fresh"
-            : delegationFromCode(code) === ROBINHOOD_CALIBUR
+            : REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES.some(
+                  (known) => known === delegationFromCode(code)
+                )
               ? "calibur"
               : "other"
         );
@@ -74,7 +88,26 @@ export function BrowserCaliburActivationPanel() {
     walletState.isTargetChain &&
     walletState.targetChainId === 4663;
 
-  const check = async () => {
+  const fundRelay = async (to: Address, value: bigint, action: "activate" | "revoke") => {
+    if (!wallet || !publicClient) throw new Error("Connected wallet changed. Review again.");
+    const gasEstimate = await publicClient.estimateGas({ account: wallet, to, value });
+    return walletState.sendEvmTransaction({
+      wallet,
+      chainId: 4663,
+      to,
+      data: "0x",
+      value,
+      gasLimit: gasEstimate + 10_000n,
+      presentation: {
+        action: action === "activate" ? "Fund Calibur activation" : "Fund Calibur removal",
+        description: "Fund a short lived browser relayer. Unused ETH will be returned.",
+        buttonText: "Confirm funding",
+        contractName: "Temporary Calibur relayer",
+      },
+    });
+  };
+
+  const check = async (action: "activate" | "revoke") => {
     setBusy(true);
     setError(null);
     setReview(null);
@@ -83,9 +116,12 @@ export function BrowserCaliburActivationPanel() {
       if (!ready || !wallet || !publicClient) {
         throw new Error("Connect a Privy embedded wallet on Robinhood Chain 4663.");
       }
-      const quote = await quoteBrowserCaliburRelay(publicClient, wallet);
-      setRelayAddress(quote.relayer);
-      setReview(quote);
+      const nextReview: Review =
+        action === "activate"
+          ? { action, quote: await quoteBrowserCaliburRelay(publicClient, wallet) }
+          : { action, quote: await quoteBrowserCaliburRevocation(publicClient, wallet) };
+      setRelayAddress(nextReview.quote.relayer);
+      setReview(nextReview);
       setReviewWallet(wallet);
       setMessage(null);
     } catch (cause) {
@@ -99,13 +135,13 @@ export function BrowserCaliburActivationPanel() {
     setBusy(true);
     setError(null);
     try {
-      if (!ready || !wallet || !publicClient || !activeReview) {
+      if (!ready || !wallet || !publicClient || activeReview?.action !== "activate") {
         throw new Error("Review Calibur activation again with the connected wallet.");
       }
       const current = await quoteBrowserCaliburRelay(publicClient, wallet);
       if (
-        current.relayer !== activeReview.relayer ||
-        current.fundingAmount > activeReview.fundingAmount
+        current.relayer !== activeReview.quote.relayer ||
+        current.fundingAmount > activeReview.quote.fundingAmount
       ) {
         throw new Error("Relayer or network fees changed. Review activation again.");
       }
@@ -114,29 +150,42 @@ export function BrowserCaliburActivationPanel() {
         wallet,
         signAuthorization,
         onProgress: setMessage,
-        sendFunding: async (to, value): Promise<Hex> => {
-          const gasEstimate = await publicClient.estimateGas({ account: wallet, to, value });
-          return walletState.sendEvmTransaction({
-            wallet,
-            chainId: 4663,
-            to,
-            data: "0x",
-            value,
-            gasLimit: gasEstimate + 10_000n,
-            presentation: {
-              action: "Fund Calibur activation",
-              description: "Fund a short lived browser relayer. Unused ETH will be returned.",
-              buttonText: "Confirm funding",
-              contractName: "Temporary activation relayer",
-            },
-          });
-        },
+        sendFunding: (to, value): Promise<Hex> => fundRelay(to, value, "activate"),
       });
-      setResult(outcome);
+      setResult({ action: "activate", value: outcome });
       setDelegation("calibur");
       setRelayAddress(outcome.relayer);
       setReview(null);
       setMessage(t("confirmed"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!ready || !wallet || !publicClient || activeReview?.action !== "revoke") {
+        throw new Error("Review Calibur removal again with the connected wallet.");
+      }
+      const outcome = await revokeCaliburWithBrowserRelay({
+        publicClient,
+        wallet,
+        review: activeReview.quote,
+        signAuthorization,
+        onProgress: setMessage,
+        sendFunding: (to, value): Promise<Hex> => fundRelay(to, value, "revoke"),
+      });
+      setResult({ action: "revoke", value: outcome });
+      setDelegation("fresh");
+      setRelayAddress(outcome.relayer);
+      setReview(null);
+      setMessage(
+        t(outcome.relayExecutionReverted ? "revocationClearedAfterRevert" : "revocationConfirmed")
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -171,12 +220,24 @@ export function BrowserCaliburActivationPanel() {
           className="ui-button ui-button--secondary"
           type="button"
           disabled={busy || !ready}
-          onClick={() => void check()}
+          onClick={() => void check("activate")}
         >
           {busy ? t("checking") : t("review")}
         </button>
       )}
-      {delegation === "calibur" && <p>{t("alreadyActive")}</p>}
+      {delegation === "calibur" && (
+        <>
+          <p>{t("alreadyActive")}</p>
+          <button
+            className="ui-button ui-button--secondary"
+            type="button"
+            disabled={busy || !ready}
+            onClick={() => void check("revoke")}
+          >
+            {busy ? t("checking") : t("reviewRevocation")}
+          </button>
+        </>
+      )}
       {delegation === "other" && <p>{t("otherDelegate")}</p>}
       {relayAddress && (
         <button
@@ -190,22 +251,34 @@ export function BrowserCaliburActivationPanel() {
       )}
       {activeReview && (
         <div className="genesis-batch-review" role="status">
-          <p>{t("delegate", { address: ROBINHOOD_CALIBUR })}</p>
-          <p>{t("relayer", { address: activeReview.relayer })}</p>
+          {activeReview.action === "revoke" && <p>{t("revocationWarning")}</p>}
           <p>
-            {t("funding", {
-              amount: formatEther(activeReview.fundingAmount),
-              balance: formatEther(activeReview.existingBalance),
+            {t("delegate", {
+              address:
+                activeReview.action === "revoke" ? activeReview.quote.delegate : ROBINHOOD_CALIBUR,
             })}
           </p>
-          <p>{t("maximumFee", { amount: formatEther(activeReview.maximumActivationFee) })}</p>
+          <p>{t("relayer", { address: activeReview.quote.relayer })}</p>
+          <p>
+            {t("funding", {
+              amount: formatEther(activeReview.quote.fundingAmount),
+              balance: formatEther(activeReview.quote.existingBalance),
+            })}
+          </p>
+          <p>
+            {t(activeReview.action === "revoke" ? "maximumRemovalFee" : "maximumFee", {
+              amount: formatEther(activeReview.quote.maximumActivationFee),
+            })}
+          </p>
           <button
             className="ui-button ui-button--primary"
             type="button"
             disabled={busy}
-            onClick={() => void activate()}
+            onClick={() => void (activeReview.action === "revoke" ? revoke() : activate())}
           >
-            {busy ? t("activating") : t("fundAndSign")}
+            {busy
+              ? t(activeReview.action === "revoke" ? "revoking" : "activating")
+              : t(activeReview.action === "revoke" ? "fundAndRevoke" : "fundAndSign")}
           </button>
           <button
             className="ui-button ui-button--secondary"
@@ -217,12 +290,21 @@ export function BrowserCaliburActivationPanel() {
           </button>
         </div>
       )}
-      {result && (
+      {result?.action === "activate" && (
         <p role="status">
           {t("result", {
-            activation: result.activationHash,
-            refund: result.refundHash ?? t("notConfirmed"),
-            balance: formatEther(result.remainingBalance),
+            activation: result.value.activationHash,
+            refund: result.value.refundHash ?? t("notConfirmed"),
+            balance: formatEther(result.value.remainingBalance),
+          })}
+        </p>
+      )}
+      {result?.action === "revoke" && (
+        <p role="status">
+          {t("revocationResult", {
+            removal: result.value.revocationHash,
+            refund: result.value.refundHash ?? t("notConfirmed"),
+            balance: formatEther(result.value.remainingBalance),
           })}
         </p>
       )}
