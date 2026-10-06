@@ -181,6 +181,59 @@ describe("Phase 1 gauge allocations and rewards", () => {
     expect(sendTransaction).not.toHaveBeenCalled();
   });
 
+  it("includes uncheckpointed allocator accrual while retaining slot metadata and LP rewards", async () => {
+    const lp = { slotCount: 3, amounts: [12n, 17n, 19n, 0n, 0n] };
+    const stored = [
+      { slot: 2, asset: address("3"), allocation: 100n, amount: 0n },
+      { slot: 1, asset: address("2"), allocation: 0n, amount: 5n },
+    ];
+    const readContract = vi.fn().mockResolvedValueOnce(lp).mockResolvedValueOnce(stored);
+    const simulateContract = vi.fn().mockResolvedValue({ result: [87n, 5n] });
+    const sendTransaction = vi.fn();
+    const result = await readPositionGaugeRewards({
+      publicClient: { readContract, simulateContract, sendTransaction } as unknown as PublicClient,
+      deployment,
+      positionId: 30n,
+      poolId: hash("3"),
+      account: address("4"),
+      allocatorSlots: [2, 1],
+      includeProtocolAccrual: false,
+    });
+    expect(result.lp).toEqual(lp);
+    expect(result.allocator).toEqual([{ ...stored[0], amount: 87n }, stored[1]]);
+    expect(simulateContract).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        address: deployment.contracts.diamond,
+        functionName: "claimGaugeAllocatorRewards",
+        account: address("4"),
+        args: [30n, hash("3"), [2, 1], [0n, 0n], address("4")],
+      })
+    );
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it.each(["RPC failure", "invalid result"])("surfaces allocator preview %s", async (kind) => {
+    const readContract = vi
+      .fn()
+      .mockResolvedValueOnce({ slotCount: 2, amounts: [0n, 0n, 0n, 0n, 0n] })
+      .mockResolvedValueOnce([{ slot: 1, asset: address("2"), allocation: 1n, amount: 0n }]);
+    const simulateContract = vi.fn();
+    if (kind === "RPC failure") simulateContract.mockRejectedValue(new Error("RPC unavailable"));
+    else simulateContract.mockResolvedValue({ result: [] });
+    await expect(
+      readPositionGaugeRewards({
+        publicClient: { readContract, simulateContract } as unknown as PublicClient,
+        deployment,
+        positionId: 30n,
+        poolId: hash("3"),
+        account: address("4"),
+        includeProtocolAccrual: false,
+      })
+    ).rejects.toThrow(
+      kind === "RPC failure" ? "RPC unavailable" : "Invalid allocator rewards preview"
+    );
+  });
+
   it.each(["no LP", "exited LP", "bribe-only review"])(
     "does not simulate protocol settlement for %s",
     async (kind) => {

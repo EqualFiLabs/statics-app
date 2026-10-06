@@ -155,6 +155,16 @@ beforeEach(() => {
     if (functionName === "unfundedSwapRewards") return 0n;
     throw new Error(`Unexpected RPC ${functionName}`);
   });
+  mocks.simulate.mockImplementation(async ({ functionName, args }) => {
+    if (functionName === "claimGaugeAllocatorRewards") {
+      const rewards = await mocks.read({
+        functionName: "previewGaugeAllocatorRewards",
+        args: args.slice(0, 3),
+      });
+      return { result: rewards.map((reward: { amount: bigint }) => reward.amount) };
+    }
+    throw new Error(`Unexpected simulation ${functionName}`);
+  });
 });
 
 describe("additive Phase 1 screens", () => {
@@ -240,6 +250,42 @@ describe("additive Phase 1 screens", () => {
     });
     expect(decoded.functionName).toBe("claimLpRewards");
     expect(decoded.args).toEqual([1n, hash("1"), [0], [minimum], wallet]);
+  });
+  it("shows elapsed allocator bribes and refreshes their reviewed minimum before signing", async () => {
+    const amount = 87066354994n;
+    const refreshed = amount + 1000n;
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "previewLpRewards")
+        return {
+          slotCount: 2,
+          assets: [tokens[0].address, tokens[1].address, zeroAddress, zeroAddress, zeroAddress],
+          amounts: [0n, 0n, 0n, 0n, 0n],
+        };
+      if (input.functionName === "previewGaugeAllocatorRewards")
+        return [{ slot: 1, asset: tokens[1].address, allocation: parseEther("10"), amount: 0n }];
+      return original(input);
+    });
+    mocks.simulate.mockResolvedValue({ result: [amount] });
+    withPhaseOne(<RewardsPage />);
+    const bribes = await screen.findByRole("region", { name: "Bribe Rewards" });
+    expect(await within(bribes).findByText(`${formatEther(amount)} WETH`)).toBeInTheDocument();
+    const button = within(bribes).getByRole("button", { name: "Claim allocator bribes" });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(mocks.execute).not.toHaveBeenCalled();
+    mocks.simulate.mockResolvedValue({ result: [refreshed] });
+    fireEvent.click(button);
+    const minimum = (refreshed * 995n) / 1000n;
+    await screen.findByText(`Minimum payout: ${formatEther(minimum)} WETH`);
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsGaugeIncentivesAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.functionName).toBe("claimGaugeAllocatorRewards");
+    expect(decoded.args).toEqual([1n, hash("1"), [1], [minimum], wallet]);
   });
   it.each([
     ["Claim LP Gauge Rewards", "claimLpRewards", 0, "1.99"],

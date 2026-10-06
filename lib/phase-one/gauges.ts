@@ -174,7 +174,7 @@ export async function readPositionGaugeRewards(input: {
   const allocatorSlots =
     input.allocatorSlots ??
     Array.from({ length: Math.max(0, lp.slotCount - 1) }, (_, index) => index + 1);
-  const allocator =
+  let allocator =
     allocatorSlots.length === 0
       ? ([] as readonly GaugeAllocatorClaimPreview[])
       : await input.publicClient.readContract({
@@ -184,6 +184,26 @@ export async function readPositionGaugeRewards(input: {
           args: [input.positionId, input.poolId, allocatorSlots],
           account: input.account,
         });
+  if (allocator.length > 0) {
+    // The view stops at the stored bribe index. Simulate the claim to include
+    // elapsed stream rewards, preserving each slot's asset and allocation metadata.
+    const preview = await input.publicClient.simulateContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsGaugeIncentivesAbi,
+      functionName: "claimGaugeAllocatorRewards",
+      args: [
+        input.positionId,
+        input.poolId,
+        allocator.map((reward) => reward.slot),
+        allocator.map(() => 0n),
+        input.account,
+      ],
+      account: input.account,
+    });
+    if (preview.result.length !== allocator.length)
+      throw new Error("Invalid allocator rewards preview.");
+    allocator = allocator.map((reward, index) => ({ ...reward, amount: preview.result[index] }));
+  }
   return { lp, allocator };
 }
 
