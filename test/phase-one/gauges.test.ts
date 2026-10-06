@@ -137,6 +137,7 @@ describe("Phase 1 gauge allocations and rewards", () => {
         assets: [zeroAddress, address("2"), address("3"), zeroAddress, zeroAddress],
         amounts: [0n, 1n, 2n, 0n, 0n],
       })
+      .mockResolvedValueOnce({ liquidity: 0n })
       .mockResolvedValueOnce([]);
     await readPositionGaugeRewards({
       publicClient: { readContract } as unknown as PublicClient,
@@ -145,6 +146,85 @@ describe("Phase 1 gauge allocations and rewards", () => {
       poolId: hash("3"),
       account: address("4"),
     });
-    expect(readContract.mock.calls[1]?.[0].args).toEqual([9n, hash("3"), [1, 2]]);
+    expect(readContract.mock.calls[2]?.[0].args).toEqual([9n, hash("3"), [1, 2]]);
+  });
+
+  it("previews elapsed protocol emissions without changing community rewards or submitting a transaction", async () => {
+    const readContract = vi.fn().mockImplementation(async ({ functionName }) => {
+      if (functionName === "previewLpRewards")
+        return {
+          slotCount: 2,
+          assets: [address("2"), address("3"), zeroAddress, zeroAddress, zeroAddress],
+          amounts: [0n, 17n, 0n, 0n, 0n],
+        };
+      if (functionName === "lpLeg") return { liquidity: 100n };
+      throw new Error(`Unexpected read ${functionName}`);
+    });
+    const simulateContract = vi.fn().mockResolvedValue({ result: [8867n] });
+    const sendTransaction = vi.fn();
+    const result = await readPositionGaugeRewards({
+      publicClient: { readContract, simulateContract, sendTransaction } as unknown as PublicClient,
+      deployment,
+      positionId: 30n,
+      poolId: hash("3"),
+      account: address("4"),
+      allocatorSlots: [],
+    });
+    expect(result.lp.amounts).toEqual([8867n, 17n, 0n, 0n, 0n]);
+    expect(simulateContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        functionName: "claimLpRewards",
+        account: address("4"),
+        args: [30n, hash("3"), [0], [0n], address("4")],
+      })
+    );
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it.each(["no LP", "exited LP", "bribe-only review"])(
+    "does not simulate protocol settlement for %s",
+    async (kind) => {
+      const readContract = vi.fn().mockImplementation(async ({ functionName }) => {
+        if (functionName === "previewLpRewards")
+          return {
+            slotCount: 1,
+            assets: [address("2"), zeroAddress, zeroAddress, zeroAddress, zeroAddress],
+            amounts: [kind === "exited LP" ? 12n : 0n, 0n, 0n, 0n, 0n],
+          };
+        if (functionName === "lpLeg") return { liquidity: 0n };
+        throw new Error(`Unexpected read ${functionName}`);
+      });
+      const simulateContract = vi.fn();
+      const result = await readPositionGaugeRewards({
+        publicClient: { readContract, simulateContract } as unknown as PublicClient,
+        deployment,
+        positionId: 30n,
+        poolId: hash("3"),
+        account: address("4"),
+        allocatorSlots: [],
+        includeProtocolAccrual: kind !== "bribe-only review",
+      });
+      expect(simulateContract).not.toHaveBeenCalled();
+      expect(result.lp.amounts[0]).toBe(kind === "exited LP" ? 12n : 0n);
+      if (kind === "bribe-only review") expect(readContract).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it("surfaces a failed settlement preview instead of reporting zero rewards", async () => {
+    const readContract = vi
+      .fn()
+      .mockResolvedValueOnce({ slotCount: 1, amounts: [0n, 0n, 0n, 0n, 0n] })
+      .mockResolvedValueOnce({ liquidity: 1n });
+    const simulateContract = vi.fn().mockRejectedValue(new Error("RPC unavailable"));
+    await expect(
+      readPositionGaugeRewards({
+        publicClient: { readContract, simulateContract } as unknown as PublicClient,
+        deployment,
+        positionId: 30n,
+        poolId: hash("3"),
+        account: address("4"),
+        allocatorSlots: [],
+      })
+    ).rejects.toThrow("RPC unavailable");
   });
 });

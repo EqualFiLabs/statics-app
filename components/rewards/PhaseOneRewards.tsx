@@ -480,6 +480,7 @@ function PositionRewards({
               poolId,
               account: action.wallet,
               allocatorSlots: kind === "allocator" ? undefined : [],
+              includeProtocolAccrual: kind === "gauge",
             });
       const claims =
         "pendingRewards" in latest

@@ -135,17 +135,42 @@ export async function readPositionGaugeRewards(input: {
   positionId: bigint;
   poolId: Hex;
   allocatorSlots?: readonly number[];
+  includeProtocolAccrual?: boolean;
   account: Address;
 }): Promise<
   Readonly<{ lp: RangeGaugePendingRewards; allocator: readonly GaugeAllocatorClaimPreview[] }>
 > {
-  const lp = await input.publicClient.readContract({
+  let lp = await input.publicClient.readContract({
     address: input.deployment.contracts.diamond,
     abi: staticsRangeGaugeAbi,
     functionName: "previewLpRewards",
     args: [input.positionId, input.poolId],
     account: input.account,
   });
+  if (input.includeProtocolAccrual !== false && lp.slotCount > 0) {
+    const leg = await input.publicClient.readContract({
+      address: input.deployment.contracts.diamond,
+      abi: staticsRangeGaugeAbi,
+      functionName: "lpLeg",
+      args: [input.positionId, input.poolId],
+    });
+    if (leg.liquidity > 0n) {
+      // The slot-0 view omits uncheckpointed reserve routing. eth_call runs the
+      // claim's settlement without signing, transferring tokens, or persisting state.
+      const preview = await input.publicClient.simulateContract({
+        address: input.deployment.contracts.diamond,
+        abi: staticsRangeGaugeAbi,
+        functionName: "claimLpRewards",
+        args: [input.positionId, input.poolId, [0], [0n], input.account],
+        account: input.account,
+      });
+      if (preview.result.length !== 1) throw new Error("Invalid LP Gauge Rewards preview.");
+      lp = {
+        ...lp,
+        amounts: [preview.result[0], lp.amounts[1], lp.amounts[2], lp.amounts[3], lp.amounts[4]],
+      };
+    }
+  }
   const allocatorSlots =
     input.allocatorSlots ??
     Array.from({ length: Math.max(0, lp.slotCount - 1) }, (_, index) => index + 1);

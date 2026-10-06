@@ -1,6 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { decodeFunctionData, getAddress, maxUint256, parseEther, zeroAddress } from "viem";
+import {
+  decodeFunctionData,
+  formatEther,
+  getAddress,
+  maxUint256,
+  parseEther,
+  zeroAddress,
+} from "viem";
 import { staticsGaugeIncentivesAbi, staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
 import { PositionListPage } from "@/components/positions/PositionListPage";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
@@ -13,11 +20,13 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   page: vi.fn(),
   position: vi.fn(),
+  simulate: vi.fn(),
 }));
 vi.mock("wagmi", () => ({
   usePublicClient: () => ({
     chain: { id: 31337 },
     readContract: mocks.read,
+    simulateContract: mocks.simulate,
     getBlock: async () => ({ timestamp: 3000n }),
   }),
 }));
@@ -102,6 +111,7 @@ function withPhaseOne(ui: React.ReactElement) {
   );
 }
 beforeEach(() => {
+  mocks.simulate.mockReset();
   mocks.execute.mockReset().mockResolvedValue(hash("f"));
   mocks.position.mockReset().mockImplementation(async (id) => position(id));
   mocks.page.mockReset().mockResolvedValue({
@@ -197,6 +207,39 @@ describe("additive Phase 1 screens", () => {
       data: mocks.execute.mock.calls.at(-1)![0].data,
     });
     expect(decoded.args?.[1]).toBe(hash("2"));
+  });
+  it("shows and reviews uncheckpointed gauge rewards before sending one claim", async () => {
+    const amount = parseEther("8867.354557816343210541");
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "lpLeg") return { liquidity: 100n };
+      if (input.functionName === "previewLpRewards")
+        return {
+          slotCount: 1,
+          assets: [tokens[0].address, zeroAddress, zeroAddress, zeroAddress, zeroAddress],
+          amounts: [0n, 0n, 0n, 0n, 0n],
+        };
+      return original(input);
+    });
+    mocks.simulate.mockResolvedValue({ result: [amount] });
+    withPhaseOne(<RewardsPage />);
+    const gauge = await screen.findByRole("article", { name: "LP Gauge Rewards" });
+    expect(await within(gauge).findByText(`${formatEther(amount)} STATICS`)).toBeInTheDocument();
+    const button = within(gauge).getByRole("button", { name: "Claim LP Gauge Rewards" });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    const minimum = (amount * 995n) / 1000n;
+    await screen.findByText(`Minimum payout: ${formatEther(minimum)} STATICS`);
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsRangeGaugeAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.functionName).toBe("claimLpRewards");
+    expect(decoded.args).toEqual([1n, hash("1"), [0], [minimum], wallet]);
   });
   it.each([
     ["Claim LP Gauge Rewards", "claimLpRewards", 0, "1.99"],
