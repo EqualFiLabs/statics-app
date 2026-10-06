@@ -1489,6 +1489,7 @@
     "increase": "Increase liquidity",
     "decrease": "Decrease liquidity",
     "collect": "Collect fees",
+    "feesToCollect": "Fees to collect",
     "rebalance": "Rebalance",
     "exit": "Exit liquidity",
     "chooseLp": "Owned liquidity NFT",

@@ -144,6 +144,8 @@ beforeEach(() => {
     if (functionName === "gaugeReserve")
       return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
     if (functionName === "maxGaugeCatchupPeriods") return 52;
+    if (functionName === "getPositionInfo") return [mocks.liquidity, 0n, 0n];
+    if (functionName === "getFeeGrowthInside") return [0n, 0n];
     if (functionName === "allowance") return mocks.allowance;
     if (functionName === "positionCreationFee") return 1n;
     throw new Error(`Unexpected RPC ${functionName}`);
@@ -163,6 +165,52 @@ async function provideReview() {
   return screen.findByRole("button", { name: "Confirm transaction" });
 }
 describe("Phase 1 liquidity in the existing screen", () => {
+  it("reviews fresh collection amounts without slippage and freezes exact payout checks", async () => {
+    mocks.liquidity = 10n ** 18n;
+    let growth = 1n << 128n;
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "getFeeGrowthInside") return [growth, growth * 2n];
+      return original(input);
+    });
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Collect fees" }));
+    expect(screen.queryByRole("textbox", { name: "Slippage (%)" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Minimum STATICS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Minimum WETH" })).not.toBeInTheDocument();
+    growth = 2n << 128n;
+    fireEvent.click(screen.getByRole("button", { name: "Review Collect fees" }));
+    expect(await screen.findByText("Fees to collect: 2 STATICS + 4 WETH")).toBeInTheDocument();
+    expect(screen.queryByText("Slippage: 0.5%")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Minimum payout:/)).not.toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsRangeGaugeAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.functionName).toBe("collectNativeFees");
+    expect(decoded.args).toEqual([1n, poolId, 2n * 10n ** 18n, 4n * 10n ** 18n, 10000001200n]);
+    expect(mocks.read.mock.calls.some(([input]) => input.functionName === "gaugeReserve")).toBe(
+      false
+    );
+  });
+  it("fails collection review when the current fees cannot be read", async () => {
+    mocks.liquidity = 10n ** 18n;
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "getFeeGrowthInside") throw new Error("Fee RPC unavailable");
+      return original(input);
+    });
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Collect fees" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review Collect fees" }));
+    expect(await screen.findByText("Fee RPC unavailable")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
   it("defaults Decrease to a valid partial withdrawal and directs full withdrawals to Exit", async () => {
     mocks.liquidity = 100n;
     render(tree());

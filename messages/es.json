@@ -1489,6 +1489,7 @@
     "increase": "Aumentar liquidez",
     "decrease": "Reducir liquidez",
     "collect": "Cobrar comisiones",
+    "feesToCollect": "Comisiones por cobrar",
     "rebalance": "Reequilibrar",
     "exit": "Retirar liquidez",
     "chooseLp": "NFT de liquidez propio",

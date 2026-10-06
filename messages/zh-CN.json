@@ -1489,6 +1489,7 @@
     "increase": "增加流动性",
     "decrease": "减少流动性",
     "collect": "领取手续费",
+    "feesToCollect": "待领取手续费",
     "rebalance": "重新平衡",
     "exit": "退出流动性",
     "chooseLp": "持有的流动性 NFT",

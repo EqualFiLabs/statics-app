@@ -3,6 +3,7 @@ import {
   erc20Abi,
   getAddress,
   maxUint256,
+  toHex,
   type Address,
   type Hex,
   type PublicClient,
@@ -21,10 +22,12 @@ import {
   decodePositionInfo,
   getSqrtPriceAtTick,
   maximumLiquidityForAmounts,
+  pendingLpFees,
   quoteRangeAmounts,
   staticsAbi,
   staticsRangeGaugeAbi,
   v4PositionManagerReadAbi,
+  v4StateViewReadAbi,
   type RangeGaugeLpLegState,
   type RangeGaugePendingRewards,
 } from "@statics-protocol/sdk/phase-one";
@@ -476,4 +479,36 @@ export async function publicLiquidityDeadline(publicClient: PublicClient): Promi
     swapDeadlineBase(latest.timestamp, pending.timestamp, BigInt(Math.floor(Date.now() / 1000))) +
     1200n
   );
+}
+
+export async function readPublicLiquidityFees(input: {
+  publicClient: PublicClient;
+  deployment: PhaseOneDeployment;
+  poolId: Hex;
+  posmTokenId: bigint;
+  tickLower: number;
+  tickUpper: number;
+}) {
+  const { publicClient, deployment, poolId, tickLower, tickUpper, posmTokenId } = input;
+  const [position, growth] = await Promise.all([
+    publicClient.readContract({
+      address: deployment.contracts.stateView,
+      abi: v4StateViewReadAbi,
+      functionName: "getPositionInfo",
+      args: [
+        poolId,
+        deployment.contracts.positionManager,
+        tickLower,
+        tickUpper,
+        toHex(posmTokenId, { size: 32 }),
+      ],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.stateView,
+      abi: v4StateViewReadAbi,
+      functionName: "getFeeGrowthInside",
+      args: [poolId, tickLower, tickUpper],
+    }),
+  ]);
+  return pendingLpFees(position[0], growth[0], growth[1], position[1], position[2]);
 }

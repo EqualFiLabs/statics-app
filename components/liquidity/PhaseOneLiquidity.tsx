@@ -20,6 +20,7 @@ import {
   quotePublicLiquidity,
   quoteWithdrawalAmounts,
   readPublicManagedLiquidityPosition,
+  readPublicLiquidityFees,
   planPublicLiquidityApprovals,
   usableTickBounds,
   publicLiquidityDeadline,
@@ -362,7 +363,8 @@ function ManagedLiquidity({
           },
         };
       }
-      const tolerance = Number(parseLocalizedUnits(slippage, 2, locale));
+      const tolerance =
+        selectedMode === "collect" ? 0 : Number(parseLocalizedUnits(slippage, 2, locale));
       if (tolerance < 0 || tolerance > 5000) throw new Error(t("slippageError"));
       const [market, latestManaged] = await Promise.all([
         readPublicPoolState(action.publicClient, deployment, pool),
@@ -405,20 +407,33 @@ function ManagedLiquidity({
       if ((selectedMode === "decrease" || selectedMode === "exit") && delta <= 0n)
         throw new Error(t("noLiquidity"));
       const estimated =
-        latestManaged.leg.liquidity > 0n && withdrawals && selectedMode !== "collect"
-          ? quoteWithdrawalAmounts(
-              market.sqrtPriceX96,
-              latestManaged.leg.tickLower,
-              latestManaged.leg.tickUpper,
-              delta
-            )
-          : { amount0: 0n, amount1: 0n };
-      const min0 = minimum0
-        ? parseLocalizedUnits(minimum0, pool.token0.decimals, locale)
-        : (estimated.amount0 * BigInt(10000 - tolerance)) / 10000n;
-      const min1 = minimum1
-        ? parseLocalizedUnits(minimum1, pool.token1.decimals, locale)
-        : (estimated.amount1 * BigInt(10000 - tolerance)) / 10000n;
+        selectedMode === "collect"
+          ? await readPublicLiquidityFees({
+              publicClient: action.publicClient,
+              deployment,
+              poolId,
+              ...latestManaged.leg,
+            })
+          : latestManaged.leg.liquidity > 0n && withdrawals
+            ? quoteWithdrawalAmounts(
+                market.sqrtPriceX96,
+                latestManaged.leg.tickLower,
+                latestManaged.leg.tickUpper,
+                delta
+              )
+            : { amount0: 0n, amount1: 0n };
+      const min0 =
+        selectedMode === "collect"
+          ? estimated.amount0
+          : minimum0
+            ? parseLocalizedUnits(minimum0, pool.token0.decimals, locale)
+            : (estimated.amount0 * BigInt(10000 - tolerance)) / 10000n;
+      const min1 =
+        selectedMode === "collect"
+          ? estimated.amount1
+          : minimum1
+            ? parseLocalizedUnits(minimum1, pool.token1.decimals, locale)
+            : (estimated.amount1 * BigInt(10000 - tolerance)) / 10000n;
       const maximum0 = deposits
         ? parseLocalizedUnits(amount0 || "0", pool.token0.decimals, locale)
         : 0n;
@@ -480,9 +495,11 @@ function ManagedLiquidity({
               ]
             : []),
           ...(withdrawals
-            ? [`${t("minimum")}: ${tokenAmount(min0, 0)} + ${tokenAmount(min1, 1)}`]
+            ? [
+                `${t(selectedMode === "collect" ? "feesToCollect" : "minimum")}: ${tokenAmount(min0, 0)} + ${tokenAmount(min1, 1)}`,
+              ]
             : []),
-          `${t("slippage")}: ${slippage}%`,
+          ...(selectedMode === "collect" ? [] : [`${t("slippage")}: ${slippage}%`]),
           ...prerequisites.map((entry) => entry.label),
           ...(selectedMode === "exit" ? [t("exitHelp")] : []),
         ],
@@ -737,13 +754,13 @@ function ManagedLiquidity({
                 />
               </label>
             )}
-            {withdrawals && (
+            {withdrawals && selectedMode !== "collect" && (
               <>
                 <label className="basket-field">
                   {t("minimumToken", { symbol: pool.token0.symbol })}
                   <input
                     value={minimum0}
-                    placeholder={selectedMode === "collect" ? "0" : t("automatic")}
+                    placeholder={t("automatic")}
                     onChange={(event) => {
                       action.cancel();
                       setMinimum0(event.target.value);
@@ -755,7 +772,7 @@ function ManagedLiquidity({
                   {t("minimumToken", { symbol: pool.token1.symbol })}
                   <input
                     value={minimum1}
-                    placeholder={selectedMode === "collect" ? "0" : t("automatic")}
+                    placeholder={t("automatic")}
                     onChange={(event) => {
                       action.cancel();
                       setMinimum1(event.target.value);
@@ -765,17 +782,19 @@ function ManagedLiquidity({
                 </label>
               </>
             )}
-            <label className="basket-field">
-              {t("slippage")} (%)
-              <input
-                value={slippage}
-                onChange={(event) => {
-                  action.cancel();
-                  setSlippage(event.target.value);
-                }}
-                inputMode="decimal"
-              />
-            </label>
+            {selectedMode !== "collect" && (
+              <label className="basket-field">
+                {t("slippage")} (%)
+                <input
+                  value={slippage}
+                  onChange={(event) => {
+                    action.cancel();
+                    setSlippage(event.target.value);
+                  }}
+                  inputMode="decimal"
+                />
+              </label>
+            )}
           </>
         )}
         {!managed.data?.claimOnly && (
