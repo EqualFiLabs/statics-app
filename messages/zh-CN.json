@@ -1573,5 +1573,39 @@
     "reviewGauge": "审查 LP Gauge 奖励",
     "reviewLpBribes": "审查 LP Bribe 奖励",
     "reviewAllocatorBribes": "审查分配者 Bribe 奖励"
+  },
+  "earnPortfolio": {
+    "title": "所有仓位奖励",
+    "help": "显示你所有仓位及其 LP 和分配池的奖励。查看某一行即可使用现有的审核领取功能。",
+    "refresh": "刷新奖励",
+    "coverage": "{positions} 个仓位 · {pools} 个池",
+    "partial": "部分奖励未能加载。总计仅包含可用余额；下方会标出不可用的行。",
+    "total": "总计",
+    "breakdown": "按仓位和池显示奖励",
+    "position": "仓位",
+    "pool": "池",
+    "actions": "操作",
+    "manage": "查看奖励",
+    "allAssets": "质押资产",
+    "staked": "已质押",
+    "unknownAsset": "{amount} 个基础单位 · {asset}（元数据不可用）",
+    "unknownPool": "池 {pool}"
+  },
+  "batchRewards": {
+    "claimAll": "领取全部",
+    "working": "正在准备或领取…",
+    "incomplete": "请先加载所有仓位奖励，再审核全部领取。",
+    "unsupported": "此部署暂不支持批量领取。请刷新或使用单独领取功能。",
+    "noRewards": "暂无可领取的奖励。请刷新后重试。",
+    "invalidPreview": "奖励预览无效。请重新审核。",
+    "transactions": "共 {count} 笔交易 · 请在钱包中逐笔确认",
+    "receiver": "奖励将发送至 {address}",
+    "minimum": "最低到账：{amount} {asset}",
+    "unknownMinimum": "最低到账：{amount} 基础单位 · {asset}（元数据不可用）",
+    "atomicHelp": "每笔交易同时领取其中的全部奖励。后续交易失败不影响已确认的领取。LP 交易手续费和 Operator 奖励需单独领取。",
+    "batch": "领取奖励（{current}/{total}）",
+    "batchAmount": "{count} 组奖励",
+    "progress": "已确认 {completed}/{total} 笔交易。如果中断，请重新审核剩余奖励。",
+    "complete": "全部 {total} 笔交易已确认。"
   }
 }

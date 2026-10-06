@@ -11466,3 +11466,5 @@ export type UnderlyingRoute = {
 };
 export declare function planMintUnderlyingRoutes(sourceToken: Address, mintQuote: readonly MintQuoteLeg[], adapter: UnderlyingLiquidityAdapter): Promise<readonly UnderlyingRoute[]>;
 export declare function planRedeemUnderlyingRoutes(destinationToken: Address, redeemQuote: readonly RedeemQuoteLeg[], adapter: UnderlyingLiquidityAdapter): Promise<readonly UnderlyingRoute[]>;
+
+export * from "./batch-rewards.js";

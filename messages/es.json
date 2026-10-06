@@ -1573,5 +1573,39 @@
     "reviewGauge": "Revisar recompensas del gauge de LP",
     "reviewLpBribes": "Revisar bribes de LP",
     "reviewAllocatorBribes": "Revisar bribes de asignador"
+  },
+  "earnPortfolio": {
+    "title": "Todas las recompensas de posiciones",
+    "help": "Recompensas de todas tus posiciones y sus pools LP y de asignación. Inspecciona una fila para usar los controles de reclamación con revisión.",
+    "refresh": "Actualizar recompensas",
+    "coverage": "{positions} posiciones · {pools} pools",
+    "partial": "No se pudieron cargar algunas recompensas. Los totales incluyen los saldos disponibles; las filas no disponibles se muestran abajo.",
+    "total": "Total",
+    "breakdown": "Recompensas por posición y pool",
+    "position": "Posición",
+    "pool": "Pool",
+    "actions": "Acciones",
+    "manage": "Ver recompensas",
+    "allAssets": "Activos de staking",
+    "staked": "en staking",
+    "unknownAsset": "{amount} unidades base · {asset} (metadatos no disponibles)",
+    "unknownPool": "Pool {pool}"
+  },
+  "batchRewards": {
+    "claimAll": "Reclamar todo",
+    "working": "Preparando o reclamando…",
+    "incomplete": "Carga todas las recompensas antes de revisar Reclamar todo.",
+    "unsupported": "Este despliegue no permite reclamaciones por lotes. Actualiza o usa los controles individuales.",
+    "noRewards": "No hay recompensas disponibles. Actualiza e inténtalo de nuevo.",
+    "invalidPreview": "La vista previa no es válida. Revisa las recompensas de nuevo.",
+    "transactions": "{count, plural, one {# transacción} other {# transacciones}} · confirma cada una en tu cartera",
+    "receiver": "Recibir recompensas en {address}",
+    "minimum": "Pago mínimo: {amount} {asset}",
+    "unknownMinimum": "Pago mínimo: {amount} unidades base · {asset} (metadatos no disponibles)",
+    "atomicHelp": "Cada transacción reclama juntas sus recompensas. Si una transacción posterior falla, las anteriores confirmadas permanecen completas. Las comisiones LP y las recompensas Operator se reclaman por separado.",
+    "batch": "Reclamar recompensas ({current}/{total})",
+    "batchAmount": "{count} grupos de recompensas",
+    "progress": "{completed} de {total} transacciones confirmadas. Si se interrumpe, revisa de nuevo las recompensas restantes.",
+    "complete": "Las {total} transacciones se han confirmado."
   }
 }

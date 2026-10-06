@@ -1975,3 +1975,5 @@ export async function planRedeemUnderlyingRoutes(destinationToken, redeemQuote, 
         return { asset, amount: amountOut, sourceOrDestinationAmount: route.minAmountOut, execution: route.execution };
     }));
 }
+
+export * from "./batch-rewards.js";

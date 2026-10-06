@@ -103,6 +103,7 @@ export type DollarActivityKind =
   | "phase-one-unstake"
   | "phase-one-reward-selection"
   | "phase-one-claim-global-rewards"
+  | "phase-one-claim-batch-rewards"
   | "phase-one-set-allocations"
   | "phase-one-claim-lp-rewards"
   | "phase-one-forfeit-lp-reward"

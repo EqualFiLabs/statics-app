@@ -102,6 +102,7 @@ export function usePhaseOneAction(deployment: PhaseOneDeployment, selection = ""
     ready,
     busy,
     error,
+    assertCurrent,
     send,
     prepare,
     confirm,

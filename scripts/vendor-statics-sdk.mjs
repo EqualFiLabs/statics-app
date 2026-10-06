@@ -39,6 +39,15 @@ const legacyArtifactsRoot = configuredLegacyArtifactsRoot
   ? resolve(repositoryRoot, configuredLegacyArtifactsRoot)
   : null;
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
+if (
+  existsSync(resolve(destination, "provenance.json")) &&
+  JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8")).batchRewardsSource &&
+  !process.env.STATICS_BATCH_REWARDS_SDK_REPOSITORY?.trim()
+) {
+  throw new Error(
+    "Set STATICS_BATCH_REWARDS_SDK_REPOSITORY to retain the installed batch SDK during sync."
+  );
+}
 
 const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: protocolRoot,
@@ -245,3 +254,7 @@ writeFileSync(
 );
 
 console.log(`Vendored @statics-protocol/sdk from ${protocolCommit}.`);
+
+if (process.env.STATICS_BATCH_REWARDS_SDK_REPOSITORY?.trim()) {
+  await import("./vendor-batch-rewards-sdk.mjs");
+}

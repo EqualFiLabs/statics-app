@@ -13,6 +13,8 @@ describe("vendored Statics SDK", () => {
       protocolCommit: string;
       source: { repository: string; path: string; commit: string };
       extensionSource?: { repository: string; path: string; commit: string };
+      batchRewardsSource?: { repository: string; path: string; commit: string };
+      batchRewardsSourceChecksums?: Record<string, string>;
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
       extensionSourceChecksums?: Record<string, string>;
@@ -30,6 +32,15 @@ describe("vendored Statics SDK", () => {
       commit: expect.stringMatching(/^[a-f0-9]{40}$/),
     });
     expect(["clean", "dirty"]).toContain(provenance.sdkTreeState);
+    expect(provenance.batchRewardsSource).toEqual({
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: "7621609f21c99e633b216199587cc810d1bb5c13",
+    });
+    expect(Object.keys(provenance.batchRewardsSourceChecksums ?? {}).sort()).toEqual([
+      "package.json",
+      "src/batch-rewards.ts",
+    ]);
     expect(Object.keys(provenance.sourceChecksums).sort()).toEqual([
       "package.json",
       "src/index.ts",

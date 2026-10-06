@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, type Address } from "viem";
 import { staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
@@ -29,6 +29,8 @@ import { gaugePrerequisites } from "@/lib/phase-one/reward-actions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { useAppLocale } from "@/i18n/client";
+import { PhaseOneRewardPortfolio } from "@/components/rewards/PhaseOneRewardPortfolio";
+import { discoverPositionRewardPools } from "@/lib/phase-one/reward-portfolio";
 
 export function PhaseOneRewards({
   deployment,
@@ -66,6 +68,11 @@ export function PhaseOneRewards({
     ).values(),
   ];
   const [selection, setSelection] = useState<string | null>(null);
+  const [poolFocus, setPoolFocus] = useState<`0x${string}` | null>(null);
+  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = positions;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
   const selected =
     items.find((item) => String(item.positionId) === selection) ?? ownInitial ?? items[0];
   return (
@@ -90,7 +97,10 @@ export function PhaseOneRewards({
             {p("choosePosition")}
             <select
               value={String(selected?.positionId ?? "")}
-              onChange={(event) => setSelection(event.target.value)}
+              onChange={(event) => {
+                setSelection(event.target.value);
+                setPoolFocus(null);
+              }}
             >
               {items.map((position) => (
                 <option key={String(position.positionId)} value={String(position.positionId)}>
@@ -111,12 +121,29 @@ export function PhaseOneRewards({
           </button>
         )}
       </section>
-      {selected && (
-        <PositionRewards
-          key={`${deployment.descriptor.deploymentId}:${action.wallet}:${selected.positionId}`}
+      {items.length > 0 && (
+        <PhaseOneRewardPortfolio
           deployment={deployment}
-          positionId={selected.positionId}
+          positions={items}
+          loadingPositions={
+            positions.isLoading || positions.isFetchingNextPage || positions.hasNextPage
+          }
+          incompletePositions={positions.isError}
+          onManage={(positionId, poolId) => {
+            setSelection(String(positionId));
+            setPoolFocus(poolId);
+          }}
         />
+      )}
+      {selected && (
+        <div id="earn-position-details">
+          <PositionRewards
+            key={`${deployment.descriptor.deploymentId}:${action.wallet}:${selected.positionId}:${poolFocus}`}
+            deployment={deployment}
+            positionId={selected.positionId}
+            initialPoolId={poolFocus}
+          />
+        </div>
       )}
     </div>
   );
@@ -125,9 +152,11 @@ export function PhaseOneRewards({
 function PositionRewards({
   deployment,
   positionId,
+  initialPoolId,
 }: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
+  initialPoolId: `0x${string}` | null;
 }) {
   const t = useTranslations("rewards");
   const d = useTranslations("positionDetail");
@@ -135,9 +164,32 @@ function PositionRewards({
   const p = useTranslations("phaseOne");
   const locale = useAppLocale();
   const action = usePhaseOneAction(deployment, String(positionId));
-  const [poolId, setPoolId] = useState<`0x${string}`>(
-    deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? "0x"
-  );
+  const discovered = useQuery({
+    queryKey: [
+      "phase-one-gauges",
+      deployment.descriptor.deploymentId,
+      action.wallet,
+      String(positionId),
+      "reward-pools",
+    ],
+    enabled: action.ready,
+    staleTime: 60_000,
+    retry: false,
+    queryFn: () =>
+      discoverPositionRewardPools({
+        publicClient: action.publicClient!,
+        deployment,
+        positionId,
+        account: action.wallet!,
+      }),
+  });
+  const [poolSelection, setPoolId] = useState<`0x${string}` | null>(initialPoolId);
+  const poolId =
+    poolSelection ??
+    discovered.data?.lp[0] ??
+    discovered.data?.allocator[0] ??
+    deployment.supportedPools.find((pool) => pool.enabled)?.poolId ??
+    "0x";
   const [mode, setMode] = useState<"stake" | "unstake">("stake");
   type ClaimScope = "global" | "gauge" | "lp-bribe" | "allocator";
   type Scope = "stake" | "selection" | "allocation" | ClaimScope;
@@ -224,7 +276,11 @@ function PositionRewards({
       positionId,
       poolId
     ),
-    enabled: action.ready && Boolean(poolId),
+    enabled:
+      action.ready &&
+      poolId !== "0x" &&
+      (discovered.isSuccess || discovered.isError || initialPoolId !== null),
+    staleTime: 30_000,
     queryFn: () =>
       readPositionGaugeRewards({
         publicClient: action.publicClient!,
@@ -650,6 +706,16 @@ function PositionRewards({
     },
   ];
   const selectedPool = deployment.supportedPools.find((pool) => pool.poolId === poolId);
+  const rewardPoolIds = [
+    ...new Map(
+      [
+        ...deployment.supportedPools.filter((pool) => pool.enabled).map((pool) => pool.poolId),
+        ...(discovered.data?.lp ?? []),
+        ...(discovered.data?.allocator ?? []),
+        ...(poolId !== "0x" ? [poolId] : []),
+      ].map((id) => [id.toLowerCase(), id])
+    ).values(),
+  ];
   const poolPicker = (
     <>
       <label className="basket-field earn-pool-select">
@@ -669,13 +735,16 @@ function PositionRewards({
             setPoolId(event.target.value as `0x${string}`);
           }}
         >
-          {deployment.supportedPools
-            .filter((pool) => pool.enabled)
-            .map((pool) => (
-              <option key={pool.poolId} value={pool.poolId}>
-                {pool.token0.symbol}/{pool.token1.symbol}
+          {rewardPoolIds.map((id) => {
+            const pool = deployment.supportedPools.find(
+              (entry) => entry.poolId.toLowerCase() === id.toLowerCase()
+            );
+            return (
+              <option key={id} value={id}>
+                {pool ? `${pool.token0.symbol}/${pool.token1.symbol}` : id}
               </option>
-            ))}
+            );
+          })}
         </select>
       </label>
       <p className="earn-muted earn-pool-help">{e("poolHelp")}</p>

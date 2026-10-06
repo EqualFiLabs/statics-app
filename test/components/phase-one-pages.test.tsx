@@ -91,11 +91,10 @@ const position = (id: bigint) => ({
   unresolvedObligationCount: 0n,
   updatedAtBlock: 1n,
 });
-function withPhaseOne(ui: React.ReactElement) {
+function withPhaseOne(ui: React.ReactElement, deployment = phaseOne) {
+  const active = { ...option, phaseOne: deployment };
   return render(
-    <DeploymentContext.Provider
-      value={{ active: option, options: [option], selectNetwork: vi.fn() }}
-    >
+    <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
       <WalletContext.Provider
         value={{
           ...defaultWalletState,
@@ -139,6 +138,8 @@ beforeEach(() => {
         parseEther("30"),
       ];
     if (functionName === "maxGaugeAllocationsPerPosition") return 10n;
+    if (functionName === "positionGaugePools") return [[hash("1")], 1n];
+    if (functionName === "positionGaugeAllocatorPools") return [[hash("1"), hash("2")], 2n];
     if (functionName === "previewLpRewards")
       return {
         slotCount: 1,
@@ -187,9 +188,65 @@ describe("additive Phase 1 screens", () => {
       nextCursor: cursor ? null : "100",
     }));
     withPhaseOne(<RewardsPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Load more positions" }));
     expect(await screen.findByRole("option", { name: "Position #101" })).toBeInTheDocument();
     expect(mocks.page.mock.calls.at(-1)?.[3]).toBe("100");
+  });
+  it("shows every owned LP pool and allocator-only pool, then focuses the matching reviewed claim", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "positionGaugePools")
+        return [[input.args[0] === 1n ? hash("1") : hash("2")], 1n];
+      if (input.functionName === "positionGaugeAllocatorPools") return [[hash("1"), hash("2")], 2n];
+      return original(input);
+    });
+    withPhaseOne(<RewardsPage />, {
+      ...phaseOne,
+      supportedPools: phaseOne.supportedPools.map((pool, index) => ({
+        ...pool,
+        enabled: index === 0,
+      })),
+    });
+    const portfolio = await screen.findByRole("region", { name: "All position rewards" });
+    await within(portfolio).findByRole("link", {
+      name: "Inspect rewards Position #2 STATICS/TOKEN",
+    });
+    const total = within(portfolio).getByRole("article", { name: "Total LP Gauge Rewards" });
+    expect(await within(total).findByText("10 STATICS")).toBeInTheDocument();
+    const allocatorOnly = within(portfolio)
+      .getByRole("link", { name: "Inspect rewards Position #1 STATICS/TOKEN" })
+      .closest("tr")!;
+    expect(within(allocatorOnly).queryByText("9 STATICS")).not.toBeInTheDocument();
+    fireEvent.click(
+      within(portfolio).getByRole("link", { name: "Inspect rewards Position #2 STATICS/TOKEN" })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Position" })).toHaveValue("2")
+    );
+    expect(screen.getByRole("combobox", { name: "Pool" })).toHaveValue(hash("2"));
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(
+      mocks.read.mock.calls.filter(
+        ([input]) =>
+          input.functionName === "previewLpRewards" &&
+          input.args[0] === 2n &&
+          input.args[1] === hash("2")
+      )
+    ).toHaveLength(1);
+    fireEvent.click(await screen.findByRole("button", { name: "Claim LP Gauge Rewards" }));
+    await screen.findByText("Minimum payout: 8.955 STATICS");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const decoded = decodeFunctionData({
+      abi: staticsRangeGaugeAbi,
+      data: mocks.execute.mock.calls[0][0].data,
+    });
+    expect(decoded.args?.slice(0, 2)).toEqual([2n, hash("2")]);
   });
   it("preserves initialPositionId navigation beyond the first page", async () => {
     withPhaseOne(<RewardsPage initialPositionId={101n} />);

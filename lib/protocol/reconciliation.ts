@@ -126,7 +126,11 @@ const deploymentScopedRoots = new Set([
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
   if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
-  if (kind === "phase-one-claim-lp-rewards" || kind === "phase-one-forfeit-lp-reward")
+  if (
+    kind === "phase-one-claim-lp-rewards" ||
+    kind === "phase-one-forfeit-lp-reward" ||
+    kind === "phase-one-claim-batch-rewards"
+  )
     return ["phase-one-liquidity", "phase-one-position", "phase-one-reward", "wallet"];
   if (kind === "phase-one-approve-token" || kind === "phase-one-approve-permit2") {
     return ["approval", "phase-one-market", "phase-one-liquidity", "wallet"];
