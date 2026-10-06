@@ -32,14 +32,14 @@ const rows = (count = 1): PositionRewardPortfolio[] =>
     discoveryUnavailable: false,
     pools: [],
   }));
-function view(values = rows(), address = wallet, props = {}) {
+function view(values = rows(), address = wallet, props = {}, chainId = 4663) {
   return (
     <WalletContext.Provider
       value={{
         ...defaultWalletState,
         status: "ready",
         address,
-        chainId: 4663,
+        chainId,
         isTargetChain: true,
       }}
     >
@@ -119,6 +119,31 @@ describe("Claim all review", () => {
     );
     expect(mocks.call).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+  it("discards an obsolete preview when the network changes during preparation", async () => {
+    let finish!: (value: { data: `0x${string}` }) => void;
+    mocks.call.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const { rerender } = render(view());
+    fireEvent.click(screen.getByRole("button", { name: "Claim all" }));
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledTimes(1));
+    rerender(view(rows(), wallet, {}, 1));
+    finish({
+      data: encodeFunctionResult({
+        abi: staticsBatchRewardsAbi,
+        functionName: "batchClaimRewards",
+        result: [[[parseEther("7")]], [], []],
+      }),
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument()
+    );
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Claim all" })).toBeDisabled();
   });
   it("does not offer a partial claim while discovery is incomplete", () => {
     render(view(rows(), wallet, { incomplete: true }));
