@@ -87,6 +87,7 @@ export type DollarActivityKind =
   | "unlink-genesis"
   | "claim-creator-revenue"
   | "distribute-partner-revenue"
+  | "phase-one-wrap-native"
   | "phase-one-approve-token"
   | "phase-one-approve-permit2"
   | "phase-one-swap"

@@ -20,6 +20,35 @@ describe("confirmed transaction reconciliation", () => {
     expect(protocolQueryScopes("phase-one-forfeit-lp-reward")).toContain("phase-one-liquidity");
   });
 
+  it("refreshes liquidity catalog, fee previews, and wallet balances only for the matching wallet and deployment", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+    for (const root of [
+      "phase-one-liquidity-catalog",
+      "phase-one-liquidity-fees",
+      "phase-one-liquidity-balances",
+      "phase-one-liquidity-native-balance",
+    ]) {
+      expect(queryMatchesProtocolReconciliation([root, "local", detail.wallet], detail)).toBe(true);
+      expect(queryMatchesProtocolReconciliation([root, "other", detail.wallet], detail)).toBe(
+        false
+      );
+      expect(
+        queryMatchesProtocolReconciliation(
+          [root, "local", "0x0000000000000000000000000000000000000002"],
+          detail
+        )
+      ).toBe(false);
+    }
+    expect(protocolQueryScopes("phase-one-wrap-native")).toEqual(["wallet"]);
+  });
+
   it("refreshes Earn wallet balances on a scoped stake receipt", () => {
     const detail = {
       wallet: "0x0000000000000000000000000000000000000001" as Address,

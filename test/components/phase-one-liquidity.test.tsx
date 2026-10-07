@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   positions: vi.fn(),
   lpIds: vi.fn(),
+  legs: vi.fn(),
+  position: vi.fn(),
+  native: 10n ** 19n,
   reward: 0n,
   liquidity: 0n,
   allowance: 0n,
@@ -27,13 +30,18 @@ vi.mock("wagmi", () => ({
   usePublicClient: () => ({
     chain: { id: 31337 },
     readContract: mocks.read,
+    getBalance: async () => mocks.native,
     getBlock: async ({ blockTag }: { blockTag?: string } = {}) => ({
       timestamp: blockTag === "pending" ? 10000000000n : 3000n,
     }),
   }),
 }));
 vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
-vi.mock("@/lib/indexer/phase-one", () => ({ loadIndexedPhaseOnePositions: mocks.positions }));
+vi.mock("@/lib/indexer/phase-one", () => ({
+  loadIndexedPhaseOnePositions: mocks.positions,
+  loadIndexedManagedLiquidity: mocks.legs,
+  loadIndexedPhaseOnePosition: mocks.position,
+}));
 vi.mock("@/lib/indexer/statics", () => ({
   loadWalletV4PositionIds: mocks.lpIds,
   configuredIndexerUrlForDeployment: () => "http://localhost/indexer",
@@ -61,6 +69,7 @@ const deployment = {
   contracts: {
     diamond: address("1"),
     statics: address("2"),
+    weth: address("3"),
     positionManager: address("5"),
     liquidityManager: address("6"),
     stateView: address("7"),
@@ -86,14 +95,18 @@ const indexed = (id: bigint) => ({
   positionId: id,
   owner: wallet,
   stakedBalance: 0n,
-  activeLegCount: 0n,
-  unresolvedObligationCount: 0n,
+  activeLegCount: mocks.liquidity > 0n ? 1n : 0n,
+  unresolvedObligationCount: mocks.reward > 0n ? 1n : 0n,
   updatedAtBlock: 1n,
 });
-function tree() {
+function tree(
+  initialPositionId: bigint | null = null,
+  initialPoolId: `0x${string}` | null = null,
+  activeOption: DeploymentOption = option
+) {
   return (
     <DeploymentContext.Provider
-      value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+      value={{ active: activeOption, options: [activeOption], selectNetwork: vi.fn() }}
     >
       <WalletContext.Provider
         value={{
@@ -104,22 +117,35 @@ function tree() {
           walletKind: "external",
         }}
       >
-        <LiquidityPage />
+        <LiquidityPage initialPositionId={initialPositionId} initialPoolId={initialPoolId} />
       </WalletContext.Provider>
     </DeploymentContext.Provider>
   );
 }
 const fiveZero = [0n, 0n, 0n, 0n, 0n];
 beforeEach(() => {
+  mocks.native = 10n ** 19n;
+  mocks.position.mockReset().mockImplementation(async (id: bigint) => indexed(id));
+  mocks.legs.mockReset().mockImplementation(async () => [
+    {
+      positionId: 1n,
+      poolId,
+      posmTokenId: 10n,
+      tickLower: -60,
+      tickUpper: 60,
+      liquidity: mocks.liquidity,
+      active: mocks.liquidity > 0n,
+    },
+  ]);
   mocks.reward = 0n;
   mocks.liquidity = 0n;
   mocks.allowance = 0n;
-  mocks.positions.mockReset().mockResolvedValue({
+  mocks.positions.mockReset().mockImplementation(async () => ({
     deploymentId: "fixture",
     indexedAtBlock: 1n,
     items: [indexed(1n)],
     nextCursor: null,
-  });
+  }));
   mocks.lpIds.mockReset().mockResolvedValue([10n]);
   mocks.execute.mockReset().mockResolvedValue(hash("a"));
   mocks.read.mockReset().mockImplementation(async ({ functionName }) => {
@@ -144,6 +170,7 @@ beforeEach(() => {
     if (functionName === "gaugeReserve")
       return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
     if (functionName === "maxGaugeCatchupPeriods") return 52;
+    if (functionName === "balanceOf") return 10n ** 24n;
     if (functionName === "getPositionInfo") return [mocks.liquidity, 0n, 0n];
     if (functionName === "getFeeGrowthInside") return [0n, 0n];
     if (functionName === "allowance") return mocks.allowance;
@@ -151,12 +178,19 @@ beforeEach(() => {
     throw new Error(`Unexpected RPC ${functionName}`);
   });
 });
+async function openDeposit() {
+  if (!screen.queryByRole("textbox", { name: "Deposit STATICS" })) {
+    fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  }
+  return screen.findByRole("textbox", { name: "Deposit STATICS" });
+}
+async function openDetail() {
+  fireEvent.click(await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ }));
+}
 async function provideReview() {
-  await screen.findByRole("textbox", { name: "Maximum STATICS" });
-  fireEvent.change(screen.getByRole("textbox", { name: "Maximum STATICS" }), {
-    target: { value: "1" },
-  });
-  fireEvent.change(screen.getByRole("textbox", { name: "Maximum WETH" }), {
+  await openDeposit();
+  fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
     target: { value: "1" },
   });
   const button = screen.getByRole("button", { name: "Review Add liquidity" });
@@ -174,6 +208,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
       return original(input);
     });
     render(tree());
+    await openDetail();
     fireEvent.click(await screen.findByRole("button", { name: "Collect fees" }));
     expect(screen.queryByRole("textbox", { name: "Slippage (%)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Minimum STATICS" })).not.toBeInTheDocument();
@@ -204,6 +239,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
       return original(input);
     });
     render(tree());
+    await openDetail();
     fireEvent.click(await screen.findByRole("button", { name: "Collect fees" }));
     fireEvent.click(screen.getByRole("button", { name: "Review Collect fees" }));
     expect(await screen.findByText("Fee RPC unavailable")).toBeInTheDocument();
@@ -211,11 +247,12 @@ describe("Phase 1 liquidity in the existing screen", () => {
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 
-  it("defaults Decrease to a valid partial withdrawal and directs full withdrawals to Exit", async () => {
+  it("defaults removal to a partial withdrawal and uses Exit for 100%", async () => {
     mocks.liquidity = 100n;
     render(tree());
-    fireEvent.click(await screen.findByRole("button", { name: "Decrease liquidity" }));
-    const share = screen.getByRole("textbox", { name: "Liquidity to withdraw (%)" });
+    await openDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove liquidity" }));
+    const share = screen.getByRole("slider", { name: "Liquidity to withdraw (%)" });
     expect(share).toHaveValue("50");
     fireEvent.click(screen.getByRole("button", { name: "Review Decrease liquidity" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
@@ -229,14 +266,17 @@ describe("Phase 1 liquidity in the existing screen", () => {
       expect(screen.getByRole("button", { name: "Review Decrease liquidity" })).toBeEnabled()
     );
     fireEvent.change(share, { target: { value: "100" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review Decrease liquidity" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Use Exit");
-    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Review Exit liquidity" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+    expect(mocks.execute.mock.calls[1][0].kind).toBe("phase-one-exit-liquidity");
   });
   it("rebalances using principal with no wallet top-up", async () => {
     mocks.liquidity = 10n ** 21n;
     render(tree());
-    fireEvent.click(await screen.findByRole("button", { name: "Rebalance" }));
+    await openDetail();
+    fireEvent.click(await screen.findByText("More"));
+    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
     fireEvent.click(screen.getByRole("button", { name: "Review Rebalance" }));
     expect(await screen.findByText("Maximum token debit: 0 STATICS + 0 WETH")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
@@ -252,8 +292,10 @@ describe("Phase 1 liquidity in the existing screen", () => {
   it("collects fees without gauge reads or unfinished range inputs from another action", async () => {
     mocks.liquidity = 100n;
     render(tree());
-    fireEvent.click(await screen.findByRole("button", { name: "Rebalance" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Full range" }));
+    await openDetail();
+    fireEvent.click(await screen.findByText("More"));
+    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
     fireEvent.click(screen.getByRole("button", { name: "Collect fees" }));
     fireEvent.click(screen.getByRole("button", { name: "Review Collect fees" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
@@ -269,8 +311,12 @@ describe("Phase 1 liquidity in the existing screen", () => {
       return hash("a");
     });
     render(tree());
-    expect(await screen.findByRole("button", { name: "Position #1" })).toHaveClass("lp-position");
-    expect(await screen.findByRole("checkbox", { name: "Full range" })).toBeChecked();
+    await openDeposit();
+    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("1");
+    expect(screen.getByRole("button", { name: "Full range" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     expect(screen.queryByRole("textbox", { name: "PositionNFT ID" })).not.toBeInTheDocument();
     const confirm = await provideReview();
     expect(mocks.execute).not.toHaveBeenCalled();
@@ -302,6 +348,8 @@ describe("Phase 1 liquidity in the existing screen", () => {
       nextCursor: null,
     });
     const rendered = render(tree());
+    fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: "Create position" }));
     mocks.execute.mockImplementation(async (request) => {
       if (request.kind === "phase-one-create-position") {
@@ -324,7 +372,9 @@ describe("Phase 1 liquidity in the existing screen", () => {
       throw new Error("Approval interrupted");
     });
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
-    await screen.findByRole("button", { name: "Position #99" });
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("99")
+    );
     fireEvent.click(await provideReview());
     await screen.findByText("Approval interrupted");
     expect(
@@ -340,7 +390,8 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.allowance = maxUint256;
     mocks.execute.mockResolvedValue(hash("b"));
     render(tree());
-    expect(await screen.findByRole("button", { name: "Position #99" })).toBeInTheDocument();
+    await openDeposit();
+    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("99");
     fireEvent.click(await provideReview());
     await waitFor(() =>
       expect(
@@ -361,9 +412,10 @@ describe("Phase 1 liquidity in the existing screen", () => {
         : original(input)
     );
     render(tree());
+    await openDetail();
     const button = await screen.findByRole("button", { name: "Review forfeiture" });
     fireEvent.click(button);
-    await screen.findByText("1 STATICS");
+    await screen.findAllByText("1 STATICS");
     await screen.findByText("You permanently give up this reward amount. It cannot be recovered.");
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
@@ -373,4 +425,239 @@ describe("Phase 1 liquidity in the existing screen", () => {
       "phase-one-forfeit-lp-reward",
     ]);
   });
+  it("keeps empty NFTs out of the list and calculates paired amounts without more RPC reads", async () => {
+    render(tree());
+    await screen.findByText("No liquidity positions yet");
+    expect(mocks.legs).not.toHaveBeenCalled();
+    await openDeposit();
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Max" })[0]).toBeEnabled());
+    const calls = mocks.read.mock.calls.length;
+    fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
+      target: { value: "2" },
+    });
+    expect(screen.getByRole("textbox", { name: "Deposit WETH" })).toHaveValue("2");
+    expect(mocks.read).toHaveBeenCalledTimes(calls);
+    fireEvent.click(screen.getByRole("button", { name: "Review Add liquidity" }));
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
+      target: { value: "3" },
+    });
+    expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument();
+  });
+  it("blocks invalid amounts and insufficient balances before review without RPC work", async () => {
+    render(tree());
+    await openDeposit();
+    fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
+      target: { value: "abc" },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid token amount");
+    expect(screen.getByRole("button", { name: "Review Add liquidity" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
+      target: { value: "100000000" },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Insufficient token balance");
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("reviews ETH wrapping and stops before approvals if wrapping fails", async () => {
+    const read = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "balanceOf" && input.address === address("3")
+        ? Promise.resolve(0n)
+        : read(input)
+    );
+    mocks.execute.mockRejectedValue(new Error("Wrapping reverted"));
+    render(tree());
+    await openDeposit();
+    fireEvent.change(screen.getByRole("combobox", { name: "Pay with" }), {
+      target: { value: "ETH" },
+    });
+    const confirm = await provideReview();
+    await screen.findByText("Wrap up to 1 ETH to WETH before depositing.");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await screen.findByText("Wrapping reverted");
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.execute.mock.calls[0][0]).toMatchObject({
+      kind: "phase-one-wrap-native",
+      to: address("3"),
+      value: 10n ** 18n,
+    });
+  });
+  it("resumes with existing WETH after an interrupted wrapping step", async () => {
+    let weth = 0n;
+    const read = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "balanceOf" && input.address === address("3")
+        ? Promise.resolve(weth)
+        : read(input)
+    );
+    mocks.allowance = maxUint256;
+    render(tree());
+    await openDeposit();
+    fireEvent.change(screen.getByRole("combobox", { name: "Pay with" }), {
+      target: { value: "ETH" },
+    });
+    const confirm = await provideReview();
+    weth = 10n ** 18n;
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-provide-liquidity");
+  });
+  it("opens an existing liquidity leg from Position NFT navigation", async () => {
+    mocks.liquidity = 10n ** 21n;
+    render(tree(1n));
+    await screen.findByRole("heading", { name: "Position details" });
+    expect(await screen.findByRole("button", { name: "Remove liquidity" })).toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("opens a deposit for an owned Position NFT that has no liquidity", async () => {
+    render(tree(1n));
+    expect(await screen.findByRole("textbox", { name: "Deposit STATICS" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("1");
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+});
+
+it("shows unavailable indexed pools without crashing or hiding retained rewards", async () => {
+  mocks.liquidity = 100n;
+  const disabled = {
+    ...option,
+    phaseOne: {
+      ...deployment,
+      supportedPools: deployment.supportedPools.map((pool) => ({ ...pool, enabled: false })),
+    },
+  };
+  render(tree(null, null, disabled));
+  expect(
+    await screen.findByText("Position #1 belongs to a pool that is currently unavailable.")
+  ).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Manage rewards" })).toHaveAttribute(
+    "href",
+    `/app/rewards/bribes?positionId=1&poolId=${poolId}`
+  );
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+it("rejects an unknown pool deep link with an explicit pool reset", async () => {
+  render(tree(1n, hash("f")));
+  expect(
+    await screen.findByText("This pool is unavailable. Choose an enabled pool to continue.")
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Deposit STATICS" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Choose a pool" })).toBeInTheDocument();
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+it("does not substitute another NFT when a requested position belongs to a different wallet", async () => {
+  mocks.position.mockResolvedValue({ ...indexed(99n), owner: address("f") });
+  render(tree(99n));
+  expect(
+    await screen.findByText(
+      "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue."
+    )
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Deposit STATICS" })).not.toBeInTheDocument();
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+it("does not open a deposit when focused liquidity discovery fails", async () => {
+  mocks.liquidity = 100n;
+  mocks.legs.mockRejectedValue(new Error("indexer unavailable"));
+  render(tree(1n));
+  expect(
+    await screen.findByText(
+      "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue."
+    )
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Deposit STATICS" })).not.toBeInTheDocument();
+});
+it("does not show a definitive empty state while ownership discovery has another page", async () => {
+  mocks.positions.mockResolvedValue({
+    deploymentId: "fixture",
+    indexedAtBlock: 1n,
+    items: [indexed(1n)],
+    nextCursor: "1",
+  });
+  render(tree());
+  await screen.findByRole("button", { name: "Load more positions" });
+  expect(screen.queryByText("Your liquidity positions will appear here.")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "No liquidity positions yet" })
+  ).not.toBeInTheDocument();
+});
+
+it("retains only the inactive pool with actual exit obligations", async () => {
+  mocks.reward = 100n;
+  mocks.legs.mockResolvedValue(
+    [poolId, hash("f")].map((id) => ({
+      positionId: 1n,
+      poolId: id,
+      posmTokenId: 10n,
+      tickLower: -60,
+      tickUpper: 60,
+      liquidity: 0n,
+      active: false,
+    }))
+  );
+  const read = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation((input) =>
+    input.functionName === "lpLeg" && input.args[1] === hash("f")
+      ? Promise.resolve({ liquidity: 0n, claimable: fiveZero, rewardRemainderRay: fiveZero })
+      : read(input)
+  );
+  render(tree());
+  expect(
+    await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ })
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText("Position #1 belongs to a pool that is currently unavailable.")
+  ).not.toBeInTheDocument();
+});
+it("reuses earlier position discovery when loading another ownership page", async () => {
+  mocks.liquidity = 100n;
+  mocks.positions.mockImplementation(async (_wallet, _deployment, _url, cursor) => ({
+    deploymentId: "fixture",
+    indexedAtBlock: 1n,
+    items: [indexed(cursor ? 2n : 1n)],
+    nextCursor: cursor ? null : "1",
+  }));
+  mocks.legs.mockImplementation(async (id) => [
+    {
+      positionId: id,
+      poolId,
+      posmTokenId: id,
+      tickLower: -60,
+      tickUpper: 60,
+      liquidity: 100n,
+      active: true,
+    },
+  ]);
+  render(tree());
+  await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ });
+  fireEvent.click(screen.getByRole("button", { name: "Load more positions" }));
+  await screen.findByRole("button", { name: /STATICS \/ WETH Position #2/ });
+  expect(mocks.legs).toHaveBeenCalledTimes(2);
+});
+it("waits for live price before enabling custom range defaults", async () => {
+  const read = mocks.read.getMockImplementation()!;
+  let loaded!: (value: readonly [bigint, number, number, number]) => void;
+  mocks.read.mockImplementation((input) =>
+    input.functionName === "getSlot0"
+      ? new Promise((resolve) => {
+          loaded = resolve;
+        })
+      : read(input)
+  );
+  render(tree());
+  await openDeposit();
+  expect(screen.getByRole("button", { name: "Custom range" })).toBeDisabled();
+  loaded([1n << 96n, 0, 0, 3000]);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Custom range" })).toBeEnabled());
+});
+
+it("accepts a mixed-case bytes32 pool deep link", async () => {
+  render(tree(1n, `0x${poolId.slice(2).toUpperCase()}`));
+  expect(await screen.findByRole("textbox", { name: "Deposit STATICS" })).toBeInTheDocument();
+  expect(
+    screen.queryByText("This pool is unavailable. Choose an enabled pool to continue.")
+  ).not.toBeInTheDocument();
+  expect(mocks.execute).not.toHaveBeenCalled();
 });

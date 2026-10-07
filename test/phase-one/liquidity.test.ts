@@ -1,5 +1,12 @@
-import { decodeFunctionData, erc20Abi, getAddress, maxUint256 } from "viem";
-import { describe, expect, it } from "vitest";
+import {
+  decodeFunctionData,
+  erc20Abi,
+  getAddress,
+  maxUint256,
+  toHex,
+  type PublicClient,
+} from "viem";
+import { describe, expect, it, vi } from "vitest";
 
 import { staticsRangeGaugeAbi, v4PoolId, type V4PoolKey } from "@statics-protocol/sdk/phase-one";
 
@@ -11,6 +18,7 @@ import {
   planPublicLiquidityApprovals,
   quotePublicLiquidity,
   quoteWithdrawalAmounts,
+  readPublicLiquidityFees,
   usableTickBounds,
   validatePublicLiquidityRange,
 } from "@/lib/phase-one/liquidity";
@@ -162,5 +170,38 @@ describe("user-facing price bounds", () => {
     expect(priceToAlignedTick(parseUnits("1", 36), 6, 18, 60, "lower")).toBeGreaterThan(270000);
     expect(tickPrice(0, 6, 18)).toBe("0.000000000001");
     expect(() => priceToAlignedTick(0n, 18, 18, 60, "lower")).toThrow("greater than zero");
+  });
+  it("reads trading fees for the PositionManager NFT salt rather than the managed Position NFT", async () => {
+    const readContract = vi
+      .fn()
+      .mockResolvedValueOnce([100n, 1n << 128n, 0n])
+      .mockResolvedValueOnce([3n << 128n, 1n << 128n]);
+    const configured = {
+      ...deployment,
+      contracts: {
+        ...deployment.contracts,
+        stateView: address("7"),
+        positionManager: address("8"),
+      },
+    };
+    await expect(
+      readPublicLiquidityFees({
+        publicClient: { readContract } as unknown as PublicClient,
+        deployment: configured,
+        poolId: pool.poolId,
+        posmTokenId: 99n,
+        tickLower: -60,
+        tickUpper: 60,
+      })
+    ).resolves.toEqual({ amount0: 200n, amount1: 100n });
+    expect(readContract.mock.calls[0][0]).toMatchObject({
+      address: address("7"),
+      functionName: "getPositionInfo",
+      args: [pool.poolId, address("8"), -60, 60, toHex(99n, { size: 32 })],
+    });
+    expect(readContract.mock.calls[1][0]).toMatchObject({
+      functionName: "getFeeGrowthInside",
+      args: [pool.poolId, -60, 60],
+    });
   });
 });

@@ -1,6 +1,8 @@
+import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
 import {
+  parseIndexedManagedLiquidity,
   parseIndexedPositions,
   parseIndexedPublicPools,
   parsePhaseOneCandles,
@@ -102,5 +104,37 @@ describe("Phase 1 indexed read models", () => {
         "phase-one"
       )
     ).toThrow("position owner");
+  });
+  it("discovers managed liquidity with owner, deployment and position isolation", () => {
+    const response = {
+      deploymentId: "phase-one",
+      position: { positionId: "34", owner: address("1") },
+      managedLiquidity: [
+        {
+          poolId: hash("2"),
+          posmTokenId: "9007199254740993",
+          tickLower: -60,
+          tickUpper: 60,
+          liquidity: "12345678901234567890",
+          active: true,
+        },
+      ],
+    };
+    const owner = getAddress(address("1"));
+    expect(parseIndexedManagedLiquidity(response, 34n, "phase-one", owner)[0]).toMatchObject({
+      positionId: 34n,
+      posmTokenId: 9007199254740993n,
+      liquidity: 12345678901234567890n,
+      tickLower: -60,
+    });
+    expect(
+      parseIndexedManagedLiquidity(response, 34n, "phase-one", getAddress(address("3")))
+    ).toEqual([]);
+    expect(() => parseIndexedManagedLiquidity(response, 35n, "phase-one", owner)).toThrow(
+      "different position"
+    );
+    expect(() => parseIndexedManagedLiquidity(response, 34n, "other", owner)).toThrow(
+      "different deployment"
+    );
   });
 });

@@ -74,7 +74,11 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-stake-allowance": "approval",
   "phase-one-liquidity-allowance": "approval",
   "phase-one-wallet-lp": "phase-one-liquidity",
+  "phase-one-liquidity-catalog": "phase-one-liquidity",
+  "phase-one-liquidity-balances": "wallet",
   "earn-wallet-balance": "wallet",
+  "phase-one-liquidity-native-balance": "wallet",
+  "phase-one-liquidity-fees": "phase-one-liquidity",
   "phase-one-liquidity": "phase-one-liquidity",
   "phase-one-rewards": "phase-one-reward",
   "phase-one-gauges": "phase-one-reward",
@@ -103,10 +107,14 @@ const walletScopedRoots = new Set([
   "phase-one-stake-allowance",
   "phase-one-liquidity-allowance",
   "phase-one-wallet-lp",
-  "earn-wallet-balance",
   "direct-swap-allowances",
   "phase-one-positions",
   "phase-one-position",
+  "phase-one-liquidity-catalog",
+  "phase-one-liquidity-balances",
+  "earn-wallet-balance",
+  "phase-one-liquidity-native-balance",
+  "phase-one-liquidity-fees",
   "phase-one-liquidity",
   "phase-one-rewards",
   "phase-one-gauges",
@@ -118,16 +126,21 @@ const deploymentScopedRoots = new Set([
   "phase-one-stake-allowance",
   "phase-one-liquidity-allowance",
   "phase-one-wallet-lp",
-  "earn-wallet-balance",
   "direct-swap-allowances",
   "phase-one-positions",
   "phase-one-position",
+  "phase-one-liquidity-catalog",
+  "phase-one-liquidity-balances",
+  "earn-wallet-balance",
+  "phase-one-liquidity-native-balance",
+  "phase-one-liquidity-fees",
   "phase-one-liquidity",
   "phase-one-rewards",
   "phase-one-gauges",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
+  if (kind === "phase-one-wrap-native") return ["wallet"];
   if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
   if (
     kind === "phase-one-claim-lp-rewards" ||

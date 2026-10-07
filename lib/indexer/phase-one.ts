@@ -297,6 +297,58 @@ export async function loadIndexedPhaseOnePosition(
   ).items[0];
 }
 
+export type IndexedManagedLiquidity = Readonly<{
+  positionId: bigint;
+  poolId: Hex;
+  posmTokenId: bigint;
+  tickLower: number;
+  tickUpper: number;
+  liquidity: bigint;
+  active: boolean;
+}>;
+
+export function parseIndexedManagedLiquidity(
+  value: unknown,
+  positionId: bigint,
+  deploymentId: string,
+  owner: Address
+): readonly IndexedManagedLiquidity[] {
+  const body = record(value, "position response");
+  if (body.deploymentId !== deploymentId)
+    throw new Error("The indexer returned a different deployment.");
+  const position = record(body.position, "position");
+  if (unsignedBigint(position.positionId, "position ID") !== positionId)
+    throw new Error("The indexer returned a different position.");
+  if (address(position.owner, "owner").toLowerCase() !== owner.toLowerCase()) return [];
+  if (!Array.isArray(body.managedLiquidity))
+    throw new Error("The indexer returned invalid liquidity positions.");
+  return body.managedLiquidity.map((item) => {
+    const row = record(item, "liquidity position");
+    return {
+      positionId,
+      poolId: hash(row.poolId, "pool"),
+      posmTokenId: unsignedBigint(row.posmTokenId, "LP NFT"),
+      tickLower: integer(row.tickLower, "lower tick"),
+      tickUpper: integer(row.tickUpper, "upper tick"),
+      liquidity: unsignedBigint(row.liquidity, "liquidity"),
+      active: boolean(row.active, "active liquidity"),
+    };
+  });
+}
+
+export async function loadIndexedManagedLiquidity(
+  positionId: bigint,
+  deploymentId: string,
+  owner: Address
+): Promise<readonly IndexedManagedLiquidity[]> {
+  return parseIndexedManagedLiquidity(
+    await load(deploymentId, `/phase-one/positions/${positionId}`),
+    positionId,
+    deploymentId,
+    owner
+  );
+}
+
 export type IndexedAllocationSnapshot = Readonly<{
   positionId: bigint;
   nextAllocationAt: bigint;
