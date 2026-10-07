@@ -291,6 +291,11 @@ describe("focused Phase 1 Earn", () => {
     expect(
       screen.queryByRole("region", { name: "Actions for selected positions" })
     ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
+    expect(screen.getByRole("checkbox", { name: "Select Position #2" })).not.toBeChecked();
+    expect(
+      screen.queryByRole("region", { name: "Actions for selected positions" })
+    ).not.toBeInTheDocument();
   });
   it("loads ownership beyond 100 and scopes management to an explicitly requested NFT", async () => {
     mocks.params = new URLSearchParams("positionId=101");

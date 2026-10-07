@@ -91,6 +91,9 @@ export function EarnPositionsTable({
     context: selectionContext,
     ids: [],
   });
+  if (selection.context !== selectionContext) {
+    setSelection({ context: selectionContext, ids: [] });
+  }
   const selected = selection.context === selectionContext ? selection.ids : [];
   const setSelected = (ids: string[]) => setSelection({ context: selectionContext, ids });
 
