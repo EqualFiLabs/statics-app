@@ -136,3 +136,41 @@ describe("batch transaction sequencing", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("typed reward scopes", () => {
+  it("claims gauge slot zero without unrelated failed global or allocator reads", () => {
+    const [batch] = planBatchRewardClaims(
+      [
+        {
+          ...row(),
+          globalUnavailable: true,
+          pools: [{ ...row().pools[0], allocatorUnavailable: true }],
+        },
+      ],
+      receiver,
+      diamond,
+      { sources: ["gauge"] }
+    );
+    expect(batch.globalClaims).toEqual([]);
+    expect(batch.allocatorClaims).toEqual([]);
+    expect(batch.lpClaims[0].slots).toEqual([0]);
+  });
+  it("excludes hidden assets and pools and supports narrower checked position rows", () => {
+    const [batch] = planBatchRewardClaims([row(1n), row(2n)], receiver, diamond, {
+      sources: ["lp-bribe"],
+      asset: address(3),
+      selectedRows: [`2:${poolId}`],
+    });
+    expect(batch.lpClaims).toEqual([{ positionId: 2n, poolId, slots: [2], minimumAmounts: [0n] }]);
+    expect(batch.globalClaims).toEqual([]);
+    expect(batch.allocatorClaims).toEqual([]);
+  });
+  it("deduplicates the same selected parent/child reward group", () => {
+    const [batch] = planBatchRewardClaims([row(), row()], receiver, diamond, {
+      sources: ["gauge", "lp-bribe"],
+      selectedRows: [`1:${poolId}`, `1:${poolId}`],
+    });
+    expect(batch.lpClaims).toHaveLength(1);
+    expect(batch.lpClaims[0].slots).toEqual([0, 2]);
+  });
+});

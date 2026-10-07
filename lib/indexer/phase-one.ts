@@ -296,3 +296,78 @@ export async function loadIndexedPhaseOnePosition(
     deploymentId
   ).items[0];
 }
+
+export type IndexedAllocationSnapshot = Readonly<{
+  positionId: bigint;
+  nextAllocationAt: bigint;
+  totalAllocated: bigint;
+  lockedStake: bigint;
+  allocations: readonly Readonly<{ poolId: Hex; amount: bigint; eligibilityVersion: Hex }>[];
+  updatedAtBlock: bigint;
+}>;
+export function parseIndexedAllocationSnapshot(
+  value: unknown,
+  positionId: bigint,
+  deploymentId: string,
+  owner: Address
+): IndexedAllocationSnapshot {
+  const body = record(value, "position response");
+  if (body.deploymentId !== deploymentId)
+    throw new Error("The Phase 1 indexer returned a different deployment.");
+  const position = record(body.position, "position");
+  if (
+    unsignedBigint(position.positionId, "position ID") !== positionId ||
+    address(position.owner, "owner").toLowerCase() !== owner.toLowerCase()
+  )
+    throw new Error("The position does not belong to this wallet.");
+  if (body.allocations === null)
+    return {
+      positionId,
+      nextAllocationAt: 0n,
+      totalAllocated: 0n,
+      lockedStake: 0n,
+      allocations: [],
+      updatedAtBlock: unsignedBigint(body.indexedAtBlock, "indexed block"),
+    };
+  const row = record(body.allocations, "allocations");
+  if (
+    !Array.isArray(row.poolIds) ||
+    !Array.isArray(row.amounts) ||
+    !Array.isArray(row.eligibilityVersions) ||
+    row.poolIds.length !== row.amounts.length ||
+    row.poolIds.length !== row.eligibilityVersions.length
+  )
+    throw new Error("The Phase 1 indexer returned invalid allocation arrays.");
+  const amounts = row.amounts,
+    versions = row.eligibilityVersions;
+  const allocations = row.poolIds.map((poolId, index) => ({
+    poolId: hash(poolId, "allocation pool"),
+    amount: unsignedBigint(amounts[index], "allocation amount"),
+    eligibilityVersion: hash(versions[index], "eligibility version"),
+  }));
+  if (new Set(allocations.map((entry) => entry.poolId.toLowerCase())).size !== allocations.length)
+    throw new Error("The Phase 1 indexer returned duplicate allocation pools.");
+  const totalAllocated = unsignedBigint(row.totalAllocated, "allocated stake");
+  if (allocations.reduce((total, entry) => total + entry.amount, 0n) !== totalAllocated)
+    throw new Error("The Phase 1 indexer returned an inconsistent allocation total.");
+  return {
+    positionId,
+    nextAllocationAt: unsignedBigint(row.nextAllocationAt, "cooldown"),
+    totalAllocated,
+    lockedStake: unsignedBigint(row.lockedStake, "locked stake"),
+    allocations,
+    updatedAtBlock: unsignedBigint(row.updatedAtBlock, "allocation block"),
+  };
+}
+export async function loadIndexedAllocationSnapshot(
+  positionId: bigint,
+  deploymentId: string,
+  owner: Address
+) {
+  return parseIndexedAllocationSnapshot(
+    await load(deploymentId, `/phase-one/positions/${positionId}`),
+    positionId,
+    deploymentId,
+    owner
+  );
+}

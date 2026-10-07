@@ -213,7 +213,10 @@ export function PhaseOnePositionDetail({
         )}
         {owned && (
           <>
-            <Link className="position-card-link" href={`/app/rewards?positionId=${positionId}`}>
+            <Link
+              className="position-card-link"
+              href={`/app/rewards/staking?positionId=${positionId}`}
+            >
               {p("rewards")} →
             </Link>
             <Link className="position-card-link" href={`/app/liquidity?positionId=${positionId}`}>

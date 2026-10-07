@@ -68,6 +68,7 @@ export type ProtocolTransactionRequest = Readonly<{
   describeError: (error: unknown) => string;
   validateSimulation?: (result: Hex | undefined) => void;
   onSubmitted?: (hash: Hex) => void;
+  onSigning?: () => void;
   verifyConfirmation?: (receipt: TransactionReceipt) => Promise<void>;
 }>;
 
@@ -250,6 +251,7 @@ export async function executeProtocolTransaction(
       deploymentId
     );
 
+    request.onSigning?.();
     const hash = await request.sendTransaction({
       wallet: request.wallet,
       chainId: request.chainId,

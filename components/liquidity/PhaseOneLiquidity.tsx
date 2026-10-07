@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -39,9 +40,11 @@ type Mode = "provide" | "attach" | "increase" | "decrease" | "collect" | "rebala
 export function PhaseOneLiquidity({
   deployment,
   initialPositionId = null,
+  initialPoolId = null,
 }: {
   deployment: PhaseOneDeployment;
   initialPositionId?: bigint | null;
+  initialPoolId?: Hex | null;
 }) {
   const t = useTranslations("phaseOne");
   const action = usePhaseOneAction(deployment);
@@ -49,7 +52,7 @@ export function PhaseOneLiquidity({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<bigint | null>(null);
   const [poolId, setPoolId] = useState(
-    deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? ""
+    initialPoolId ?? deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? ""
   );
   const initial = useQuery({
     queryKey: [
@@ -209,6 +212,7 @@ function ManagedLiquidity({
   poolId: Hex;
 }) {
   const t = useTranslations("phaseOne");
+  const earn = useTranslations("earnUx");
   const locale = useAppLocale();
   const action = usePhaseOneAction(deployment, `${positionId}:${poolId}`);
   const queryClient = useQueryClient();
@@ -628,6 +632,9 @@ function ManagedLiquidity({
           <h3>
             {pool.token0.symbol}/{pool.token1.symbol}
           </h3>
+          <Link href={`/app/rewards/gauge?positionId=${positionId}&poolId=${poolId}`}>
+            {earn("viewGauge")}
+          </Link>
         </div>
       </div>
       {managed.isError && <p role="alert">{managed.error.message}</p>}

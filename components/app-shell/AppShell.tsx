@@ -373,11 +373,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Every route names itself. This used to be gated to /app, which left
               every other destination -- Genesis included -- with no <h1> at all
               and no statement of what the page is for. */}
-          <section className="dapp-intro">
-            <p className="dapp-eyebrow">{routeCopy.status}</p>
-            <h1>{routeCopy.title}</h1>
-            <p>{routeCopy.description}</p>
-          </section>
+          {!(active.phaseOne && currentPath.startsWith("/app/rewards")) && (
+            <section className="dapp-intro">
+              <p className="dapp-eyebrow">{routeCopy.status}</p>
+              <h1>{routeCopy.title}</h1>
+              <p>{routeCopy.description}</p>
+            </section>
+          )}
 
           {wallet.error && (
             <p className="dapp-inline-error" role="alert">

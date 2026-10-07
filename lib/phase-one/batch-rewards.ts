@@ -5,27 +5,51 @@ import {
 } from "@statics-protocol/sdk";
 import type { Address, Hex } from "viem";
 import type { PositionRewardPortfolio, RewardAmount } from "./reward-portfolio";
+import { scopeIncludes, claimScopeIncomplete, type RewardClaimScope } from "@/lib/rewards/earn";
 
 /** Select positive balances only; global claims retain the protocol's NoRewards behavior. */
 export function planBatchRewardClaims(
   rows: readonly PositionRewardPortfolio[],
   receiver: Address,
-  diamond: Address
+  diamond: Address,
+  scope: RewardClaimScope = { sources: ["global", "gauge", "lp-bribe", "allocator"] }
 ): readonly BatchRewardClaims[] {
-  if (
-    rows.some(
-      (row) =>
-        row.globalUnavailable || row.discoveryUnavailable || row.pools.some((pool) => !pool.rewards)
-    )
-  )
-    throw new Error("Load all position rewards before reviewing Claim all.");
+  const unique = new Map<string, PositionRewardPortfolio>();
+  for (const row of rows) {
+    const old = unique.get(String(row.positionId));
+    unique.set(
+      String(row.positionId),
+      old
+        ? {
+            ...old,
+            pools: [
+              ...new Map(
+                [...old.pools, ...row.pools].map((pool) => [pool.poolId.toLowerCase(), pool])
+              ).values(),
+            ],
+          }
+        : row
+    );
+  }
+  rows = [...unique.values()];
+  const includesAsset = (asset: Address) =>
+    !scope.asset || scope.asset.toLowerCase() === asset.toLowerCase();
+  const global = scope.sources.includes("global"),
+    lp = scope.sources.some((source) => source === "gauge" || source === "lp-bribe"),
+    allocator = scope.sources.includes("allocator");
+  if (claimScopeIncomplete(rows, scope))
+    throw new Error("Load all rewards in this scope before reviewing a claim.");
   const globalClaims: BatchRewardClaims["globalClaims"][number][] = [];
   const lpClaims: BatchRewardClaims["lpClaims"][number][] = [];
   const allocatorClaims: BatchRewardClaims["allocatorClaims"][number][] = [];
   for (const row of rows) {
     const assets =
       row.global?.claimAssets.filter(
-        (_, index) => (row.global?.pendingRewards[index] ?? 0n) > 0n
+        (asset, index) =>
+          global &&
+          scopeIncludes(scope, row.positionId) &&
+          includesAsset(asset) &&
+          (row.global?.pendingRewards[index] ?? 0n) > 0n
       ) ?? [];
     if (assets.length)
       globalClaims.push({
@@ -34,9 +58,15 @@ export function planBatchRewardClaims(
         minimumAmounts: assets.map(() => 0n),
       });
     for (const pool of row.pools) {
-      const rewards = pool.rewards!;
+      if (!scopeIncludes(scope, row.positionId, pool.poolId) || !pool.rewards) continue;
+      const rewards = pool.rewards;
       const slots = Array.from({ length: rewards.lp.slotCount }, (_, slot) => slot).filter(
-        (slot) => pool.hasLp && rewards.lp.amounts[slot] > 0n
+        (slot) =>
+          lp &&
+          pool.hasLp &&
+          (slot === 0 ? scope.sources.includes("gauge") : scope.sources.includes("lp-bribe")) &&
+          includesAsset(rewards.lp.assets[slot]) &&
+          rewards.lp.amounts[slot] > 0n
       );
       if (slots.length)
         lpClaims.push({
@@ -45,9 +75,12 @@ export function planBatchRewardClaims(
           slots,
           minimumAmounts: slots.map(() => 0n),
         });
-      const allocatorSlots = pool.hasAllocator
-        ? rewards.allocator.filter((reward) => reward.amount > 0n).map((reward) => reward.slot)
-        : [];
+      const allocatorSlots =
+        allocator && pool.hasAllocator
+          ? rewards.allocator
+              .filter((reward) => includesAsset(reward.asset) && reward.amount > 0n)
+              .map((reward) => reward.slot)
+          : [];
       if (allocatorSlots.length)
         allocatorClaims.push({
           positionId: row.positionId,

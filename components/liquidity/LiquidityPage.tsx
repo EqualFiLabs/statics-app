@@ -290,15 +290,22 @@ export function LiquidityContributionForm({
   );
 }
 
-export function LiquidityPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
+export function LiquidityPage({
+  initialPositionId = null,
+  initialPoolId = null,
+}: {
+  initialPositionId?: bigint | null;
+  initialPoolId?: Hex | null;
+}) {
   const wallet = useWalletState();
   const { active } = useDeployment();
   if (active.phaseOne)
     return (
       <PhaseOneLiquidity
-        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}:${initialPositionId}:${initialPoolId}`}
         deployment={active.phaseOne}
         initialPositionId={initialPositionId}
+        initialPoolId={initialPoolId}
       />
     );
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;

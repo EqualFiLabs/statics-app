@@ -11,7 +11,9 @@ import {
   parseEventLogs,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { EarnView } from "@/lib/rewards/earn";
 import { useTranslations } from "next-intl";
 
 import {
@@ -69,7 +71,13 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
   }
 }
 
-export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
+export function RewardsPage({
+  initialPositionId = null,
+  earnView = "overview",
+}: {
+  initialPositionId?: bigint | null;
+  earnView?: EarnView;
+}) {
   const wallet = useWalletState();
   const { active } = useDeployment();
   if (active.phaseOne) {
@@ -78,15 +86,26 @@ export function RewardsPage({ initialPositionId = null }: { initialPositionId?: 
         key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
         deployment={active.phaseOne}
         initialPositionId={initialPositionId}
+        view={earnView}
       />
     );
   }
+  if (earnView !== "overview") return <UnsupportedEarnFeature />;
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
   return (
     <ProtocolActionScope>
       <RewardsRuntime initialPositionId={initialPositionId} />
     </ProtocolActionScope>
   );
+}
+
+function UnsupportedEarnFeature() {
+  const t = useTranslations("earnUx");
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/app/rewards");
+  }, [router]);
+  return <Link href="/app/rewards">{t("title")}</Link>;
 }
 
 function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | null }) {

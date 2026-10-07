@@ -1,4 +1,4 @@
-import type { Address, Hex, PublicClient } from "viem";
+import { zeroAddress, type Address, type Hex, type PublicClient } from "viem";
 
 import {
   buildClaimGaugeAllocatorRewardsCall,
@@ -136,18 +136,40 @@ export async function readPositionGaugeRewards(input: {
   poolId: Hex;
   allocatorSlots?: readonly number[];
   includeProtocolAccrual?: boolean;
+  source?: "gauge" | "lp-bribe" | "allocator";
   account: Address;
 }): Promise<
   Readonly<{ lp: RangeGaugePendingRewards; allocator: readonly GaugeAllocatorClaimPreview[] }>
 > {
-  let lp = await input.publicClient.readContract({
-    address: input.deployment.contracts.diamond,
-    abi: staticsRangeGaugeAbi,
-    functionName: "previewLpRewards",
-    args: [input.positionId, input.poolId],
-    account: input.account,
-  });
-  if (input.includeProtocolAccrual !== false && lp.slotCount > 0) {
+  const allocatorOnly = input.source === "allocator";
+  const config =
+    allocatorOnly && input.allocatorSlots === undefined
+      ? await input.publicClient.readContract({
+          address: input.deployment.contracts.diamond,
+          abi: staticsRangeGaugeAbi,
+          functionName: "poolRewardConfig",
+          args: [input.poolId],
+        })
+      : null;
+  let lp: RangeGaugePendingRewards = allocatorOnly
+    ? {
+        slotCount: config?.slotCount ?? 0,
+        assets: [zeroAddress, zeroAddress, zeroAddress, zeroAddress, zeroAddress],
+        amounts: [0n, 0n, 0n, 0n, 0n],
+      }
+    : await input.publicClient.readContract({
+        address: input.deployment.contracts.diamond,
+        abi: staticsRangeGaugeAbi,
+        functionName: "previewLpRewards",
+        args: [input.positionId, input.poolId],
+        account: input.account,
+      });
+  if (
+    input.includeProtocolAccrual !== false &&
+    input.source !== "allocator" &&
+    input.source !== "lp-bribe" &&
+    lp.slotCount > 0
+  ) {
     const leg = await input.publicClient.readContract({
       address: input.deployment.contracts.diamond,
       abi: staticsRangeGaugeAbi,
@@ -172,7 +194,7 @@ export async function readPositionGaugeRewards(input: {
     }
   }
   const allocatorSlots =
-    input.allocatorSlots ??
+    (input.source === "gauge" || input.source === "lp-bribe" ? [] : input.allocatorSlots) ??
     Array.from({ length: Math.max(0, lp.slotCount - 1) }, (_, index) => index + 1);
   let allocator =
     allocatorSlots.length === 0

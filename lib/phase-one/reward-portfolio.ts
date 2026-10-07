@@ -13,6 +13,7 @@ const allocatorPoolsAbi = parseAbi([
 ]);
 export type PositionRewardPortfolio = Readonly<{
   positionId: bigint;
+  loadedSources?: readonly RewardSource[];
   global: GlobalRewards | null;
   globalUnavailable: boolean;
   discoveryUnavailable: boolean;
@@ -21,6 +22,8 @@ export type PositionRewardPortfolio = Readonly<{
     hasLp: boolean;
     hasAllocator: boolean;
     rewards: PoolRewards | null;
+    lpUnavailable?: boolean;
+    allocatorUnavailable?: boolean;
   }>[];
 }>;
 
@@ -31,6 +34,7 @@ export async function discoverPositionRewardPools(input: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
   account: Address;
+  kind?: "lp" | "allocator";
 }): Promise<RewardPools> {
   async function pages(kind: "lp" | "allocator") {
     let cursor = 0n;
@@ -60,7 +64,10 @@ export async function discoverPositionRewardPools(input: {
     }
     throw new Error("Reward pool discovery exceeded its page limit.");
   }
-  const [lp, allocator] = await Promise.all([pages("lp"), pages("allocator")]);
+  const [lp, allocator] = await Promise.all([
+    input.kind === "allocator" ? [] : pages("lp"),
+    input.kind === "lp" ? [] : pages("allocator"),
+  ]);
   return { lp, allocator };
 }
 

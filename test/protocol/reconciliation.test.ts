@@ -20,6 +20,29 @@ describe("confirmed transaction reconciliation", () => {
     expect(protocolQueryScopes("phase-one-forfeit-lp-reward")).toContain("phase-one-liquidity");
   });
 
+  it("refreshes Earn wallet balances on a scoped stake receipt", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-stake" as const,
+      scopes: protocolQueryScopes("phase-one-stake"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(["earn-wallet-balance", "local", detail.wallet], detail)
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["earn-wallet-balance", "other", detail.wallet], detail)
+    ).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["earn-wallet-balance", "local", "0x0000000000000000000000000000000000000002"],
+        detail
+      )
+    ).toBe(false);
+  });
+
   it("waits until the read RPC serves the confirmed block", async () => {
     const getBlockNumber = vi.fn().mockResolvedValueOnce(99n).mockResolvedValueOnce(100n);
 
