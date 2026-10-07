@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeFunctionData, encodeFunctionResult, getAddress, parseEther } from "viem";
-import { staticsBatchRewardsAbi } from "@statics-protocol/sdk";
+import { staticsBatchRewardsAbi, staticsAggregatedBatchRewardsAbi } from "@statics-protocol/sdk";
 import { fireEvent, render, screen, waitFor } from "@/test/render";
 import { BatchRewardClaim } from "@/components/rewards/BatchRewardClaim";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import type { PositionRewardPortfolio } from "@/lib/phase-one/reward-portfolio";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
+const batchAbi = [...staticsBatchRewardsAbi, ...staticsAggregatedBatchRewardsAbi] as const;
 const mocks = vi.hoisted(() => ({ read: vi.fn(), call: vi.fn(), send: vi.fn() }));
 vi.mock("wagmi", () => ({
   usePublicClient: () => ({
@@ -54,14 +55,22 @@ function view(values = rows(), address = wallet, props = {}, chainId = 4663) {
   );
 }
 beforeEach(() => {
-  mocks.read.mockReset().mockResolvedValue([16n, 64n]);
+  mocks.read
+    .mockReset()
+    .mockImplementation(async ({ functionName }) =>
+      functionName === "batchClaimLimits" ? [16n, 64n] : true
+    );
   mocks.call.mockReset().mockImplementation(async ({ data }) => {
-    const decoded = decodeFunctionData({ abi: staticsBatchRewardsAbi, data });
-    if (decoded.functionName !== "batchClaimRewards") throw new Error("Wrong call");
+    const decoded = decodeFunctionData({ abi: batchAbi, data });
+    if (
+      decoded.functionName !== "batchClaimRewards" &&
+      decoded.functionName !== "batchClaimRewardsAggregated"
+    )
+      throw new Error("Wrong call");
     return {
       data: encodeFunctionResult({
-        abi: staticsBatchRewardsAbi,
-        functionName: "batchClaimRewards",
+        abi: batchAbi,
+        functionName: decoded.functionName as "batchClaimRewards" | "batchClaimRewardsAggregated",
         result: [decoded.args[0].map(() => [parseEther("7")]), [], []],
       }),
     };
@@ -79,14 +88,38 @@ describe("Claim all review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
     await screen.findByText("All 1 transactions confirmed.");
     const decoded = decodeFunctionData({
-      abi: staticsBatchRewardsAbi,
+      abi: batchAbi,
       data: mocks.send.mock.calls[0][0].data,
     });
-    expect(decoded.functionName).toBe("batchClaimRewards");
-    if (decoded.functionName === "batchClaimRewards") {
+    expect(decoded.functionName).toBe("batchClaimRewardsAggregated");
+    if (decoded.functionName === "batchClaimRewardsAggregated") {
       expect(decoded.args[0][0].minimumAmounts).toEqual([parseEther("7")]);
       expect(decoded.args[3].toLowerCase()).toBe(wallet.toLowerCase());
     }
+  });
+  it("keeps legacy calls on deployments without the aggregated interface", async () => {
+    mocks.read.mockImplementation(async ({ functionName }) =>
+      functionName === "batchClaimLimits" ? [16n, 64n] : false
+    );
+    render(view());
+    fireEvent.click(screen.getByRole("button", { name: "Claim all" }));
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await screen.findByText("All 1 transactions confirmed.");
+    expect(
+      decodeFunctionData({ abi: batchAbi, data: mocks.send.mock.calls[0][0].data }).functionName
+    ).toBe("batchClaimRewards");
+  });
+  it("does not retry an aggregated preview failure through legacy claims", async () => {
+    mocks.call.mockRejectedValue(new Error("Incompatible aggregated transfer"));
+    render(view());
+    fireEvent.click(screen.getByRole("button", { name: "Claim all" }));
+    await screen.findByText("Incompatible aggregated transfer");
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+    expect(
+      decodeFunctionData({ abi: batchAbi, data: mocks.call.mock.calls[0][0].data }).functionName
+    ).toBe("batchClaimRewardsAggregated");
+    expect(mocks.send).not.toHaveBeenCalled();
   });
   it("shows partial confirmation and stops when a later wallet request fails", async () => {
     mocks.send
@@ -134,8 +167,8 @@ describe("Claim all review", () => {
     rerender(view(rows(), wallet, {}, 1));
     finish({
       data: encodeFunctionResult({
-        abi: staticsBatchRewardsAbi,
-        functionName: "batchClaimRewards",
+        abi: batchAbi,
+        functionName: "batchClaimRewardsAggregated",
         result: [[[parseEther("7")]], [], []],
       }),
     });

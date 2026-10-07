@@ -35,7 +35,7 @@ describe("vendored Statics SDK", () => {
     expect(provenance.batchRewardsSource).toEqual({
       repository: "https://github.com/EqualFiLabs/statics-sdk",
       path: ".",
-      commit: "7621609f21c99e633b216199587cc810d1bb5c13",
+      commit: "672e26cb7a28f651740d5a9f6ff0951edf219f81",
     });
     expect(Object.keys(provenance.batchRewardsSourceChecksums ?? {}).sort()).toEqual([
       "package.json",

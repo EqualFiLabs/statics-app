@@ -48,16 +48,16 @@
     "dist/phase-one/range-gauges.d.ts": "1b9caf21ec7b7c249dd260e2214a38ba161e6324ab8e6b46bb74f072f7a510af",
     "dist/phase-one/generated/robinhoodChain.js": "30d4a618c61a835c469019ed59e0e7894c995c648c7e73db9c742aa010849c53",
     "dist/phase-one/generated/robinhoodChain.d.ts": "2b1c6402c7189ca7aee68cf5d9fdf73456abdab7af5115926a8c86f2567edd48",
-    "dist/batch-rewards.js": "da791ea1507db09f70a13fa69b90c5b670b6b61699d34dcf0adf253757d76e5e",
-    "dist/batch-rewards.d.ts": "380dca9f0be8e5cf7ae2c0a7b0997bc4ad5e9425e4ac54aa284ed0a52d75abae"
+    "dist/batch-rewards.js": "65c3abb83fee22fb7fdb1bc9546dee30d0fd0ef30376cda6d8a6dc718979d70e",
+    "dist/batch-rewards.d.ts": "edfc506d90c0acb02f75b97a3b8c007ec562444da481d1c18d6f3d8564341055"
   },
   "batchRewardsSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "7621609f21c99e633b216199587cc810d1bb5c13"
+    "commit": "672e26cb7a28f651740d5a9f6ff0951edf219f81"
   },
   "batchRewardsSourceChecksums": {
-    "src/batch-rewards.ts": "9f0bcc93be827881636842eeecde7518a6c9ea472c9ebe53d54ee24bbcd499d4",
+    "src/batch-rewards.ts": "0d0ff63ca6e82f7d6fb581292572e8a3e34103354252dfb9d1c0a95607471a8a",
     "package.json": "98fa4239fadcf6659053e995f0d80c0e76588c9734297e85cea6cf634dee56e6"
   }
 }

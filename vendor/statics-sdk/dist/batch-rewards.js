@@ -19,6 +19,13 @@ export const staticsBatchRewardsAbi = parseAbi([
     "error BatchClaimRouteUnavailable(bytes4 selector)",
     "error BatchClaimReentrantCall()",
 ]);
+export const staticsAggregatedBatchRewardsAbi = parseAbi([
+    "function batchClaimRewardsAggregated((uint256 positionId,address[] assets,uint256[] minimumAmounts)[] globalClaims,(uint256 positionId,bytes32 poolId,uint8[] slots,uint256[] minimumAmounts)[] lpClaims,(uint256 positionId,bytes32 poolId,uint8[] slots,uint256[] minimumAmounts)[] allocatorClaims,address receiver) returns (uint256[][] globalReceived,uint256[][] lpReceived,uint256[][] allocatorReceived)",
+    "error IncompatibleAggregatedRewardTransfer(address asset,uint256 expected,uint256 debited,uint256 received)",
+    "error AggregatedClaimRouteIncompatible(bytes4 selector)",
+    "error InvalidAggregatedClaimContext()",
+    "event AggregatedRewardPaid(address indexed receiver,address indexed asset,uint256 amount)",
+]);
 function uint256(value, label) {
     if (typeof value !== "bigint" || value < 0n || value > UINT256_MAX)
         throw new Error(`${label} is out of uint256 range`);
@@ -166,4 +173,13 @@ export function splitBatchRewardClaims(input, diamond) {
     }
     flush();
     return output;
+}
+/** Exact-transfer mode. Simulate the complete batch with the connected account before signing. */
+export function buildBatchClaimRewardsAggregatedCall(input, diamond) {
+    validate(input, true, diamond);
+    return encodeFunctionData({ abi: staticsAggregatedBatchRewardsAbi, functionName: "batchClaimRewardsAggregated", args: [input.globalClaims, input.lpClaims, input.allocatorClaims, input.receiver] });
+}
+export function decodeBatchClaimRewardsAggregatedResult(data) {
+    const [globalReceived, lpReceived, allocatorReceived] = decodeFunctionResult({ abi: staticsAggregatedBatchRewardsAbi, functionName: "batchClaimRewardsAggregated", data });
+    return { globalReceived, lpReceived, allocatorReceived };
 }

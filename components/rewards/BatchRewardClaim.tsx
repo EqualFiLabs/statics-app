@@ -6,11 +6,13 @@ import {
   BATCH_REWARD_MAX_CLAIMS,
   BATCH_REWARD_MAX_ENTRIES,
   buildBatchClaimRewardsCall,
+  buildBatchClaimRewardsAggregatedCall,
   decodeBatchClaimRewardsResult,
+  decodeBatchClaimRewardsAggregatedResult,
   staticsBatchRewardsAbi,
   type BatchRewardClaims,
 } from "@statics-protocol/sdk";
-import type { Hex } from "viem";
+import { parseAbi, type Hex } from "viem";
 import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import {
@@ -24,6 +26,11 @@ import { scopeRewardAmounts, rewardPoolName, type RewardClaimScope } from "@/lib
 import { ReviewDrawer } from "./ReviewDrawer";
 import { RewardAmounts } from "./RewardAmounts";
 import styles from "./earn.module.css";
+
+const interfaceAbi = parseAbi([
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+]);
+const aggregatedInterfaceId = "0x23dbb931";
 
 const allSources: RewardClaimScope = { sources: ["global", "gauge", "lp-bribe", "allocator"] };
 type Progress = {
@@ -84,26 +91,46 @@ export function BatchRewardClaim({
         const client = action.publicClient!,
           wallet = action.wallet!,
           diamond = deployment.contracts.diamond;
+        let aggregated = false;
         try {
-          const limits = await cache.fetchQuery({
-            queryKey: ["phase-one-batch-limits", deployment.descriptor.chainId, diamond],
+          const capabilities = await cache.fetchQuery({
+            queryKey: ["phase-one-batch-capabilities", deployment.descriptor.chainId, diamond],
             staleTime: 300_000,
             retry: false,
-            queryFn: () =>
-              client.readContract({
-                address: diamond,
-                abi: staticsBatchRewardsAbi,
-                functionName: "batchClaimLimits",
-              }),
+            queryFn: async () => {
+              const [limits, supportsAggregated] = await Promise.all([
+                client.readContract({
+                  address: diamond,
+                  abi: staticsBatchRewardsAbi,
+                  functionName: "batchClaimLimits",
+                }),
+                client.readContract({
+                  address: diamond,
+                  abi: interfaceAbi,
+                  functionName: "supportsInterface",
+                  args: [aggregatedInterfaceId],
+                }),
+              ]);
+              return { limits, supportsAggregated };
+            },
           });
           if (
-            limits[0] !== BigInt(BATCH_REWARD_MAX_CLAIMS) ||
-            limits[1] !== BigInt(BATCH_REWARD_MAX_ENTRIES)
+            capabilities.limits[0] !== BigInt(BATCH_REWARD_MAX_CLAIMS) ||
+            capabilities.limits[1] !== BigInt(BATCH_REWARD_MAX_ENTRIES)
           )
             throw new Error();
+          aggregated = capabilities.supportsAggregated;
         } catch {
           throw new Error(t("unsupported"));
         }
+        // Freeze one call format for both review and signing. A failed aggregated
+        // simulation is never retried through the legacy API.
+        const buildCall = aggregated
+          ? buildBatchClaimRewardsAggregatedCall
+          : buildBatchClaimRewardsCall;
+        const decodeResult = aggregated
+          ? decodeBatchClaimRewardsAggregatedResult
+          : decodeBatchClaimRewardsResult;
         action.assertCurrent();
         const planned = planBatchRewardClaims(rows, wallet, diamond, scope);
         if (!planned.length) throw new Error(t("noRewards"));
@@ -115,11 +142,11 @@ export function BatchRewardClaim({
           const preview = await client.call({
             account: wallet,
             to: diamond,
-            data: buildBatchClaimRewardsCall(batch, diamond),
+            data: buildCall(batch, diamond),
             blockNumber,
           });
           if (!preview.data) throw new Error(t("invalidPreview"));
-          batches.push(freezeBatchRewardClaims(batch, decodeBatchClaimRewardsResult(preview.data)));
+          batches.push(freezeBatchRewardClaims(batch, decodeResult(preview.data)));
         }
         action.assertCurrent();
         if (stop.current) throw new Error(u("stopped"));
@@ -149,7 +176,7 @@ export function BatchRewardClaim({
                         batch.allocatorClaims.length,
                     }),
                     to: diamond,
-                    data: buildBatchClaimRewardsCall(batch, diamond),
+                    data: buildCall(batch, diamond),
                     onSigning: () => {
                       action.assertCurrent();
                       if (stop.current) throw new Error(u("stopped"));
@@ -158,7 +185,7 @@ export function BatchRewardClaim({
                     onSubmitted: () => update({ state: "confirming" }),
                     validateSimulation: (data) => {
                       if (!data) throw new Error(t("invalidPreview"));
-                      freezeBatchRewardClaims(batch, decodeBatchClaimRewardsResult(data));
+                      freezeBatchRewardClaims(batch, decodeResult(data));
                     },
                   });
                 },

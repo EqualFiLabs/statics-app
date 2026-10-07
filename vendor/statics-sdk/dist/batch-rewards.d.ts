@@ -187,6 +187,112 @@ export declare const staticsBatchRewardsAbi: readonly [{
     readonly type: "error";
     readonly inputs: readonly [];
 }];
+export declare const staticsAggregatedBatchRewardsAbi: readonly [{
+    readonly name: "batchClaimRewardsAggregated";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "tuple[]";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "positionId";
+        }, {
+            readonly type: "address[]";
+            readonly name: "assets";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "minimumAmounts";
+        }];
+        readonly name: "globalClaims";
+    }, {
+        readonly type: "tuple[]";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "positionId";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "poolId";
+        }, {
+            readonly type: "uint8[]";
+            readonly name: "slots";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "minimumAmounts";
+        }];
+        readonly name: "lpClaims";
+    }, {
+        readonly type: "tuple[]";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "positionId";
+        }, {
+            readonly type: "bytes32";
+            readonly name: "poolId";
+        }, {
+            readonly type: "uint8[]";
+            readonly name: "slots";
+        }, {
+            readonly type: "uint256[]";
+            readonly name: "minimumAmounts";
+        }];
+        readonly name: "allocatorClaims";
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256[][]";
+        readonly name: "globalReceived";
+    }, {
+        readonly type: "uint256[][]";
+        readonly name: "lpReceived";
+    }, {
+        readonly type: "uint256[][]";
+        readonly name: "allocatorReceived";
+    }];
+}, {
+    readonly name: "IncompatibleAggregatedRewardTransfer";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "asset";
+    }, {
+        readonly type: "uint256";
+        readonly name: "expected";
+    }, {
+        readonly type: "uint256";
+        readonly name: "debited";
+    }, {
+        readonly type: "uint256";
+        readonly name: "received";
+    }];
+}, {
+    readonly name: "AggregatedClaimRouteIncompatible";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "bytes4";
+        readonly name: "selector";
+    }];
+}, {
+    readonly name: "InvalidAggregatedClaimContext";
+    readonly type: "error";
+    readonly inputs: readonly [];
+}, {
+    readonly name: "AggregatedRewardPaid";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "address";
+        readonly name: "receiver";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "asset";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount";
+    }];
+}];
 export declare function buildBatchClaimRewardsCall(input: BatchRewardClaims, diamond?: Address): Hex;
 export declare function decodeBatchClaimRewardsResult(data: Hex): BatchRewardClaimResult;
 export declare function buildBatchClaimLimitsCall(): Hex;
@@ -196,3 +302,6 @@ export declare function decodeBatchClaimLimitsResult(data: Hex): Readonly<{
 }>;
 /** Input limits only. Callers must simulate/estimate each complete batch and split further if needed. */
 export declare function splitBatchRewardClaims(input: BatchRewardClaims, diamond?: Address): BatchRewardClaims[];
+/** Exact-transfer mode. Simulate the complete batch with the connected account before signing. */
+export declare function buildBatchClaimRewardsAggregatedCall(input: BatchRewardClaims, diamond?: Address): Hex;
+export declare function decodeBatchClaimRewardsAggregatedResult(data: Hex): BatchRewardClaimResult;
