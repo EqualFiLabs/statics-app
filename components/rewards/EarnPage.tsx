@@ -133,12 +133,14 @@ export function EarnPage({
     filters.positionId !== undefined &&
     !positions.items.some((position) => position.positionId === filters.positionId);
   const unknownPool =
+    view !== "staking" &&
     !loading &&
     !data.ownershipLoading &&
     !data.allocations.some((query) => query.isPending || query.isError) &&
     filters.poolId &&
     !poolIds.some((pool) => pool.toLowerCase() === filters.poolId?.toLowerCase());
   const unknownAsset =
+    view !== "staking" &&
     !loading &&
     !data.ownershipLoading &&
     filters.asset &&

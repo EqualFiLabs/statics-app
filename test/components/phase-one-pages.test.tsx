@@ -859,3 +859,10 @@ describe("additional review regressions", () => {
     );
   });
 });
+
+it("keeps legacy unlisted reward-asset links usable on the management-only staking screen", async () => {
+  mocks.params = new URLSearchParams(`positionId=1&asset=${address("a")}&poolId=${hash("c")}`);
+  withPhaseOne(<RewardsPage earnView="staking" />);
+  expect(await screen.findByRole("radio", { name: /Position #1/ })).toBeChecked();
+  expect(screen.queryByRole("link", { name: "Reset filters" })).not.toBeInTheDocument();
+});
