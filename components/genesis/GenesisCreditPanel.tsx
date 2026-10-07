@@ -291,7 +291,11 @@ export function GenesisCreditPanel({
     setBusy(key);
     setError(null);
     try {
-      if (!publicClient || !wallet || !walletState.isTargetChain) return;
+      if (!publicClient || !wallet) return;
+      if (!walletState.isTargetChain) {
+        await walletState.switchNetwork();
+        return;
+      }
       await verifyLaunchDeployment(publicClient, deployment);
       await action();
       await refresh();
