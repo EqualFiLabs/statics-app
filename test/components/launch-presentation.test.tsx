@@ -139,7 +139,12 @@ function redemptionQuote(epochActive: boolean) {
   };
 }
 
-function renderWithProviders(ui: React.ReactElement, signedIn = true, locale = "en") {
+function renderWithProviders(
+  ui: React.ReactElement,
+  signedIn = true,
+  locale = "en",
+  walletOverrides: Partial<typeof defaultWalletState> = {}
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const tree = (
     <QueryClientProvider client={queryClient}>
@@ -154,6 +159,7 @@ function renderWithProviders(ui: React.ReactElement, signedIn = true, locale = "
             address: signedIn ? wallet : null,
             chainId: descriptor.chainId,
             isTargetChain: true,
+            ...walletOverrides,
           }}
         >
           {ui}
@@ -292,12 +298,19 @@ describe("launch overview", () => {
 });
 
 describe("Genesis credit presentation", () => {
-  function creditReads(epochActive: boolean, paused: boolean) {
+  function creditReads(epochActive: boolean, paused: boolean, active = false) {
     readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
       if (functionName === "vaultAccounting") return vaultAccounting(epochActive);
       if (functionName === "creditIncreasesPaused") return paused;
       if (functionName === "credit") {
-        return { owner: zeroAddress, principal: 0n, maturity: 0, recoverableAt: 0, active: false };
+        const maturity = 2_100_000_000 + 86_400;
+        return {
+          owner: active ? wallet : zeroAddress,
+          principal: active ? parseEther("1000") : 0n,
+          maturity: active ? maturity : 0,
+          recoverableAt: active ? maturity + 3_600 : 0,
+          active,
+        };
       }
       if (functionName === "creditLimit") return parseEther("171000");
       throw new Error(`Unexpected read ${functionName}`);
@@ -319,6 +332,38 @@ describe("Genesis credit presentation", () => {
 
     expect(await screen.findByRole("button", { name: /^Borrow/ })).toBeInTheDocument();
     expect(screen.getByLabelText("Amount to borrow")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["open", /^Borrow/, false],
+    ["extend", /^Extend/, true],
+    ["repay", /^Repay/, true],
+  ])("requests a network switch before %s credit", async (_action, buttonName, active) => {
+    creditReads(false, false, active);
+    const switchNetwork = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />, true, "en", {
+      chainId: 1,
+      isTargetChain: false,
+      switchNetwork,
+    });
+
+    if (!active) {
+      fireEvent.change(await screen.findByLabelText("Or enter an exact amount"), {
+        target: { value: "1000" },
+      });
+    }
+    const action = await screen.findByRole("button", { name: buttonName });
+    fireEvent.click(action);
+
+    await waitFor(() => expect(switchNetwork).toHaveBeenCalledOnce());
+    await waitFor(() => expect(action).toBeEnabled());
+    expect(
+      readContract.mock.calls.some(([request]) =>
+        ["quoteGenesisCredit", "quoteGenesisCreditExtension", "allowance"].includes(
+          request.functionName
+        )
+      )
+    ).toBe(false);
   });
 
   it("uses the latest chain timestamp for an advanced credit clock", async () => {
