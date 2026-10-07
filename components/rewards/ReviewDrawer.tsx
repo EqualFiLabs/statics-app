@@ -9,9 +9,12 @@ export function ReviewDrawer({
   busy = false,
   onClose,
   children,
+  variant = "drawer",
 }: {
   title: string;
   busy?: boolean;
+  /** "modal" centers a compact dialog; the default slides in from the side. */
+  variant?: "drawer" | "modal";
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -94,7 +97,7 @@ export function ReviewDrawer({
   }, []);
   return createPortal(
     <div
-      className={styles.overlay}
+      className={`${styles.overlay} ${variant === "modal" ? styles.overlayCentered : ""}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
       }}
@@ -105,7 +108,7 @@ export function ReviewDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={styles.drawer}
+        className={variant === "modal" ? styles.modal : styles.drawer}
       >
         <header className={styles.drawerHeader}>
           <h2 id={titleId}>{title}</h2>

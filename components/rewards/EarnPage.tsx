@@ -28,6 +28,7 @@ import { BatchRewardClaim } from "./BatchRewardClaim";
 import { RewardAmounts } from "./RewardAmounts";
 import { EarnPositionManagement } from "./EarnPositionManagement";
 import { EarnPositionsTable } from "./EarnPositionsTable";
+import { EarnStakeForm } from "./EarnStakeForm";
 import { BribeSchedule } from "./BribeSchedule";
 import styles from "./earn.module.css";
 
@@ -146,14 +147,6 @@ export function EarnPage({
   const ownedFilteredPositions = positions.items.filter(
     (position) => filters.positionId === undefined || position.positionId === filters.positionId
   );
-  const visiblePositions = ownedFilteredPositions.filter(
-    (position) =>
-      !filters.asset ||
-      !rows.find((row) => row.positionId === position.positionId)?.global ||
-      rows
-        .find((row) => row.positionId === position.positionId)
-        ?.global?.claimAssets.some((asset) => asset.toLowerCase() === filters.asset?.toLowerCase())
-  );
   const poolRows = [
     ...new Map(
       rows
@@ -185,12 +178,9 @@ export function EarnPage({
       ),
     }))
     .filter((pool) => pool.positions.length > 0);
-  const filteredKeys =
-    view === "staking"
-      ? visiblePositions.map((position) => rewardRowKey(position.positionId))
-      : poolRows.flatMap((pool) =>
-          pool.positions.map((position) => rewardRowKey(position.positionId, pool.poolId))
-        );
+  const filteredKeys = poolRows.flatMap((pool) =>
+    pool.positions.map((position) => rewardRowKey(position.positionId, pool.poolId))
+  );
   const select = (keys: string[], checked: boolean) =>
     setSelection({
       context,
@@ -246,19 +236,15 @@ export function EarnPage({
         query.queryKey.includes(action.wallet),
     });
   const managementPanel =
-    (view === "staking" || view === "allocations") && managementPosition ? (
+    view === "allocations" && managementPosition ? (
       <section className={styles.manager} aria-label={t("positionManagement")}>
-        <h2>
-          {view === "staking"
-            ? t("manageStake")
-            : t("position", { id: String(managementPosition.positionId) })}
-        </h2>
+        <h2>{t("position", { id: String(managementPosition.positionId) })}</h2>
         <EarnPositionManagement
           key={`${context}:${managementPosition.positionId}`}
           deployment={deployment}
           positionId={managementPosition.positionId}
           initialPoolId={filters.poolId ?? null}
-          feature={view}
+          feature="allocations"
           onPoolChange={(poolId) => navigateFilter("poolId", poolId)}
         />
       </section>
@@ -328,6 +314,19 @@ export function EarnPage({
           }
           ownershipLoading={data.ownershipLoading}
         />
+      ) : view === "staking" ? (
+        // Wait for ownership so a foreign or missing position ID never triggers reads.
+        !invalid &&
+        action.ready &&
+        (!data.ownershipLoading || positions.items.length > 0) && (
+          <EarnStakeForm
+            key={`${deployment.descriptor.deploymentId}:${action.wallet}:${params}`}
+            deployment={deployment}
+            action={action}
+            positions={positions.items}
+            requestedPositionId={filters.positionId}
+          />
+        )
       ) : (
         !invalid && (
           <>
@@ -362,7 +361,7 @@ export function EarnPage({
                   ))}
                 </select>
               </label>
-              {view !== "staking" && view !== "allocations" && (
+              {view !== "allocations" && (
                 <label>
                   {t("poolFilter")}
                   <select
@@ -451,154 +450,114 @@ export function EarnPage({
                     />
                   </div>
                 </div>
-                <div className={view === "staking" ? styles.stakingLayout : undefined}>
+                <div>
                   <div className={styles.list} aria-label={t("rewardList")}>
-                    {view === "staking"
-                      ? visiblePositions.map((position) => (
-                          <article className={styles.row} key={String(position.positionId)}>
-                            <div className={styles.rowHeading}>
-                              <div>
+                    {poolRows.slice(page * 10, (page + 1) * 10).map((pool) => {
+                      const keys = pool.positions.map((position) =>
+                        rewardRowKey(position.positionId, pool.poolId)
+                      );
+                      return (
+                        <article className={styles.row} key={pool.poolId}>
+                          <div className={styles.rowHeading}>
+                            <div>
+                              <SelectionCheckbox
+                                keys={keys}
+                                selected={selected}
+                                onChange={select}
+                                label={rewardPoolName(deployment, pool.poolId)}
+                              />
+                              <p className={styles.muted}>
+                                {t("positionCount", { count: pool.positions.length })}
+                              </p>
+                            </div>
+                            <RewardAmounts
+                              deployment={deployment}
+                              amounts={scopeRewardAmounts(rows, {
+                                ...scope,
+                                poolId: pool.poolId,
+                              })}
+                              empty={!loading && !incomplete}
+                            />
+                          </div>
+                          <details className={styles.breakdown}>
+                            <summary>{t("positionBreakdown")}</summary>
+                            {pool.positions.map((position) => (
+                              <div className={styles.child} key={String(position.positionId)}>
                                 <SelectionCheckbox
-                                  keys={[rewardRowKey(position.positionId)]}
+                                  keys={[rewardRowKey(position.positionId, pool.poolId)]}
                                   selected={selected}
                                   onChange={select}
                                   label={t("position", { id: String(position.positionId) })}
                                 />
-                                <p className={styles.muted}>
-                                  {rewardDisplay(position.stakedBalance, 18).display} STATICS{" "}
-                                  {t("staked")}
-                                </p>
-                              </div>
-                              <RewardAmounts
-                                deployment={deployment}
-                                amounts={scopeRewardAmounts(rows, {
-                                  ...scope,
-                                  positionId: position.positionId,
-                                })}
-                                empty={!loading && !incomplete}
-                              />
-                            </div>
-                            <div className={styles.links}>
-                              <Link
-                                href={earnHref("staking", {
-                                  ...filters,
-                                  positionId: position.positionId,
-                                })}
-                              >
-                                {t("manageStake")}
-                              </Link>
-                            </div>
-                          </article>
-                        ))
-                      : poolRows.slice(page * 10, (page + 1) * 10).map((pool) => {
-                          const keys = pool.positions.map((position) =>
-                            rewardRowKey(position.positionId, pool.poolId)
-                          );
-                          return (
-                            <article className={styles.row} key={pool.poolId}>
-                              <div className={styles.rowHeading}>
-                                <div>
-                                  <SelectionCheckbox
-                                    keys={keys}
-                                    selected={selected}
-                                    onChange={select}
-                                    label={rewardPoolName(deployment, pool.poolId)}
-                                  />
-                                  <p className={styles.muted}>
-                                    {t("positionCount", { count: pool.positions.length })}
-                                  </p>
-                                </div>
                                 <RewardAmounts
                                   deployment={deployment}
                                   amounts={scopeRewardAmounts(rows, {
                                     ...scope,
+                                    positionId: position.positionId,
                                     poolId: pool.poolId,
                                   })}
-                                  empty={!loading && !incomplete}
                                 />
                               </div>
-                              <details className={styles.breakdown}>
-                                <summary>{t("positionBreakdown")}</summary>
-                                {pool.positions.map((position) => (
-                                  <div className={styles.child} key={String(position.positionId)}>
-                                    <SelectionCheckbox
-                                      keys={[rewardRowKey(position.positionId, pool.poolId)]}
-                                      selected={selected}
-                                      onChange={select}
-                                      label={t("position", { id: String(position.positionId) })}
-                                    />
-                                    <RewardAmounts
-                                      deployment={deployment}
-                                      amounts={scopeRewardAmounts(rows, {
-                                        ...scope,
-                                        positionId: position.positionId,
-                                        poolId: pool.poolId,
-                                      })}
-                                    />
-                                  </div>
-                                ))}
-                              </details>
-                              <div className={styles.links}>
-                                <Link
-                                  href={
-                                    view === "bribes" && filters.share === "allocator"
-                                      ? earnHref("allocations", {
-                                          positionId:
-                                            filters.positionId ?? pool.positions[0].positionId,
-                                          poolId: pool.poolId,
-                                        })
-                                      : `/app/liquidity?positionId=${filters.positionId ?? pool.positions[0].positionId}&poolId=${pool.poolId}`
-                                  }
-                                >
-                                  {t(
-                                    view === "bribes" && filters.share === "allocator"
-                                      ? "viewAllocations"
-                                      : "manageLiquidity"
-                                  )}
-                                </Link>
-                                <Link
-                                  href={earnHref(view === "gauge" ? "bribes" : "gauge", {
-                                    ...filters,
-                                    poolId: pool.poolId,
-                                  })}
-                                >
-                                  {t(view === "gauge" ? "bribes" : "gauge")}
-                                </Link>
-                                {view === "bribes" && (
-                                  <button
-                                    className="ui-button ui-button--ghost ui-button--sm"
-                                    type="button"
-                                    onClick={() =>
-                                      setFunding(
-                                        funding?.context === context &&
-                                          funding.poolId === pool.poolId
-                                          ? null
-                                          : { context, poolId: pool.poolId }
-                                      )
-                                    }
-                                  >
-                                    {t("funding")}
-                                  </button>
-                                )}
-                              </div>
-                              {funding?.context === context && funding.poolId === pool.poolId && (
-                                <BribeSchedule
-                                  deployment={deployment}
-                                  poolId={pool.poolId}
-                                  share={filters.share}
-                                />
+                            ))}
+                          </details>
+                          <div className={styles.links}>
+                            <Link
+                              href={
+                                view === "bribes" && filters.share === "allocator"
+                                  ? earnHref("allocations", {
+                                      positionId:
+                                        filters.positionId ?? pool.positions[0].positionId,
+                                      poolId: pool.poolId,
+                                    })
+                                  : `/app/liquidity?positionId=${filters.positionId ?? pool.positions[0].positionId}&poolId=${pool.poolId}`
+                              }
+                            >
+                              {t(
+                                view === "bribes" && filters.share === "allocator"
+                                  ? "viewAllocations"
+                                  : "manageLiquidity"
                               )}
-                            </article>
-                          );
-                        })}
-                    {!loading &&
-                      !(view === "staking" ? visiblePositions.length : poolRows.length) && (
-                        <p className={styles.empty}>{t("noMatching")}</p>
-                      )}
+                            </Link>
+                            <Link
+                              href={earnHref(view === "gauge" ? "bribes" : "gauge", {
+                                ...filters,
+                                poolId: pool.poolId,
+                              })}
+                            >
+                              {t(view === "gauge" ? "bribes" : "gauge")}
+                            </Link>
+                            {view === "bribes" && (
+                              <button
+                                className="ui-button ui-button--ghost ui-button--sm"
+                                type="button"
+                                onClick={() =>
+                                  setFunding(
+                                    funding?.context === context && funding.poolId === pool.poolId
+                                      ? null
+                                      : { context, poolId: pool.poolId }
+                                  )
+                                }
+                              >
+                                {t("funding")}
+                              </button>
+                            )}
+                          </div>
+                          {funding?.context === context && funding.poolId === pool.poolId && (
+                            <BribeSchedule
+                              deployment={deployment}
+                              poolId={pool.poolId}
+                              share={filters.share}
+                            />
+                          )}
+                        </article>
+                      );
+                    })}
+                    {!loading && !poolRows.length && (
+                      <p className={styles.empty}>{t("noMatching")}</p>
+                    )}
                   </div>
-                  {view === "staking" && managementPanel}
                 </div>
-                {view !== "staking" && poolRows.length > 10 && (
+                {poolRows.length > 10 && (
                   <div className={styles.pagination}>
                     <button
                       type="button"

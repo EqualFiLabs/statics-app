@@ -35,6 +35,7 @@ import {
   subscribeHiddenPositions,
   writeHiddenPositions,
 } from "@/lib/rewards/hidden-positions";
+import { formatDuration } from "@/lib/rewards/time";
 import { useEarnPositionTable } from "@/hooks/useEarnPositionTable";
 import type { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { BatchRewardClaim } from "./BatchRewardClaim";
@@ -571,12 +572,4 @@ function SelectAll({
       }
     />
   );
-}
-
-function formatDuration(seconds: bigint): string {
-  const total = Number(seconds > 0n ? seconds : 0n);
-  const hours = Math.floor(total / 3600),
-    minutes = Math.ceil((total % 3600) / 60);
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-  return hours > 0 ? `${hours}h ${minutes}m` : `${Math.max(1, minutes)}m`;
 }

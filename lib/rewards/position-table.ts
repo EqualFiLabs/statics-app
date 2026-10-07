@@ -12,6 +12,14 @@ export type EarnPositionRow = Readonly<{
   maturingAssets?: readonly Address[];
   /** Earliest time a maturing asset starts earning, in seconds. */
   maturesAt?: bigint;
+  /** Independent reward selections; stake maturity is tracked per asset. */
+  rewardSelections?: readonly Readonly<{
+    asset: Address;
+    pendingStake: bigint;
+    eligibleAt: bigint;
+  }>[];
+  /** When each maturing asset starts earning, keyed by lowercase address, in seconds. */
+  assetMaturity?: Readonly<Record<string, bigint>>;
   allocation?: Readonly<{
     totalAllocated: bigint;
     /** Allocations whose pool is still eligible; stale allocations are excluded. */

@@ -130,6 +130,7 @@ export function useEarnPositionTable(
       stakedBalance: data?.stakedBalance ?? position.stakedBalance,
       liquidityLegs: position.activeLegCount,
       selectedAssets: data?.selectedAssets,
+      rewardSelections: data?.selections,
       maximumRewardAssets: limits.data,
       maturingAssets: data ? maturing.map((entry) => entry.asset) : undefined,
       maturesAt: maturing.length
@@ -138,6 +139,9 @@ export function useEarnPositionTable(
             maturing[0].eligibleAt
           )
         : undefined,
+      assetMaturity: Object.fromEntries(
+        maturing.map((entry) => [entry.asset.toLowerCase(), entry.eligibleAt])
+      ),
       allocation: data?.allocation,
       unavailable: Boolean((query?.isError && !data) || (clock.isError && now === undefined)),
     };

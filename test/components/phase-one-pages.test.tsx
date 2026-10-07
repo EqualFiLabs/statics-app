@@ -2,12 +2,15 @@ import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   decodeFunctionData,
+  encodeAbiParameters,
+  encodeEventTopics,
   getAddress,
   maxUint256,
   encodeFunctionResult,
   parseEther,
   zeroAddress,
 } from "viem";
+import { staticsAbi as phaseOneStaticsAbi } from "@statics-protocol/sdk/phase-one";
 import {
   staticsBatchRewardsAbi as legacyBatchRewardsAbi,
   staticsAggregatedBatchRewardsAbi,
@@ -184,6 +187,9 @@ beforeEach(() => {
     if (functionName === "globalRewardAssetsOfPosition") return [[tokens[0].address], 1n];
     if (functionName === "pendingRewards") return [parseEther("3")];
     if (functionName === "maxRewardAssetsPerPosition") return 10n;
+    if (functionName === "gaugeAllocationCooldown") return 14_400;
+    if (functionName === "rewardEligibilityDelay") return 86_400n;
+    if (functionName === "rewardEligibilityBucketSize") return 3_600n;
     if (functionName === "gaugePositionAllocations")
       return [
         0,
@@ -234,6 +240,42 @@ describe("focused Phase 1 Earn", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create position" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("lists a newly created position without a reload once the indexer catches up", async () => {
+    mocks.execute.mockImplementation(async (request) => {
+      await request.verifyConfirmation?.({
+        logs: [
+          {
+            address: address("1"),
+            topics: encodeEventTopics({
+              abi: phaseOneStaticsAbi,
+              eventName: "PositionCreated",
+              args: { positionId: 2n, owner: wallet },
+            }),
+            data: "0x",
+          },
+        ],
+      });
+      const page = (items: ReturnType<typeof position>[]) => ({
+        deploymentId: "phase-one-fixture",
+        indexedAtBlock: 1n,
+        items,
+        nextCursor: null,
+      });
+      // The first refresh after confirmation still returns the old list.
+      mocks.page
+        .mockResolvedValueOnce(page([position(1n)]))
+        .mockResolvedValue(page([position(1n), position(2n)]));
+      return hash("f");
+    });
+    withPhaseOne(<PositionListPage />);
+    await screen.findByRole("link", { name: "Position #1" });
+    fireEvent.click(screen.getByRole("button", { name: "Create position" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    // The position card (not just the interim link) appears without a reload.
+    await waitFor(() => expect(document.querySelectorAll(".position-card")).toHaveLength(2), {
+      timeout: 5_000,
+    });
   });
   it("shows a multi-position table with a wallet-wide Collect and no management controls", async () => {
     withPhaseOne(<RewardsPage />);
@@ -297,7 +339,7 @@ describe("focused Phase 1 Earn", () => {
       screen.queryByRole("region", { name: "Actions for selected positions" })
     ).not.toBeInTheDocument();
   });
-  it("loads ownership beyond 100 and scopes management to an explicitly requested NFT", async () => {
+  it("loads ownership beyond 100 and pages the stake picker to an explicitly requested NFT", async () => {
     mocks.params = new URLSearchParams("positionId=101");
     mocks.page.mockImplementation(async (_owner, _deployment, _url, cursor) => ({
       deploymentId: "phase-one-fixture",
@@ -308,7 +350,9 @@ describe("focused Phase 1 Earn", () => {
       nextCursor: cursor ? null : "100",
     }));
     withPhaseOne(<RewardsPage earnView="staking" />);
-    expect(await screen.findByRole("option", { name: "Position #101" })).toBeInTheDocument();
+    expect(await screen.findByRole("radio", { name: /Position #101/ })).toBeChecked();
+    expect(screen.getByText("101–101 of 101")).toBeInTheDocument();
+    expect(screen.getAllByRole("radio", { name: /^Position #/ })).toHaveLength(1);
     expect(mocks.page.mock.calls.at(-1)?.[3]).toBe("100");
     await waitFor(() =>
       expect(
@@ -317,11 +361,15 @@ describe("focused Phase 1 Earn", () => {
         )
       ).toBe(true)
     );
+    // Only the visible page, the selection and the largest position are read on-chain.
     expect(
       mocks.read.mock.calls.some(
-        ([input]) => input.functionName === "stakePosition" && input.args[0] === 1n
+        ([input]) => input.functionName === "stakePosition" && input.args[0] === 50n
       )
     ).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Previous positions" }));
+    expect(await screen.findByText("96–100 of 101")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Position #101/ })).toBeChecked();
   });
   it("rejects a missing or foreign position without falling back to another NFT", async () => {
     mocks.params = new URLSearchParams("positionId=999");
@@ -340,12 +388,13 @@ describe("focused Phase 1 Earn", () => {
       expect(mocks.replace).toHaveBeenCalledWith("/app/rewards/staking?positionId=1")
     );
   });
-  it("does not perform pool, allocation, or reserve reads on the initial staking screen", async () => {
+  it("does not perform pool, LP, or reserve reads on the initial staking screen", async () => {
     withPhaseOne(<RewardsPage earnView="staking" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    // Allocation lock and cooldown are read because stake and unstake previews depend on them.
     expect(
       mocks.read.mock.calls.some(([input]) =>
-        /gauge|lpLeg|previewLp|Reserve/i.test(input.functionName)
+        /positionGaugePools|lpLeg|previewLp|Reserve|poolRewardConfig/i.test(input.functionName)
       )
     ).toBe(false);
     expect(mocks.allocations).not.toHaveBeenCalled();
@@ -443,7 +492,7 @@ describe("focused Phase 1 Earn", () => {
       `/app/rewards/allocations?positionId=1&poolId=${hash("1")}`
     );
   });
-  it("keeps a partial ownership result visible but disables claims", async () => {
+  it("keeps known positions stakeable when the rest of ownership fails", async () => {
     mocks.page.mockImplementation(async (_owner, _id, _url, cursor) => {
       if (cursor) throw Error("Indexer unavailable");
       return {
@@ -455,8 +504,8 @@ describe("focused Phase 1 Earn", () => {
     });
     withPhaseOne(<RewardsPage earnView="staking" />);
     await screen.findByText(/Some data could not be loaded/);
-    expect(screen.getByRole("button", { name: "Claim displayed rewards" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Position #1" })).toBeInTheDocument();
+    // Known positions stay usable for staking while the rest of ownership is unavailable.
+    expect(await screen.findByRole("radio", { name: /Position #1/ })).toBeChecked();
   });
   it("clearing one allocation preserves other pools, with no reward-source reads", async () => {
     withPhaseOne(<RewardsPage earnView="allocations" />);
@@ -496,6 +545,138 @@ describe("focused Phase 1 Earn", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Max" }));
     expect(screen.getByRole("textbox", { name: "STATICS amount" })).toHaveValue("70");
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "71" },
+    });
+    expect(
+      screen.getByText("Amount exceeds the stake you can unstake from this position.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Manage allocations" })).toHaveAttribute(
+      "href",
+      "/app/rewards/allocations?positionId=1"
+    );
+  });
+  it("previews the eligibility delay and allocation cooldown before staking", async () => {
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "10" },
+    });
+    const preview = await screen.findByRole("status", { name: "" });
+    expect(
+      within(preview).getByText("Position #1 will have 110 STATICS staked.")
+    ).toBeInTheDocument();
+    expect(
+      within(preview).getByText(/STATICS: added stake is estimated to start earning from/)
+    ).toBeInTheDocument();
+    expect(
+      within(preview).getByText(/Restarts Position #1's allocation cooldown/)
+    ).toBeInTheDocument();
+  });
+  it("creates a position and stakes with the chosen reward assets in one transaction", async () => {
+    // The receipt carries the new Position ID; the indexer lags one refresh behind it.
+    mocks.execute.mockImplementation(async (request) => {
+      if (request.kind === "phase-one-create-position") {
+        await request.verifyConfirmation?.({
+          logs: [
+            {
+              address: phaseOne.contracts.diamond,
+              topics: encodeEventTopics({
+                abi: phaseOneStaticsAbi,
+                eventName: "StakingPositionCreated",
+                args: { positionId: 2n, owner: wallet },
+              }),
+              data: encodeAbiParameters([{ type: "uint256" }], [parseEther("25")]),
+            },
+          ],
+        });
+        const page = (items: ReturnType<typeof position>[]) => ({
+          deploymentId: "phase-one-fixture",
+          indexedAtBlock: 1n,
+          items,
+          nextCursor: null,
+        });
+        mocks.page
+          .mockResolvedValueOnce(page([position(1n)]))
+          .mockResolvedValue(page([position(1n), position(2n)]));
+      }
+      return hash("f");
+    });
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    fireEvent.click(await screen.findByRole("radio", { name: /New position/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "25" },
+    });
+    // The modal defaults to the reward assets of the largest existing position.
+    fireEvent.click(screen.getByRole("button", { name: "Reward assets for New position" }));
+    const modal = await screen.findByRole("dialog", { name: "Reward assets · new position" });
+    expect(within(modal).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
+    expect(within(modal).getByText("1 of 10 selected")).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: "OK" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Reward assets for New position" })
+    ).toHaveTextContent("Assets 2/10");
+    fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+    const review = await screen.findByRole("dialog", { name: "Create position and stake" });
+    expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(within(review).getByRole("button", { name: "Close" })).toBeEnabled();
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+    const sent = mocks.execute.mock.calls.at(-1)![0];
+    expect(sent.kind).toBe("phase-one-create-position");
+    expect(sent.value).toBe(1n);
+    const decoded = decodeFunctionData({ abi: phaseOneStaticsAbi, data: sent.data });
+    expect(decoded.functionName).toBe("createAndStake");
+    expect(decoded.args).toEqual([
+      parseEther("25"),
+      wallet,
+      [tokens[0].address, tokens[1].address],
+    ]);
+    // No reload needed: the new position appears and is selected once indexed.
+    expect(
+      await screen.findByRole("radio", { name: /Position #2/ }, { timeout: 5_000 })
+    ).toBeChecked();
+    expect(screen.getByText("Create position and stake confirmed.")).toBeInTheDocument();
+  });
+  it("updates an existing position's reward assets from the Assets modal", async () => {
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    const open = await screen.findByRole("button", { name: "Reward assets for Position #1" });
+    await waitFor(() => expect(open).toBeEnabled());
+    fireEvent.click(open);
+    const modal = await screen.findByRole("dialog", { name: "Reward assets · Position #1" });
+    fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: "Cancel" }));
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(open);
+    const reopened = await screen.findByRole("dialog", { name: "Reward assets · Position #1" });
+    // Cancel discarded the draft.
+    expect(within(reopened).getByRole("checkbox", { name: /^WETH/ })).not.toBeChecked();
+    const search = within(reopened).getByRole("searchbox", { name: "Search reward assets" });
+    fireEvent.change(search, { target: { value: "zzz" } });
+    expect(within(reopened).getByText("No assets match your search.")).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "we" } });
+    expect(within(reopened).getAllByRole("checkbox")).toHaveLength(1);
+    fireEvent.click(within(reopened).getByRole("checkbox", { name: /^WETH/ }));
+    // Clearing the search keeps the existing selection that was hidden by it.
+    fireEvent.change(search, { target: { value: "" } });
+    expect(within(reopened).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
+    fireEvent.click(within(reopened).getByRole("button", { name: "OK" }));
+    const review = await screen.findByRole("dialog", {
+      name: "Update reward assets for Position #1",
+    });
+    expect(within(review).getByText("+ WETH")).toBeInTheDocument();
+    expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(within(review).getByRole("button", { name: "Close" })).toBeEnabled();
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const sent = mocks.execute.mock.calls[0][0];
+    expect(sent.kind).toBe("phase-one-reward-selection");
+    const decoded = decodeFunctionData({ abi: phaseOneStaticsAbi, data: sent.data });
+    expect(decoded.functionName).toBe("optInRewardAssets");
+    expect(decoded.args).toEqual([1n, [tokens[1].address]]);
   });
 });
 
@@ -591,8 +772,90 @@ it("shows position creation for an empty wallet without perpetual reward loading
     nextCursor: null,
   });
   withPhaseOne(<RewardsPage earnView="staking" />);
-  await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Create position" })).toBeInTheDocument()
-  );
+  // An empty wallet can create a position and stake in one step.
+  expect(await screen.findByRole("radio", { name: /New position/ })).toBeChecked();
   expect(screen.queryByText("Loading your positions and rewards…")).not.toBeInTheDocument();
+});
+
+function reviewTree() {
+  return (
+    <DeploymentContext.Provider
+      value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+    >
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          status: "ready",
+          address: wallet,
+          chainId: 31337,
+          isTargetChain: true,
+        }}
+      >
+        <RewardsPage earnView="staking" />
+      </WalletContext.Provider>
+    </DeploymentContext.Provider>
+  );
+}
+describe("additional review regressions", () => {
+  it("clears a pending review when the requested position URL changes", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    const view = render(reviewTree());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("radio", { name: /Position #2/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+    await screen.findByRole("dialog", { name: "Stake into Position #2" });
+    mocks.params = new URLSearchParams("positionId=1");
+    view.rerender(reviewTree());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Position #1/ })).toBeChecked();
+  });
+  it("disables unstake review when the allocation read failed", async () => {
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? Promise.reject(Error("RPC failed"))
+        : base(input)
+    );
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Unstake" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    expect(screen.getByRole("button", { name: "Review unstake" })).toBeDisabled();
+  });
+  it("does not silently change the reviewed creation fee", async () => {
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("radio", { name: /New position/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+    const dialog = await screen.findByRole("dialog", { name: "Create position and stake" });
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "positionCreationFee" ? Promise.resolve(2n) : base(input)
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm transaction" }));
+    expect(
+      await screen.findByText("The position creation fee changed. Review the action again.")
+    ).toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("does not load undisplayed wallet reward totals on the management-only staking form", async () => {
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    expect(mocks.read.mock.calls.some(([input]) => input.functionName === "pendingRewards")).toBe(
+      false
+    );
+  });
 });

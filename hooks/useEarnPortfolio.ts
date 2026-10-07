@@ -24,13 +24,19 @@ export function useEarnPortfolio(
   view: EarnView,
   filters: EarnFilters
 ) {
-  const action = usePhaseOneAction(deployment);
+  const action = usePhaseOneAction(
+    deployment,
+    view === "staking"
+      ? `${view}:${filters.positionId ?? "all"}:${filters.poolId ?? "all"}:${filters.asset ?? "all"}:${filters.share}`
+      : ""
+  );
   const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, action.wallet);
   const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = positions;
   useEffect(() => {
     if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
-  const sources = sourceForView(view, filters.share);
+  // Staking is management-only; its form reads selections, not claimable rewards.
+  const sources = view === "staking" ? [] : sourceForView(view, filters.share);
   const rewardPositions = positions.items.filter(
     (position) => filters.positionId === undefined || position.positionId === filters.positionId
   );

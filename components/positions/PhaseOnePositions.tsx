@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatEther, formatUnits, parseEventLogs } from "viem";
@@ -16,11 +16,13 @@ import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
 import { loadIndexedPhaseOnePosition } from "@/lib/indexer/phase-one";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
+import { waitForIndexedPosition } from "@/lib/rewards/indexed-position";
 
 export function PhaseOnePositions({ deployment }: { deployment: PhaseOneDeployment }) {
   const t = useTranslations("positions");
   const p = useTranslations("phaseOne");
   const action = usePhaseOneAction(deployment);
+  const queryClient = useQueryClient();
   const [createdId, setCreatedId] = useState<bigint | null>(null);
   const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, action.wallet);
   const fee = useQuery({
@@ -46,6 +48,7 @@ export function PhaseOnePositions({ deployment }: { deployment: PhaseOneDeployme
         label: t("create"),
         details: [t("creationFee", { fee: formatEther(creationFee) })],
         execute: async () => {
+          let created: bigint | null = null;
           await action.send({
             kind: "phase-one-create-position",
             label: t("create"),
@@ -62,9 +65,21 @@ export function PhaseOnePositions({ deployment }: { deployment: PhaseOneDeployme
                 (entry) =>
                   entry.address.toLowerCase() === deployment.contracts.diamond.toLowerCase()
               );
-              if (event) setCreatedId(event.args.positionId);
+              if (event) {
+                created = event.args.positionId;
+                setCreatedId(created);
+              }
             },
           });
+          // The list comes from the indexer, which can trail the receipt; keep refreshing
+          // until the new position is listed rather than leaving the old list on screen.
+          if (created !== null)
+            await waitForIndexedPosition({
+              queryClient,
+              deploymentId: deployment.descriptor.deploymentId,
+              wallet: action.wallet!,
+              positionId: created,
+            });
         },
       };
     });

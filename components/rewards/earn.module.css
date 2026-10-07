@@ -708,3 +708,206 @@
 .bulkClear {
   margin-left: auto;
 }
+
+/* Stake / unstake form (Staking tab). */
+.stakeForm {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.stakeFormHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stakeFormHeading h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+.positionPicker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.positionPicker legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--app-text-muted);
+}
+.pickerOption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--control-height);
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+.pickerLabel {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+.assetsButton {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.pickerOption[data-checked="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-wash);
+}
+.pickerLabel:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pickerOption input {
+  accent-color: var(--accent);
+}
+.pickerMain {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.stakePreview {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+.stakePreview h3 {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+}
+.stakePreview ul {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 4px;
+  padding-left: 18px;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.pickerPager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Reward asset modal. */
+.overlayCentered {
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 480px);
+  max-height: min(720px, calc(100dvh - 32px));
+  overflow: hidden;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  outline: none;
+  box-shadow: var(--shadow-lg);
+}
+.modal .drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+.assetList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  cursor: pointer;
+}
+.assetRow[data-checked="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-wash);
+}
+.assetRow:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.assetName {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.assetName strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A round dot that matches the position picker's radio buttons, for multi-select. */
+.selectionDot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid var(--app-text-muted);
+  border-radius: 50%;
+  appearance: none;
+  background: transparent;
+  cursor: inherit;
+}
+.selectionDot:checked {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 45%, transparent 50%);
+}
+.selectionDot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.assetFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+.assetFooter > span {
+  margin-right: auto;
+}
+.assetSearch input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 14px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}

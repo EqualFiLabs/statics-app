@@ -2,7 +2,14 @@
 import { useTranslations } from "next-intl";
 import type { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 
-export function ActionReview({ action }: { action: ReturnType<typeof usePhaseOneAction> }) {
+export function ActionReview({
+  action,
+  showCancel = true,
+}: {
+  action: ReturnType<typeof usePhaseOneAction>;
+  /** False inside a dialog whose own close control already cancels the review. */
+  showCancel?: boolean;
+}) {
   const t = useTranslations("phaseOne");
   return (
     <>
@@ -43,9 +50,11 @@ export function ActionReview({ action }: { action: ReturnType<typeof usePhaseOne
           >
             {action.busy ? t("waiting") : t("confirm")}
           </button>
-          <button type="button" disabled={action.busy} onClick={action.cancel}>
-            {t("cancel")}
-          </button>
+          {showCancel && (
+            <button type="button" disabled={action.busy} onClick={action.cancel}>
+              {t("cancel")}
+            </button>
+          )}
         </section>
       )}
     </>
