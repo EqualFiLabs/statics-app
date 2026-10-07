@@ -8,7 +8,7 @@ import type { Hex } from "viem";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { ActionReview } from "@/components/phase-one/ActionReview";
 import { useEarnPortfolio, mergeEarnRewardSources } from "@/hooks/useEarnPortfolio";
-import { portfolioRewardAmounts, totalPortfolioRewards } from "@/lib/phase-one/reward-portfolio";
+import { portfolioRewardAmounts } from "@/lib/phase-one/reward-portfolio";
 import {
   earnViews,
   earnHref,
@@ -27,6 +27,7 @@ import {
 import { BatchRewardClaim } from "./BatchRewardClaim";
 import { RewardAmounts } from "./RewardAmounts";
 import { EarnPositionManagement } from "./EarnPositionManagement";
+import { EarnPositionsTable } from "./EarnPositionsTable";
 import { BribeSchedule } from "./BribeSchedule";
 import styles from "./earn.module.css";
 
@@ -224,35 +225,6 @@ export function EarnPage({
     filters.positionId !== undefined
       ? ownedFilteredPositions[0]
       : [...positions.items].sort((a, b) => (a.positionId < b.positionId ? -1 : 1))[0];
-  const cardState = (kind: "global" | "gauge" | "lp-bribe" | "allocator") => {
-    const query = data.rewards[sources.indexOf(kind)];
-    if (!action.ready)
-      return t(action.walletState.status === "loading" ? "loading" : "unavailable");
-    return query?.isError ||
-      query?.data?.some(
-        (row) =>
-          row.globalUnavailable ||
-          row.discoveryUnavailable ||
-          row.pools.some((pool) => !pool.rewards)
-      )
-      ? t("unavailable")
-      : loading
-        ? t("loading")
-        : undefined;
-  };
-  const cardRewards = (kind: "global" | "gauge" | "lp-bribe" | "allocator") => (
-    <>
-      <RewardAmounts
-        deployment={deployment}
-        amounts={cardAmounts(kind)}
-        preview
-        empty={!cardState(kind)}
-      />
-      {cardState(kind) && <span className={styles.muted}>{cardState(kind)}</span>}
-    </>
-  );
-  const cardAmounts = (kind: "global" | "gauge" | "lp-bribe" | "allocator") =>
-    totalPortfolioRewards(rows, kind);
   const allocationValue = (amount: bigint) =>
     !action.wallet
       ? t(action.walletState.status === "loading" ? "loading" : "unavailable")
@@ -303,30 +275,21 @@ export function EarnPage({
           <h1>{heading}</h1>
           <p>{t(`${view}Help`)}</p>
         </div>
-        {view === "overview" && (
-          <BatchRewardClaim
-            deployment={deployment}
-            rows={rows}
-            loading={loading || data.ownershipLoading}
-            incomplete={incomplete}
-            scope={scope}
-            scopeKey={scopeKey}
-          />
-        )}
       </header>
-      {view !== "overview" && (
-        <nav className={styles.nav} aria-label={t("featureNavigation")}>
-          {earnViews.map((feature) => (
-            <Link
-              key={feature}
-              href={earnHref(feature, filters)}
-              aria-current={feature === view ? "page" : undefined}
-            >
-              {t(feature)}
-            </Link>
-          ))}
-        </nav>
-      )}
+      <nav className={styles.nav} aria-label={t("featureNavigation")}>
+        <Link href={earnHref("overview")} aria-current={view === "overview" ? "page" : undefined}>
+          {t("positions")}
+        </Link>
+        {earnViews.map((feature) => (
+          <Link
+            key={feature}
+            href={earnHref(feature, filters)}
+            aria-current={feature === view ? "page" : undefined}
+          >
+            {t(feature)}
+          </Link>
+        ))}
+      </nav>
       {!action.ready && <ActionReview action={action} />}
       {(action.walletState.status === "loading" ||
         data.ownershipLoading ||
@@ -354,61 +317,17 @@ export function EarnPage({
         </div>
       )}
       {view === "overview" ? (
-        <div className={styles.cards}>
-          <FeatureCard
-            title={t("staking")}
-            description={t("stakingHelp")}
-            href={earnHref("staking")}
-            link={t("viewStaking")}
-          >
-            <p className={styles.value} title={`${staked} raw units`}>
-              {(action.walletState.status === "loading" ||
-                data.ownershipLoading ||
-                data.ownershipIncomplete) &&
-              !positions.items.length
-                ? t(data.ownershipIncomplete ? "unavailable" : "loading")
-                : `${rewardDisplay(staked, 18).display}`}
-              <small>STATICS {t("staked")}</small>
-            </p>
-            {cardRewards("global")}
-          </FeatureCard>
-          <FeatureCard
-            title={t("gauge")}
-            description={t("gaugeHelp")}
-            href={earnHref("gauge")}
-            link={t("viewGauge")}
-          >
-            <div className={styles.metric}>{cardRewards("gauge")}</div>
-          </FeatureCard>
-          <FeatureCard
-            title={t("bribes")}
-            description={t("bribesHelp")}
-            href={earnHref("bribes")}
-            link={t("viewBribes")}
-          >
-            <p className={styles.muted}>{t("lpShare")}</p>
-            {cardRewards("lp-bribe")}
-            <p className={styles.muted}>{t("allocatorShare")}</p>
-            {cardRewards("allocator")}
-          </FeatureCard>
-          <FeatureCard
-            title={t("allocations")}
-            description={t("allocationsHelp")}
-            href={earnHref("allocations")}
-            link={t("viewAllocations")}
-          >
-            <p className={styles.value}>{allocationValue(allocated)}</p>
-            <p className={styles.muted}>{t("allocated")}</p>
-            <p className={styles.muted}>
-              {allocationValue(unallocated)} {t("unallocated")}
-            </p>
-            {(allocationLoading || allocationIncomplete) && (
-              <span className={styles.muted}>
-                {t(allocationIncomplete ? "unavailable" : "loading")}
-              </span>
-            )}
-          </FeatureCard>
-        </div>
+        <EarnPositionsTable
+          deployment={deployment}
+          action={action}
+          positions={positions.items}
+          rewardRows={rows}
+          rewardsLoading={loading}
+          rewardsIncomplete={
+            data.ownershipIncomplete || data.rewards.some((query) => query.isError)
+          }
+          ownershipLoading={data.ownershipLoading}
+        />
       ) : (
         !invalid && (
           <>
@@ -717,30 +636,6 @@ export function EarnPage({
         )
       )}
     </div>
-  );
-}
-function FeatureCard({
-  title,
-  description,
-  href,
-  link,
-  children,
-}: {
-  title: string;
-  description: string;
-  href: string;
-  link: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={styles.card}>
-      <h2>{title}</h2>
-      <p className={styles.muted}>{description}</p>
-      {children}
-      <Link href={href} className="ui-button ui-button--secondary">
-        {link} <span aria-hidden="true">→</span>
-      </Link>
-    </section>
   );
 }
 function SelectionCheckbox({

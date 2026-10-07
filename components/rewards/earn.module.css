@@ -435,3 +435,276 @@
     order: -1;
   }
 }
+
+/* Multi-position table (Earn overview). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.positionsSection {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.summaryChips {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.summaryChip {
+  flex: 1 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+}
+.attentionChip {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: var(--warning-wash);
+}
+.attentionChip .chipLabel {
+  color: var(--warning);
+}
+.chipHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chipLabel {
+  font-size: var(--text-xs);
+  color: var(--app-text-muted);
+}
+.chipValue {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.chipValue small,
+.chipMeta {
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+  font-weight: 400;
+}
+.tableHeading h2 {
+  margin: 8px 0 0;
+  font-size: var(--text-xl);
+}
+.controlBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.statusTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.statusTabs button {
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--app-text-muted);
+  font: 500 var(--text-xs) var(--font-sans);
+  cursor: pointer;
+}
+.statusTabs button[aria-pressed="true"] {
+  background: var(--app-overlay);
+  color: var(--app-text);
+}
+.tabCount {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-muted);
+}
+.controlActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.search input {
+  width: 220px;
+  max-width: 100%;
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+.tableFrame {
+  overflow-x: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.positionsTable {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+.positionsTable th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--app-text-muted);
+  border-bottom: 1px solid var(--app-border);
+  white-space: nowrap;
+}
+.positionsTable td {
+  padding: 14px;
+  border-bottom: 1px solid var(--app-border);
+  vertical-align: middle;
+  font-size: var(--text-sm);
+}
+.positionsTable tbody tr:hover td {
+  background: var(--app-surface);
+}
+.positionsTable .numeric {
+  text-align: right;
+}
+.positionsTable .numeric .assets {
+  justify-content: flex-end;
+}
+.checkCell {
+  width: 44px;
+}
+.checkCell input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.sortButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sortButton:hover {
+  color: var(--app-text);
+}
+.selectedRow td {
+  background: var(--accent-wash);
+}
+.hiddenRow td {
+  opacity: 0.6;
+}
+.positionName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--app-raised);
+  color: var(--app-text-muted);
+}
+.statusPill[data-tone="positive"] {
+  background: var(--accent-wash);
+  color: var(--positive);
+}
+.statusPill[data-tone="warning"] {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.statusPill[data-tone="negative"] {
+  background: var(--negative-wash);
+  color: var(--negative);
+}
+.dangerText {
+  color: var(--negative);
+  font-weight: 500;
+}
+.cellMeta {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+}
+.allocationBar {
+  display: flex;
+  height: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.allocationBar span {
+  background: var(--accent);
+}
+.allocationBar span[data-tone="negative"] {
+  background: var(--negative);
+}
+.rowActions {
+  text-align: right;
+  white-space: nowrap;
+}
+.rowActions > * + * {
+  margin-left: 6px;
+}
+.tableEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 32px 16px;
+  color: var(--app-text-muted);
+}
+.tableEmpty p {
+  margin: 0;
+}
+.loadMore {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+}
+.bulkBar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--app-overlay);
+  box-shadow: var(--shadow-lg);
+}
+.bulkClear {
+  margin-left: auto;
+}

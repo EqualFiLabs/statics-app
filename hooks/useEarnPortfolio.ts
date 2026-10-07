@@ -38,7 +38,7 @@ export function useEarnPortfolio(
   const id = deployment.descriptor.deploymentId;
   const allocationQuery = useQueries({
     queries:
-      view === "overview" || view === "allocations"
+      view === "allocations"
         ? positions.items.map((position) => ({
             queryKey: [
               "phase-one-position",
