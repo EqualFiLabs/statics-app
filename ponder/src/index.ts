@@ -8,8 +8,10 @@ import {
   staticsAbi as phaseOneStaticsAbi,
   staticsGaugeIncentivesAbi,
   staticsMarketTapeAbi,
+  staticsRangeGaugeAbi,
 } from "@statics-protocol/sdk/phase-one";
-import { getAddress, zeroAddress, type Hex } from "viem";
+import { getAddress, parseAbi, zeroAddress, type Hex } from "viem";
+import { allocationSnapshots, readTokenMetadata } from "./allocation-snapshots";
 import { activeGenesisCreditMutation } from "./genesis-credit";
 import {
   genesisConsecutiveTransferMutations,
@@ -27,8 +29,6 @@ import {
   marketCandle,
   marketSwap,
   gaugePeriod,
-  gaugePoolState,
-  gaugeReserveState,
   managedGaugePosition,
   phaseOneActivity,
   phaseOneMarketObservation,
@@ -81,6 +81,15 @@ const phaseOneKey = (...parts: readonly (string | bigint)[]) =>
   phaseOneEntityKey(phaseOneDeploymentId!, ...parts);
 const phaseOneEventKey = (transactionHash: string, logIndex: number) =>
   phaseOneKey(transactionHash, BigInt(logIndex));
+
+const allocationIndex = allocationSnapshots(
+  phaseOneDeploymentId || "unconfigured-phase-one",
+  phaseOneDiamondAddress || zeroAddress
+);
+const rewardRestrictionReadAbi = parseAbi([
+  "function rewardRestricted(address) view returns (bool)",
+  "function rewardRestrictionNonce(address) view returns (uint64)",
+]);
 
 function rewardSlotKey(poolId: Hex, slot: number): string {
   return phaseOneKey(poolId.toLowerCase(), BigInt(slot));
@@ -439,6 +448,13 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
 
 onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => {
   if (!publicHookAddress) throw new Error("Public hook address is required for public pools.");
+  const gauge = await context.client.readContract({
+    address: event.log.address,
+    abi: staticsRangeGaugeAbi,
+    functionName: "gaugePool",
+    args: [event.args.poolId],
+    blockNumber: event.block.number,
+  });
   const feeRate = await context.client.readContract({
     address: event.log.address,
     abi: phaseOneStaticsAbi,
@@ -466,6 +482,10 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => 
       quarantined: false,
       decommissioned: false,
       polActivated: false,
+      gaugeInitialized: gauge.initialized,
+      gaugeStopped: gauge.stopped,
+      decommissionStarted: false,
+      decommissionFinalized: false,
       createdAtBlock: event.block.number,
       updatedAtBlock: event.block.number,
     })
@@ -483,6 +503,7 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => 
       feeRateOverridden: feeRate.overridden,
       updatedAtBlock: event.block.number,
     });
+  await allocationIndex.pool(context, event, event.args.poolId);
 });
 
 onPhaseOne("PhaseOneStatics:ProtocolPolActivated", async ({ event, context }) => {
@@ -523,6 +544,10 @@ onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
       quarantined: false,
       decommissioned: pool.decommissioned,
       polActivated: pool.polActivated,
+      gaugeInitialized: true,
+      gaugeStopped: pool.decommissioned,
+      decommissionStarted: pool.decommissioned,
+      decommissionFinalized: false,
       createdAtBlock: event.block.number,
       updatedAtBlock: event.block.number,
     })
@@ -532,6 +557,7 @@ onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
       feeRateOverridden: event.args.overridden,
       updatedAtBlock: event.block.number,
     });
+  await allocationIndex.directory(context, event, event.args.poolId);
 });
 
 onPublicHook("PublicHook:PoolDecommissioned", async ({ event, context }) => {
@@ -539,6 +565,7 @@ onPublicHook("PublicHook:PoolDecommissioned", async ({ event, context }) => {
     decommissioned: true,
     updatedAtBlock: event.block.number,
   });
+  await allocationIndex.directory(context, event, event.args.poolId);
 });
 
 onPhaseOne("PhaseOneStatics:ProtocolPoolQuarantineSet", async ({ event, context }) => {
@@ -546,35 +573,40 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolQuarantineSet", async ({ event, context 
     quarantined: event.args.quarantined,
     updatedAtBlock: event.block.number,
   });
+  await allocationIndex.directory(context, event, event.args.poolId);
 });
 
-onPhaseOne("PhaseOneStatics:RewardRestrictionAdded", async ({ event, context }) => {
-  const asset = getAddress(event.args.asset);
-  await context.db
-    .insert(rewardRestriction)
-    .values({
+for (const eventName of ["RewardRestrictionAdded", "RewardRestrictionRemoved"] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const asset = getAddress(event.args.asset);
+    const restricted = await context.client.readContract({
+      address: event.log.address,
+      abi: rewardRestrictionReadAbi,
+      functionName: "rewardRestricted",
+      args: [asset],
+      blockNumber: event.block.number,
+    });
+    const nonce = await context.client.readContract({
+      address: event.log.address,
+      abi: rewardRestrictionReadAbi,
+      functionName: "rewardRestrictionNonce",
+      args: [asset],
+      blockNumber: event.block.number,
+    });
+    const row = {
       key: phaseOneKey(asset.toLowerCase()),
       deploymentId: phaseOneDeploymentId!,
       asset,
-      restricted: true,
+      restricted,
+      nonce,
       updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({ restricted: true, updatedAtBlock: event.block.number });
-});
-
-onPhaseOne("PhaseOneStatics:RewardRestrictionRemoved", async ({ event, context }) => {
-  const asset = getAddress(event.args.asset);
-  await context.db
-    .insert(rewardRestriction)
-    .values({
-      key: phaseOneKey(asset.toLowerCase()),
-      deploymentId: phaseOneDeploymentId!,
-      asset,
-      restricted: false,
-      updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({ restricted: false, updatedAtBlock: event.block.number });
-});
+    };
+    await context.db.insert(rewardRestriction).values(row).onConflictDoUpdate(row);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.affectedByRestriction(context, event, asset);
+    await allocationIndex.touch(context, event);
+  });
+}
 
 onPhaseOne("PhaseOneStatics:MarketSwapRecorded", async ({ event, context }) => {
   const delta = unpackBalanceDelta(event.args.poolDelta);
@@ -714,6 +746,8 @@ onPhaseOne("PhaseOneStatics:PositionStateChanged", async ({ event, context }) =>
 
 for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"] as const) {
   onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    await allocationIndex.pool(context, event, event.args.poolId);
+    await allocationIndex.reserve(context, event);
     const state = {
       posmTokenId: event.args.posmTokenId,
       manager: getAddress(event.args.manager),
@@ -737,6 +771,8 @@ for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"]
 }
 
 onPhaseOne("PhaseOneStatics:ManagedLiquidityChanged", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .update(managedGaugePosition, {
       key: managedPositionKey(event.args.positionId, event.args.poolId),
@@ -745,6 +781,8 @@ onPhaseOne("PhaseOneStatics:ManagedLiquidityChanged", async ({ event, context })
 });
 
 onPhaseOne("PhaseOneStatics:ManagedLiquidityRebalanced", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .update(managedGaugePosition, {
       key: managedPositionKey(event.args.positionId, event.args.poolId),
@@ -761,6 +799,8 @@ onPhaseOne("PhaseOneStatics:ManagedLiquidityRebalanced", async ({ event, context
 });
 
 onPhaseOne("PhaseOneStatics:ManagedLiquidityExited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .update(managedGaugePosition, {
       key: managedPositionKey(event.args.positionId, event.args.poolId),
@@ -769,6 +809,9 @@ onPhaseOne("PhaseOneStatics:ManagedLiquidityExited", async ({ event, context }) 
 });
 
 onPhaseOne("PhaseOneStatics:PoolRewardAssetAppended", async ({ event, context }) => {
+  await readTokenMetadata(context, event, getAddress(event.args.asset));
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db.insert(poolRewardSlot).values({
     key: rewardSlotKey(event.args.poolId, event.args.slot),
     deploymentId: phaseOneDeploymentId!,
@@ -784,6 +827,8 @@ onPhaseOne("PhaseOneStatics:PoolRewardAssetAppended", async ({ event, context })
 });
 
 onPhaseOne("PhaseOneStatics:PoolRewardAllocatorShareSet", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .update(poolRewardSlot, { key: rewardSlotKey(event.args.poolId, event.args.slot) })
     .set({
@@ -793,6 +838,8 @@ onPhaseOne("PhaseOneStatics:PoolRewardAllocatorShareSet", async ({ event, contex
 });
 
 onPhaseOne("PhaseOneStatics:PoolRewardFunded", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .insert(poolRewardSlot)
     .values({
@@ -816,6 +863,8 @@ onPhaseOne("PhaseOneStatics:PoolRewardFunded", async ({ event, context }) => {
 });
 
 onPhaseOne("PhaseOneStatics:PoolAllocatorRewardFunded", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db
     .insert(poolRewardSlot)
     .values({
@@ -845,62 +894,8 @@ for (const eventName of [
   "GaugeAllocationCooldownSet",
 ] as const) {
   onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
-    const reserve = await context.client.readContract({
-      address: event.log.address,
-      abi: staticsGaugeIncentivesAbi,
-      functionName: "gaugeReserve",
-      blockNumber: event.block.number,
-    });
-    await context.db
-      .insert(gaugeReserveState)
-      .values({
-        key: phaseOneDeploymentId!,
-        deploymentId: phaseOneDeploymentId!,
-        activated: reserve.activated,
-        releaseBps: reserve.releaseBps,
-        pendingReleaseBps: reserve.pendingReleaseBps,
-        pendingReleaseAt: BigInt(reserve.pendingReleaseAt),
-        deferredMaturityAt: BigInt(reserve.deferredMaturityAt),
-        scheduleStart: BigInt(reserve.scheduleStart),
-        lastCheckpoint: BigInt(reserve.lastCheckpoint),
-        periodStart: BigInt(reserve.periodStart),
-        periodFinish: BigInt(reserve.periodFinish),
-        currentPeriod: reserve.currentPeriod,
-        allocationCooldown: BigInt(reserve.allocationCooldown),
-        available: reserve.available,
-        deferred: reserve.deferred,
-        committed: reserve.committed,
-        periodBudget: reserve.periodBudget,
-        periodAccounted: reserve.periodAccounted,
-        totalAllocatedWeight: reserve.totalAllocatedWeight,
-        globalIndexX160: reserve.globalIndexX160,
-        unsettledRoutingLiability: reserve.unsettledRoutingLiability,
-        updatedAtBlock: event.block.number,
-        updatedAtTimestamp: event.block.timestamp,
-      })
-      .onConflictDoUpdate({
-        activated: reserve.activated,
-        releaseBps: reserve.releaseBps,
-        pendingReleaseBps: reserve.pendingReleaseBps,
-        pendingReleaseAt: BigInt(reserve.pendingReleaseAt),
-        deferredMaturityAt: BigInt(reserve.deferredMaturityAt),
-        scheduleStart: BigInt(reserve.scheduleStart),
-        lastCheckpoint: BigInt(reserve.lastCheckpoint),
-        periodStart: BigInt(reserve.periodStart),
-        periodFinish: BigInt(reserve.periodFinish),
-        currentPeriod: reserve.currentPeriod,
-        allocationCooldown: BigInt(reserve.allocationCooldown),
-        available: reserve.available,
-        deferred: reserve.deferred,
-        committed: reserve.committed,
-        periodBudget: reserve.periodBudget,
-        periodAccounted: reserve.periodAccounted,
-        totalAllocatedWeight: reserve.totalAllocatedWeight,
-        globalIndexX160: reserve.globalIndexX160,
-        unsettledRoutingLiability: reserve.unsettledRoutingLiability,
-        updatedAtBlock: event.block.number,
-        updatedAtTimestamp: event.block.timestamp,
-      });
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
   });
 }
 
@@ -917,104 +912,20 @@ onPhaseOne("PhaseOneStatics:GaugePeriodStarted", async ({ event, context }) => {
     blockNumber: event.block.number,
   });
 
-  const reserve = await context.client.readContract({
-    address: event.log.address,
-    abi: staticsGaugeIncentivesAbi,
-    functionName: "gaugeReserve",
-    blockNumber: event.block.number,
-  });
-  await context.db
-    .insert(gaugeReserveState)
-    .values({
-      key: phaseOneDeploymentId!,
-      deploymentId: phaseOneDeploymentId!,
-      activated: reserve.activated,
-      releaseBps: reserve.releaseBps,
-      pendingReleaseBps: reserve.pendingReleaseBps,
-      pendingReleaseAt: BigInt(reserve.pendingReleaseAt),
-      deferredMaturityAt: BigInt(reserve.deferredMaturityAt),
-      scheduleStart: BigInt(reserve.scheduleStart),
-      lastCheckpoint: BigInt(reserve.lastCheckpoint),
-      periodStart: BigInt(reserve.periodStart),
-      periodFinish: BigInt(reserve.periodFinish),
-      currentPeriod: reserve.currentPeriod,
-      allocationCooldown: BigInt(reserve.allocationCooldown),
-      available: reserve.available,
-      deferred: reserve.deferred,
-      committed: reserve.committed,
-      periodBudget: reserve.periodBudget,
-      periodAccounted: reserve.periodAccounted,
-      totalAllocatedWeight: reserve.totalAllocatedWeight,
-      globalIndexX160: reserve.globalIndexX160,
-      unsettledRoutingLiability: reserve.unsettledRoutingLiability,
-      updatedAtBlock: event.block.number,
-      updatedAtTimestamp: event.block.timestamp,
-    })
-    .onConflictDoUpdate({
-      activated: reserve.activated,
-      releaseBps: reserve.releaseBps,
-      pendingReleaseBps: reserve.pendingReleaseBps,
-      pendingReleaseAt: BigInt(reserve.pendingReleaseAt),
-      deferredMaturityAt: BigInt(reserve.deferredMaturityAt),
-      scheduleStart: BigInt(reserve.scheduleStart),
-      lastCheckpoint: BigInt(reserve.lastCheckpoint),
-      periodStart: BigInt(reserve.periodStart),
-      periodFinish: BigInt(reserve.periodFinish),
-      currentPeriod: reserve.currentPeriod,
-      allocationCooldown: BigInt(reserve.allocationCooldown),
-      available: reserve.available,
-      deferred: reserve.deferred,
-      committed: reserve.committed,
-      periodBudget: reserve.periodBudget,
-      periodAccounted: reserve.periodAccounted,
-      totalAllocatedWeight: reserve.totalAllocatedWeight,
-      globalIndexX160: reserve.globalIndexX160,
-      unsettledRoutingLiability: reserve.unsettledRoutingLiability,
-      updatedAtBlock: event.block.number,
-      updatedAtTimestamp: event.block.timestamp,
-    });
-});
-
-onPhaseOne("PhaseOneStatics:PositionGaugeAllocationsSet", async ({ event, context }) => {
-  const snapshot = normalizeGaugeAllocationSnapshot(
-    await context.client.readContract({
-      address: event.log.address,
-      abi: staticsGaugeIncentivesAbi,
-      functionName: "gaugePositionAllocations",
-      args: [event.args.positionId],
-      blockNumber: event.block.number,
-    })
-  );
-  // eth_call at this block returns its ending state, including later transactions.
-  const serialized = allocationSnapshotJson(snapshot);
-  await context.db
-    .insert(positionGaugeState)
-    .values({
-      key: phaseOneKey(event.args.positionId),
-      deploymentId: phaseOneDeploymentId!,
-      positionId: event.args.positionId,
-      nextAllocationAt: BigInt(snapshot.nextAllocationAt),
-      totalAllocated: snapshot.totalAllocated,
-      lockedStake: snapshot.lockedStake,
-      ...serialized,
-      transactionHash: event.transaction.hash,
-      updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({
-      nextAllocationAt: BigInt(snapshot.nextAllocationAt),
-      totalAllocated: snapshot.totalAllocated,
-      lockedStake: snapshot.lockedStake,
-      ...serialized,
-      transactionHash: event.transaction.hash,
-      updatedAtBlock: event.block.number,
-    });
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.touch(context, event);
 });
 
 for (const eventName of [
+  "PositionGaugeAllocationsSet",
   "PositionGaugeAllocationCooldownExtended",
   "PositionGaugeAllocationsClearedByStakeLoss",
 ] as const) {
   onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const previous = await context.db.find(positionGaugeState, {
+      key: phaseOneKey(event.args.positionId),
+    });
+    const priorPools = previous ? (JSON.parse(previous.poolIdsJson) as Hex[]) : [];
     const snapshot = normalizeGaugeAllocationSnapshot(
       await context.client.readContract({
         address: event.log.address,
@@ -1024,67 +935,36 @@ for (const eventName of [
         blockNumber: event.block.number,
       })
     );
-    const serialized = allocationSnapshotJson(snapshot);
-    await context.db
-      .insert(positionGaugeState)
-      .values({
-        key: phaseOneKey(event.args.positionId),
-        deploymentId: phaseOneDeploymentId!,
-        positionId: event.args.positionId,
-        nextAllocationAt: BigInt(snapshot.nextAllocationAt),
-        totalAllocated: snapshot.totalAllocated,
-        lockedStake: snapshot.lockedStake,
-        ...serialized,
-        transactionHash: event.transaction.hash,
-        updatedAtBlock: event.block.number,
-      })
-      .onConflictDoUpdate({
-        nextAllocationAt: BigInt(snapshot.nextAllocationAt),
-        totalAllocated: snapshot.totalAllocated,
-        lockedStake: snapshot.lockedStake,
-        ...serialized,
-        transactionHash: event.transaction.hash,
-        updatedAtBlock: event.block.number,
-      });
+    // All snapshots describe the block's ending state, never an inferred outer calldata state.
+    const row = {
+      key: phaseOneKey(event.args.positionId),
+      deploymentId: phaseOneDeploymentId!,
+      positionId: event.args.positionId,
+      nextAllocationAt: BigInt(snapshot.nextAllocationAt),
+      totalAllocated: snapshot.totalAllocated,
+      lockedStake: snapshot.lockedStake,
+      ...allocationSnapshotJson(snapshot),
+      transactionHash: event.transaction.hash,
+      updatedAtBlock: event.block.number,
+    };
+    await context.db.insert(positionGaugeState).values(row).onConflictDoUpdate(row);
+    const affected = new Set(
+      [...priorPools, ...snapshot.active.map((a) => a.poolId)].map((id) => id.toLowerCase() as Hex)
+    );
+    for (const poolId of affected) await allocationIndex.pool(context, event, poolId);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
   });
 }
 
 onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardCredited", async ({ event, context }) => {
-  const state = await context.client.readContract({
-    address: event.log.address,
-    abi: staticsGaugeIncentivesAbi,
-    functionName: "gaugePoolWeight",
-    args: [event.args.poolId],
-    blockNumber: event.block.number,
+  await allocationIndex.weight(context, event, event.args.poolId, {
+    lastCredited: event.args.amount,
   });
-  await context.db
-    .insert(gaugePoolState)
-    .values({
-      key: phaseOneKey(event.args.poolId),
-      deploymentId: phaseOneDeploymentId!,
-      poolId: event.args.poolId,
-      weight: state.weight,
-      storedVersion: state.storedVersion,
-      currentVersion: state.currentVersion,
-      restrictionSequence: state.restrictionSequence,
-      indexCursorX160: state.indexCursorX160,
-      pendingReward: state.pendingReward,
-      stale: state.stale,
-      lastCredited: event.args.amount,
-      lastRecycled: 0n,
-      updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({
-      weight: state.weight,
-      storedVersion: state.storedVersion,
-      currentVersion: state.currentVersion,
-      restrictionSequence: state.restrictionSequence,
-      indexCursorX160: state.indexCursorX160,
-      pendingReward: state.pendingReward,
-      stale: state.stale,
-      lastCredited: event.args.amount,
-      updatedAtBlock: event.block.number,
-    });
+  await allocationIndex.streams(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.directory(context, event, event.args.poolId);
+  await allocationIndex.touch(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1103,41 +983,13 @@ onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardCredited", async ({ event, contex
 });
 
 onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardRecycled", async ({ event, context }) => {
-  const state = await context.client.readContract({
-    address: event.log.address,
-    abi: staticsGaugeIncentivesAbi,
-    functionName: "gaugePoolWeight",
-    args: [event.args.poolId],
-    blockNumber: event.block.number,
+  await allocationIndex.weight(context, event, event.args.poolId, {
+    lastRecycled: event.args.amount,
   });
-  await context.db
-    .insert(gaugePoolState)
-    .values({
-      key: phaseOneKey(event.args.poolId),
-      deploymentId: phaseOneDeploymentId!,
-      poolId: event.args.poolId,
-      weight: state.weight,
-      storedVersion: state.storedVersion,
-      currentVersion: state.currentVersion,
-      restrictionSequence: state.restrictionSequence,
-      indexCursorX160: state.indexCursorX160,
-      pendingReward: state.pendingReward,
-      stale: state.stale,
-      lastCredited: 0n,
-      lastRecycled: event.args.amount,
-      updatedAtBlock: event.block.number,
-    })
-    .onConflictDoUpdate({
-      weight: state.weight,
-      storedVersion: state.storedVersion,
-      currentVersion: state.currentVersion,
-      restrictionSequence: state.restrictionSequence,
-      indexCursorX160: state.indexCursorX160,
-      pendingReward: state.pendingReward,
-      stale: state.stale,
-      lastRecycled: event.args.amount,
-      updatedAtBlock: event.block.number,
-    });
+  await allocationIndex.streams(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.directory(context, event, event.args.poolId);
+  await allocationIndex.touch(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1156,6 +1008,8 @@ onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardRecycled", async ({ event, contex
 });
 
 onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardClaimed", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1174,6 +1028,8 @@ onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardClaimed", async ({ event, contex
 });
 
 onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardForfeited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1192,6 +1048,8 @@ onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardForfeited", async ({ event, cont
 });
 
 onPhaseOne("PhaseOneStatics:LpRewardsClaimed", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1210,6 +1068,8 @@ onPhaseOne("PhaseOneStatics:LpRewardsClaimed", async ({ event, context }) => {
 });
 
 onPhaseOne("PhaseOneStatics:LpRewardForfeited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
   await context.db.insert(phaseOneActivity).values({
     key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
     deploymentId: phaseOneDeploymentId!,
@@ -1280,3 +1140,33 @@ onPhaseOne("PhaseOneStatics:CreatorRevenueClaimed", async ({ event, context }) =
     logIndex: event.log.logIndex,
   });
 });
+
+for (const eventName of [
+  "PoolGaugeStopped",
+  "GeneralPoolDecommissionStarted",
+  "GeneralPoolDecommissionFinalized",
+] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const gauge = await context.client.readContract({
+      address: event.log.address,
+      abi: staticsRangeGaugeAbi,
+      functionName: "gaugePool",
+      args: [event.args.poolId],
+      blockNumber: event.block.number,
+    });
+    const existing = await context.db.find(publicPool, { key: phaseOneKey(event.args.poolId) });
+    if (existing)
+      await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+        gaugeInitialized: gauge.initialized,
+        gaugeStopped: gauge.stopped,
+        decommissioned: existing.decommissioned || eventName !== "PoolGaugeStopped",
+        decommissionStarted: existing.decommissionStarted || eventName !== "PoolGaugeStopped",
+        decommissionFinalized:
+          existing.decommissionFinalized || eventName === "GeneralPoolDecommissionFinalized",
+        updatedAtBlock: event.block.number,
+      });
+    await allocationIndex.pool(context, event, event.args.poolId);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
+  });
+}

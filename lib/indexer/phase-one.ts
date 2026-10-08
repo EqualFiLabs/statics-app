@@ -423,3 +423,293 @@ export async function loadIndexedAllocationSnapshot(
     owner
   );
 }
+
+const allocationReasons = [
+  "gauge-uninitialized",
+  "gauge-stopped",
+  "decommissioned",
+  "currency0-restricted",
+  "currency1-restricted",
+] as const;
+export type AllocationEligibilityReason = (typeof allocationReasons)[number];
+function nullableText(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string")
+    throw new Error(`The Phase 1 indexer returned an invalid ${label}.`);
+  return value;
+}
+function boundedInteger(value: unknown, minimum: number, maximum: number, label: string): number {
+  const result = integer(value, label);
+  if (result < minimum || result > maximum)
+    throw new Error(`The Phase 1 indexer returned an invalid ${label}.`);
+  return result;
+}
+function nullableUnsigned(value: unknown, label: string): bigint | null {
+  return value === null ? null : unsignedBigint(value, label);
+}
+function allocationMetadata(value: unknown) {
+  const row = record(value, "token metadata");
+  return {
+    address: address(row.address, "token address"),
+    symbol: nullableText(row.symbol, "symbol"),
+    name: nullableText(row.name, "name"),
+    decimals: row.decimals === null ? null : boundedInteger(row.decimals, 0, 255, "decimals"),
+  };
+}
+function parseAllocationPool(value: unknown) {
+  const row = record(value, "allocation pool"),
+    key = record(row.poolKey, "PoolKey"),
+    eligibilityRow = record(row.eligibility, "eligibility"),
+    restrictions = record(row.restrictionFlags, "restriction flags");
+  const token0 = allocationMetadata(row.token0),
+    token1 = allocationMetadata(row.token1);
+  const poolKey = {
+    currency0: address(key.currency0, "currency0"),
+    currency1: address(key.currency1, "currency1"),
+    hooks: address(key.hooks, "hooks"),
+    fee: boundedInteger(key.fee, 0, 0xffffff, "fee"),
+    tickSpacing: boundedInteger(key.tickSpacing, 1, 32767, "tick spacing"),
+  };
+  if (
+    poolKey.currency0 !== token0.address ||
+    poolKey.currency1 !== token1.address ||
+    poolKey.currency0.toLowerCase() >= poolKey.currency1.toLowerCase()
+  )
+    throw new Error("The Phase 1 indexer returned inconsistent pool currencies.");
+  if (
+    !Array.isArray(eligibilityRow.reasons) ||
+    eligibilityRow.reasons.some((v) => !allocationReasons.includes(v)) ||
+    new Set(eligibilityRow.reasons).size !== eligibilityRow.reasons.length
+  )
+    throw new Error("The Phase 1 indexer returned invalid eligibility reasons.");
+  const eligibility = {
+    eligible: boolean(eligibilityRow.eligible, "eligibility"),
+    reasons: eligibilityRow.reasons as AllocationEligibilityReason[],
+  };
+  const gaugeInitialized = boolean(row.gaugeInitialized, "gauge initialization"),
+    gaugeStopped = boolean(row.gaugeStopped, "gauge stop"),
+    decommissioned = boolean(row.decommissioned, "decommission"),
+    decommissionStarted = boolean(row.decommissionStarted, "decommission start"),
+    decommissionFinalized = boolean(row.decommissionFinalized, "decommission finalization");
+  const restrictionFlags = {
+    token0: boolean(restrictions.token0, "currency0 restriction"),
+    token1: boolean(restrictions.token1, "currency1 restriction"),
+  };
+  const expectedReasons = [
+    !gaugeInitialized && "gauge-uninitialized",
+    gaugeStopped && "gauge-stopped",
+    decommissioned && "decommissioned",
+    restrictionFlags.token0 && "currency0-restricted",
+    restrictionFlags.token1 && "currency1-restricted",
+  ].filter(Boolean);
+  if (
+    eligibility.eligible !== (expectedReasons.length === 0) ||
+    expectedReasons.join() !== eligibility.reasons.join() ||
+    (decommissionFinalized && !decommissionStarted)
+  )
+    throw new Error("The Phase 1 indexer returned inconsistent eligibility.");
+  const weight = unsignedBigint(row.weight, "pool weight"),
+    currentVersion = hash(row.currentVersion, "current version"),
+    storedVersion = hash(row.storedVersion, "stored version"),
+    stale = boolean(row.stale, "stale weight");
+  if (stale !== (weight > 0n && storedVersion !== currentVersion))
+    throw new Error("The Phase 1 indexer returned inconsistent stale weight.");
+  if (!Array.isArray(row.allocatorStreams) || row.allocatorStreams.length > 4)
+    throw new Error("The Phase 1 indexer returned invalid allocator streams.");
+  const allocatorStreams = row.allocatorStreams.map((value) => {
+    const stream = record(value, "allocator stream");
+    const result = {
+      slot: boundedInteger(stream.slot, 1, 4, "allocator slot"),
+      asset: allocationMetadata(stream.asset),
+      allocatorShareBps: boundedInteger(stream.allocatorShareBps, 0, 10000, "allocator share"),
+      eligibilityVersion: hash(stream.eligibilityVersion, "stream version"),
+      fundingRestrictionSequence: unsignedBigint(
+        stream.fundingRestrictionSequence,
+        "restriction sequence"
+      ),
+      periodStart: unsignedBigint(stream.periodStart, "stream start"),
+      periodFinish: unsignedBigint(stream.periodFinish, "stream finish"),
+      lastUpdate: unsignedBigint(stream.lastUpdate, "last update"),
+      periodBudget: unsignedBigint(stream.periodBudget, "stream budget"),
+      periodEmitted: unsignedBigint(stream.periodEmitted, "stream emitted"),
+      terminated: boolean(stream.terminated, "termination"),
+      observedAtBlock: unsignedBigint(stream.observedAtBlock, "stream observation block"),
+      observedAtTimestamp: unsignedBigint(
+        stream.observedAtTimestamp,
+        "stream observation timestamp"
+      ),
+      funded: boolean(stream.funded, "funded stream"),
+      paused: boolean(stream.paused, "paused stream"),
+      invalidated: boolean(stream.invalidated, "invalidated stream"),
+      rateNumerator: unsignedBigint(stream.rateNumerator, "rate numerator"),
+      rateDenominator: unsignedBigint(stream.rateDenominator, "rate denominator"),
+      nominalRatePerSecond: unsignedBigint(stream.nominalRatePerSecond, "nominal rate"),
+      ratePerSecond: unsignedBigint(stream.ratePerSecond, "effective rate"),
+    };
+    const invalidated = !eligibility.eligible || currentVersion !== result.eligibilityVersion;
+    const remaining = result.periodBudget - result.periodEmitted,
+      duration =
+        result.periodFinish > result.lastUpdate ? result.periodFinish - result.lastUpdate : 0n;
+    const funded = !result.terminated && !invalidated && remaining > 0n && duration > 0n,
+      paused = funded && weight === 0n;
+    if (
+      remaining < 0n ||
+      result.lastUpdate < result.periodStart ||
+      result.observedAtTimestamp < result.lastUpdate ||
+      result.invalidated !== invalidated ||
+      result.funded !== funded ||
+      result.paused !== paused ||
+      result.rateNumerator !== (funded ? remaining : 0n) ||
+      result.rateDenominator !== (funded ? duration : 0n) ||
+      result.nominalRatePerSecond !== (funded ? remaining / duration : 0n) ||
+      result.ratePerSecond !== (funded && !paused ? remaining / duration : 0n)
+    )
+      throw new Error("The Phase 1 indexer returned an inconsistent allocator schedule.");
+    return result;
+  });
+  if (new Set(allocatorStreams.map((s) => s.slot)).size !== allocatorStreams.length)
+    throw new Error("The Phase 1 indexer returned duplicate allocator slots.");
+  const incentiveStreamCount = boundedInteger(row.incentiveStreamCount, 0, 4, "incentive count");
+  if (incentiveStreamCount !== allocatorStreams.filter((s) => s.funded).length)
+    throw new Error("The Phase 1 indexer returned an inconsistent incentive count.");
+  const createdAtBlock = unsignedBigint(row.createdAtBlock, "creation block"),
+    updatedAtBlock = unsignedBigint(row.updatedAtBlock, "update block"),
+    weightObservedAtBlock = nullableUnsigned(row.weightObservedAtBlock, "weight observation block"),
+    observedAtTimestamp = unsignedBigint(row.observedAtTimestamp, "observation timestamp");
+  if (
+    createdAtBlock > updatedAtBlock ||
+    (weightObservedAtBlock !== null && weightObservedAtBlock > updatedAtBlock) ||
+    allocatorStreams.some(
+      (s) => s.observedAtBlock > updatedAtBlock || s.observedAtTimestamp > observedAtTimestamp
+    )
+  )
+    throw new Error("The Phase 1 indexer returned inconsistent observation blocks.");
+  return {
+    poolId: hash(row.poolId, "PoolId"),
+    poolKey,
+    token0,
+    token1,
+    creator: address(row.creator, "creator"),
+    eligibility,
+    weight,
+    stale,
+    gaugeInitialized,
+    gaugeStopped,
+    decommissioned,
+    decommissionStarted,
+    decommissionFinalized,
+    quarantined: boolean(row.quarantined, "quarantine"),
+    restrictionFlags,
+    currentVersion,
+    storedVersion,
+    allocatorStreams,
+    incentiveStreamCount,
+    createdAtBlock,
+    updatedAtBlock,
+    observedAtTimestamp,
+    weightObservedAtBlock,
+  };
+}
+export type IndexedAllocationPool = ReturnType<typeof parseAllocationPool>;
+export function parseAllocationDirectory(value: unknown, deploymentId: string) {
+  const body = page(value, deploymentId);
+  const indexedAtBlock = nullableUnsigned(body.indexedAtBlock, "directory block"),
+    indexedAtTimestamp = nullableUnsigned(body.indexedAtTimestamp, "directory timestamp"),
+    directoryRevision = unsignedBigint(body.directoryRevision, "directory revision");
+  const items = (body.items as unknown[]).map(parseAllocationPool),
+    total = boundedInteger(body.total, 0, Number.MAX_SAFE_INTEGER, "directory total");
+  if (
+    items.length > 100 ||
+    items.length > total ||
+    new Set(items.map((p) => p.poolId.toLowerCase())).size !== items.length ||
+    (indexedAtBlock === null) !== (indexedAtTimestamp === null) ||
+    (items.length > 0 && indexedAtBlock === null) ||
+    items.some(
+      (p) => p.updatedAtBlock > indexedAtBlock! || p.observedAtTimestamp > indexedAtTimestamp!
+    )
+  )
+    throw new Error("The Phase 1 indexer returned an inconsistent directory page.");
+  const nextCursor = nullableText(body.nextCursor, "directory cursor");
+  if (
+    nextCursor !== null &&
+    (!nextCursor ||
+      items.length === 0 ||
+      items.length >= total ||
+      !/^[A-Za-z0-9_-]+$/.test(nextCursor))
+  )
+    throw new Error("The Phase 1 indexer returned an invalid directory cursor.");
+  let reserve = null;
+  if (body.reserve !== null) {
+    const row = record(body.reserve, "reserve");
+    reserve = {
+      activated: boolean(row.activated, "reserve activation"),
+      periodBudget: unsignedBigint(row.periodBudget, "reserve budget"),
+      periodStart: unsignedBigint(row.periodStart, "reserve start"),
+      periodFinish: unsignedBigint(row.periodFinish, "reserve finish"),
+      totalAllocatedWeight: unsignedBigint(row.totalAllocatedWeight, "allocated weight"),
+      observedAtBlock: unsignedBigint(row.observedAtBlock, "reserve block"),
+      observedAtTimestamp: unsignedBigint(row.observedAtTimestamp, "reserve timestamp"),
+      periodExpired: boolean(row.periodExpired, "expired period"),
+    };
+    if (
+      reserve.periodStart > reserve.periodFinish ||
+      indexedAtBlock === null ||
+      reserve.observedAtBlock > indexedAtBlock ||
+      reserve.observedAtTimestamp > indexedAtTimestamp! ||
+      reserve.periodExpired !==
+        (reserve.periodFinish > 0n && reserve.periodFinish <= indexedAtTimestamp!)
+    )
+      throw new Error("The Phase 1 indexer returned an inconsistent reserve observation.");
+  }
+  return {
+    deploymentId,
+    indexedAtBlock,
+    indexedAtTimestamp,
+    directoryRevision,
+    reserve,
+    items,
+    nextCursor,
+    total,
+  };
+}
+export type AllocationDirectoryPage = ReturnType<typeof parseAllocationDirectory>;
+export type AllocationDirectoryFilters = Readonly<{
+  search?: string;
+  eligible?: "true" | "false" | "all";
+  hasIncentives?: boolean;
+  sort?: "weight" | "incentives" | "created";
+  direction?: "asc" | "desc";
+  limit?: number;
+  cursor?: string;
+}>;
+export class AllocationDirectoryChangedError extends Error {
+  readonly code = "DIRECTORY_CHANGED";
+  constructor() {
+    super("The allocation directory changed. Restart from the first page.");
+    this.name = "AllocationDirectoryChangedError";
+  }
+}
+export async function loadAllocationDirectory(input: {
+  deploymentId: string;
+  filters?: AllocationDirectoryFilters;
+  indexerUrl?: string | null;
+}): Promise<AllocationDirectoryPage> {
+  const base =
+    input.indexerUrl === undefined
+      ? configuredIndexerUrlForDeployment(input.deploymentId)
+      : input.indexerUrl;
+  if (!base) throw new Error("No indexer is configured for this deployment.");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(input.filters ?? {}))
+    if (value !== undefined) query.set(key, String(value));
+  const response = await fetchIndexer(
+    `${base}/phase-one/allocation-pools${query.size ? `?${query}` : ""}`,
+    "no-store"
+  );
+  if (response.status === 409) {
+    const body = record(await response.json(), "directory error");
+    if (body.code === "DIRECTORY_CHANGED") throw new AllocationDirectoryChangedError();
+  }
+  if (!response.ok) throw new Error(`Allocation directory request failed (${response.status}).`);
+  return parseAllocationDirectory(await response.json(), input.deploymentId);
+}

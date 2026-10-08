@@ -28,3 +28,15 @@ export function configuredCanonicalPool(
   }
   return value;
 }
+
+export function configuredLogBlockRange(
+  environment: Environment = process.env
+): number | undefined {
+  const value = environment.PONDER_LOG_BLOCK_RANGE?.trim();
+  if (!value) return undefined;
+  const range = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(range) || range < 1 || range > 1_000_000) {
+    throw new Error("PONDER_LOG_BLOCK_RANGE must be an integer from 1 through 1000000.");
+  }
+  return range;
+}

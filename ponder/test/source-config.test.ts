@@ -34,3 +34,21 @@ describe("Ponder source configuration", () => {
     ).toThrow("32-byte hex value");
   });
 });
+
+describe("configured log block ranges", () => {
+  it("uses defaults when unset or whitespace", async () => {
+    const { configuredLogBlockRange } = await import("../src/source-config");
+    expect(configuredLogBlockRange({})).toBeUndefined();
+    expect(configuredLogBlockRange({ PONDER_LOG_BLOCK_RANGE: "  " })).toBeUndefined();
+    expect(configuredLogBlockRange({ PONDER_LOG_BLOCK_RANGE: " 1000000 " })).toBe(1000000);
+  });
+  it.each(["0", "-1", "1.5", "NaN", "1000001", "9007199254740992"])(
+    "rejects unsafe range %s before Ponder chunking",
+    async (value) => {
+      const { configuredLogBlockRange } = await import("../src/source-config");
+      expect(() => configuredLogBlockRange({ PONDER_LOG_BLOCK_RANGE: value })).toThrow(
+        "from 1 through 1000000"
+      );
+    }
+  );
+});

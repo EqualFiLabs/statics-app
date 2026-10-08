@@ -20,7 +20,11 @@ import {
 } from "@statics-protocol/sdk/phase-one";
 
 import { uniqueAbi } from "./src/abi";
-import { configuredAddress, configuredCanonicalPool } from "./src/source-config";
+import {
+  configuredAddress,
+  configuredCanonicalPool,
+  configuredLogBlockRange,
+} from "./src/source-config";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -45,6 +49,7 @@ const chainId = Number(required("PONDER_CHAIN_ID"));
 if (!Number.isSafeInteger(chainId) || chainId <= 0) {
   throw new Error("PONDER_CHAIN_ID must be a positive integer.");
 }
+const logBlockRange = configuredLogBlockRange();
 const deploymentStartBlock = optionalStartBlock("PONDER_DEPLOYMENT_START_BLOCK", 0);
 const poolManagerEventsAbi = parseAbi([
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
@@ -89,6 +94,7 @@ export default createConfig({
       id: chainId,
       rpc: required(`PONDER_RPC_URL_${chainId}`),
       pollingInterval: chainId === 4_663 ? 2_000 : undefined,
+      ...(logBlockRange !== undefined ? { ethGetLogsBlockRange: logBlockRange } : {}),
     },
   },
   contracts: activeContracts({

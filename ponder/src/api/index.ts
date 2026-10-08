@@ -25,6 +25,7 @@ import {
   rewardRestriction,
   v4Position,
 } from "ponder:schema";
+import { allocationPoolRoutes } from "./allocation-pools";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
 import { nextAvailableGenesisId } from "../genesis";
@@ -35,6 +36,8 @@ app.use("*", cors({ origin: process.env.PONDER_ALLOWED_ORIGIN || "*" }));
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim() || "unconfigured";
 const phaseOneDeploymentId =
   process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID?.trim() || "unconfigured-phase-one";
+
+app.route("/", allocationPoolRoutes(phaseOneDeploymentId));
 
 const MAX_MARKET_RANGE_SECONDS = 31n * 24n * 60n * 60n;
 

@@ -167,6 +167,10 @@ export const publicPool = onchainTable(
     quarantined: table.boolean().notNull(),
     decommissioned: table.boolean().notNull(),
     polActivated: table.boolean().notNull(),
+    gaugeInitialized: table.boolean().notNull(),
+    gaugeStopped: table.boolean().notNull(),
+    decommissionStarted: table.boolean().notNull(),
+    decommissionFinalized: table.boolean().notNull(),
     createdAtBlock: table.bigint().notNull(),
     updatedAtBlock: table.bigint().notNull(),
   }),
@@ -183,6 +187,7 @@ export const rewardRestriction = onchainTable(
     deploymentId: table.text().notNull(),
     asset: table.hex().notNull(),
     restricted: table.boolean().notNull(),
+    nonce: table.bigint().notNull(),
     updatedAtBlock: table.bigint().notNull(),
   }),
   (table) => ({ asset: index().on(table.deploymentId, table.asset) })
@@ -403,3 +408,65 @@ export const phaseOneActivity = onchainTable(
     pool: index().on(table.deploymentId, table.poolId, table.blockNumber),
   })
 );
+
+export const allocationToken = onchainTable("allocation_token", (t) => ({
+  key: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
+  address: t.hex().notNull(),
+  symbol: t.text(),
+  name: t.text(),
+  decimals: t.integer(),
+  observedAtBlock: t.bigint().notNull(),
+}));
+
+export const allocatorStream = onchainTable(
+  "allocator_stream",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    slot: t.integer().notNull(),
+    asset: t.hex().notNull(),
+    allocatorShareBps: t.integer().notNull(),
+    eligibilityVersion: t.hex().notNull(),
+    fundingRestrictionSequence: t.bigint().notNull(),
+    periodStart: t.bigint().notNull(),
+    periodFinish: t.bigint().notNull(),
+    lastUpdate: t.bigint().notNull(),
+    periodBudget: t.bigint().notNull(),
+    periodEmitted: t.bigint().notNull(),
+    terminated: t.boolean().notNull(),
+    observedAtBlock: t.bigint().notNull(),
+    observedAtTimestamp: t.bigint().notNull(),
+  }),
+  (t) => ({ pool: index().on(t.deploymentId, t.poolId, t.slot) })
+);
+
+// Materialized browsing data: all filtering, numeric sorting and paging happen in SQL.
+export const allocationDirectoryPool = onchainTable(
+  "allocation_directory_pool",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    eligible: t.boolean().notNull(),
+    weight: t.bigint().notNull(),
+    incentiveStreamCount: t.integer().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    searchText: t.text().notNull(),
+    detailsJson: t.text().notNull(),
+  }),
+  (t) => ({
+    weight: index().on(t.deploymentId, t.weight, t.poolId),
+    incentives: index().on(t.deploymentId, t.incentiveStreamCount, t.poolId),
+    created: index().on(t.deploymentId, t.createdAtBlock, t.poolId),
+  })
+);
+
+export const allocationDirectoryState = onchainTable("allocation_directory_state", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  revision: t.bigint().notNull(),
+  indexedAtBlock: t.bigint().notNull(),
+  indexedAtTimestamp: t.bigint().notNull(),
+}));

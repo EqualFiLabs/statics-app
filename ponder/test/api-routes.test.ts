@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("ponder:api", () => ({ db: {} }));
 vi.mock("ponder:schema", () => ({
+  allocationDirectoryPool: {},
+  allocationDirectoryState: {},
   activeGenesisCredit: {},
   activeLoan: {},
   v4Position: {},
