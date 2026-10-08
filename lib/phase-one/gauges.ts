@@ -136,6 +136,7 @@ export async function readPositionGaugeRewards(input: {
   poolId: Hex;
   allocatorSlots?: readonly number[];
   includeProtocolAccrual?: boolean;
+  readLpLeg?: () => Promise<Readonly<{ liquidity: bigint }>>;
   source?: "gauge" | "lp-bribe" | "allocator";
   account: Address;
 }): Promise<
@@ -170,12 +171,14 @@ export async function readPositionGaugeRewards(input: {
     input.source !== "lp-bribe" &&
     lp.slotCount > 0
   ) {
-    const leg = await input.publicClient.readContract({
-      address: input.deployment.contracts.diamond,
-      abi: staticsRangeGaugeAbi,
-      functionName: "lpLeg",
-      args: [input.positionId, input.poolId],
-    });
+    const leg = await (input.readLpLeg
+      ? input.readLpLeg()
+      : input.publicClient.readContract({
+          address: input.deployment.contracts.diamond,
+          abi: staticsRangeGaugeAbi,
+          functionName: "lpLeg",
+          args: [input.positionId, input.poolId],
+        }));
     if (leg.liquidity > 0n) {
       // The slot-0 view omits uncheckpointed reserve routing. eth_call runs the
       // claim's settlement without signing, transferring tokens, or persisting state.

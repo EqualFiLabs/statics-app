@@ -54,7 +54,8 @@ export function sourceForView(view: EarnView, share: EarnFilters["share"]): Rewa
     : view === "staking"
       ? ["global"]
       : view === "gauge"
-        ? ["gauge"]
+        ? // Liquidity rewards: protocol emissions and LP-share incentives both pay in-range LPs.
+          ["gauge", "lp-bribe"]
         : view === "bribes"
           ? [share === "lp" ? "lp-bribe" : "allocator"]
           : [];

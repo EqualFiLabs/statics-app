@@ -212,9 +212,18 @@ beforeEach(() => {
         amounts: [parseEther(args[1] === hash("1") ? "1" : "9"), parseEther("2"), 0n, 0n, 0n],
       };
     if (functionName === "gaugeReserve")
-      return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
+      return {
+        activated: false,
+        periodFinish: 0,
+        lastCheckpoint: 0,
+        periodBudget: 0n,
+        totalAllocatedWeight: 0n,
+      };
+    if (functionName === "gaugePool")
+      return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 0n };
+    if (functionName === "gaugePoolWeight") return { weight: 0n, stale: false };
     if (functionName === "maxGaugeCatchupPeriods") return 10;
-    if (functionName === "lpLeg") return { liquidity: 0n };
+    if (functionName === "lpLeg") return { liquidity: 0n, tickLower: -60, tickUpper: 60 };
     if (functionName === "balanceOf") return parseEther("500");
     if (functionName === "allowance") return maxUint256;
     if (functionName === "rewardBookNeedsCheckpoint") return false;
@@ -401,7 +410,7 @@ describe("focused Phase 1 Earn", () => {
     ).toBe(false);
     expect(mocks.allocations).not.toHaveBeenCalled();
   });
-  it("reads only LP reward sources on Gauge and survives an unrelated allocator failure", async () => {
+  it("reads only LP reward sources on Liquidity rewards and survives an unrelated allocator failure", async () => {
     const original = mocks.read.getMockImplementation()!;
     mocks.read.mockImplementation((input) =>
       input.functionName === "positionGaugeAllocatorPools"
@@ -409,9 +418,7 @@ describe("focused Phase 1 Earn", () => {
         : original(input)
     );
     withPhaseOne(<RewardsPage earnView="gauge" />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Claim displayed rewards" })).toBeEnabled()
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     expect(
       mocks.read.mock.calls.some(([input]) =>
         [
@@ -422,15 +429,16 @@ describe("focused Phase 1 Earn", () => {
         ].includes(input.functionName)
       )
     ).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Claim displayed rewards" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collect" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     const decoded = decodeFunctionData({
       abi: staticsBatchRewardsAbi,
       data: mocks.call.mock.calls[0][0].data,
     });
+    // No global or allocator claims; one LP claim covering emissions (slot 0) and incentives.
     expect(decoded.args?.[0]).toEqual([]);
     expect(decoded.args?.[2]).toEqual([]);
-    expect(decoded.args?.[1]).toMatchObject([{ positionId: 1n, slots: [0] }]);
+    expect(decoded.args?.[1]).toMatchObject([{ positionId: 1n, slots: [0, 1] }]);
     expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("separates LP and allocator bribes without staking or allocation-management reads", async () => {
@@ -455,7 +463,7 @@ describe("focused Phase 1 Earn", () => {
     expect(decoded.args?.[1]).toEqual([]);
     expect(decoded.args?.[2]).toHaveLength(2);
   });
-  it("selects all filtered pools across pages and deduplicates parent and child rows", async () => {
+  it("collects every pool and deduplicates pool and position selections", async () => {
     const poolIds = Array.from(
       { length: 12 },
       (_, index) => `0x${(index + 1).toString(16).padStart(64, "0")}`
@@ -465,14 +473,19 @@ describe("focused Phase 1 Earn", () => {
       input.functionName === "positionGaugePools" ? [poolIds, 12n] : original(input)
     );
     withPhaseOne(<RewardsPage earnView="gauge" />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Claim displayed rewards" })).toBeEnabled()
-    );
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select all filtered results" }));
-    expect(screen.getByText("12 selected")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Claim selected rewards" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    const [first] = screen.getAllByRole("checkbox", { name: /^Select all positions in/ });
+    fireEvent.click(first);
+    expect(screen.getByText("1 leg selected")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in/ })[0]);
+    const child = screen.getByRole("checkbox", { name: /^Select Position #1 in/ });
+    expect(child).toBeChecked();
+    fireEvent.click(child);
+    expect(first).not.toBeChecked();
+    expect(
+      screen.queryByRole("region", { name: "Actions for selected liquidity" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Collect" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     const decoded = decodeFunctionData({
       abi: staticsBatchRewardsAbi,
@@ -715,11 +728,61 @@ describe("Earn review remediation", () => {
     );
     withPhaseOne(<RewardsPage earnView="gauge" />);
     await screen.findByText(/Some data could not be loaded/);
-    fireEvent.click(screen.getByRole("checkbox", { name: "STATICS / WETH" }));
-    expect(screen.getByRole("button", { name: "Claim displayed rewards" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Claim selected rewards" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Claim selected rewards" }));
+    expect(screen.getByRole("button", { name: "Collect" })).toBeDisabled();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+    );
+    expect(screen.getByRole("button", { name: "Collect selected" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
+  });
+  it("shows range status, share and the emission estimate per pool", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    let poolWeight = 50n;
+    mocks.read.mockImplementation((input) => {
+      if (input.functionName === "gaugeReserve")
+        return {
+          activated: true,
+          periodBudget: parseEther("700"),
+          totalAllocatedWeight: 100n,
+          periodFinish: 3000 + 7_200,
+        };
+      if (input.functionName === "gaugePool")
+        return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 1_000n };
+      if (input.functionName === "gaugePoolWeight") return { weight: poolWeight, stale: false };
+      if (input.functionName === "lpLeg") return { liquidity: 250n, tickLower: -60, tickUpper: 60 };
+      return original(input);
+    });
+    const view = withPhaseOne(<RewardsPage earnView="gauge" />);
+    const row = (
+      await screen.findByTitle("At least one of your ranges contains the current price.")
+    ).closest("tr")!;
+    // 700 × 50/100 to the pool; 250 of 1,000 active liquidity is a 25% share.
+    expect(within(row).getByText("25%")).toBeInTheDocument();
+    expect(within(row).getByText("350")).toBeInTheDocument();
+    expect(within(row).getByText("87.5")).toBeInTheDocument();
+    expect(screen.getByText("Current period ends in 2h 0m")).toBeInTheDocument();
+    expect(screen.getByText("1 of 1")).toBeInTheDocument();
+    view.unmount();
+    // Zero allocation weight: in range, but the pool receives no emissions.
+    poolWeight = 0n;
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    const idle = (
+      await screen.findByTitle(/receives no protocol emissions even while you are in range/)
+    ).closest("tr")!;
+    // The attention chip filters to every reason, not only out-of-range pools.
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 pools that need attention" }));
+    expect(screen.getByRole("button", { name: /^Needs attention/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByTitle(/receives no protocol emissions/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Earning/ }));
+    expect(screen.queryByTitle(/receives no protocol emissions/)).not.toBeInTheDocument();
+    expect(within(idle).getByRole("link", { name: "Allocate" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/app/rewards/allocations?positionId=1&poolId=")
+    );
   });
   it("keeps retained allocation pools valid when absent from enabled manifests", async () => {
     mocks.params = new URLSearchParams(`poolId=${hash("3")}`);
@@ -943,4 +1006,108 @@ it("keeps legacy unlisted reward-asset links usable on the management-only staki
   withPhaseOne(<RewardsPage earnView="staking" />);
   expect(await screen.findByRole("radio", { name: /Position #1/ })).toBeChecked();
   expect(screen.queryByRole("link", { name: "Reset filters" })).not.toBeInTheDocument();
+});
+
+describe("liquidity claim scope regressions", () => {
+  it.each(["Collect", "Collect selected"])(
+    "honors the requested reward asset in %s",
+    async (label) => {
+      mocks.params = new URLSearchParams(`asset=${tokens[1].address}`);
+      withPhaseOne(<RewardsPage earnView="gauge" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+      if (label === "Collect selected")
+        fireEvent.click(
+          screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+        );
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      await screen.findByRole("button", { name: "Confirm transaction" });
+      const decoded = decodeFunctionData({
+        abi: staticsBatchRewardsAbi,
+        data: mocks.call.mock.calls[0][0].data,
+      });
+      expect(decoded.args?.[1]).toMatchObject([{ positionId: 1n, slots: [1] }]);
+    }
+  );
+  it("clears selected legs when search hides them", async () => {
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+    );
+    expect(
+      screen.getByRole("region", { name: "Actions for selected liquidity" })
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search pools" }), {
+      target: { value: "nothing matches" },
+    });
+    expect(
+      screen.queryByRole("region", { name: "Actions for selected liquidity" })
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search pools" }), {
+      target: { value: "" },
+    });
+    expect(
+      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+    ).not.toBeChecked();
+  });
+});
+
+function gaugeReviewTree() {
+  return (
+    <DeploymentContext.Provider
+      value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+    >
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          status: "ready",
+          address: wallet,
+          chainId: 31337,
+          isTargetChain: true,
+        }}
+      >
+        <RewardsPage earnView="gauge" />
+      </WalletContext.Provider>
+    </DeploymentContext.Provider>
+  );
+}
+it("updates pool search when the URL pool changes", async () => {
+  const base = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation((input) =>
+    input.functionName === "positionGaugePools"
+      ? Promise.resolve([[hash("1"), hash("2")], 2n])
+      : base(input)
+  );
+  mocks.params = new URLSearchParams(`poolId=${hash("1")}`);
+  const view = render(gaugeReviewTree());
+  await waitFor(() =>
+    expect(screen.getByRole("searchbox", { name: "Search pools" })).toHaveValue("STATICS / WETH")
+  );
+  mocks.params = new URLSearchParams(`poolId=${hash("2")}`);
+  view.rerender(gaugeReviewTree());
+  await waitFor(() =>
+    expect(
+      mocks.read.mock.calls.some(
+        ([input]) => input.functionName === "previewLpRewards" && input.args[1] === hash("2")
+      )
+    ).toBe(true)
+  );
+  expect(screen.getByRole("searchbox", { name: "Search pools" })).toHaveValue("STATICS / TOKEN");
+});
+
+it("clears a liquidity claim review when the status filter changes", async () => {
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Collect" }));
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  fireEvent.click(screen.getByRole("button", { name: /^Needs attention/ }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+it("reuses the reward discovery LP leg for range presentation", async () => {
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+  await screen.findByText("No liquidity");
+  expect(mocks.read.mock.calls.filter(([input]) => input.functionName === "lpLeg")).toHaveLength(1);
 });

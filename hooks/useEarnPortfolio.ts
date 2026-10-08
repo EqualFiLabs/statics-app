@@ -16,6 +16,7 @@ import {
 } from "@/lib/phase-one/reward-portfolio";
 import { readPositionGlobalRewards } from "@/lib/phase-one/staking";
 import { staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
+import { liquidityLegQuery } from "@/lib/rewards/gauge-reads";
 import { readPositionGaugeRewards } from "@/lib/phase-one/gauges";
 import { sourceForView, type EarnView, type EarnFilters } from "@/lib/rewards/earn";
 
@@ -202,6 +203,7 @@ export function useEarnRewardSources(
                           ...base,
                           poolId,
                           source,
+                          readLpLeg: () => cache.fetchQuery(liquidityLegQuery({ ...base, poolId })),
                           allocatorSlots: config
                             ? Array.from(
                                 { length: Math.max(0, config.slotCount - 1) },

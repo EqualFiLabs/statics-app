@@ -29,6 +29,7 @@ import { RewardAmounts } from "./RewardAmounts";
 import { EarnPositionManagement } from "./EarnPositionManagement";
 import { EarnPositionsTable } from "./EarnPositionsTable";
 import { EarnStakeForm } from "./EarnStakeForm";
+import { LiquidityRewardsTable } from "./LiquidityRewardsTable";
 import { BribeSchedule } from "./BribeSchedule";
 import styles from "./earn.module.css";
 
@@ -316,6 +317,19 @@ export function EarnPage({
           }
           ownershipLoading={data.ownershipLoading}
         />
+      ) : view === "gauge" ? (
+        !invalid && (
+          <LiquidityRewardsTable
+            key={`${scopeKey}:${deployment.descriptor.chainId}:${deployment.contracts.diamond}:${action.walletState.chainId}`}
+            deployment={deployment}
+            action={action}
+            rows={rows}
+            loading={loading || data.ownershipLoading}
+            incomplete={data.ownershipIncomplete || data.rewards.some((query) => query.isError)}
+            initialPoolId={filters.poolId}
+            scope={scope}
+          />
+        )
       ) : view === "staking" ? (
         // Wait for ownership so a foreign or missing position ID never triggers reads.
         !invalid &&
@@ -520,13 +534,8 @@ export function EarnPage({
                                   : "manageLiquidity"
                               )}
                             </Link>
-                            <Link
-                              href={earnHref(view === "gauge" ? "bribes" : "gauge", {
-                                ...filters,
-                                poolId: pool.poolId,
-                              })}
-                            >
-                              {t(view === "gauge" ? "bribes" : "gauge")}
+                            <Link href={earnHref("gauge", { ...filters, poolId: pool.poolId })}>
+                              {t("gauge")}
                             </Link>
                             {view === "bribes" && (
                               <button

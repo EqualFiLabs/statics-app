@@ -911,3 +911,54 @@
   color: var(--app-text);
   font: var(--text-sm) var(--font-sans);
 }
+
+/* Liquidity rewards. */
+.expandButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-sm);
+  background: var(--app-raised);
+  color: var(--app-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.legCell {
+  display: grid;
+  gap: 6px;
+  padding-left: 38px;
+}
+.rangeWrap {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+.rangeTrack {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.rangeSpan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: var(--warning);
+}
+.rangeSpan[data-in-range="true"] {
+  background: var(--accent);
+}
+.rangeMarker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  background: var(--app-text);
+}
