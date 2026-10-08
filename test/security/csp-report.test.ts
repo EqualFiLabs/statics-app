@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST, resetCspReportLimiterForTests } from "@/app/api/security/csp-report/route";
+import { POST } from "@/app/api/security/csp-report/route";
+import { resetCspReportLimiterForTests } from "@/lib/security/csp-report-state";
 
 function request(body: unknown, headers: Record<string, string> = {}) {
   return new Request("https://staticsprotocol.com/api/security/csp-report", {
