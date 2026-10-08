@@ -119,16 +119,17 @@ export function CompactLiquidityPools({
                 className={styles.compactPoolToggle}
                 aria-expanded={open}
                 aria-controls={detailId}
+                aria-describedby={`${detailId}-count ${detailId}-status`}
                 aria-label={t(open ? "collapse" : "expand", { pool: pool.name })}
                 onClick={() => onExpand(pool.poolId)}
               >
                 <span className={styles.compactPoolName}>
                   <strong>{pool.name}</strong>
-                  <span className={styles.cellMeta}>
+                  <span id={`${detailId}-count`} className={styles.cellMeta}>
                     {t("positionCount", { count: pool.positions.length })}
                   </span>
                 </span>
-                {poolStatus(pool)}
+                <span id={`${detailId}-status`}>{poolStatus(pool)}</span>
                 <span aria-hidden="true">{open ? "▾" : "▸"}</span>
               </button>
             </div>

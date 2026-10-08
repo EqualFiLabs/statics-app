@@ -1725,6 +1725,9 @@ describe("compact liquidity rewards", () => {
     withPhaseOne(<RewardsPage earnView="gauge" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     await screen.findByText("Some range or emission data could not be loaded.");
+    expect(
+      screen.getByRole("button", { name: "Show positions in STATICS / WETH" })
+    ).toHaveAccessibleDescription("1 position Unavailable");
     fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
     const positionDetail = screen.getByRole("region", { name: "Position #1" });
     expect(within(positionDetail).getByText("Unavailable")).toBeInTheDocument();
