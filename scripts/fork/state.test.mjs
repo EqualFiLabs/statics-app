@@ -4,7 +4,9 @@ import { createServer } from "node:http";
 import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { resolve } from "node:path";
-import { decodeDump, saveDump, savedStateBlock } from "./state.mjs";
+import { decodeDump, saveDump, savedStateBlock, checkpointLimit } from "./state.mjs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 const state = '{"block":{"number":"0x123"},"best_block_number":291,"historical_states":[]}';
 async function* pieces(text, size = 3) {
   for (let i = 0; i < text.length; i += size) yield Buffer.from(text.slice(i, i + size));
@@ -38,7 +40,13 @@ test("atomic streaming checkpoint handles gzip and plain dumps and preserves pre
   const path = await mkdtemp(".local/tooling-tests/state-");
   const file = resolve(path, "state.json");
   let body;
-  const server = createServer((req, res) => res.end(body));
+  const requests = [];
+  const server = createServer(async (req, res) => {
+    let input = "";
+    for await (const chunk of req) input += chunk;
+    requests.push(JSON.parse(input));
+    res.end(body);
+  });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   try {
     for (const buffer of [gzipSync(state), Buffer.from(state)]) {
@@ -53,9 +61,32 @@ test("atomic streaming checkpoint handles gzip and plain dumps and preserves pre
       /preserve/
     );
     assert.equal(await readFile(file, "utf8"), state);
+    assert.ok(
+      requests.every(
+        (request) =>
+          request.method === "anvil_dumpState" &&
+          request.params.length === 1 &&
+          request.params[0] === false
+      ),
+      "No checkpoint may request full historical states."
+    );
     await writeFile(file, state.slice(0, -1));
     await assert.rejects(() => savedStateBlock(file), /Incomplete/);
   } finally {
     await new Promise((r) => server.close(r));
   }
+});
+
+test("decoded checkpoint bytes are bounded even for compressed responses", async () => {
+  await assert.rejects(
+    () =>
+      pipeline(
+        Readable.from([Buffer.from("12345"), Buffer.from("6789")]),
+        checkpointLimit(8),
+        async function* (source) {
+          for await (const chunk of source) yield chunk;
+        }
+      ),
+    /size limit/
+  );
 });

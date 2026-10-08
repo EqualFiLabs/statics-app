@@ -10,12 +10,17 @@ const anchor = "0x" + "a".repeat(64),
 test("history relay pins reads, splits ranges, caches hashes and excludes unproven history", async () => {
   const seen = [];
   let activeAnchor = anchor;
+  let localStatePruned = false;
+  let localHash = "0x" + "f".repeat(64);
   async function mock(label) {
     const server = createServer(async (req, res) => {
       let body = "";
       for await (const b of req) body += b;
       const r = JSON.parse(body);
-      if (r.method === "eth_call" && r.params[0]?.fault) {
+      if (
+        r.method === "eth_call" &&
+        (r.params[0]?.fault || (label === "fork" && r.params[1] === "0x65" && localStatePruned))
+      ) {
         res.end(
           JSON.stringify({
             id: r.id,
@@ -35,7 +40,7 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
             : ["safe", "finalized"].includes(r.params[0])
               ? "0x68"
               : r.params[0],
-          hash: activeAnchor,
+          hash: label === "fork" && r.params[0] === "0x65" ? localHash : activeAnchor,
         };
       else if (r.method === "eth_blockNumber") result = "0x70";
       else if (r.method === "eth_getLogs")
@@ -65,6 +70,7 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
     snapshotBlock: 100,
     snapshotHash: anchor,
     cacheDirectory: cache,
+    localCacheNamespace: "owned-profile-a",
   };
   try {
     relay = await startForkHistoryRpc(options);
@@ -74,6 +80,15 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
     assert.equal(relay.stats.mainnet, prior);
     assert.equal(await relay.route("eth_getCode", ["addr", "0x65"]), "0x02");
     assert.equal(await relay.route("eth_call", [{}, "latest"]), "0x02");
+    assert.equal(await relay.route("eth_call", [{}, "0x65"]), "0x02");
+    const calls = seen.filter(([side, method]) => side === "fork" && method === "eth_call").length;
+    localStatePruned = true;
+    assert.equal(await relay.route("eth_call", [{}, "0x65"]), "0x02");
+    assert.equal(
+      seen.filter(([side, method]) => side === "fork" && method === "eth_call").length,
+      calls
+    );
+
     const logs = await relay.route("eth_getLogs", [{ fromBlock: "0x60", toBlock: "0x70" }]);
     assert.deepEqual(
       logs.map((x) => x.source),
@@ -111,11 +126,27 @@ test("history relay pins reads, splits ranges, caches hashes and excludes unprov
     await assert.rejects(() => relay.route("eth_sendRawTransaction", ["0x"]), /read-only/);
     await new Promise((r) => relay.server.close(r));
     relay = await startForkHistoryRpc(options);
+    assert.equal(
+      await relay.route("eth_call", [{}, "0x65"]),
+      "0x02",
+      "Pinned local reads survive relay restart and Anvil pruning"
+    );
     prior = relay.stats.mainnet;
     assert.equal((await relay.route("eth_getTransactionReceipt", [oldTx])).blockNumber, "0x60");
     assert.equal(relay.stats.mainnet, prior);
     await assert.rejects(() => relay.route("eth_call", [{ fault: true }, "0x60"]), /RPC rejected/);
     await new Promise((r) => relay.server.close(r));
+    relay = await startForkHistoryRpc({ ...options, localCacheNamespace: "owned-profile-b" });
+    await assert.rejects(() => relay.route("eth_call", [{}, "0x65"]), /RPC rejected/);
+    await new Promise((r) => relay.server.close(r));
+    localStatePruned = false;
+    // Reusing a lost height after a stale checkpoint cannot resurrect old cached state.
+    relay = await startForkHistoryRpc(options);
+    localHash = "0x" + "9".repeat(64);
+    localStatePruned = true;
+    await assert.rejects(() => relay.route("eth_call", [{}, "0x65"]), /RPC rejected/);
+    await new Promise((r) => relay.server.close(r));
+    localStatePruned = false;
     const differentHash = "0x" + "e".repeat(64);
     activeAnchor = differentHash;
     relay = await startForkHistoryRpc({ ...options, snapshotHash: differentHash });

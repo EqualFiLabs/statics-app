@@ -1,9 +1,11 @@
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, statSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import {
   appRoot,
+  applicationRoot,
+  liveHistoryLimit,
   childEnvironment,
   compatible,
   json,
@@ -17,7 +19,7 @@ import {
   verifyAnvil,
 } from "./profile.mjs";
 import { ownedProcess, stopChild, upstreamRelay, waitRpc } from "./processes.mjs";
-import { savedStateBlock } from "./state.mjs";
+import { savedStateBlock, maximumCheckpointBytes } from "./state.mjs";
 import { deploy, transactionContext, checkpoint } from "./deploy.mjs";
 import { startForkHistoryRpc } from "./history-rpc.mjs";
 import { startApp, startIndexer } from "./app.mjs";
@@ -58,9 +60,13 @@ export async function launch(options, environment) {
     throw new Error(
       "Set STATICS_PROTOCOL_REPOSITORY to the existing compatible protocol checkout."
     );
-  const source = provenance(protocol),
+  const source = provenance(
+      protocol,
+      environment.STATICS_APP_REPOSITORY ?? saved?.appRepository ?? appRoot
+    ),
     profile = saved ?? newProfile(options, environment, source);
   if (saved) compatible(profile, options, environment, source);
+  profile.appRevision = source.app;
   if (existsSync(lock)) {
     const prior = json(lock);
     let alive = true;
@@ -81,6 +87,11 @@ export async function launch(options, environment) {
       throw new Error("Foreign lock; preserve it and inspect ownership.");
     unlinkSync(lock);
   }
+  const stateFile = resolve(path, "state.json");
+  if (existsSync(stateFile) && statSync(stateFile).size > maximumCheckpointBytes)
+    throw new Error(
+      "Saved state exceeds the 128 MiB recovery limit. Preserve it for a reviewed compact migration; Anvil was not started."
+    );
   for (const port of Object.values(profile.ports)) await requirePort(port);
   if (!environment.ROBINHOOD_MAINNET)
     throw new Error("ROBINHOOD_MAINNET is required for lazy fork state and historical backfill.");
@@ -205,7 +216,7 @@ export async function launch(options, environment) {
       ]);
       if (!block?.hash) throw new Error("Snapshot block is unavailable.");
       // Verify executable state now, rather than recording an unusable header-only snapshot.
-      const genesis = json(resolve(appRoot, "deployments/robinhood-genesis.json"));
+      const genesis = json(resolve(applicationRoot(profile), "deployments/robinhood-genesis.json"));
       if (
         (await rpc(upstream.url, "eth_getCode", [
           genesis.contracts.vault.address,
@@ -253,8 +264,9 @@ export async function launch(options, environment) {
         "--state",
         resolve(path, "state.json"),
         "--state-interval",
-        "15",
-        "--preserve-historical-states",
+        "60",
+        "--prune-history",
+        String(profile.historyWindow ?? liveHistoryLimit),
         "--cache-path",
         resolve(path, "anvil-cache"),
         "--silent",
@@ -278,6 +290,17 @@ export async function launch(options, environment) {
         "Saved Anvil state is older than its confirmed checkpoint; preserve it for recovery."
       );
     if (stopping) throw new Error("Startup interrupted.");
+    const history = await startForkHistoryRpc({
+      mainnetUrl: environment.ROBINHOOD_MAINNET,
+      forkUrl: urls(profile).rpc,
+      snapshotBlock: profile.snapshot.number,
+      snapshotHash: profile.snapshot.hash,
+      cacheDirectory: resolve(path, "history-cache"),
+      localCacheNamespace: profile.id,
+    });
+    relays.push(history);
+    profile.historyRpcUrl = history.url;
+    persist();
     await deploy(profile, path, children);
     if (!profile.stages.finalize) {
       await rpc(urls(profile).rpc, "anvil_mine", ["0x60"]);
@@ -287,13 +310,14 @@ export async function launch(options, environment) {
     // Retain transaction-driven automining without unbounded empty-block history.
     await rpc(urls(profile).rpc, "anvil_setIntervalMining", [0]);
     await rpc(urls(profile).rpc, "evm_setAutomine", [true]);
-    if (profile.historyProbe) {
+    const loadedBlock = await savedStateBlock(resolve(path, "state.json"));
+    if (profile.historyProbe && BigInt(profile.historyProbe.block) === BigInt(loadedBlock)) {
       const result = await rpc(urls(profile).rpc, "eth_call", [
         profile.historyProbe.call,
         profile.historyProbe.block,
       ]);
       if (result !== profile.historyProbe.result)
-        throw new Error("Historical contract read changed after restart; preserve state.");
+        throw new Error("Checkpoint contract read changed after restart; preserve state.");
     } else {
       const { client } = transactionContext(profile),
         block = await client.getBlockNumber();
@@ -312,18 +336,10 @@ export async function launch(options, environment) {
       };
       persist();
     }
-    const history = await startForkHistoryRpc({
-      mainnetUrl: environment.ROBINHOOD_MAINNET,
-      forkUrl: urls(profile).rpc,
-      snapshotBlock: profile.snapshot.number,
-      snapshotHash: profile.snapshot.hash,
-      cacheDirectory: resolve(path, "history-cache"),
-    });
     if (stopping) {
       history.server.close();
       throw new Error("Startup interrupted.");
     }
-    relays.push(history);
     const indexed = await startIndexer(profile, path, history.url, children);
     await startApp(profile, path, indexed.launch, indexed.phaseOne, children);
     profile.owner.controlPort = control.address().port;

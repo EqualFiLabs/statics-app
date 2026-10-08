@@ -112,6 +112,7 @@ export async function lightweightStatus(profile) {
   const result = {
     profile: profile.profile,
     status: profile.status,
+    appMode: profile.appMode ?? "development",
     chainId: profile.chainId,
     snapshot: profile.snapshot,
     revisions: {

@@ -16,8 +16,60 @@ import {
   verifyAnvil,
 } from "./profile.mjs";
 import { upstreamRelay, ownedProcess, stopChild } from "./processes.mjs";
-import { stage, confirmed } from "./deploy.mjs";
+import { stage, confirmed, localGasPrice } from "./deploy.mjs";
+import { testEnvironment } from "./testing.mjs";
+import { forkCompilerRoot } from "./app.mjs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 const source = { protocol: "revision", sdkDigest: "digest", sdk: {} };
+test("compiler root contains both the isolated app copy and its source dependencies", () => {
+  assert.equal(forkCompilerRoot("/work/app/.local/profile/app", "/work/app"), "/work/app");
+  assert.equal(forkCompilerRoot("/work/tooling/.local/app", "/work/candidate"), "/work");
+});
+test("local transaction fees use block base fee rather than feedback recommendations", async () => {
+  const client = {
+    getBlock: async () => ({ baseFeePerGas: 7n }),
+    getGasPrice: async () => {
+      throw new Error("must not request recommended gas price");
+    },
+  };
+  assert.equal(await localGasPrice(client), 1_000_000_014n);
+  const p = fixture(),
+    path = await directory();
+  let submitted;
+  await confirmed(
+    {
+      client: {
+        ...client,
+        waitForTransactionReceipt: async () => ({ status: "success", blockNumber: 101n }),
+      },
+    },
+    {
+      sendTransaction: async (tx) => {
+        submitted = tx;
+        return "0xfee";
+      },
+    },
+    {},
+    p,
+    path
+  );
+  assert.equal(submitted.gasPrice, 1_000_000_014n);
+  assert.equal(submitted.type, "legacy");
+});
+test("disposable tests inherit the selected source checkout without losing explicit overrides", () => {
+  const selected = {
+    appRepository: "/selected/app",
+    protocolRepository: "/selected/protocol",
+    privy: { appId: "public", clientId: "client" },
+  };
+  assert.equal(testEnvironment({}, selected).STATICS_APP_REPOSITORY, "/selected/app");
+  assert.equal(
+    testEnvironment({ STATICS_APP_REPOSITORY: "/override" }, selected).STATICS_APP_REPOSITORY,
+    "/override"
+  );
+  assert.equal(testEnvironment({}, selected).STATICS_PROTOCOL_REPOSITORY, "/selected/protocol");
+});
 function fixture() {
   const p = newProfile(
     { profile: "dev" },
@@ -38,10 +90,14 @@ async function server(handler) {
 }
 test("strict options, configuration persistence, incompatible and uncertain stages", () => {
   assert.equal(parseOptions([]).options.profile, "dev");
+  assert.equal(parseOptions(["--app-mode", "preview"]).options.appMode, "preview");
+  assert.throws(() => parseOptions(["--app-mode", "invalid"]), /app-mode/);
   assert.throws(() => parseOptions(["--profile", "../bad"]), /Profile/);
   assert.throws(() => parseOptions(["--rpc-port", "0"]), /port/);
   const p = fixture();
-  compatible(p, { profile: "dev" }, {}, source);
+  assert.equal(p.appMode, "preview");
+  compatible(p, { profile: "dev", appMode: "preview" }, {}, source);
+  assert.throws(() => compatible(p, { appMode: "development" }, {}, source), /conflicts/);
   assert.throws(() => compatible(p, { rpcPort: 1 }, {}, source), /conflicts/);
   assert.throws(() => compatible(p, { snapshot: "99" }, {}, source), /conflicts/);
   assert.throws(() => compatible(p, {}, {}, { ...source, sdkDigest: "changed" }), /Incompatible/);
@@ -146,6 +202,7 @@ test("receipt failure is recorded; uncertain stage is never marked complete", as
       confirmed(
         {
           client: {
+            getBlock: async () => ({ baseFeePerGas: 1n }),
             waitForTransactionReceipt: async () => ({ status: "reverted", blockNumber: 101n }),
           },
         },
@@ -169,6 +226,24 @@ test("shutdown signals only a child created by this supervisor", async () => {
   await stopChild(child);
   assert.ok(child.signalCode || child.exitCode !== null);
   assert.equal(children.size, 0);
+});
+test("successful child shutdown leaves no timeout keeping the supervisor alive", async () => {
+  const path = await directory();
+  await promisify(execFile)(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `
+    import { ownedProcess, stopChild } from "./scripts/fork/processes.mjs";
+    const child = ownedProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+      cwd: process.cwd(), log: ${JSON.stringify(resolve(path, "shutdown.log"))}, children: new Set(),
+    });
+    await stopChild(child, 10000);
+  `,
+    ],
+    { cwd: process.cwd(), timeout: 3000 }
+  );
 });
 test("atomic profile writes do not serialize private upstream configuration", async () => {
   const path = await directory(),

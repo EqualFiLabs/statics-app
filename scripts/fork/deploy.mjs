@@ -13,11 +13,13 @@ import {
   zeroHash,
   maxUint256,
   parseEventLogs,
+  erc20Abi,
 } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
 import { buildV4ExactInputSingleSwap, v4PoolId } from "@statics-protocol/sdk";
-import { appRoot, childEnvironment, json, mnemonic, rpc, save, urls } from "./profile.mjs";
+import { applicationRoot, childEnvironment, json, mnemonic, rpc, save, urls } from "./profile.mjs";
 import { run } from "./processes.mjs";
+import { snapshotMarket, seedLiquidity } from "./market-fixture.mjs";
 
 export function transactionContext(profile) {
   const url = urls(profile).rpc,
@@ -27,12 +29,19 @@ export function transactionContext(profile) {
   const wallet = (index) => createWalletClient({ transport, account: account(index) });
   return { client, account, wallet, url };
 }
+export async function localGasPrice(client) {
+  const block = await client.getBlock();
+  // Anvil's fee recommendation can feed back on local legacy transactions.
+  // Use the actual block base fee plus a fixed local tip instead.
+  return (block.baseFeePerGas ?? 0n) * 2n + 1_000_000_000n;
+}
 export async function confirmed(context, sender, transaction, profile, path) {
   profile.signal?.throwIfAborted();
   const hash = await sender.sendTransaction({
     ...transaction,
     chain: null,
     type: "legacy",
+    gasPrice: transaction.gasPrice ?? (await localGasPrice(context.client)),
     gas: transaction.gas ?? 12000000n,
   });
   // Receipt hashes are durable recovery evidence even before confirmation.
@@ -52,7 +61,24 @@ export async function confirmed(context, sender, transaction, profile, path) {
   return receipt;
 }
 export async function checkpoint(profile, path) {
+  const { client } = transactionContext(profile);
+  if (profile.addresses?.STATICS_DIAMOND_ADDRESS) {
+    const block = await client.getBlockNumber();
+    const call = {
+      to: profile.addresses.STATICS_DIAMOND_ADDRESS,
+      data: encodeFunctionData({
+        abi: parseAbi(["function nextPositionId() view returns (uint256)"]),
+        functionName: "nextPositionId",
+      }),
+    };
+    profile.historyProbe = {
+      call,
+      block: `0x${block.toString(16)}`,
+      result: await rpc(urls(profile).rpc, "eth_call", [call, `0x${block.toString(16)}`]),
+    };
+  }
   profile.savedStateBlock = await saveDump(urls(profile).rpc, resolve(path, "state.json"));
+  profile.checkpointMode = "current-state";
 }
 export async function stage(profile, path, name, operation) {
   profile.signal?.throwIfAborted();
@@ -74,6 +100,7 @@ function label(log, name) {
   return match[1];
 }
 export async function deploy(profile, path, children) {
+  const appRoot = applicationRoot(profile);
   const { client, account, wallet, url } = transactionContext(profile);
   const genesis = json(
     resolve(profile.protocolRepository, "deployments/robinhood-mainnet-genesis.json")
@@ -100,6 +127,8 @@ export async function deploy(profile, path, children) {
     const args = [
       "script",
       source,
+      "--threads",
+      "2",
       "--sig",
       sig,
       "--out",
@@ -109,6 +138,8 @@ export async function deploy(profile, path, children) {
       "--rpc-url",
       url,
       "--legacy",
+      "--with-gas-price",
+      String(await localGasPrice(client)),
       "--slow",
       "-vv",
     ];
@@ -230,6 +261,17 @@ export async function deploy(profile, path, children) {
       tickSpacing: 60,
       hooks: env.STATICS_SWAP_FEE_HOOK_ADDRESS,
     };
+    // Capture the pinned market before fixture purchases move the inherited pool.
+    const historicalClient = createPublicClient({
+      transport: http(profile.historyRpcUrl, { timeout: 120000 }),
+    });
+    profile.marketFixture = await snapshotMarket(
+      historicalClient,
+      launch,
+      profile.snapshot,
+      poolKey
+    );
+    save(resolve(path, "profile.json"), profile);
     const deadline = (await client.getBlock()).timestamp + 172800n;
     const data = encodeFunctionData({
       abi: parseAbi([
@@ -238,11 +280,11 @@ export async function deploy(profile, path, children) {
       functionName: "createPool",
       args: [
         {
-          tokenA: env.STAKING_TOKEN,
-          tokenB: env.WETH_ADDRESS,
+          tokenA: poolKey.currency0,
+          tokenB: poolKey.currency1,
           lpFee: 3000,
           tickSpacing: 60,
-          sqrtPriceX96: 2n ** 96n,
+          sqrtPriceX96: BigInt(profile.marketFixture.sqrtPriceX96),
           feeConfig: { inputFeeBps: 5, outputFeeBps: 5 },
           creator: account(6).address,
           restricted: false,
@@ -301,6 +343,7 @@ export async function deploy(profile, path, children) {
       poolKey,
       poolId: v4PoolId(poolKey),
       registrationBlock: String(poolReceipt.blockNumber),
+      creationTransactionHash: poolReceipt.transactionHash,
     };
     const tokenAbi = parseAbi([
       "function approve(address,uint256) returns (bool)",
@@ -382,6 +425,30 @@ export async function deploy(profile, path, children) {
         "Create receipt did not contain PositionNFT ID; preserve it, never create a replacement automatically."
       );
     profile.positionId = String(mint.args.tokenId);
+    const budgets = await Promise.all(
+      currencies.map(async (address) => {
+        const balance = await client.readContract({
+          address,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [account(6).address],
+        });
+        return address.toLowerCase() === env.WETH_ADDRESS.toLowerCase()
+          ? balance / 2n < parseEther("1")
+            ? balance / 2n
+            : parseEther("1")
+          : balance / 2n;
+      })
+    );
+    const seed = seedLiquidity(
+      BigInt(profile.marketFixture.sqrtPriceX96),
+      poolKey.tickSpacing,
+      ...budgets
+    );
+    profile.marketFixture.seed = JSON.parse(
+      JSON.stringify(seed, (_, value) => (typeof value === "bigint" ? String(value) : value))
+    );
+    save(resolve(path, "profile.json"), profile);
     await confirmed(
       { client },
       wallet(6),
@@ -396,11 +463,7 @@ export async function deploy(profile, path, children) {
             mint.args.tokenId,
             {
               poolId: profile.pool.poolId,
-              tickLower: -600,
-              tickUpper: 600,
-              liquidity: 10n ** 20n,
-              amount0Max: 10n ** 20n,
-              amount1Max: 10n ** 20n,
+              ...seed,
               deadline: (await client.getBlock()).timestamp + 3600n,
             },
           ],

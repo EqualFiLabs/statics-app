@@ -6,7 +6,13 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const appRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-export const protocolCommit = "ec73b2c3e1919b79a01726001d78bf666279c59d";
+export const protocolCommit = "0f2af8ade5fd34fe618703a4e7fc9f315e90f509";
+export const supportedProtocolCommits = [
+  protocolCommit,
+  "ec73b2c3e1919b79a01726001d78bf666279c59d",
+];
+export const liveHistoryLimit = 1024;
+export const applicationRoot = (profile) => profile.appRepository ?? appRoot;
 export const sdkCommit = "6770d0caef5b94b8f102d2a33534970fb31b681e";
 export const mnemonic = "test test test test test test test test test test test junk";
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -57,6 +63,7 @@ export function parseOptions(args) {
     "--rpc-port": "rpcPort",
     "--indexer-port": "indexerPort",
     "--app-port": "appPort",
+    "--app-mode": "appMode",
   };
   for (let i = 0; i < args.length; i++) {
     const key = names[args[i]];
@@ -88,6 +95,8 @@ export function parseOptions(args) {
     }
   if (options.snapshot !== undefined && !/^\d+$/.test(options.snapshot))
     throw new Error("--snapshot must be a block number.");
+  if (options.appMode !== undefined && !["preview", "development"].includes(options.appMode))
+    throw new Error("--app-mode must be preview or development.");
   return { options, positional };
 }
 export function profilePath(profile, root = appRoot) {
@@ -98,8 +107,10 @@ export function provenance(protocol, root = appRoot) {
     cwd: protocol,
     encoding: "utf8",
   }).trim();
-  if (revision !== protocolCommit)
-    throw new Error(`Protocol checkout must be at ${protocolCommit}; no branch was changed.`);
+  if (!supportedProtocolCommits.includes(revision))
+    throw new Error(
+      `Protocol checkout must use a supported revision (${supportedProtocolCommits.join(", ")}); no branch was changed.`
+    );
   for (const path of [
     "script/DeployStaticsPhaseOne.s.sol",
     "script/DeployStaticsPermissionedPeriphery.s.sol",
@@ -142,6 +153,7 @@ export function provenance(protocol, root = appRoot) {
       );
   }
   return {
+    app: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
     protocol: revision,
     sdk,
     sdkDigest: digest(readFileSync(resolve(root, "vendor/statics-sdk/provenance.json"))),
@@ -166,6 +178,10 @@ export function newProfile(options, environment, source) {
     chainId: 4663,
     ports,
     protocolRepository: resolve(environment.STATICS_PROTOCOL_REPOSITORY),
+    appRepository: resolve(environment.STATICS_APP_REPOSITORY ?? appRoot),
+    appRevision: source.app,
+    appMode: options.appMode ?? "preview",
+    historyWindow: liveHistoryLimit,
     provenance: source,
     privy: {
       appId: environment.NEXT_PUBLIC_PRIVY_APP_ID,
@@ -192,6 +208,8 @@ export function compatible(profile, options, environment, source) {
   ])
     if (options[option] !== undefined && options[option] !== profile.ports[port])
       throw new Error(`Saved profile conflicts with ${option}.`);
+  if (options.appMode !== undefined && options.appMode !== (profile.appMode ?? "development"))
+    throw new Error("Saved profile conflicts with --app-mode.");
   if (options.snapshot !== undefined && options.snapshot !== profile.snapshot?.number)
     throw new Error("Saved profile conflicts with --snapshot.");
   if (
@@ -199,6 +217,11 @@ export function compatible(profile, options, environment, source) {
     resolve(environment.STATICS_PROTOCOL_REPOSITORY) !== profile.protocolRepository
   )
     throw new Error("Saved profile uses a different protocol checkout.");
+  if (
+    environment.STATICS_APP_REPOSITORY &&
+    resolve(environment.STATICS_APP_REPOSITORY) !== applicationRoot(profile)
+  )
+    throw new Error("Saved profile uses a different application checkout.");
   for (const [name, value] of [
     ["NEXT_PUBLIC_PRIVY_APP_ID", profile.privy.appId],
     ["NEXT_PUBLIC_PRIVY_CLIENT_ID", profile.privy.clientId],

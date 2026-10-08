@@ -1,8 +1,24 @@
 import { createWriteStream } from "node:fs";
 import { open, rename, unlink } from "node:fs/promises";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
+
+export const maximumCheckpointBytes = 128 * 1024 * 1024;
+export function checkpointLimit(maximumBytes = maximumCheckpointBytes) {
+  let bytes = 0;
+  return new Transform({
+    transform(chunk, encoding, next) {
+      bytes += chunk.length;
+      next(
+        bytes > maximumBytes
+          ? new Error("Checkpoint exceeds size limit; retain the previous checkpoint.")
+          : null,
+        chunk
+      );
+    },
+  });
+}
 
 // Anvil historical snapshots can exceed V8's maximum string length. Decode the
 // RPC hex payload and decompress directly to disk, with bounded framing buffers.
@@ -77,7 +93,9 @@ export async function saveDump(url, file) {
     const response = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "anvil_dumpState", params: [true] }),
+      // Streaming protects Node, but Anvil builds a full history dump in memory
+      // before streaming it. Checkpoint current state only.
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "anvil_dumpState", params: [false] }),
       signal: AbortSignal.timeout(600000),
     });
     if (!response.ok) throw new Error("Anvil state checkpoint failed.");
@@ -98,8 +116,9 @@ export async function saveDump(url, file) {
       })()
     );
     const output = createWriteStream(temporary, { mode: 0o600 });
-    if (initial[0] === 31 && initial[1] === 139) await pipeline(input, createGunzip(), output);
-    else await pipeline(input, output);
+    if (initial[0] === 31 && initial[1] === 139)
+      await pipeline(input, createGunzip(), checkpointLimit(), output);
+    else await pipeline(input, checkpointLimit(), output);
     const block = await savedStateBlock(temporary);
     await rename(temporary, file);
     return block;

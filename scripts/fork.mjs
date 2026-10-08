@@ -9,7 +9,7 @@ try {
   const [action, ...args] = process.argv.slice(2),
     { options, positional } = parseOptions(args);
   if (action !== "start" && Object.keys(options).some((key) => key !== "profile"))
-    throw new Error("Snapshot and port options are only accepted by dev:fork.");
+    throw new Error("Snapshot, port and app-mode options are only accepted by dev:fork.");
   if (action === "start") {
     if (positional.length) throw new Error(`Unknown startup option ${positional[0]}.`);
     await launch(options, loadConfig());

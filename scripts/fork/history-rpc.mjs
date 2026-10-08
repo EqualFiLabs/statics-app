@@ -54,6 +54,7 @@ export async function startForkHistoryRpc({
   snapshotBlock,
   snapshotHash,
   cacheDirectory,
+  localCacheNamespace,
   port = 0,
 }) {
   if (!mainnetUrl) throw new Error("ROBINHOOD_MAINNET is required for historical replay.");
@@ -109,6 +110,12 @@ export async function startForkHistoryRpc({
     if (data.error) {
       const error = new Error(`${target} RPC rejected ${method}.`);
       error.code = data.error.code;
+      if (
+        typeof data.error.data === "string" &&
+        /^0x[0-9a-f]*$/i.test(data.error.data) &&
+        data.error.data.length <= 65536
+      )
+        error.data = data.error.data;
       throw error;
     }
     if (!Object.hasOwn(data, "result")) throw new Error(`${target} RPC response has no result.`);
@@ -141,6 +148,52 @@ export async function startForkHistoryRpc({
       return await task;
     } finally {
       inFlight.delete(key);
+    }
+  }
+  // Cache only successful immutable local block reads. The profile identity isolates
+  // different forks at the same mainnet pin. Mutable tags always reach live Anvil.
+  const localDirectory = localCacheNamespace
+    ? join(
+        cacheDirectory,
+        "local-" + createHash("sha256").update(localCacheNamespace).digest("hex")
+      )
+    : null;
+  if (localDirectory) await mkdir(localDirectory, { recursive: true });
+  async function localPinned(method, params) {
+    if (!localDirectory) return rpc("fork", method, params);
+    const tag = params[blockArgument[method]];
+    const block = await rpc("fork", "eth_getBlockByNumber", [tag?.blockNumber ?? tag, false]);
+    if (!block?.hash)
+      throw new Error("Pinned local block identity is unavailable; refusing cached state.");
+    const key = createHash("sha256")
+      .update(
+        JSON.stringify(stable([4663, String(boundary), snapshotHash, block.hash, method, params]))
+      )
+      .digest("hex");
+    const file = join(localDirectory, key + ".json");
+    try {
+      const result = JSON.parse(await readFile(file, "utf8"));
+      stats.cacheHits++;
+      return remember(result);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw new Error("Local history cache could not be read.");
+    }
+    const flightKey = "local-" + key;
+    if (inFlight.has(flightKey)) return inFlight.get(flightKey);
+    const task = (async () => {
+      const result = await rpc("fork", method, params);
+      if (result !== null) {
+        const temporary = file + "." + process.pid + ".partial";
+        await writeFile(temporary, JSON.stringify(result), { mode: 0o600 });
+        await rename(temporary, file);
+      }
+      return result;
+    })();
+    inFlight.set(flightKey, task);
+    try {
+      return await task;
+    } finally {
+      inFlight.delete(flightKey);
     }
   }
   async function byHash(method, params) {
@@ -213,6 +266,21 @@ export async function startForkHistoryRpc({
       }
       const height = arg === "earliest" ? 0n : number(arg?.blockNumber ?? arg);
       if (height !== null && height <= boundary) return historical(method, params);
+      if (
+        height !== null &&
+        [
+          "eth_call",
+          "eth_getCode",
+          "eth_getBalance",
+          "eth_getStorageAt",
+          "eth_getTransactionCount",
+          "eth_getProof",
+          "eth_getBlockByNumber",
+        ].includes(method)
+      ) {
+        const head = BigInt(await rpc("fork", "eth_blockNumber", []));
+        if (height <= head) return localPinned(method, params);
+      }
     }
     return rpc("fork", method, params);
   }
@@ -258,7 +326,11 @@ export async function startForkHistoryRpc({
           return {
             jsonrpc: "2.0",
             id: request.id,
-            error: { code: error.code ?? -32000, message: error.message },
+            error: {
+              code: error.code ?? -32000,
+              message: error.message,
+              ...(error.data ? { data: error.data } : {}),
+            },
           };
         }
       };

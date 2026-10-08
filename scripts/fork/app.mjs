@@ -7,12 +7,22 @@ import {
   writeFileSync,
   readdirSync,
 } from "node:fs";
-import { resolve, relative } from "node:path";
-import { appRoot, childEnvironment, digest, json, save, sleep, urls } from "./profile.mjs";
+import { resolve, relative, dirname, sep } from "node:path";
+import {
+  appRoot,
+  childEnvironment,
+  digest,
+  applicationRoot,
+  json,
+  save,
+  sleep,
+  urls,
+} from "./profile.mjs";
 import { transactionContext } from "./deploy.mjs";
-import { ownedProcess, waitHttp } from "./processes.mjs";
+import { ownedProcess, run, waitHttp } from "./processes.mjs";
 
 export async function manifests(profile, path) {
+  const appRoot = applicationRoot(profile);
   const launch = {
     ...json(resolve(appRoot, "deployments/robinhood-genesis.json")),
     deploymentId: "local-anvil-genesis",
@@ -73,6 +83,7 @@ export async function manifests(profile, path) {
         token1: await metadata(profile.pool.poolKey.currency1),
         enabled: true,
       },
+      ...(profile.additionalPools ?? []),
     ],
   };
   // Rehearsal filenames remain usable by the integration suite.
@@ -98,11 +109,12 @@ export function indexerFingerprint(root = resolve(appRoot, "ponder")) {
   );
 }
 export async function startIndexer(profile, path, historyUrl, children) {
+  const appRoot = applicationRoot(profile);
   const { launch, phaseOne } = await manifests(profile, path),
     c = phaseOne.contracts,
     g = launch.contracts;
   const origin = urls(profile).app;
-  const sourceDigest = indexerFingerprint();
+  const sourceDigest = indexerFingerprint(resolve(appRoot, "ponder"));
   if (profile.indexer?.sourceDigest !== sourceDigest) {
     profile.indexer = {
       sourceDigest,
@@ -124,19 +136,13 @@ export async function startIndexer(profile, path, historyUrl, children) {
   ])
     cpSync(resolve(appRoot, "ponder", entry), resolve(project, entry), { recursive: true });
   writeFileSync(resolve(project, ".env.local"), "", { mode: 0o600 });
-  const configPath = resolve(project, "ponder.config.ts");
-  writeFileSync(
-    configPath,
-    readFileSync(configPath, "utf8").replace(
-      "pollingInterval: chainId === 4_663 ? 2_000 : undefined,",
-      "pollingInterval: chainId === 4_663 ? 2_000 : undefined,\n      ethGetLogsBlockRange: 1_000_000,"
-    )
-  );
   const genesisStart = json(
     resolve(appRoot, "deployments/robinhood-genesis.json")
   ).deploymentStartBlock;
   const env = {
     ...childEnvironment(),
+    NODE_OPTIONS: "--max-old-space-size=2048",
+    PONDER_LOG_BLOCK_RANGE: "1000000",
     DATABASE_URL: "",
     DATABASE_PRIVATE_URL: "",
     PONDER_DATABASE_DIRECTORY: database,
@@ -184,7 +190,14 @@ export async function startIndexer(profile, path, historyUrl, children) {
   }
   throw new Error("Indexer has not caught up; preserve the profile and inspect ponder.log.");
 }
+export function forkCompilerRoot(project, source) {
+  let root = resolve(project);
+  while (relative(root, source) === ".." || relative(root, source).startsWith(".." + sep))
+    root = dirname(root);
+  return root;
+}
 export async function startApp(profile, path, launch, phaseOne, children) {
+  const appRoot = applicationRoot(profile);
   const local = urls(profile);
   // Next loads dotenv files from its cwd. A profile-owned source copy avoids
   // inheriting credentials or writing generated files in the contributor checkout.
@@ -211,6 +224,29 @@ export async function startApp(profile, path, launch, phaseOne, children) {
   symlinkSync(resolve(appRoot, "node_modules"), resolve(project, "node_modules"), "dir");
   symlinkSync(resolve(appRoot, "public"), resolve(project, "public"), "dir");
   symlinkSync(resolve(appRoot, "vendor"), resolve(project, "vendor"), "dir");
+  cpSync(resolve(project, "next.config.ts"), resolve(project, "next.source.config.ts"));
+  const compilerRoot = JSON.stringify(forkCompilerRoot(project, appRoot));
+  const preview = profile.appMode === "preview";
+  // Keep source configuration intact. Webpack uses a bounded V8 heap rather
+  // than Turbopack's separate native graph cache. Wagmi's optional Tempo accounts
+  // package is absent and marked optional only for Turbopack; treating it as
+  // unavailable matches that optional-module behavior.
+  writeFileSync(
+    resolve(project, "next.config.ts"),
+    `import type { NextConfig } from "next";
+import base from "./next.source.config";
+const config: NextConfig = { ...base, outputFileTracingRoot: ${compilerRoot},
+  experimental: { ...base.experimental, ${preview ? "webpackMemoryOptimizations: true, webpackBuildWorker: true, cpus: 1," : ""} optimizePackageImports: [...new Set([...(base.experimental?.optimizePackageImports ?? []), "wagmi", "wagmi/chains", "viem", "viem/chains"])] },
+  onDemandEntries: { ...base.onDemandEntries, maxInactiveAge: 15000, pagesBufferLength: 1 },
+  webpack(config, options) {
+    const configured = base.webpack ? base.webpack(config, options) : config;
+    configured.resolve.alias = { ...configured.resolve.alias, "accounts$": false };
+    configured.parallelism = 2;
+    return configured;
+  } };
+export default config;
+`
+  );
   const { execFileSync } = await import("node:child_process");
   profile.appRevision = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: appRoot,
@@ -221,6 +257,8 @@ export async function startApp(profile, path, launch, phaseOne, children) {
 
   const env = {
     ...childEnvironment(),
+    NODE_OPTIONS: "--max-old-space-size=3072",
+    NEXT_WEBPACK_PARALLELISM: "2",
     STATICS_NEXT_DIST_DIR: ".next",
     NEXT_PUBLIC_APP_ENV: "development",
     NEXT_PUBLIC_APP_NETWORK: "anvil",
@@ -234,11 +272,19 @@ export async function startApp(profile, path, launch, phaseOne, children) {
     NEXT_PUBLIC_PRIVY_APP_ID: profile.privy.appId,
     ...(profile.privy.clientId ? { NEXT_PUBLIC_PRIVY_CLIENT_ID: profile.privy.clientId } : {}),
   };
+  const executable = resolve(appRoot, "node_modules/next/dist/bin/next");
+  if (preview)
+    await run(process.execPath, [executable, "build", "--webpack"], {
+      cwd: project,
+      env,
+      log: resolve(path, "app-build.log"),
+      children,
+    });
   const child = ownedProcess(
     process.execPath,
     [
-      resolve(appRoot, "node_modules/next/dist/bin/next"),
-      "dev",
+      executable,
+      ...(preview ? ["start"] : ["dev", "--webpack"]),
       "--hostname",
       "127.0.0.1",
       "--port",
