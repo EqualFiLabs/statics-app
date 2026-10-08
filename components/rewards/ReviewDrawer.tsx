@@ -13,8 +13,8 @@ export function ReviewDrawer({
 }: {
   title: string;
   busy?: boolean;
-  /** "modal" centers a compact dialog; the default slides in from the side. */
-  variant?: "drawer" | "modal";
+  /** "modal" centers a compact dialog; "fullscreen" fills the viewport. */
+  variant?: "drawer" | "modal" | "fullscreen";
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -108,7 +108,11 @@ export function ReviewDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={variant === "modal" ? styles.modal : styles.drawer}
+        className={
+          variant === "modal"
+            ? styles.modal
+            : `${styles.drawer} ${variant === "fullscreen" ? styles.fullScreenDialog : ""}`
+        }
       >
         <header className={styles.drawerHeader}>
           <h2 id={titleId}>{title}</h2>

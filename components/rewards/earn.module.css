@@ -692,9 +692,12 @@
   padding: 14px;
 }
 .bulkBar {
-  position: sticky;
-  bottom: 16px;
-  z-index: 5;
+  position: fixed;
+  bottom: calc(16px + var(--tabbar-clearance, env(safe-area-inset-bottom)));
+  z-index: 30;
+  box-sizing: border-box;
+  max-height: calc(100dvh - var(--tabbar-clearance, 0px) - 100px);
+  overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -704,6 +707,11 @@
   border-radius: var(--radius-lg);
   background: var(--app-overlay);
   box-shadow: var(--shadow-lg);
+}
+@media (width <= 900px) {
+  .bulkBar {
+    bottom: calc(75px + env(safe-area-inset-bottom));
+  }
 }
 .bulkClear {
   margin-left: auto;
@@ -913,6 +921,25 @@
 }
 
 /* Liquidity rewards. */
+/* Expanded position content must not resize the pool summary columns. */
+.liquidityTable {
+  table-layout: fixed;
+  min-width: 1080px;
+}
+.liquidityTable th {
+  white-space: normal;
+}
+.liquidityTable .rowActions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--app-sunken);
+  box-shadow: -1px 0 var(--app-border);
+  white-space: normal;
+}
+.liquidityTable .rangeWrap {
+  min-width: 0;
+}
 .expandButton {
   display: inline-flex;
   align-items: center;
@@ -961,4 +988,181 @@
   height: 14px;
   margin-left: -1px;
   background: var(--app-text);
+}
+
+/* Compact liquidity view: details expand below a stable summary row. */
+.compactSummary,
+.summaryDetails,
+.compactPools {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.summaryMore {
+  align-self: flex-end;
+}
+.fullScreenDialog {
+  width: 100%;
+  border-left: 0;
+}
+.compactFrame {
+  min-width: 0;
+}
+.compactPool {
+  overflow: clip;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.compactPool[data-selected] {
+  border-color: var(--accent);
+}
+.compactPoolHeading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.compactPoolHeading > input,
+.compactPositionHeading > input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.compactPoolToggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.compactPoolName {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.compactPoolDetails {
+  display: grid;
+  gap: 20px;
+  padding: 20px 16px;
+  border-top: 1px solid var(--app-border);
+}
+.compactMetrics {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  min-width: 0;
+}
+.compactMetrics > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+.compactMetrics dt {
+  flex: 1;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+.compactMetrics dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.compactMetrics .assets {
+  justify-content: flex-end;
+}
+.compactActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.compactPositionsTitle,
+.compactPosition h4 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.compactPositionHeading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.compactPosition {
+  display: grid;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--app-border);
+}
+.compactPosition .rangeWrap {
+  min-width: 0;
+}
+@media (width < 1200px) {
+  .liquiditySection .controlBar,
+  .earnPositionsSection .controlBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .liquiditySection .statusTabs,
+  .earnPositionsSection .statusTabs {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .liquiditySection .search,
+  .liquiditySection .search input,
+  .earnPositionsSection .search,
+  .earnPositionsSection .search input {
+    width: 100%;
+  }
+  .liquiditySection .bulkBar,
+  .earnPositionsSection .bulkBar {
+    flex-wrap: wrap;
+  }
+}
+
+.compactSort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+.compactSort select {
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: inherit;
+}
+@media (width < 1200px) {
+  .earnPositionsSection .controlActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .earnPositionsSection .compactSort select {
+    flex: 1;
+  }
+  .earnPositionsSection .compactPoolToggle > .statusPill {
+    max-width: 50%;
+    white-space: normal;
+  }
 }

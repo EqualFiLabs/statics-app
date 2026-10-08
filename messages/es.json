@@ -1757,6 +1757,14 @@
     "positions": "Posiciones"
   },
   "earnTable": {
+    "more": "Más",
+    "expand": "Mostrar detalles de la posición #{id}",
+    "collapse": "Ocultar detalles de la posición #{id}",
+    "sort": "Ordenar posiciones",
+    "sortStakedDesc": "Depositado: de mayor a menor",
+    "sortStakedAsc": "Depositado: de menor a mayor",
+    "sortAllocatedDesc": "Asignado: de mayor a menor",
+    "sortAllocatedAsc": "Asignado: de menor a mayor",
     "summary": "Resumen de la cartera",
     "totalStaked": "Total en staking",
     "positionCount": "{count, plural, one {# posición} other {# posiciones}}",
@@ -1826,7 +1834,8 @@
     "legs": "{count, plural, one {# tramo de liquidez} other {# tramos de liquidez}}",
     "hide": "Ocultar",
     "unhide": "Mostrar",
-    "manage": "Gestionar"
+    "manage": "Gestionar",
+    "collectPosition": "Cobrar recompensas de la posición #{id}"
   },
   "earnStake": {
     "title": "Hacer staking de STATICS",
@@ -1922,6 +1931,7 @@
     "summary": "Resumen de recompensas de liquidez",
     "claimable": "Recompensas de liquidez reclamables",
     "collect": "Cobrar",
+    "collectAll": "Cobrar todo",
     "estimate": "Emisiones estimadas en este periodo",
     "periodEnds": "El periodo actual termina en {time}",
     "notActivated": "Las emisiones del protocolo aún no están activas",
@@ -1954,6 +1964,7 @@
       "incentives": "Incentivos",
       "actions": "Acciones"
     },
+    "selectAllPositions": "Seleccionar todas las posiciones",
     "selectPool": "Seleccionar todas las posiciones de {pool}",
     "expand": "Mostrar posiciones de {pool}",
     "collapse": "Ocultar posiciones de {pool}",
@@ -1992,6 +2003,12 @@
     "legEmpty": "Sin liquidez",
     "legInRange": "En rango",
     "legBelow": "Precio por debajo del rango",
-    "legAbove": "Precio por encima del rango"
+    "legAbove": "Precio por encima del rango",
+    "collectPool": "Cobrar recompensas de {pool}",
+    "collectAllPool": "Cobrar todas las recompensas de {pool}",
+    "collectLeg": "Cobrar recompensas de la posición #{id} en {pool}",
+    "more": "Más",
+    "positions": "Posiciones",
+    "poolList": "Tus pools de liquidez"
   }
 }

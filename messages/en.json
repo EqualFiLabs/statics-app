@@ -1757,6 +1757,14 @@
     "positions": "Positions"
   },
   "earnTable": {
+    "more": "More",
+    "expand": "Show details for Position #{id}",
+    "collapse": "Hide details for Position #{id}",
+    "sort": "Sort positions",
+    "sortStakedDesc": "Staked: highest first",
+    "sortStakedAsc": "Staked: lowest first",
+    "sortAllocatedDesc": "Allocated: highest first",
+    "sortAllocatedAsc": "Allocated: lowest first",
     "summary": "Portfolio summary",
     "totalStaked": "Total staked",
     "positionCount": "{count, plural, one {# position} other {# positions}}",
@@ -1826,7 +1834,8 @@
     "legs": "{count, plural, one {# liquidity leg} other {# liquidity legs}}",
     "hide": "Hide",
     "unhide": "Unhide",
-    "manage": "Manage"
+    "manage": "Manage",
+    "collectPosition": "Collect Position #{id} rewards"
   },
   "earnStake": {
     "title": "Stake STATICS",
@@ -1922,6 +1931,7 @@
     "summary": "Liquidity rewards summary",
     "claimable": "Claimable liquidity rewards",
     "collect": "Collect",
+    "collectAll": "Collect all",
     "estimate": "Estimated emissions this period",
     "periodEnds": "Current period ends in {time}",
     "notActivated": "Protocol emissions are not active yet",
@@ -1954,6 +1964,7 @@
       "incentives": "Incentives",
       "actions": "Actions"
     },
+    "selectAllPositions": "Select all positions",
     "selectPool": "Select all positions in {pool}",
     "expand": "Show positions in {pool}",
     "collapse": "Hide positions in {pool}",
@@ -1992,6 +2003,12 @@
     "legEmpty": "No liquidity",
     "legInRange": "In range",
     "legBelow": "Price below range",
-    "legAbove": "Price above range"
+    "legAbove": "Price above range",
+    "collectPool": "Collect {pool} rewards",
+    "collectAllPool": "Collect all {pool} rewards",
+    "collectLeg": "Collect Position #{id} rewards in {pool}",
+    "more": "More",
+    "positions": "Positions",
+    "poolList": "Your liquidity pools"
   }
 }

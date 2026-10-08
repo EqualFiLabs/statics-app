@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeFunctionData, encodeFunctionResult, getAddress, parseEther } from "viem";
 import { staticsBatchRewardsAbi, staticsAggregatedBatchRewardsAbi } from "@statics-protocol/sdk";
@@ -235,4 +236,11 @@ describe("batch drawer lifecycle", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mocks.send).not.toHaveBeenCalled();
   });
+});
+
+it("prepares an automatically opened review only once under StrictMode", async () => {
+  render(<StrictMode>{view(rows(), wallet, { autoReview: true, hideTrigger: true })}</StrictMode>);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  expect(mocks.call).toHaveBeenCalledTimes(1);
+  expect(mocks.send).not.toHaveBeenCalled();
 });

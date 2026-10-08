@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import {
@@ -51,6 +51,11 @@ export function BatchRewardClaim({
   scope = allSources,
   label,
   scopeKey = "",
+  accessibleLabel,
+  compact = false,
+  autoReview = false,
+  hideTrigger = false,
+  onDismiss,
 }: {
   deployment: PhaseOneDeployment;
   rows: readonly PositionRewardPortfolio[];
@@ -59,6 +64,14 @@ export function BatchRewardClaim({
   scope?: RewardClaimScope;
   label?: string;
   scopeKey?: string;
+  /** Names what is collected when several Collect buttons share one visible label. */
+  accessibleLabel?: string;
+  /** Small secondary button for table rows. */
+  compact?: boolean;
+  /** A table-level host can open a frozen row scope without a second trigger. */
+  autoReview?: boolean;
+  hideTrigger?: boolean;
+  onDismiss?: () => void;
 }) {
   const t = useTranslations("batchRewards"),
     u = useTranslations("earnUx"),
@@ -213,27 +226,46 @@ export function BatchRewardClaim({
     stop.current = true;
     action.cancel();
     setProgress(null);
+    onDismiss?.();
   };
+  const reviewRef = useRef(review);
+  const autoStarted = useRef(false);
+  useLayoutEffect(() => {
+    reviewRef.current = review;
+  });
+  useEffect(() => {
+    if (autoReview && !autoStarted.current) {
+      autoStarted.current = true;
+      reviewRef.current();
+    }
+  }, [autoReview]);
   const positive = scopeRewardAmounts(rows, scope).length > 0;
   return (
     <div>
-      <button
-        type="button"
-        className="ui-button ui-button--primary"
-        disabled={
-          !action.ready ||
-          loading ||
-          incomplete ||
-          !positive ||
-          action.busy ||
-          Boolean(action.review)
-        }
-        onClick={review}
-      >
-        {action.busy ? t("working") : title}
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          className={
+            compact
+              ? "ui-button ui-button--secondary ui-button--sm"
+              : "ui-button ui-button--primary"
+          }
+          aria-label={accessibleLabel}
+          disabled={
+            !action.ready ||
+            loading ||
+            incomplete ||
+            !positive ||
+            action.busy ||
+            Boolean(action.review)
+          }
+          onClick={review}
+        >
+          {action.busy ? t("working") : title}
+        </button>
+      )}
       {visible && (
-        <ReviewDrawer title={title} busy={action.busy} onClose={close}>
+        <ReviewDrawer title={accessibleLabel ?? title} busy={action.busy} onClose={close}>
           <p role="status" aria-live="polite">
             {visible.state === "review"
               ? t("transactions", { count: visible.total })

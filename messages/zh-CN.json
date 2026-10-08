@@ -1757,6 +1757,14 @@
     "positions": "仓位"
   },
   "earnTable": {
+    "more": "更多",
+    "expand": "显示仓位 #{id} 的详情",
+    "collapse": "隐藏仓位 #{id} 的详情",
+    "sort": "仓位排序",
+    "sortStakedDesc": "质押量：从高到低",
+    "sortStakedAsc": "质押量：从低到高",
+    "sortAllocatedDesc": "分配量：从高到低",
+    "sortAllocatedAsc": "分配量：从低到高",
     "summary": "投资组合摘要",
     "totalStaked": "质押总额",
     "positionCount": "{count, plural, other {# 个仓位}}",
@@ -1826,7 +1834,8 @@
     "legs": "{count, plural, other {# 个流动性仓段}}",
     "hide": "隐藏",
     "unhide": "取消隐藏",
-    "manage": "管理"
+    "manage": "管理",
+    "collectPosition": "领取仓位 #{id} 的奖励"
   },
   "earnStake": {
     "title": "质押 STATICS",
@@ -1922,6 +1931,7 @@
     "summary": "流动性奖励摘要",
     "claimable": "可领取的流动性奖励",
     "collect": "领取",
+    "collectAll": "全部领取",
     "estimate": "本周期预计排放",
     "periodEnds": "当前周期将在 {time} 后结束",
     "notActivated": "协议排放尚未启动",
@@ -1954,6 +1964,7 @@
       "incentives": "激励",
       "actions": "操作"
     },
+    "selectAllPositions": "选择所有仓位",
     "selectPool": "选择 {pool} 中的所有仓位",
     "expand": "显示 {pool} 中的仓位",
     "collapse": "隐藏 {pool} 中的仓位",
@@ -1992,6 +2003,12 @@
     "legEmpty": "无流动性",
     "legInRange": "区间内",
     "legBelow": "价格低于区间",
-    "legAbove": "价格高于区间"
+    "legAbove": "价格高于区间",
+    "collectPool": "领取 {pool} 的奖励",
+    "collectAllPool": "领取 {pool} 的全部奖励",
+    "collectLeg": "领取仓位 #{id} 在 {pool} 中的奖励",
+    "more": "更多",
+    "positions": "仓位",
+    "poolList": "你的流动性池"
   }
 }

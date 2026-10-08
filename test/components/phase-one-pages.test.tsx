@@ -1,8 +1,15 @@
+import { cleanup } from "@testing-library/react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { liquidityLegQuery } from "@/lib/rewards/gauge-reads";
 import type { PublicClient, Address } from "viem";
+import { act } from "react";
+import {
+  announceProtocolTransactionConfirmed,
+  protocolQueryScopes,
+} from "@/lib/protocol/reconciliation";
+import { ProtocolQueryReconciler } from "@/providers/ProtocolQueryReconciler";
 import { fireEvent, render, screen, waitFor, within } from "@/test/render";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   decodeFunctionData,
   encodeAbiParameters,
@@ -466,7 +473,7 @@ describe("focused Phase 1 Earn", () => {
     expect(decoded.args?.[1]).toEqual([]);
     expect(decoded.args?.[2]).toHaveLength(2);
   });
-  it("collects every pool and deduplicates pool and position selections", async () => {
+  it("collects selected pools with synchronized expanded position checkboxes", async () => {
     const poolIds = Array.from(
       { length: 12 },
       (_, index) => `0x${(index + 1).toString(16).padStart(64, "0")}`
@@ -481,18 +488,22 @@ describe("focused Phase 1 Earn", () => {
     fireEvent.click(first);
     expect(screen.getByText("1 leg selected")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in/ })[0]);
-    const child = screen.getByRole("checkbox", { name: /^Select Position #1 in/ });
-    expect(child).toBeChecked();
-    fireEvent.click(child);
-    expect(first).not.toBeChecked();
-    expect(
-      screen.queryByRole("region", { name: "Actions for selected liquidity" })
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /^Select Position #1 in/ })).toBeChecked();
+    expect(first).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    const selected = decodeFunctionData({
+      abi: staticsBatchRewardsAbi,
+      data: mocks.call.mock.calls[0][0].data,
+    });
+    expect(selected.args?.[1]).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(first);
     fireEvent.click(screen.getByRole("button", { name: "Collect" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     const decoded = decodeFunctionData({
       abi: staticsBatchRewardsAbi,
-      data: mocks.call.mock.calls[0][0].data,
+      data: mocks.call.mock.calls.at(-1)![0].data,
     });
     expect(decoded.args?.[1]).toHaveLength(12);
   });
@@ -1260,4 +1271,667 @@ it("refreshes checksummed-wallet leg data after the stake form confirms", async 
   fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
   await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(cache!.getQueryState(key)?.isInvalidated).toBe(true));
+});
+
+it("shows no claimable rewards after Collect confirms, without a reload", async () => {
+  const original = mocks.read.getMockImplementation()!;
+  let claimed = false;
+  mocks.read.mockImplementation((input) => {
+    if (claimed) {
+      // Chain state after the claim: nothing left to collect.
+      if (input.functionName === "pendingRewards") return [0n];
+      if (input.functionName === "previewLpRewards")
+        return {
+          slotCount: 2,
+          assets: [tokens[0].address, tokens[1].address, zeroAddress, zeroAddress, zeroAddress],
+          amounts: [0n, 0n, 0n, 0n, 0n],
+        };
+      if (input.functionName === "previewGaugeAllocatorRewards")
+        return input.args[2].map((slot: number) => ({
+          slot,
+          asset: tokens[1].address,
+          allocation: parseEther("10"),
+          amount: 0n,
+        }));
+    }
+    return original(input);
+  });
+  withPhaseOne(
+    <>
+      <ProtocolQueryReconciler />
+      <RewardsPage />
+    </>
+  );
+  const collect = await screen.findByRole("button", { name: "Collect Position #1 rewards" });
+  await waitFor(() => expect(collect).toBeEnabled());
+  fireEvent.click(collect);
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+  await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+  claimed = true;
+  act(() =>
+    announceProtocolTransactionConfirmed({
+      wallet,
+      chainId: 31337,
+      deploymentId: "phase-one-fixture",
+      blockNumber: 11n,
+      kind: "phase-one-claim-batch-rewards",
+      scopes: protocolQueryScopes("phase-one-claim-batch-rewards"),
+    })
+  );
+  const row = screen.getByText("Position #1").closest("tr")!;
+  expect(await within(row).findByText("No claimable rewards")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Collect Position #1 rewards" })
+  ).not.toBeInTheDocument();
+  const completed = screen.getByRole("dialog", { name: "Collect Position #1 rewards" });
+  expect(within(completed).getByText("All 1 transactions confirmed.")).toBeInTheDocument();
+  expect(
+    within(completed).getByRole("link", { name: /Transaction 1 confirmed/ })
+  ).toBeInTheDocument();
+});
+it("collects one position from its row and hides positions from the overview table", async () => {
+  window.localStorage.clear();
+  mocks.page.mockResolvedValue({
+    deploymentId: "phase-one-fixture",
+    indexedAtBlock: 1n,
+    items: [position(1n), position(2n)],
+    nextCursor: null,
+  });
+  withPhaseOne(<RewardsPage />);
+  const collectTwo = await screen.findByRole("button", { name: "Collect Position #2 rewards" });
+  await waitFor(() => expect(collectTwo).toBeEnabled());
+  fireEvent.click(collectTwo);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  // Only Position #2 is claimed.
+  expect(claimedPositions(mocks.call.mock.calls[0][0].data)).toEqual([2n]);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  const rowTwo = screen.getByText("Position #2").closest("tr")!;
+  fireEvent.click(within(rowTwo).getByRole("button", { name: "Hide" }));
+  await waitFor(() => expect(screen.queryByText("Position #2")).not.toBeInTheDocument());
+  expect(screen.getByText("Position #1")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show hidden · 1" }));
+  expect(await screen.findByText("Position #2")).toBeInTheDocument();
+  window.localStorage.clear();
+});
+it("collects every pool from the summary, or one pool or position from its row", async () => {
+  const poolIds = Array.from(
+    { length: 12 },
+    (_, index) => `0x${(index + 1).toString(16).padStart(64, "0")}`
+  );
+  const original = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation((input) =>
+    input.functionName === "positionGaugePools" ? [poolIds, 12n] : original(input)
+  );
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Collect" }));
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  const all = decodeFunctionData({
+    abi: staticsBatchRewardsAbi,
+    data: mocks.call.mock.calls[0][0].data,
+  });
+  expect(all.args?.[1]).toHaveLength(12);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  const [poolCollect] = screen.getAllByRole("button", { name: /^Collect .* rewards$/ });
+  fireEvent.click(poolCollect);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  const one = decodeFunctionData({
+    abi: staticsBatchRewardsAbi,
+    data: mocks.call.mock.calls.at(-1)![0].data,
+  });
+  expect(one.args?.[1]).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in/ })[0]);
+  expect(
+    screen.getAllByRole("button", { name: /^Collect Position #1 rewards in / })[0]
+  ).toBeInTheDocument();
+});
+it("a healthy pool stays claimable from its row when another pool fails", async () => {
+  const original = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation((input) =>
+    input.functionName === "positionGaugePools"
+      ? [[hash("1"), hash("2")], 2n]
+      : input.functionName === "previewLpRewards" && input.args[1] === hash("2")
+        ? Promise.reject(Error("pool unavailable"))
+        : original(input)
+  );
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  await screen.findByText(/Some data could not be loaded/);
+  expect(screen.getByRole("button", { name: "Collect" })).toBeDisabled();
+  // The healthy pool's own Collect is gated only by its own data.
+  const healthy = await screen.findByRole("button", { name: "Collect STATICS / WETH rewards" });
+  await waitFor(() => expect(healthy).toBeEnabled());
+  fireEvent.click(healthy);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+});
+/** Position IDs claimed by a batch reward call, in either the legacy or aggregated format. */
+function claimedPositions(data: `0x${string}`): bigint[] {
+  const decoded = decodeFunctionData({ abi: staticsBatchRewardsAbi, data });
+  const ids = new Set<bigint>();
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      if (typeof record.positionId === "bigint") ids.add(record.positionId);
+      Object.values(record).forEach(visit);
+    }
+  };
+  visit(decoded.args);
+  return [...ids].sort((a, b) => (a < b ? -1 : 1));
+}
+
+it.each(["row", "selected"])(
+  "keeps the %s claim receipt after its last LP row disappears",
+  async (source) => {
+    let claimed = false;
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      claimed && input.functionName === "positionGaugePools"
+        ? Promise.resolve([[], 0n])
+        : original(input)
+    );
+    withPhaseOne(
+      <>
+        <ProtocolQueryReconciler />
+        <RewardsPage earnView="gauge" />
+      </>
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    const label = source === "row" ? "Collect STATICS / WETH rewards" : "Collect selected";
+    if (source === "selected")
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      );
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+    claimed = true;
+    act(() =>
+      announceProtocolTransactionConfirmed({
+        wallet,
+        chainId: 31337,
+        deploymentId: "phase-one-fixture",
+        blockNumber: 11n,
+        kind: "phase-one-claim-batch-rewards",
+        scopes: protocolQueryScopes("phase-one-claim-batch-rewards"),
+      })
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      ).not.toBeInTheDocument()
+    );
+    const dialog = screen.getByRole("dialog", { name: label });
+    expect(within(dialog).getByText("All 1 transactions confirmed.")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("link", { name: /Transaction 1 confirmed/ })
+    ).toBeInTheDocument();
+  }
+);
+
+it("does not reopen a saved row review after filtering away and back", async () => {
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  const collect = await screen.findByRole("button", { name: "Collect STATICS / WETH rewards" });
+  await waitFor(() => expect(collect).toBeEnabled());
+  fireEvent.click(collect);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  const search = screen.getByRole("searchbox", { name: "Search pools" });
+  fireEvent.change(search, { target: { value: "nothing matches" } });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: "" } });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Collect STATICS / WETH rewards" })).toBeEnabled();
+  expect(mocks.call).toHaveBeenCalledTimes(1);
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+describe("compact liquidity rewards", () => {
+  let compact = true;
+  let listeners: Set<() => void>;
+  beforeEach(() => {
+    compact = true;
+    listeners = new Set();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        get matches() {
+          return compact;
+        },
+        addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+      }))
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const resize = (isCompact: boolean) =>
+    act(() => {
+      compact = isCompact;
+      listeners.forEach((listener) => listener());
+    });
+
+  it("uses one summary card and opens the other summary metrics in More without extra reads", async () => {
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("Estimated emissions this period")).not.toBeInTheDocument();
+    const count = mocks.read.mock.calls.length;
+    const more = screen.getByRole("button", { name: "More" });
+    more.focus();
+    fireEvent.click(more);
+    const dialog = screen.getByRole("dialog", { name: "Liquidity rewards summary" });
+    expect(within(dialog).getByText("Estimated emissions this period")).toBeInTheDocument();
+    expect(within(dialog).getByText("Liquidity in range")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: /^Show .* pools that need attention$/ })
+    ).toBeInTheDocument();
+    expect(mocks.read).toHaveBeenCalledTimes(count);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(more);
+  });
+
+  it("keeps pool metrics and all actions in the expanded detail while selecting every position in a pool", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    expect(
+      screen.queryByRole("button", { name: "Collect STATICS / WETH rewards" })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Your estimate")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    expect(
+      screen.getByRole("button", { name: "Hide positions in STATICS / WETH" })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("Your estimate")).toHaveLength(3);
+    expect(
+      screen.getByRole("button", { name: "Collect Position #1 rewards in STATICS / WETH" })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Collect Position #2 rewards in STATICS / WETH" })
+    ).toBeEnabled();
+    expect(screen.getAllByRole("checkbox", { name: /^Select/ })).toHaveLength(4);
+    const poolCollect = screen.getByRole("button", {
+      name: "Collect all STATICS / WETH rewards",
+    });
+    expect(poolCollect).toHaveTextContent("Collect all");
+    expect(screen.getAllByRole("link", { name: "Manage" })).toHaveLength(2);
+    resize(false);
+    const poolRow = screen.getByRole("row", { name: /Select all positions in STATICS/ });
+    expect(within(poolRow).queryByRole("link", { name: "Manage" })).not.toBeInTheDocument();
+    fireEvent.click(
+      within(poolRow).getByRole("button", {
+        name: "Collect all STATICS / WETH rewards",
+      })
+    );
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    const poolClaim = decodeFunctionData({
+      abi: staticsBatchRewardsAbi,
+      data: mocks.call.mock.calls.at(-1)![0].data,
+    });
+    expect(poolClaim.args?.[1]).toMatchObject([
+      { positionId: 1n, poolId: hash("1"), slots: [0, 1] },
+      { positionId: 2n, poolId: hash("1"), slots: [0, 1] },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Collect Position #2 rewards in STATICS / WETH",
+      })
+    );
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    const positionClaim = decodeFunctionData({
+      abi: staticsBatchRewardsAbi,
+      data: mocks.call.mock.calls.at(-1)![0].data,
+    });
+    expect(positionClaim.args?.[1]).toMatchObject([
+      { positionId: 2n, poolId: hash("1"), slots: [0, 1] },
+    ]);
+    expect(positionClaim.args?.[1]).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    const decoded = decodeFunctionData({
+      abi: staticsBatchRewardsAbi,
+      data: mocks.call.mock.calls.at(-1)![0].data,
+    });
+    expect(decoded.args?.[1]).toMatchObject([
+      { positionId: 1n, poolId: hash("1"), slots: [0, 1] },
+      { positionId: 2n, poolId: hash("1"), slots: [0, 1] },
+    ]);
+    expect(decoded.args?.[1]).toHaveLength(2);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    "synchronizes individual, pool and header selection (compact=%s)",
+    async (isCompact) => {
+      mocks.page.mockResolvedValue({
+        deploymentId: "phase-one-fixture",
+        indexedAtBlock: 1n,
+        items: [position(1n), position(2n)],
+        nextCursor: null,
+      });
+      const original = mocks.read.getMockImplementation()!;
+      mocks.read.mockImplementation((input) =>
+        input.functionName === "positionGaugePools"
+          ? input.args[0] === 1n
+            ? [[hash("1"), hash("2")], 2n]
+            : [[hash("1")], 1n]
+          : original(input)
+      );
+      withPhaseOne(<RewardsPage earnView="gauge" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+      resize(isCompact);
+      const header = screen.getByRole("checkbox", { name: /^Select all positions$/ });
+      fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+      const child = screen.getByRole("checkbox", { name: "Select Position #2 in STATICS / WETH" });
+      const pool = screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" });
+      const otherPool = screen.getByRole("checkbox", {
+        name: "Select all positions in STATICS / TOKEN",
+      });
+      expect(header).not.toBeChecked();
+      fireEvent.click(child);
+      expect(child).toBeChecked();
+      expect(pool).not.toBeChecked();
+      expect(pool).toBePartiallyChecked();
+      expect(header).toBePartiallyChecked();
+      expect(otherPool).not.toBeChecked();
+      expect(screen.getByText("1 leg selected")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
+      await screen.findByRole("button", { name: "Confirm transaction" });
+      const decoded = decodeFunctionData({
+        abi: staticsBatchRewardsAbi,
+        data: mocks.call.mock.calls.at(-1)![0].data,
+      });
+      expect(decoded.args?.[1]).toHaveLength(1);
+      expect(decoded.args?.[1]).toMatchObject([
+        { positionId: 2n, poolId: hash("1"), slots: [0, 1] },
+      ]);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(header);
+      expect(header).toBeChecked();
+      expect(pool).toBeChecked();
+      expect(otherPool).toBeChecked();
+      expect(screen.getByText("3 legs selected")).toBeInTheDocument();
+      fireEvent.click(child);
+      expect(header).not.toBeChecked();
+      expect(header).toBePartiallyChecked();
+      expect(pool).not.toBeChecked();
+      expect(otherPool).toBeChecked();
+      fireEvent.click(child);
+      expect(header).toBeChecked();
+      expect(pool).toBeChecked();
+      fireEvent.click(header);
+      expect(header).not.toBePartiallyChecked();
+      expect(child).not.toBeChecked();
+      expect(otherPool).not.toBeChecked();
+      fireEvent.click(pool);
+      expect(child).toBeChecked();
+      expect(header).toBePartiallyChecked();
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search pools" }), {
+        target: { value: "WETH" },
+      });
+      expect(header).not.toBeChecked();
+      expect(child).not.toBeChecked();
+      fireEvent.click(header);
+      expect(header).toBeChecked();
+      expect(screen.getByText("2 legs selected")).toBeInTheDocument();
+      expect(mocks.execute).not.toHaveBeenCalled();
+    }
+  );
+
+  it("preserves the frozen claim and expanded pool when switching to desktop", async () => {
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    expect(
+      screen.getByRole("button", { name: "Collect STATICS / WETH rewards" })
+    ).toHaveTextContent("Collect");
+    expect(
+      screen.queryByRole("button", { name: "Collect all STATICS / WETH rewards" })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Manage" })).toHaveLength(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Collect Position #1 rewards in STATICS / WETH" })
+    );
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    resize(false);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hide positions in STATICS / WETH" })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("dialog", { name: "Collect Position #1 rewards in STATICS / WETH" })
+    ).toBeInTheDocument();
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("shows unavailable range data after a failed read while retaining its claim action", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePool"
+        ? Promise.reject(Error("leg read unavailable"))
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    await screen.findByText("Some range or emission data could not be loaded.");
+    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    const positionDetail = screen.getByRole("region", { name: "Position #1" });
+    expect(within(positionDetail).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(positionDetail).queryByText("Loading")).not.toBeInTheDocument();
+    expect(
+      within(positionDetail).getByRole("button", {
+        name: "Collect Position #1 rewards in STATICS / WETH",
+      })
+    ).toBeEnabled();
+  });
+
+  it("closes More when returning to desktop and does not reopen it on mobile", async () => {
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    resize(false);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    resize(true);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
+  });
+});
+
+describe("compact Earn positions", () => {
+  let compact = true;
+  let listeners: Set<() => void>;
+  beforeEach(() => {
+    compact = true;
+    listeners = new Set();
+    window.localStorage.clear();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        get matches() {
+          return compact;
+        },
+        addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+      }))
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const resize = (value: boolean) =>
+    act(() => {
+      compact = value;
+      listeners.forEach((listener) => listener());
+    });
+
+  it("shows one summary card and opens More without extra RPC reads", async () => {
+    withPhaseOne(<RewardsPage />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total staked")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allocated to pools")).not.toBeInTheDocument();
+    const more = screen.getByRole("button", { name: "More" });
+    const reads = mocks.read.mock.calls.length;
+    more.focus();
+    fireEvent.click(more);
+    const dialog = screen.getByRole("dialog", { name: "Portfolio summary" });
+    expect(within(dialog).getByText("Total staked")).toBeInTheDocument();
+    expect(within(dialog).getByText("Allocated to pools")).toBeInTheDocument();
+    expect(within(dialog).getByText("Needs attention")).toBeInTheDocument();
+    expect(mocks.read).toHaveBeenCalledTimes(reads);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(more);
+    fireEvent.click(more);
+    resize(false);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    resize(true);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("expands position details and preserves a selected frozen claim through resizing", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    withPhaseOne(<RewardsPage />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    expect(screen.queryByRole("link", { name: "Manage" })).not.toBeInTheDocument();
+    const reads = mocks.read.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #2" }));
+    const region = screen.getByRole("region", { name: "Your positions" });
+    expect(within(region).getByText("Reward assets")).toBeInTheDocument();
+    expect(within(region).getByText("Allocated / free")).toBeInTheDocument();
+    expect(within(region).getByText("Liquidity")).toBeInTheDocument();
+    expect(within(region).getByRole("link", { name: "Manage" })).toHaveAttribute(
+      "href",
+      "/app/rewards/staking?positionId=2"
+    );
+    expect(mocks.read).toHaveBeenCalledTimes(reads);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Position #2" }));
+    expect(
+      screen.getByRole("checkbox", { name: "Select all shown positions" })
+    ).toBePartiallyChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
+    await screen.findByRole("button", { name: "Confirm transaction" });
+    const data = mocks.call.mock.calls.at(-1)![0].data;
+    const decoded = decodeFunctionData({ abi: staticsBatchRewardsAbi, data });
+    expect(decoded.args?.[0]).toHaveLength(1);
+    expect(decoded.args?.[0]?.[0]).toMatchObject({ positionId: 2n });
+    expect(decoded.args?.[1]?.every((group) => group.positionId === 2n)).toBe(true);
+    expect(decoded.args?.[2]?.every((group) => group.positionId === 2n)).toBe(true);
+    resize(false);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Position #2" })).toBeChecked();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    resize(true);
+    expect(screen.getByRole("button", { name: "Hide details for Position #2" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("sorts compact positions and retains filtering, hidden rows and pagination", async () => {
+    const items = Array.from({ length: 26 }, (_, i) => position(BigInt(i + 1)));
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items,
+      nextCursor: null,
+    });
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "stakePosition"
+        ? { stakedBalance: parseEther(String(input.args[0])), rewardMultiplierBps: 10000 }
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /^Show details/ })[0]).toHaveAccessibleName(
+        "Show details for Position #26"
+      )
+    );
+    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(25);
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort positions" }), {
+      target: { value: "staked:asc" },
+    });
+    expect(screen.getAllByRole("button", { name: /^Show details/ })[0]).toHaveAccessibleName(
+      "Show details for Position #1"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Load more · 1" }));
+    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(26);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search positions" }), {
+      target: { value: "#26" },
+    });
+    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #26" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Hide$/ }));
+    expect(screen.queryByRole("checkbox", { name: "Select Position #26" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show hidden · 1" }));
+    expect(screen.getByRole("checkbox", { name: "Select Position #26" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Unhide" }));
+    expect(screen.queryByText("Hidden")).not.toBeInTheDocument();
+  });
+
+  it("announces the compact balance and allocation cooldown", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      const result = await original(input);
+      return input.functionName === "gaugePositionAllocations"
+        ? [4000, ...result.slice(1)]
+        : result;
+    });
+    withPhaseOne(<RewardsPage />);
+    await screen.findByText(/^Cooldown /);
+    expect(
+      screen.getByRole("button", { name: "Show details for Position #1" })
+    ).toHaveAccessibleDescription(/100 STATICS Cooldown/);
+  });
+
+  it("keeps unavailable details and empty wallet actions explicit", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "positionRewardAssets"
+        ? Promise.reject(Error("unavailable"))
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage />);
+    await screen.findByText("Unavailable");
+    expect(
+      screen.getByRole("button", { name: "Show details for Position #1" })
+    ).toHaveAccessibleDescription("100 STATICS Unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #1" }));
+    expect(screen.getAllByText("Unavailable")).toHaveLength(3);
+    expect(screen.getByRole("link", { name: "Manage" })).toBeInTheDocument();
+    cleanup();
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [],
+      nextCursor: null,
+    });
+    withPhaseOne(<RewardsPage />);
+    expect(await screen.findByRole("link", { name: "Create position" })).toHaveAttribute(
+      "href",
+      "/app/positions"
+    );
+    expect(screen.getByRole("checkbox", { name: "Select all shown positions" })).toBeDisabled();
+  });
 });
