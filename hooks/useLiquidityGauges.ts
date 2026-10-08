@@ -137,10 +137,12 @@ export function useLiquidityGauges(
     legOf,
     loading:
       reserve.isLoading ||
+      clock.isLoading ||
       pools.some((query) => query.isLoading) ||
       legQueries.some((query) => query.isLoading),
     unavailable:
       reserve.isError ||
+      clock.isError ||
       pools.some((query) => query.isError) ||
       legQueries.some((query) => query.isError),
   };

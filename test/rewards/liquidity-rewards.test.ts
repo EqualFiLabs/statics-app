@@ -57,17 +57,26 @@ describe("liquidity rewards", () => {
     expect(poolPeriodEmission(pool(), { ...reserve, totalAllocatedWeight: 0n })).toBe(0n);
   });
 
+  it("does not mark an allocated in-range leg earning without active emissions", () => {
+    expect(liquidityStatus(pool(), [leg()], { ...reserve, activated: false })).toBe("no-emissions");
+    expect(liquidityStatus(pool(), [leg()], { ...reserve, periodBudget: 0n })).toBe("no-emissions");
+    expect(liquidityStatus(pool(), [leg()], { ...reserve, totalAllocatedWeight: 0n })).toBe(
+      "no-emissions"
+    );
+  });
+
   it("explains the most fundamental reason a pool is not paying", () => {
-    expect(liquidityStatus(pool({ stopped: true }), [leg()])).toBe("stopped");
-    expect(liquidityStatus(pool(), [leg({ liquidity: 0n })])).toBe("no-liquidity");
-    expect(liquidityStatus(pool({ weight: 0n }), [leg()])).toBe("no-emissions");
-    expect(liquidityStatus(pool({ stale: true }), [leg()])).toBe("no-emissions");
-    expect(liquidityStatus(pool({ referenceTick: 500 }), [leg()])).toBe("out-of-range");
+    expect(liquidityStatus(pool({ stopped: true }), [leg()], reserve)).toBe("stopped");
+    expect(liquidityStatus(pool(), [leg({ liquidity: 0n })], reserve)).toBe("no-liquidity");
+    expect(liquidityStatus(pool({ weight: 0n }), [leg()], reserve)).toBe("no-emissions");
+    expect(liquidityStatus(pool({ stale: true }), [leg()], reserve)).toBe("no-emissions");
+    expect(liquidityStatus(pool({ referenceTick: 500 }), [leg()], reserve)).toBe("out-of-range");
     expect(
-      liquidityStatus(pool({ referenceTick: 500 }), [
-        leg(),
-        leg({ positionId: 2n, tickUpper: 600 }),
-      ])
+      liquidityStatus(
+        pool({ referenceTick: 500 }),
+        [leg(), leg({ positionId: 2n, tickUpper: 600 })],
+        reserve
+      )
     ).toBe("earning");
   });
 });

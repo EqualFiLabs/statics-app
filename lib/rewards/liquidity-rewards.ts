@@ -70,12 +70,13 @@ export function legPeriodEstimate(
 /** Why a pool is or isn't paying you, most fundamental reason first. */
 export function liquidityStatus(
   pool: GaugePoolState,
-  legs: readonly GaugeLegState[]
+  legs: readonly GaugeLegState[],
+  reserve: GaugeReserveState
 ): LiquidityStatus {
   if (pool.stopped) return "stopped";
   const live = legs.filter((leg) => leg.liquidity > 0n);
   if (!live.length) return "no-liquidity";
-  if (pool.stale || pool.weight === 0n) return "no-emissions";
+  if (poolPeriodEmission(pool, reserve) === 0n) return "no-emissions";
   return live.some((leg) => legInRange(leg, pool)) ? "earning" : "out-of-range";
 }
 

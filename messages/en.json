@@ -1925,6 +1925,7 @@
     "estimate": "Estimated emissions this period",
     "periodEnds": "Current period ends in {time}",
     "notActivated": "Protocol emissions are not active yet",
+    "periodUnavailable": "Current period estimates are unavailable until the reserve is checkpointed.",
     "estimateHelp": "At current weights and liquidity",
     "inRange": "Liquidity in range",
     "inRangeValue": "{inRange} of {total}",
@@ -1965,7 +1966,7 @@
     },
     "statusHelp": {
       "stopped": "This pool's gauge is stopped. Earned rewards stay claimable; claim them before exiting.",
-      "no-emissions": "No staked STATICS is allocated to this pool, so it receives no protocol emissions even while you are in range.",
+      "no-emissions": "This pool has no active protocol emissions because its reserve, allocation weight or eligibility is inactive. Earned LP incentives can still be claimed.",
       "out-of-range": "The price is outside every range you hold here, so this liquidity earns nothing until you rebalance.",
       "earning": "At least one of your ranges contains the current price.",
       "no-liquidity": "These positions have exited this pool; any remaining rewards are still shown."

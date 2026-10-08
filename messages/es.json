@@ -1925,6 +1925,7 @@
     "estimate": "Emisiones estimadas en este periodo",
     "periodEnds": "El periodo actual termina en {time}",
     "notActivated": "Las emisiones del protocolo aún no están activas",
+    "periodUnavailable": "Las estimaciones del período actual no están disponibles hasta actualizar el punto de control de la reserva.",
     "estimateHelp": "Con los pesos y la liquidez actuales",
     "inRange": "Liquidez en rango",
     "inRangeValue": "{inRange} de {total}",
@@ -1965,7 +1966,7 @@
     },
     "statusHelp": {
       "stopped": "El gauge de este pool está detenido. Las recompensas obtenidas siguen siendo reclamables; reclámalas antes de salir.",
-      "no-emissions": "No hay STATICS en staking asignado a este pool, así que no recibe emisiones del protocolo aunque estés en rango.",
+      "no-emissions": "Este pool no tiene emisiones activas del protocolo porque su reserva, peso de asignación o elegibilidad están inactivos. Los incentivos de LP ya ganados aún se pueden reclamar.",
       "out-of-range": "El precio está fuera de todos tus rangos aquí, así que esta liquidez no genera hasta que reequilibres.",
       "earning": "Al menos uno de tus rangos contiene el precio actual.",
       "no-liquidity": "Estas posiciones salieron de este pool; se siguen mostrando las recompensas pendientes."

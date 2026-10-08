@@ -767,18 +767,20 @@ describe("Earn review remediation", () => {
     // Zero allocation weight: in range, but the pool receives no emissions.
     poolWeight = 0n;
     withPhaseOne(<RewardsPage earnView="gauge" />);
-    const idle = (
-      await screen.findByTitle(/receives no protocol emissions even while you are in range/)
-    ).closest("tr")!;
+    const idle = (await screen.findByTitle(/This pool has no active protocol emissions/)).closest(
+      "tr"
+    )!;
     // The attention chip filters to every reason, not only out-of-range pools.
     fireEvent.click(screen.getByRole("button", { name: "Show 1 pools that need attention" }));
     expect(screen.getByRole("button", { name: /^Needs attention/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
-    expect(screen.getByTitle(/receives no protocol emissions/)).toBeInTheDocument();
+    expect(screen.getByTitle(/This pool has no active protocol emissions/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Earning/ }));
-    expect(screen.queryByTitle(/receives no protocol emissions/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle(/This pool has no active protocol emissions/)
+    ).not.toBeInTheDocument();
     expect(within(idle).getByRole("link", { name: "Allocate" })).toHaveAttribute(
       "href",
       expect.stringContaining("/app/rewards/allocations?positionId=1&poolId=")
@@ -1110,4 +1112,59 @@ it("reuses the reward discovery LP leg for range presentation", async () => {
   await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
   await screen.findByText("No liquidity");
   expect(mocks.read.mock.calls.filter(([input]) => input.functionName === "lpLeg")).toHaveLength(1);
+});
+
+it.each([false, true])(
+  "shows no emissions for an inactive or empty reserve (activated=%s)",
+  async (activated) => {
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) => {
+      if (input.functionName === "gaugeReserve")
+        return {
+          activated,
+          periodBudget: activated ? 0n : parseEther("700"),
+          totalAllocatedWeight: 100n,
+          periodFinish: 10_000,
+        };
+      if (input.functionName === "gaugePool")
+        return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 1000n };
+      if (input.functionName === "gaugePoolWeight") return { weight: 50n, stale: false };
+      if (input.functionName === "lpLeg") return { liquidity: 250n, tickLower: -60, tickUpper: 60 };
+      return base(input);
+    });
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    const row = (await screen.findByTitle(/This pool has no active protocol emissions/)).closest(
+      "tr"
+    )!;
+    expect(within(row).getByText("No emissions")).toBeInTheDocument();
+    expect(within(row).queryByText("Earning")).not.toBeInTheDocument();
+  }
+);
+
+it("does not present an expired stored period budget as current emissions", async () => {
+  const base = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation((input) => {
+    if (input.functionName === "gaugeReserve")
+      return {
+        activated: true,
+        periodBudget: parseEther("700"),
+        totalAllocatedWeight: 100n,
+        periodFinish: 3000,
+      };
+    if (input.functionName === "gaugePool")
+      return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 1000n };
+    if (input.functionName === "gaugePoolWeight") return { weight: 50n, stale: false };
+    if (input.functionName === "lpLeg") return { liquidity: 250n, tickLower: -60, tickUpper: 60 };
+    return base(input);
+  });
+  withPhaseOne(<RewardsPage earnView="gauge" />);
+  expect(
+    await screen.findByText(
+      "Current period estimates are unavailable until the reserve is checkpointed."
+    )
+  ).toBeInTheDocument();
+  expect(screen.queryByText("350")).not.toBeInTheDocument();
+  expect(screen.queryByText("87.5")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+  expect(screen.queryByText("87.5")).not.toBeInTheDocument();
 });

@@ -90,6 +90,15 @@ export function LiquidityRewardsTable({
       .map((pool) => ({ positionId: row.positionId, poolId: pool.poolId }))
   );
   const gauges = useLiquidityGauges(deployment, action, legs);
+  // Reserve views are stored state. An expired period must be checkpointed before
+  // its budget can describe the current period; claim previews remain independent.
+  const estimateReserve =
+    gauges.reserve &&
+    (!gauges.reserve.activated ||
+      (gauges.now !== undefined && gauges.now < gauges.reserve.periodFinish))
+      ? gauges.reserve
+      : undefined;
+  const estimatePlaceholder = gauges.loading ? "…" : "—";
   const poolIds = [...new Map(legs.map((leg) => [leg.poolId.toLowerCase(), leg.poolId])).values()];
   const pools = poolIds.map((poolId) => {
     const positions = legs.filter((leg) => leg.poolId.toLowerCase() === poolId.toLowerCase());
@@ -98,8 +107,9 @@ export function LiquidityRewardsTable({
       .map((leg) => gauges.legOf(leg.positionId, poolId))
       .filter((leg): leg is GaugeLegState => Boolean(leg));
     const known = Boolean(state) && legStates.length === positions.length;
-    const status = state && known ? liquidityStatus(state, legStates) : undefined;
     const reserve = gauges.reserve;
+    const status =
+      state && known && reserve ? liquidityStatus(state, legStates, reserve) : undefined;
     return {
       poolId,
       name: rewardPoolName(deployment, poolId),
@@ -107,10 +117,10 @@ export function LiquidityRewardsTable({
       state,
       legStates,
       status,
-      emission: state && reserve ? poolPeriodEmission(state, reserve) : undefined,
+      emission: state && estimateReserve ? poolPeriodEmission(state, estimateReserve) : undefined,
       estimate:
-        state && reserve && known
-          ? legStates.reduce((sum, leg) => sum + legPeriodEstimate(leg, state, reserve), 0n)
+        state && estimateReserve && known
+          ? legStates.reduce((sum, leg) => sum + legPeriodEstimate(leg, state, estimateReserve), 0n)
           : undefined,
       shareBps:
         state && known
@@ -195,7 +205,9 @@ export function LiquidityRewardsTable({
               ? t("periodEnds", { time: formatDuration(periodLeft) })
               : gauges.reserve && !gauges.reserve.activated
                 ? t("notActivated")
-                : t("estimateHelp")}
+                : gauges.reserve?.activated && !estimateReserve
+                  ? t("periodUnavailable")
+                  : t("estimateHelp")}
           </span>
         </div>
         <div className={styles.summaryChip}>
@@ -325,10 +337,10 @@ export function LiquidityRewardsTable({
                       {pool.shareBps === undefined ? "…" : percent(pool.shareBps)}
                     </td>
                     <td className={styles.numeric}>
-                      {pool.emission === undefined ? "…" : statics(pool.emission)}
+                      {pool.emission === undefined ? estimatePlaceholder : statics(pool.emission)}
                     </td>
                     <td className={styles.numeric}>
-                      {pool.estimate === undefined ? "…" : statics(pool.estimate)}
+                      {pool.estimate === undefined ? estimatePlaceholder : statics(pool.estimate)}
                     </td>
                     <td className={styles.numeric}>
                       <RewardAmounts
@@ -377,7 +389,7 @@ export function LiquidityRewardsTable({
                       const key = rewardRowKey(positionId, pool.poolId);
                       const leg = gauges.legOf(positionId, pool.poolId);
                       const state = pool.state;
-                      const reserve = gauges.reserve;
+                      const reserve = estimateReserve;
                       return (
                         <tr
                           key={key}
@@ -411,7 +423,7 @@ export function LiquidityRewardsTable({
                           <td className={styles.numeric}>
                             {leg && state && reserve
                               ? statics(legPeriodEstimate(leg, state, reserve))
-                              : "…"}
+                              : estimatePlaceholder}
                           </td>
                           <td className={styles.numeric}>
                             <RewardAmounts
