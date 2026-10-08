@@ -29,7 +29,7 @@ export type GaugeReserveState = Readonly<{
 }>;
 
 export type LiquidityStatus =
-  "stopped" | "no-emissions" | "out-of-range" | "earning" | "no-liquidity";
+  "stopped" | "no-emissions" | "out-of-range" | "earning" | "no-liquidity" | "unavailable";
 
 /** Mirrors LibRangeGauge.containsTick: a leg earns while tickLower <= tick < tickUpper. */
 export function legInRange(leg: GaugeLegState, pool: GaugePoolState): boolean {
@@ -71,13 +71,17 @@ export function legPeriodEstimate(
 export function liquidityStatus(
   pool: GaugePoolState,
   legs: readonly GaugeLegState[],
-  reserve: GaugeReserveState
+  reserve: GaugeReserveState | undefined
 ): LiquidityStatus {
   if (pool.stopped) return "stopped";
   const live = legs.filter((leg) => leg.liquidity > 0n);
   if (!live.length) return "no-liquidity";
+  // Range and lifecycle state remain known when the stored emission period expires.
+  // Its old budget cannot establish whether an in-range leg earns in the new period.
+  const inRange = live.some((leg) => legInRange(leg, pool));
+  if (!reserve) return inRange ? "unavailable" : "out-of-range";
   if (poolPeriodEmission(pool, reserve) === 0n) return "no-emissions";
-  return live.some((leg) => legInRange(leg, pool)) ? "earning" : "out-of-range";
+  return inRange ? "earning" : "out-of-range";
 }
 
 export function needsLiquidityAttention(status: LiquidityStatus): boolean {

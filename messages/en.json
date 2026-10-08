@@ -1962,14 +1962,16 @@
       "no-emissions": "No emissions",
       "out-of-range": "Out of range",
       "earning": "Earning",
-      "no-liquidity": "No liquidity"
+      "no-liquidity": "No liquidity",
+      "unavailable": "Unavailable"
     },
     "statusHelp": {
       "stopped": "This pool's gauge is stopped. Earned rewards stay claimable; claim them before exiting.",
       "no-emissions": "This pool has no active protocol emissions because its reserve, allocation weight or eligibility is inactive. Earned LP incentives can still be claimed.",
       "out-of-range": "The price is outside every range you hold here, so this liquidity earns nothing until you rebalance.",
       "earning": "At least one of your ranges contains the current price.",
-      "no-liquidity": "These positions have exited this pool; any remaining rewards are still shown."
+      "no-liquidity": "These positions have exited this pool; any remaining rewards are still shown.",
+      "unavailable": "Current-period emission data is unavailable. Range information and earned rewards remain available."
     },
     "loading": "Loading",
     "positionCount": "{count, plural, one {# position} other {# positions}}",

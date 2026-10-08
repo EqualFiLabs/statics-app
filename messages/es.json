@@ -1962,14 +1962,16 @@
       "no-emissions": "Sin emisiones",
       "out-of-range": "Fuera de rango",
       "earning": "Generando",
-      "no-liquidity": "Sin liquidez"
+      "no-liquidity": "Sin liquidez",
+      "unavailable": "No disponible"
     },
     "statusHelp": {
       "stopped": "El gauge de este pool está detenido. Las recompensas obtenidas siguen siendo reclamables; reclámalas antes de salir.",
       "no-emissions": "Este pool no tiene emisiones activas del protocolo porque su reserva, peso de asignación o elegibilidad están inactivos. Los incentivos de LP ya ganados aún se pueden reclamar.",
       "out-of-range": "El precio está fuera de todos tus rangos aquí, así que esta liquidez no genera hasta que reequilibres.",
       "earning": "Al menos uno de tus rangos contiene el precio actual.",
-      "no-liquidity": "Estas posiciones salieron de este pool; se siguen mostrando las recompensas pendientes."
+      "no-liquidity": "Estas posiciones salieron de este pool; se siguen mostrando las recompensas pendientes.",
+      "unavailable": "Los datos de emisiones del período actual no están disponibles. La información del rango y las recompensas ganadas siguen disponibles."
     },
     "loading": "Cargando",
     "positionCount": "{count, plural, one {# posición} other {# posiciones}}",

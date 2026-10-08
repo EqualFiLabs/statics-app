@@ -41,6 +41,7 @@ const tone: Record<LiquidityStatus, "positive" | "warning" | "negative" | "neutr
   "no-emissions": "warning",
   stopped: "negative",
   "no-liquidity": "neutral",
+  unavailable: "neutral",
 };
 
 export function LiquidityRewardsTable({
@@ -92,7 +93,7 @@ export function LiquidityRewardsTable({
   const gauges = useLiquidityGauges(deployment, action, legs);
   // Reserve views are stored state. An expired period must be checkpointed before
   // its budget can describe the current period; claim previews remain independent.
-  const estimateReserve =
+  const currentReserve =
     gauges.reserve &&
     (!gauges.reserve.activated ||
       (gauges.now !== undefined && gauges.now < gauges.reserve.periodFinish))
@@ -107,9 +108,7 @@ export function LiquidityRewardsTable({
       .map((leg) => gauges.legOf(leg.positionId, poolId))
       .filter((leg): leg is GaugeLegState => Boolean(leg));
     const known = Boolean(state) && legStates.length === positions.length;
-    const reserve = gauges.reserve;
-    const status =
-      state && known && reserve ? liquidityStatus(state, legStates, reserve) : undefined;
+    const status = state && known ? liquidityStatus(state, legStates, currentReserve) : undefined;
     return {
       poolId,
       name: rewardPoolName(deployment, poolId),
@@ -117,10 +116,10 @@ export function LiquidityRewardsTable({
       state,
       legStates,
       status,
-      emission: state && estimateReserve ? poolPeriodEmission(state, estimateReserve) : undefined,
+      emission: state && currentReserve ? poolPeriodEmission(state, currentReserve) : undefined,
       estimate:
-        state && estimateReserve && known
-          ? legStates.reduce((sum, leg) => sum + legPeriodEstimate(leg, state, estimateReserve), 0n)
+        state && currentReserve && known
+          ? legStates.reduce((sum, leg) => sum + legPeriodEstimate(leg, state, currentReserve), 0n)
           : undefined,
       shareBps:
         state && known
@@ -168,7 +167,9 @@ export function LiquidityRewardsTable({
       checked ? [...new Set([...selected, ...keys])] : selected.filter((key) => !keys.includes(key))
     );
   const statusLabel = (status: LiquidityStatus | undefined) =>
-    status ? t(`status.${status}`) : t("loading");
+    status && (status !== "unavailable" || !gauges.loading)
+      ? t(`status.${status}`)
+      : t(gauges.loading ? "loading" : "status.unavailable");
   const liquidityHref = (positionId: bigint, poolId: Hex) =>
     `/app/liquidity?positionId=${positionId}&poolId=${poolId}`;
 
@@ -205,7 +206,7 @@ export function LiquidityRewardsTable({
               ? t("periodEnds", { time: formatDuration(periodLeft) })
               : gauges.reserve && !gauges.reserve.activated
                 ? t("notActivated")
-                : gauges.reserve?.activated && !estimateReserve
+                : gauges.reserve?.activated && !currentReserve
                   ? t("periodUnavailable")
                   : t("estimateHelp")}
           </span>
@@ -389,7 +390,7 @@ export function LiquidityRewardsTable({
                       const key = rewardRowKey(positionId, pool.poolId);
                       const leg = gauges.legOf(positionId, pool.poolId);
                       const state = pool.state;
-                      const reserve = estimateReserve;
+                      const reserve = currentReserve;
                       return (
                         <tr
                           key={key}

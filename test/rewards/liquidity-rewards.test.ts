@@ -65,6 +65,13 @@ describe("liquidity rewards", () => {
     );
   });
 
+  it("preserves range and lifecycle status without a current emission budget", () => {
+    expect(liquidityStatus(pool(), [leg()], undefined)).toBe("unavailable");
+    expect(liquidityStatus(pool({ stopped: true }), [leg()], undefined)).toBe("stopped");
+    expect(liquidityStatus(pool(), [leg({ liquidity: 0n })], undefined)).toBe("no-liquidity");
+    expect(liquidityStatus(pool({ referenceTick: 500 }), [leg()], undefined)).toBe("out-of-range");
+  });
+
   it("explains the most fundamental reason a pool is not paying", () => {
     expect(liquidityStatus(pool({ stopped: true }), [leg()], reserve)).toBe("stopped");
     expect(liquidityStatus(pool(), [leg({ liquidity: 0n })], reserve)).toBe("no-liquidity");

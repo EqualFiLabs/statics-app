@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
-import type { Address, Hex, PublicClient } from "viem";
+import { getAddress, type Address, type Hex, type PublicClient } from "viem";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 
 /** Bound individual metadata RPCs, including the two reads needed for each pool. */
@@ -42,7 +42,7 @@ export function liquidityLegQuery(input: {
     queryKey: [
       "phase-one-gauges",
       deployment.descriptor.deploymentId,
-      account?.toLowerCase() ?? "disconnected",
+      account ? getAddress(account) : "disconnected",
       String(positionId),
       "liquidity-leg",
       poolId.toLowerCase(),

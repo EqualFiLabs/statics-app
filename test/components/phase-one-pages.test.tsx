@@ -1,3 +1,6 @@
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { liquidityLegQuery } from "@/lib/rewards/gauge-reads";
+import type { PublicClient, Address } from "viem";
 import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -60,7 +63,7 @@ vi.mock("@/lib/indexer/phase-one", () => ({
 }));
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 const hash = (digit: string) => `0x${digit.repeat(64)}` as const;
-const wallet = address("9");
+const wallet = getAddress(`0x${"ab".repeat(20)}`);
 const tokens = ["STATICS", "WETH", "TOKEN"].map((symbol, index) => ({
   address: address(String(index + 2)),
   name: symbol,
@@ -1141,30 +1144,120 @@ it.each([false, true])(
   }
 );
 
-it("does not present an expired stored period budget as current emissions", async () => {
+it.each(["0", "700"])(
+  "does not use an expired %s budget for current status or emissions",
+  async (budget) => {
+    const base = mocks.read.getMockImplementation()!;
+    const simulate = mocks.simulate.getMockImplementation()!;
+    mocks.simulate.mockImplementation((input) =>
+      input.functionName === "claimLpRewards"
+        ? Promise.resolve({ result: [parseEther("1")] })
+        : simulate(input)
+    );
+    mocks.read.mockImplementation((input) => {
+      if (input.functionName === "gaugeReserve")
+        return {
+          activated: true,
+          periodBudget: parseEther(budget),
+          totalAllocatedWeight: 100n,
+          periodFinish: 3000,
+        };
+      if (input.functionName === "gaugePool")
+        return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 1000n };
+      if (input.functionName === "gaugePoolWeight") return { weight: 50n, stale: false };
+      if (input.functionName === "lpLeg") return { liquidity: 250n, tickLower: -60, tickUpper: 60 };
+      return base(input);
+    });
+    withPhaseOne(<RewardsPage earnView="gauge" />);
+    expect(
+      await screen.findByText(
+        "Current period estimates are unavailable until the reserve is checkpointed."
+      )
+    ).toBeInTheDocument();
+    const poolRow = (
+      await screen.findByTitle(
+        "Current-period emission data is unavailable. Range information and earned rewards remain available."
+      )
+    ).closest("tr")!;
+    expect(within(poolRow).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(poolRow).queryByText("Earning")).not.toBeInTheDocument();
+    expect(within(poolRow).queryByText("No emissions")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
+    expect(screen.queryByText("350")).not.toBeInTheDocument();
+    expect(screen.queryByText("87.5")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    expect(screen.queryByText("87.5")).not.toBeInTheDocument();
+  }
+);
+
+const cachedLeg = {
+  manager: zeroAddress,
+  posmTokenId: 1n,
+  tickLower: -60,
+  tickUpper: 60,
+  liquidity: 100n,
+  checkpointInsideRay: [0n, 0n, 0n, 0n, 0n],
+  rewardRemainderRay: [0n, 0n, 0n, 0n, 0n],
+  claimable: [0n, 0n, 0n, 0n, 0n],
+} as const;
+function cachedLegKey() {
+  return liquidityLegQuery({
+    publicClient: {} as PublicClient,
+    deployment: phaseOne,
+    account: wallet.toLowerCase() as Address,
+    positionId: 999n,
+    poolId: hash("1"),
+  }).queryKey;
+}
+
+it("refreshes checksummed-wallet leg data through the page Refresh button", async () => {
+  let cache: QueryClient | undefined;
+  function CacheProbe() {
+    cache = useQueryClient();
+    return null;
+  }
   const base = mocks.read.getMockImplementation()!;
   mocks.read.mockImplementation((input) => {
-    if (input.functionName === "gaugeReserve")
-      return {
-        activated: true,
-        periodBudget: parseEther("700"),
-        totalAllocatedWeight: 100n,
-        periodFinish: 3000,
-      };
-    if (input.functionName === "gaugePool")
-      return { stopped: false, referenceTick: 0, activeGaugeLiquidity: 1000n };
-    if (input.functionName === "gaugePoolWeight") return { weight: 50n, stale: false };
-    if (input.functionName === "lpLeg") return { liquidity: 250n, tickLower: -60, tickUpper: 60 };
+    if (input.functionName === "positionGaugePools")
+      return Promise.resolve([[hash("1"), hash("2")], 2n]);
+    if (input.functionName === "previewLpRewards" && input.args[1] === hash("2"))
+      return Promise.reject(Error("Rewards unavailable"));
     return base(input);
   });
-  withPhaseOne(<RewardsPage earnView="gauge" />);
-  expect(
-    await screen.findByText(
-      "Current period estimates are unavailable until the reserve is checkpointed."
-    )
-  ).toBeInTheDocument();
-  expect(screen.queryByText("350")).not.toBeInTheDocument();
-  expect(screen.queryByText("87.5")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
-  expect(screen.queryByText("87.5")).not.toBeInTheDocument();
+  withPhaseOne(
+    <>
+      <CacheProbe />
+      <RewardsPage earnView="gauge" />
+    </>
+  );
+  const refresh = await screen.findByRole("button", { name: "Refresh" });
+  const key = cachedLegKey();
+  cache!.setQueryData(key, cachedLeg);
+  expect(cache!.getQueryState(key)?.isInvalidated).toBe(false);
+  fireEvent.click(refresh);
+  await waitFor(() => expect(cache!.getQueryState(key)?.isInvalidated).toBe(true));
+});
+
+it("refreshes checksummed-wallet leg data after the stake form confirms", async () => {
+  let cache: QueryClient | undefined;
+  function CacheProbe() {
+    cache = useQueryClient();
+    return null;
+  }
+  withPhaseOne(
+    <>
+      <CacheProbe />
+      <RewardsPage earnView="staking" />
+    </>
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+  const key = cachedLegKey();
+  cache!.setQueryData(key, cachedLeg);
+  fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+    target: { value: "1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+  await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(cache!.getQueryState(key)?.isInvalidated).toBe(true));
 });

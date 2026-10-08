@@ -1962,14 +1962,16 @@
       "no-emissions": "无排放",
       "out-of-range": "超出区间",
       "earning": "收益中",
-      "no-liquidity": "无流动性"
+      "no-liquidity": "无流动性",
+      "unavailable": "暂不可用"
     },
     "statusHelp": {
       "stopped": "此资金池的 gauge 已停止。已赚取的奖励仍可领取；请在退出前领取。",
       "no-emissions": "此资金池的储备、分配权重或资格未激活，因此没有活跃的协议排放。已赚取的 LP 激励仍可领取。",
       "out-of-range": "价格超出你在此处的所有区间，在重新平衡之前这部分流动性不会赚取收益。",
       "earning": "你至少有一个区间包含当前价格。",
-      "no-liquidity": "这些仓位已退出此资金池；剩余奖励仍会显示。"
+      "no-liquidity": "这些仓位已退出此资金池；剩余奖励仍会显示。",
+      "unavailable": "当前周期的排放数据暂不可用。区间信息和已赚取奖励仍然可用。"
     },
     "loading": "加载中",
     "positionCount": "{count, plural, other {# 个仓位}}",
