@@ -32,6 +32,8 @@ test("keeps the original swap card and Operator tab with both manifests configur
 test("preserves Operator management and adds Positions Rewards Liquidity and Activity", async ({
   page,
 }) => {
+  // Cold development compilation visits nine independent routes sequentially.
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const { path, heading, copy } of [
@@ -47,13 +49,33 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
     },
     {
       path: "/app/rewards",
-      heading: "Stake Statics",
-      copy: "Reuse a Position you own, or explicitly open a new one, then choose which fee assets it earns.",
+      heading: "Earn",
+      copy: "Your stake and rewards, across every position.",
+    },
+    {
+      path: "/app/rewards/staking",
+      heading: "Staking",
+      copy: "Stake STATICS and choose the assets you earn.",
+    },
+    {
+      path: "/app/rewards/gauge",
+      heading: "Liquidity rewards",
+      copy: "STATICS emissions and incentives earned by your in-range liquidity.",
+    },
+    {
+      path: "/app/rewards/bribes?share=lp",
+      heading: "Bribe Rewards",
+      copy: "Community-funded incentives for LPs and allocators.",
+    },
+    {
+      path: "/app/rewards/allocations",
+      heading: "Allocations",
+      copy: "Direct your staked STATICS toward pool emissions.",
     },
     {
       path: "/app/liquidity",
       heading: "Your liquidity",
-      copy: "No positions found. Create a position to get started.",
+      copy: "Provide liquidity to earn trading fees and pool incentives.",
     },
     { path: "/app/activity", heading: "Transactions", copy: "Your activity" },
   ]) {
