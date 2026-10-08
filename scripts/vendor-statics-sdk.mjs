@@ -41,6 +41,16 @@ const legacyArtifactsRoot = configuredLegacyArtifactsRoot
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
 if (
   existsSync(resolve(destination, "provenance.json")) &&
+  JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8"))
+    .rewardSelectionTimingSource &&
+  !process.env.STATICS_REWARD_SELECTION_TIMING_SDK_REPOSITORY?.trim()
+) {
+  throw new Error(
+    "Set STATICS_REWARD_SELECTION_TIMING_SDK_REPOSITORY to retain the timing SDK during sync."
+  );
+}
+if (
+  existsSync(resolve(destination, "provenance.json")) &&
   JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8")).batchRewardsSource &&
   !process.env.STATICS_BATCH_REWARDS_SDK_REPOSITORY?.trim()
 ) {
@@ -257,4 +267,7 @@ console.log(`Vendored @statics-protocol/sdk from ${protocolCommit}.`);
 
 if (process.env.STATICS_BATCH_REWARDS_SDK_REPOSITORY?.trim()) {
   await import("./vendor-batch-rewards-sdk.mjs");
+}
+if (process.env.STATICS_REWARD_SELECTION_TIMING_SDK_REPOSITORY?.trim()) {
+  await import("./vendor-reward-selection-timing-sdk.mjs");
 }

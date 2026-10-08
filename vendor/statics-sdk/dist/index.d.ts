@@ -11468,3 +11468,5 @@ export declare function planMintUnderlyingRoutes(sourceToken: Address, mintQuote
 export declare function planRedeemUnderlyingRoutes(destinationToken: Address, redeemQuote: readonly RedeemQuoteLeg[], adapter: UnderlyingLiquidityAdapter): Promise<readonly UnderlyingRoute[]>;
 
 export * from "./batch-rewards.js";
+
+export * from "./position-market.js";

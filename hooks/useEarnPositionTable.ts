@@ -1,13 +1,20 @@
 "use client";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { staticsAbi, staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
-import type { Address } from "viem";
+import {
+  STATICS_REWARD_SELECTION_TIMING_INTERFACE_ID,
+  staticsRewardSelectionTimingAbi,
+} from "@statics-protocol/sdk";
+import { parseAbi, type Address } from "viem";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import type { IndexedPhaseOnePosition } from "@/lib/indexer/phase-one";
 import type { EarnPositionRow } from "@/lib/rewards/position-table";
 import type { usePhaseOneAction } from "./usePhaseOneAction";
 
 type Action = ReturnType<typeof usePhaseOneAction>;
+const interfaceAbi = parseAbi([
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+]);
 
 /**
  * Per-position staking, reward-asset and allocation state for the Earn table. Each position is
@@ -36,6 +43,19 @@ export function useEarnPositionTable(
   });
   // Until the chain clock loads, nothing reads as cooling down or maturing.
   const now = clock.data;
+  const timing = useQuery({
+    queryKey: ["phase-one-selection-timing", deployment.descriptor.chainId, diamond],
+    enabled: action.ready && positions.length > 0,
+    staleTime: 300_000,
+    retry: false,
+    queryFn: () =>
+      action.publicClient!.readContract({
+        address: diamond,
+        abi: interfaceAbi,
+        functionName: "supportsInterface",
+        args: [STATICS_REWARD_SELECTION_TIMING_INTERFACE_ID],
+      }),
+  });
   const limits = useQuery({
     queryKey: ["phase-one-position", id, "earn-limits", deployment.descriptor.chainId],
     enabled: action.ready,
@@ -55,9 +75,12 @@ export function useEarnPositionTable(
         id,
         action.wallet,
         String(position.positionId),
-        "earn-table",
+        "earn-table-timing",
+        timing.data,
+        deployment.descriptor.chainId,
+        diamond,
       ],
-      enabled: action.ready,
+      enabled: action.ready && timing.data !== undefined,
       staleTime: 30_000,
       retry: false,
       queryFn: () =>
@@ -88,24 +111,35 @@ export function useEarnPositionTable(
             }),
           ]);
           const selections = await Promise.all(
-            selectedAssets.map(async (asset) => ({
-              asset,
-              selection: await client.readContract({
+            selectedAssets.map(async (asset) => {
+              if (timing.data) {
+                const [selection, pendingStartTime] = await client.readContract({
+                  address: diamond,
+                  abi: staticsRewardSelectionTimingAbi,
+                  functionName: "rewardSelectionWithTiming",
+                  args: [position.positionId, asset],
+                  account,
+                });
+                return { asset, selection, pendingStartTime: BigInt(pendingStartTime) };
+              }
+              const selection = await client.readContract({
                 address: diamond,
                 abi: staticsAbi,
                 functionName: "rewardSelection",
                 args: [position.positionId, asset],
                 account,
-              }),
-            }))
+              });
+              return { asset, selection, pendingStartTime: undefined };
+            })
           );
           return {
             stakedBalance: stake.stakedBalance,
             selectedAssets: selectedAssets as readonly Address[],
-            selections: selections.map(({ asset, selection }) => ({
+            selections: selections.map(({ asset, selection, pendingStartTime }) => ({
               asset: asset as Address,
               pendingStake: selection.pendingStake,
               eligibleAt: BigInt(selection.eligibleAt),
+              pendingStartTime,
             })),
             allocation: {
               nextAllocationAt: BigInt(allocations[0]),
@@ -143,13 +177,17 @@ export function useEarnPositionTable(
         maturing.map((entry) => [entry.asset.toLowerCase(), entry.eligibleAt])
       ),
       allocation: data?.allocation,
-      unavailable: Boolean((query?.isError && !data) || (clock.isError && now === undefined)),
+      unavailable: Boolean(
+        (query?.isError && !data) ||
+        (clock.isError && now === undefined) ||
+        (timing.isError && timing.data === undefined)
+      ),
     };
   });
   return {
     rows,
     now,
-    loading: details.some((query) => query.isLoading),
+    loading: timing.isLoading || details.some((query) => query.isLoading),
     refetch: () => Promise.all(details.map((query) => query.refetch())),
   };
 }

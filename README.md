@@ -396,6 +396,8 @@ Use a separate recoverable indexer database for this rehearsal, as described in
   vendored SDK artifacts.
 - `npm run sdk:sync` rebuilds those artifacts from the checkout named by
   `STATICS_PROTOCOL_REPOSITORY`.
+- Staking previews use the additive reward-selection timing view when supported. See
+  [`docs/staking-timing.md`](docs/staking-timing.md) for compatibility and SDK overlay setup.
 
 ## Security
 

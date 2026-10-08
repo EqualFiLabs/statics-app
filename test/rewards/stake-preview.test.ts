@@ -126,6 +126,50 @@ it("uses a fresh hourly boundary once existing pending stake has matured", () =>
     pendingStake: 0n,
   });
 });
+it("uses the stored weighted start to select one exact top-up maturity", () => {
+  const selection = { asset, pendingStake: 100n, eligibleAt: 90_000n, pendingStartTime: 3_600n };
+  expect(earningWindow(selection, 37n, { ...rules, now: 45_000n })).toEqual({
+    asset,
+    earliest: 104_400n,
+    latest: 104_400n,
+    pendingStake: 100n,
+  });
+  // Two starts sharing the same rounded deadline can lead to different top-up deadlines.
+  expect(
+    earningWindow({ ...selection, pendingStartTime: 1n }, 37n, { ...rules, now: 45_000n })
+  ).toMatchObject({ earliest: 100_800n, latest: 100_800n });
+});
+it("caps the stored pending age and floors weighted credit as the contract does", () => {
+  const selection = { asset, pendingStake: 100n, eligibleAt: 90_000n, pendingStartTime: 1n };
+  const now = 89_999n;
+  const credit = (100n * rules.eligibilityDelay) / 137n;
+  const raw = now - credit + rules.eligibilityDelay;
+  const exact = ((raw + 3599n) / 3600n) * 3600n;
+  expect(earningWindow(selection, 37n, { ...rules, now })).toMatchObject({
+    earliest: exact,
+    latest: exact,
+  });
+});
+it("ignores cleared timing after maturity and keeps each asset's start independent", () => {
+  const other = `0x${"b".repeat(40)}` as const;
+  const target = row({
+    rewardSelections: [
+      { asset, pendingStake: 100n, eligibleAt: 90_000n, pendingStartTime: 1n },
+      { asset: other, pendingStake: 100n, eligibleAt: 90_000n, pendingStartTime: 3_600n },
+    ],
+  });
+  expect(
+    previewStake({ amount: 37n, target, newAssetCount: 0 }, { ...rules, now: 45_000n })
+  ).toMatchObject({
+    earning: [
+      { asset, earliest: 100_800n, latest: 100_800n },
+      { asset: other, earliest: 104_400n, latest: 104_400n },
+    ],
+  });
+  expect(
+    earningWindow({ asset, pendingStake: 0n, eligibleAt: 0n, pendingStartTime: 0n }, 5n, rules)
+  ).toMatchObject({ earliest: 90_000n, latest: 90_000n, pendingStake: 0n });
+});
 it("keeps an existing future cooldown even when the configured ingress cooldown is zero", () => {
   const target = row({
     allocation: { lockedStake: 0n, totalAllocated: 0n, nextAllocationAt: 5000n, poolCount: 0 },

@@ -61,9 +61,8 @@ function cooldownAfterStake(current: bigint, rules: StakeRules): bigint | null {
 }
 
 /**
- * The contract exposes rounded eligibleAt, not pendingStartTime. Recover the possible
- * start-time interval and apply its weighted-credit calculation to both endpoints.
- * Fresh/matured selections have an exact hourly boundary; pending top-ups may have a window.
+ * Apply the contract's capped, weighted age credit to the stored pending start.
+ * Older deployments expose only rounded eligibleAt; retain an honest interval for those.
  */
 export function earningWindow(
   selection: NonNullable<EarnPositionRow["rewardSelections"]>[number],
@@ -74,6 +73,13 @@ export function earningWindow(
   if (pending === 0n) {
     const at = roundedEligibility(rules.now, rules);
     return { asset: selection.asset, earliest: at, latest: at, pendingStake: 0n };
+  }
+  if (selection.pendingStartTime !== undefined) {
+    const age =
+      rules.now > selection.pendingStartTime ? rules.now - selection.pendingStartTime : 0n;
+    const credit = age > rules.eligibilityDelay ? rules.eligibilityDelay : age;
+    const at = roundedEligibility(rules.now - (pending * credit) / (pending + amount), rules);
+    return { asset: selection.asset, earliest: at, latest: at, pendingStake: pending };
   }
   const upper = selection.eligibleAt - rules.eligibilityDelay;
   const lower = upper - rules.eligibilityBucketSize + 1n;

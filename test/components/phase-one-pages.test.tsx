@@ -173,6 +173,8 @@ beforeEach(() => {
     if (functionName === "batchClaimLimits") return [16n, 64n];
     if (functionName === "supportsInterface") return true;
     if (functionName === "rewardSelection") return { pendingStake: 0n, eligibleAt: 0n };
+    if (functionName === "rewardSelectionWithTiming")
+      return [{ pendingStake: 0n, eligibleAt: 0n }, 0];
     if (functionName === "previewGaugeAllocatorRewards")
       return args[2].map((slot: number) => ({
         slot,
@@ -797,6 +799,82 @@ function reviewTree() {
   );
 }
 describe("additional review regressions", () => {
+  it("uses the timing getter once per selected asset and caches capability across positions", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "rewardSelectionWithTiming"
+        ? Promise.resolve([{ pendingStake: parseEther("100"), eligibleAt: 90_000n }, 1_000])
+        : base(input)
+    );
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "37" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review stake" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+    const dialog = await screen.findByRole("dialog", { name: "Stake into Position #1" });
+    expect(within(dialog).getByText(/weighted maturity is estimated/).textContent).not.toContain(
+      " – "
+    );
+    expect(
+      mocks.read.mock.calls.filter(([input]) => input.functionName === "rewardSelectionWithTiming")
+    ).toHaveLength(2);
+    expect(mocks.read.mock.calls.some(([input]) => input.functionName === "rewardSelection")).toBe(
+      false
+    );
+    expect(
+      mocks.read.mock.calls.filter(([input]) => input.functionName === "supportsInterface")
+    ).toHaveLength(1);
+  });
+  it("retains staking on an older diamond without the timing interface", async () => {
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "supportsInterface" ? Promise.resolve(false) : base(input)
+    );
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() =>
+      expect(
+        mocks.read.mock.calls.some(([input]) => input.functionName === "rewardSelection")
+      ).toBe(true)
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review stake" })).toBeEnabled());
+    expect(
+      mocks.read.mock.calls.some(([input]) => input.functionName === "rewardSelectionWithTiming")
+    ).toBe(false);
+  });
+  it("does not conceal a failed supported getter by estimating from the legacy view", async () => {
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "rewardSelectionWithTiming"
+        ? Promise.reject(Error("RPC failed"))
+        : base(input)
+    );
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    await waitFor(() =>
+      expect(
+        mocks.read.mock.calls.some(([input]) => input.functionName === "rewardSelectionWithTiming")
+      ).toBe(true)
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Review stake" })).toBeDisabled()
+    );
+    expect(mocks.read.mock.calls.some(([input]) => input.functionName === "rewardSelection")).toBe(
+      false
+    );
+  });
   it("clears a pending review when the requested position URL changes", async () => {
     mocks.page.mockResolvedValue({
       deploymentId: "phase-one-fixture",

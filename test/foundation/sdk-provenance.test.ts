@@ -15,6 +15,8 @@ describe("vendored Statics SDK", () => {
       extensionSource?: { repository: string; path: string; commit: string };
       batchRewardsSource?: { repository: string; path: string; commit: string };
       batchRewardsSourceChecksums?: Record<string, string>;
+      rewardSelectionTimingSource?: { repository: string; path: string; commit: string };
+      rewardSelectionTimingSourceChecksums?: Record<string, string>;
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
       extensionSourceChecksums?: Record<string, string>;
@@ -40,6 +42,15 @@ describe("vendored Statics SDK", () => {
     expect(Object.keys(provenance.batchRewardsSourceChecksums ?? {}).sort()).toEqual([
       "package.json",
       "src/batch-rewards.ts",
+    ]);
+    expect(provenance.rewardSelectionTimingSource).toEqual({
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: "498af5f864bbc8bbc9e5a65e68a182bf3b123898",
+    });
+    expect(Object.keys(provenance.rewardSelectionTimingSourceChecksums ?? {}).sort()).toEqual([
+      "package.json",
+      "src/position-market.ts",
     ]);
     expect(Object.keys(provenance.sourceChecksums).sort()).toEqual([
       "package.json",

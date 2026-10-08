@@ -17,6 +17,8 @@ export type EarnPositionRow = Readonly<{
     asset: Address;
     pendingStake: bigint;
     eligibleAt: bigint;
+    /** Weighted effective start, available on deployments with the timing view. */
+    pendingStartTime?: bigint;
   }>[];
   /** When each maturing asset starts earning, keyed by lowercase address, in seconds. */
   assetMaturity?: Readonly<Record<string, bigint>>;
