@@ -34,6 +34,29 @@ export function testEnvironment(environment, selected) {
       environment.NEXT_PUBLIC_PRIVY_CLIENT_ID ?? selected?.privy.clientId,
   };
 }
+export function lifecycleInvocation(profile, path) {
+  return {
+    command: process.execPath,
+    args: [
+      resolve(appRoot, "node_modules/vitest/vitest.mjs"),
+      "run",
+      "--config",
+      resolve(appRoot, "vitest.phase-one-fork.config.ts"),
+      "--reporter=json",
+      "--outputFile",
+      resolve(path, "lifecycle-results.json"),
+    ],
+    cwd: appRoot,
+    env: {
+      ...childEnvironment(),
+      STATICS_FORK_APP_ROOT: applicationRoot(profile),
+      STATICS_FORK_ROOT: path,
+      STATICS_FORK_RPC_URL: urls(profile).rpc,
+      STATICS_FORK_INDEXER_URL: urls(profile).indexer,
+      STATICS_FORK_PROFILE_ID: profile.id,
+    },
+  };
+}
 export async function testFork(options, environment, args) {
   if (args.length) throw new Error("test:fork accepts only --profile.");
   const selectedFile = resolve(profilePath(options.profile), "profile.json");
@@ -99,31 +122,15 @@ export async function testFork(options, environment, args) {
     }
     if (profile?.status !== "ready") throw new Error("Isolated test profile did not become ready.");
     await callSession(profile, "status");
-    const testRoot = applicationRoot(profile);
-    await run(
-      process.execPath,
-      [
-        resolve(testRoot, "node_modules/vitest/vitest.mjs"),
-        "run",
-        "--config",
-        "vitest.phase-one-fork.config.ts",
-        "--reporter=json",
-        "--outputFile",
-        resolve(path, "lifecycle-results.json"),
-      ],
-      {
-        cwd: testRoot,
-        env: {
-          ...childEnvironment(),
-          STATICS_FORK_ROOT: path,
-          STATICS_FORK_RPC_URL: urls(profile).rpc,
-          STATICS_FORK_INDEXER_URL: urls(profile).indexer,
-          STATICS_FORK_PROFILE_ID: profile.id,
-        },
-        log: resolve(path, "lifecycle.log"),
-        children,
-      }
-    );
+    // Always use this launcher's guarded suite. Older selected app checkouts may
+    // hardcode the interactive RPC; only their application imports are selected.
+    const lifecycle = lifecycleInvocation(profile, path);
+    await run(lifecycle.command, lifecycle.args, {
+      cwd: lifecycle.cwd,
+      env: lifecycle.env,
+      log: resolve(path, "lifecycle.log"),
+      children,
+    });
     await browserChecks(profile, path, children);
     save(resolve(path, "test-results.json"), {
       profile: name,

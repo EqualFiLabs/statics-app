@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
+  appRoot,
   childEnvironment,
   compatible,
   json,
@@ -17,7 +18,7 @@ import {
 } from "./profile.mjs";
 import { upstreamRelay, ownedProcess, stopChild } from "./processes.mjs";
 import { stage, confirmed, localGasPrice } from "./deploy.mjs";
-import { testEnvironment } from "./testing.mjs";
+import { lifecycleInvocation, testEnvironment } from "./testing.mjs";
 import { forkCompilerRoot } from "./app.mjs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -69,6 +70,52 @@ test("disposable tests inherit the selected source checkout without losing expli
     "/override"
   );
   assert.equal(testEnvironment({}, selected).STATICS_PROTOCOL_REPOSITORY, "/selected/protocol");
+});
+test("lifecycle execution uses the guarded tooling suite and selected app imports", () => {
+  const profile = fixture();
+  profile.appRepository = "/selected/older-app";
+  profile.ports.rpc = 12345;
+  profile.ports.indexer = 12346;
+  const invocation = lifecycleInvocation(profile, "/profiles/test-isolated");
+  assert.equal(invocation.env.STATICS_FORK_APP_ROOT, "/selected/older-app");
+  assert.equal(invocation.env.STATICS_FORK_RPC_URL, "http://127.0.0.1:12345");
+  assert.equal(invocation.env.STATICS_FORK_PROFILE_ID, profile.id);
+  assert.equal(invocation.env.STATICS_FORK_ROOT, "/profiles/test-isolated");
+  assert.equal(invocation.args[0], resolve(invocation.cwd, "node_modules/vitest/vitest.mjs"));
+  assert.equal(invocation.args[3], resolve(invocation.cwd, "vitest.phase-one-fork.config.ts"));
+  assert.notEqual(invocation.cwd, profile.appRepository);
+});
+test("lifecycle config selects application and SDK imports but retains the owned suite", async () => {
+  const { loadConfigFromFile } = await import("vite");
+  const previous = process.env.STATICS_FORK_APP_ROOT;
+  process.env.STATICS_FORK_APP_ROOT = "/selected/older-app";
+  try {
+    const loaded = await loadConfigFromFile(
+      { command: "serve", mode: "test" },
+      resolve(appRoot, "vitest.phase-one-fork.config.ts"),
+      appRoot
+    );
+    assert.equal(resolve(loaded.config.root), appRoot);
+    assert.deepEqual(loaded.config.test.include, ["test/integration/phase-one-fork.ts"]);
+    const aliases = loaded.config.resolve.alias;
+    for (const [specifier, target] of [
+      ["@statics-protocol/sdk", "index.js"],
+      ["@statics-protocol/sdk/phase-one", "phase-one/index.js"],
+      ["@statics-protocol/sdk/genesis-credit", "genesis-credit.js"],
+    ]) {
+      const alias = aliases.find(
+        (entry) => entry.find instanceof RegExp && entry.find.test(specifier)
+      );
+      assert.equal(
+        alias.replacement,
+        resolve("/selected/older-app/vendor/statics-sdk/dist", target)
+      );
+    }
+    assert.equal(aliases.find((entry) => entry.find === "@").replacement, "/selected/older-app");
+  } finally {
+    if (previous === undefined) delete process.env.STATICS_FORK_APP_ROOT;
+    else process.env.STATICS_FORK_APP_ROOT = previous;
+  }
 });
 function fixture() {
   const p = newProfile(

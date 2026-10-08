@@ -125,3 +125,5 @@ Credential-free Node tests exercise routing, boundary splitting, cache/restart b
 - **Indexer replay:** handler/schema/source changes create a new database; old Genesis data is preserved.
 
 The Genesis-only `dev:launch-fork` and its existing controls remain available independently.
+
+Lifecycle tests always use the launcher checkout’s guarded suite, with application imports and SDK aliases pointing to the selected app checkout. A selected checkout’s older hardcoded-port suite is never executed by `test:fork`.
