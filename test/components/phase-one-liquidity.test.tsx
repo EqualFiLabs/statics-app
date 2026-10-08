@@ -1,4 +1,10 @@
+import { act } from "react";
 import { fireEvent, render, screen, waitFor } from "@/test/render";
+import {
+  announceProtocolTransactionConfirmed,
+  protocolQueryScopes,
+} from "@/lib/protocol/reconciliation";
+import { ProtocolQueryReconciler } from "@/providers/ProtocolQueryReconciler";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   decodeFunctionData,
@@ -611,6 +617,55 @@ it("retains only the inactive pool with actual exit obligations", async () => {
     screen.queryByText("Position #1 belongs to a pool that is currently unavailable.")
   ).not.toBeInTheDocument();
 });
+it("drops a resolved exited leg after a claim confirms, even before the indexer catches up", async () => {
+  mocks.reward = 100n;
+  mocks.legs.mockResolvedValue([
+    {
+      positionId: 1n,
+      poolId,
+      posmTokenId: 10n,
+      tickLower: -60,
+      tickUpper: 60,
+      liquidity: 0n,
+      active: false,
+    },
+  ]);
+  const read = mocks.read.getMockImplementation()!;
+  let claimed = false;
+  // The indexer still reports the obligation (mocks.reward stays non-zero); only the
+  // chain's lpLeg state shows the reward was claimed.
+  mocks.read.mockImplementation((input) =>
+    claimed && input.functionName === "lpLeg"
+      ? Promise.resolve({ liquidity: 0n, claimable: fiveZero, rewardRemainderRay: fiveZero })
+      : read(input)
+  );
+  render(
+    <>
+      <ProtocolQueryReconciler />
+      {tree()}
+    </>
+  );
+  expect(
+    await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ })
+  ).toBeInTheDocument();
+  claimed = true;
+  act(() =>
+    announceProtocolTransactionConfirmed({
+      wallet,
+      chainId: 31337,
+      deploymentId: deployment.descriptor.deploymentId,
+      blockNumber: 11n,
+      kind: "phase-one-claim-lp-rewards",
+      scopes: protocolQueryScopes("phase-one-claim-lp-rewards"),
+    })
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: /STATICS \/ WETH Position #1/ })
+    ).not.toBeInTheDocument()
+  );
+});
+
 it("reuses earlier position discovery when loading another ownership page", async () => {
   mocks.liquidity = 100n;
   mocks.positions.mockImplementation(async (_wallet, _deployment, _url, cursor) => ({

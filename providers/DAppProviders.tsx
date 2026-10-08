@@ -19,7 +19,7 @@ import {
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
 import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createWalletClient, custom, getAddress } from "viem";
 import { useAccount } from "wagmi";
@@ -33,10 +33,7 @@ import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/fund
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
 import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
-import {
-  queryMatchesProtocolReconciliation,
-  subscribeToProtocolReconciliation,
-} from "@/lib/protocol/reconciliation";
+import { ProtocolQueryReconciler } from "./ProtocolQueryReconciler";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import { DeploymentProvider, useDeployment } from "./deployment-context";
 import {
@@ -518,23 +515,6 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
       </SolanaWalletContext.Provider>
     </WalletContext.Provider>
   );
-}
-
-function ProtocolQueryReconciler() {
-  const queryClient = useQueryClient();
-
-  useEffect(
-    () =>
-      subscribeToProtocolReconciliation((detail) =>
-        queryClient.refetchQueries({
-          type: "active",
-          predicate: (query) => queryMatchesProtocolReconciliation(query.queryKey, detail),
-        })
-      ),
-    [queryClient]
-  );
-
-  return null;
 }
 
 export function DAppProviders({ children }: { children: React.ReactNode }) {
