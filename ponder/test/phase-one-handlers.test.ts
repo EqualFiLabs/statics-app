@@ -85,6 +85,7 @@ const db = {
   update: (table: string, identity: { key: string }) => ({
     set: async (update: Record<string, unknown>) => {
       const key = `${table}:${identity.key}`;
+      if (!rows.has(key)) throw new Error("record not found");
       rows.set(key, { ...rows.get(key)!, ...update });
     },
   }),
@@ -424,6 +425,22 @@ describe("Position NFT statement handlers", () => {
     [...rows.entries()]
       .filter(([key]) => key.startsWith("positionStatementMovement:"))
       .map(([, row]) => row);
+  it("updates live position state and rejects unexplained missing current records", async () => {
+    const event = {
+      ...base,
+      args: { tokenId: 1n, stateNonce: 2n, activeLegCount: 1n, unresolvedObligationCount: 1n },
+    };
+    await expect(run("PositionStateChanged", event)).rejects.toThrow("record not found");
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: `0x${"0".repeat(40)}`, to: first },
+    });
+    await run("PositionStateChanged", event);
+    expect(rows.get("positionNft:phase-one:1")).toMatchObject({
+      activeLegCount: 1n,
+      unresolvedObligationCount: 1n,
+    });
+  });
   it("preserves a transfer during safe-mint before PositionCreated is emitted", async () => {
     await run("Transfer", {
       ...base,
@@ -448,7 +465,12 @@ describe("Position NFT statement handlers", () => {
       ...base,
       args: { tokenId: 1n, from: first, to: `0x${"0".repeat(40)}` },
     });
+    await run("PositionStateChanged", {
+      ...base,
+      args: { tokenId: 1n, stateNonce: 2n, activeLegCount: 0n, unresolvedObligationCount: 0n },
+    });
     await run("PositionClosed", { ...base, args: { positionId: 1n } });
+    expect(rows.has("positionNft:phase-one:1")).toBe(false);
     expect(entries().map((r) => r.eventName)).toEqual([
       "PositionCreated",
       "Transfer",

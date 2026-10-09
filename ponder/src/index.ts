@@ -37,6 +37,7 @@ import {
   poolRewardSlot,
   positionGaugeState,
   positionNft,
+  positionStatementHistory,
   publicPool,
   rewardRestriction,
   v4Position,
@@ -751,7 +752,13 @@ onPhaseOne("PhaseOneStatics:Unstaked", async ({ event, context }) => {
 });
 
 onPhaseOne("PhaseOneStatics:PositionStateChanged", async ({ event, context }) => {
-  await context.db.update(positionNft, { key: phaseOneKey(event.args.tokenId) }).set({
+  const identity = { key: phaseOneKey(event.args.tokenId) };
+  if (!(await context.db.find(positionNft, identity))) {
+    // Closing burns the NFT before emitting its final state change.
+    const history = await context.db.find(positionStatementHistory, identity);
+    if (history?.owner === null && history.lastOwner !== null) return;
+  }
+  await context.db.update(positionNft, identity).set({
     activeLegCount: event.args.activeLegCount,
     unresolvedObligationCount: event.args.unresolvedObligationCount,
     updatedAtBlock: event.block.number,
