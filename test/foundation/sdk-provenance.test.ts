@@ -17,12 +17,29 @@ describe("vendored Statics SDK", () => {
       batchRewardsSourceChecksums?: Record<string, string>;
       rewardSelectionTimingSource?: { repository: string; path: string; commit: string };
       rewardSelectionTimingSourceChecksums?: Record<string, string>;
+      positionStatementSource?: { repository: string; path: string; commit: string };
+      positionStatementProtocolCommit?: string;
+      positionStatementLegacyArtifactsCommit?: string;
+      positionStatementSourceChecksums?: Record<string, string>;
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
       extensionSourceChecksums?: Record<string, string>;
       checksums: Record<string, string>;
     };
     expect(provenance.protocolCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementProtocolCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementLegacyArtifactsCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementSource).toEqual({
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: "543052f8805ddcce6cb77430e1a654f16b0adeef",
+    });
+    expect(Object.keys(provenance.positionStatementSourceChecksums ?? {}).sort()).toEqual([
+      "package.json",
+      "src/gauge-incentives.ts",
+      "src/index.ts",
+      "src/range-gauges.ts",
+    ]);
     expect(provenance.source).toEqual({
       repository: "https://github.com/EqualFiLabs/statics-sdk",
       path: ".",

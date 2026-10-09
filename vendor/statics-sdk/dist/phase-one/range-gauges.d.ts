@@ -130,6 +130,24 @@ export type RangeGaugeManagedPositionMovement = {
     refund0: bigint;
     refund1: bigint;
 };
+export type LiquidityStatementMovement = {
+    liquidityBefore: bigint;
+    liquidityAfter: bigint;
+    payer: Address;
+    receiver: Address;
+    paid0: bigint;
+    received0: bigint;
+    paid1: bigint;
+    received1: bigint;
+};
+export type RebalanceSettlement = {
+    withdrawn0: bigint;
+    withdrawn1: bigint;
+    mintSpent0: bigint;
+    mintReceived0: bigint;
+    mintSpent1: bigint;
+    mintReceived1: bigint;
+};
 export declare const staticsRangeGaugeAbi: readonly [{
     readonly name: "setGaugeRewardAssetAllowed";
     readonly type: "function";
@@ -943,6 +961,24 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly name: "pending";
     }];
 }, {
+    readonly name: "previewNativeLpFees";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "amount0";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount1";
+    }];
+}, {
     readonly name: "GaugeRewardAssetAllowedSet";
     readonly type: "event";
     readonly inputs: readonly [{
@@ -1069,8 +1105,33 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly type: "int24";
         readonly name: "tickUpper";
     }, {
-        readonly type: "uint128";
-        readonly name: "liquidity";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
     }];
 }, {
     readonly name: "ManagedLiquidityAttached";
@@ -1116,8 +1177,33 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly name: "posmTokenId";
         readonly indexed: true;
     }, {
-        readonly type: "uint128";
-        readonly name: "liquidity";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
     }];
 }, {
     readonly name: "ManagedLiquidityRebalanced";
@@ -1147,8 +1233,55 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly type: "int24";
         readonly name: "tickUpper";
     }, {
-        readonly type: "uint128";
-        readonly name: "liquidity";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "withdrawn0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "withdrawn1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintSpent0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintReceived0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintSpent1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintReceived1";
+        }];
+        readonly name: "settlement";
     }];
 }, {
     readonly name: "ManagedLiquidityExited";
@@ -1165,6 +1298,59 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly type: "uint256";
         readonly name: "posmTokenId";
         readonly indexed: true;
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }];
+}, {
+    readonly name: "ManagedLiquidityFeesCollected";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount0";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount1";
     }];
 }, {
     readonly name: "LpRewardsClaimed";
@@ -1549,7 +1735,7 @@ export declare const staticsRangeGaugeAbi: readonly [{
         readonly name: "amount";
     }];
 }];
-export type RangeGaugeEventName = "GaugeRewardAssetAllowedSet" | "GaugeRewardDurationSet" | "PoolRewardAssetAppended" | "PoolRewardAllocatorShareSet" | "PoolRewardFunded" | "PoolAllocatorRewardFunded" | "ManagedLiquidityProvided" | "ManagedLiquidityAttached" | "ManagedLiquidityChanged" | "ManagedLiquidityRebalanced" | "ManagedLiquidityExited" | "LpRewardsClaimed" | "LpRewardForfeited" | "UnboundPosmRecovered" | "PoolRewardSurplusReconciled" | "PoolGaugeStopped";
+export type RangeGaugeEventName = "GaugeRewardAssetAllowedSet" | "GaugeRewardDurationSet" | "PoolRewardAssetAppended" | "PoolRewardAllocatorShareSet" | "PoolRewardFunded" | "PoolAllocatorRewardFunded" | "ManagedLiquidityProvided" | "ManagedLiquidityAttached" | "ManagedLiquidityChanged" | "ManagedLiquidityRebalanced" | "ManagedLiquidityExited" | "ManagedLiquidityFeesCollected" | "LpRewardsClaimed" | "LpRewardForfeited" | "UnboundPosmRecovered" | "PoolRewardSurplusReconciled" | "PoolGaugeStopped";
 export type RangeGaugeEventArgs<Name extends RangeGaugeEventName> = ContractEventArgs<typeof staticsRangeGaugeAbi, Name>;
 export declare function buildSetGaugeRewardAssetAllowedCall(asset: Address, allowed: boolean): Hex;
 export declare function buildSetGaugeRewardDurationCall(duration: bigint): Hex;
@@ -1582,6 +1768,7 @@ export declare function buildPosmBindingCall(posmTokenId: bigint): Hex;
 export declare function buildRangeGaugeLiquidityManagerCall(): Hex;
 export declare function buildRecordedLiquidityManagerCall(positionId: bigint, poolId: Hex): Hex;
 export declare function buildPreviewRangeLpRewardsCall(positionId: bigint, poolId: Hex): Hex;
+export declare function buildPreviewNativeLpFeesCall(positionId: bigint, poolId: Hex): Hex;
 export declare function isRangeGaugeClaimOnlyLeg(leg: RangeGaugeLpLeg): boolean;
 export declare function decodeRangeGaugeLpLegResult(data: Hex): RangeGaugeLpLegState;
 export declare function decodeRangeGaugePoolRewardConfigResult(data: Hex): RangeGaugePoolRewardConfig;
@@ -1590,3 +1777,4 @@ export declare function decodeRangeGaugeRewardStreamResult(data: Hex): RangeGaug
 export declare function decodeRangeGaugeBoundaryResult(data: Hex): RangeGaugeBoundary;
 export declare function decodePositionGaugePoolsResult(data: Hex): RangeGaugePositionPoolPage;
 export declare function decodePreviewRangeLpRewardsResult(data: Hex): RangeGaugePendingRewards;
+export declare function decodePreviewNativeLpFeesResult(data: Hex): readonly [bigint, bigint];

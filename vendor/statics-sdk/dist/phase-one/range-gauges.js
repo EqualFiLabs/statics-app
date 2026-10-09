@@ -6,6 +6,8 @@ const BPS = 10_000;
 const MIN_INT24 = -(1 << 23);
 const MAX_INT24 = (1 << 23) - 1;
 export const staticsRangeGaugeAbi = parseAbi([
+    "struct LiquidityStatementMovement { uint128 liquidityBefore; uint128 liquidityAfter; address payer; address receiver; uint256 paid0; uint256 received0; uint256 paid1; uint256 received1; }",
+    "struct RebalanceSettlement { uint256 withdrawn0; uint256 withdrawn1; uint256 mintSpent0; uint256 mintReceived0; uint256 mintSpent1; uint256 mintReceived1; }",
     "function setGaugeRewardAssetAllowed(address asset,bool allowed)",
     "function setGaugeRewardDuration(uint40 duration)",
     "function appendPoolRewardAsset(bytes32 poolId,address asset) returns (uint8 slot)",
@@ -37,17 +39,19 @@ export const staticsRangeGaugeAbi = parseAbi([
     "function liquidityManager() view returns (address manager,bool installed)",
     "function recordedLiquidityManager(uint256 positionId,bytes32 poolId) view returns (address manager)",
     "function previewLpRewards(uint256 positionId,bytes32 poolId) view returns ((uint8 slotCount,address[5] assets,uint256[5] amounts) pending)",
+    "function previewNativeLpFees(uint256 positionId,bytes32 poolId) view returns (uint256 amount0,uint256 amount1)",
     "event GaugeRewardAssetAllowedSet(address indexed asset,bool allowed)",
     "event GaugeRewardDurationSet(uint40 duration)",
     "event PoolRewardAssetAppended(bytes32 indexed poolId,address indexed asset,uint8 indexed slot)",
     "event PoolRewardAllocatorShareSet(bytes32 indexed poolId,uint8 indexed slot,uint16 allocatorShareBps)",
     "event PoolRewardFunded(bytes32 indexed poolId,address indexed asset,address indexed funder,uint8 slot,uint256 received,uint256 lpAmount,uint40 periodFinish)",
     "event PoolAllocatorRewardFunded(bytes32 indexed poolId,address indexed asset,address indexed funder,uint8 slot,uint256 allocatorAmount,uint40 periodFinish)",
-    "event ManagedLiquidityProvided(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address manager,int24 tickLower,int24 tickUpper,uint128 liquidity)",
+    "event ManagedLiquidityProvided(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address manager,int24 tickLower,int24 tickUpper,LiquidityStatementMovement movement)",
     "event ManagedLiquidityAttached(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address manager,int24 tickLower,int24 tickUpper,uint128 liquidity)",
-    "event ManagedLiquidityChanged(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,uint128 liquidity)",
-    "event ManagedLiquidityRebalanced(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed oldPosmTokenId,uint256 newPosmTokenId,address manager,int24 tickLower,int24 tickUpper,uint128 liquidity)",
-    "event ManagedLiquidityExited(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId)",
+    "event ManagedLiquidityChanged(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,LiquidityStatementMovement movement)",
+    "event ManagedLiquidityRebalanced(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed oldPosmTokenId,uint256 newPosmTokenId,address manager,int24 tickLower,int24 tickUpper,LiquidityStatementMovement movement,RebalanceSettlement settlement)",
+    "event ManagedLiquidityExited(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,LiquidityStatementMovement movement)",
+    "event ManagedLiquidityFeesCollected(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address receiver,uint256 amount0,uint256 amount1)",
     "event LpRewardsClaimed(uint256 indexed positionId,bytes32 indexed poolId,address indexed asset,uint8 slot,address receiver,uint256 debited,uint256 received)",
     "event LpRewardForfeited(uint256 indexed positionId,bytes32 indexed poolId,address indexed asset,uint8 slot,uint256 amount)",
     "event UnboundPosmRecovered(address indexed manager,uint256 indexed posmTokenId,address indexed receiver)",
@@ -326,6 +330,13 @@ export function buildPreviewRangeLpRewardsCall(positionId, poolId) {
         args: [positionId, poolId],
     });
 }
+export function buildPreviewNativeLpFeesCall(positionId, poolId) {
+    return encodeFunctionData({
+        abi: staticsRangeGaugeAbi,
+        functionName: "previewNativeLpFees",
+        args: [positionId, poolId],
+    });
+}
 export function isRangeGaugeClaimOnlyLeg(leg) {
     return (leg.liquidity === 0n &&
         (leg.rewardRemainderRay.some((amount) => amount !== 0n) || leg.claimable.some((amount) => amount !== 0n)));
@@ -356,4 +367,7 @@ export function decodePositionGaugePoolsResult(data) {
 }
 export function decodePreviewRangeLpRewardsResult(data) {
     return decodeFunctionResult({ abi: staticsRangeGaugeAbi, functionName: "previewLpRewards", data });
+}
+export function decodePreviewNativeLpFeesResult(data) {
+    return decodeFunctionResult({ abi: staticsRangeGaugeAbi, functionName: "previewNativeLpFees", data });
 }

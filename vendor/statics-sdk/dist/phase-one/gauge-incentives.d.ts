@@ -68,6 +68,10 @@ export type GaugeAllocatorClaimPreview = {
     allocation: bigint;
     amount: bigint;
 };
+export type GaugeAllocatorPoolPage = {
+    poolIds: readonly Hex[];
+    nextCursor: bigint;
+};
 export declare const staticsGaugeIncentivesAbi: readonly [{
     readonly name: "fundGaugeReserve";
     readonly type: "function";
@@ -497,6 +501,27 @@ export declare const staticsGaugeIncentivesAbi: readonly [{
         readonly name: "rewards";
     }];
 }, {
+    readonly name: "positionGaugeAllocatorPools";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+    }, {
+        readonly type: "uint256";
+        readonly name: "cursor";
+    }, {
+        readonly type: "uint256";
+        readonly name: "limit";
+    }];
+    readonly outputs: readonly [{
+        readonly type: "bytes32[]";
+        readonly name: "poolIds";
+    }, {
+        readonly type: "uint256";
+        readonly name: "nextCursor";
+    }];
+}, {
     readonly name: "GaugeReserveFunded";
     readonly type: "event";
     readonly inputs: readonly [{
@@ -558,6 +583,12 @@ export declare const staticsGaugeIncentivesAbi: readonly [{
     }, {
         readonly type: "uint256";
         readonly name: "totalAllocated";
+    }, {
+        readonly type: "bytes32[]";
+        readonly name: "poolIds";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "amounts";
     }];
 }, {
     readonly name: "PositionGaugeAllocationCooldownExtended";
@@ -907,9 +938,11 @@ export declare function buildMaxGaugeCatchupPeriodsCall(): Hex;
 export declare function buildGaugeAllocationCooldownCall(): Hex;
 export declare function buildGaugeAllocatorRewardCall(poolId: Hex, slot: number): Hex;
 export declare function buildPreviewGaugeAllocatorRewardsCall(positionId: bigint, poolId: Hex, slots: readonly number[]): Hex;
+export declare function buildPositionGaugeAllocatorPoolsCall(positionId: bigint, cursor: bigint, limit: bigint): Hex;
 export declare function decodeGaugeReserveResult(data: Hex): GaugeReserve;
 export declare function decodeGaugePoolWeightResult(data: Hex): GaugePoolWeight;
 export declare function decodeGaugePositionAllocationsResult(data: Hex): GaugePositionAllocations;
 export declare function decodeGaugePoolRewardResult(data: Hex): GaugePoolRewardPreview;
 export declare function decodeGaugeAllocatorRewardResult(data: Hex): GaugeAllocatorReward;
 export declare function decodeGaugeAllocatorRewardsPreviewResult(data: Hex): readonly GaugeAllocatorClaimPreview[];
+export declare function decodePositionGaugeAllocatorPoolsResult(data: Hex): GaugeAllocatorPoolPage;
