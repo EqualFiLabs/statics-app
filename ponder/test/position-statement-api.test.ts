@@ -131,6 +131,21 @@ describe("lifetime statements over PostgreSQL", () => {
     expect(body.items[1].poolCurrencies).toEqual([wallet, asset]);
     expect(body.items[0].stakingAsset).toBeNull();
   });
+  it("resolves currencies from the entry pool when multiple pools share a deployment", async () => {
+    const original = (await database.select().from(schema.publicPool))[0]!;
+    await database.insert(schema.publicPool).values({
+      ...original,
+      key: `selected:${hash(6)}`,
+      poolId: hash(6),
+      currency0: asset,
+      currency1: wallet,
+    });
+    const response = await app.request("/phase-one/positions/30/statement?category=liquidity"),
+      body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].poolCurrencies).toEqual([wallet, asset]);
+  });
   it("binds pages to a stable boundary while new blocks arrive", async () => {
     const first = await (await app.request("/phase-one/positions/30/statement?limit=1")).json();
     await database.insert(schema.positionStatementBlock).values({
