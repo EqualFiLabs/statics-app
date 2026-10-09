@@ -74,7 +74,7 @@
       "baskets": "篮子",
       "create": "创建篮子",
       "dollar": "美元",
-      "positions": "Position NFT",
+      "positions": "账户",
       "loans": "贷款",
       "wallet": "钱包",
       "faucet": "水龙头",
@@ -550,10 +550,10 @@
       "description": "将一组固定资产作为一个整体买卖。购买前可查看篮子中包含的确切资产。"
     },
     "positions": {
-      "label": "Position NFT",
-      "status": "Position NFT",
-      "title": "你的 Position NFTs",
-      "description": "每个头寸汇集你的篮子、贷款和美元。在这里管理抵押品、质押和奖励。"
+      "label": "账户",
+      "status": "账户",
+      "title": "你的账户",
+      "description": "每个账户都是一个 Position NFT。打开账户查看余额、记录和操作。"
     },
     "loans": {
       "label": "贷款",
@@ -2258,5 +2258,67 @@
     "pageRange": "第 {from}–{to} 个，共 {total} 个",
     "addCoolingRow": "在 {time} 之前仅可减少：可以从此池移除，但不能增加。",
     "addMax": "最多可增加 {amount}。"
+  },
+  "accounts": {
+    "listLabel": "你的账户",
+    "accountName": "账户 #{id}",
+    "nftName": "Position NFT #{id}",
+    "open": "开设账户",
+    "opening": "正在开设…",
+    "fee": "开设账户需要 {fee} ETH。",
+    "connect": "连接钱包以开设账户。",
+    "created": "{name} 已开设。查看",
+    "loading": "正在加载你的账户…",
+    "unavailable": "部分账户详情无法加载，显示的数字可能不完整。",
+    "overviewAccounts": "{count, plural, other {# 个账户}}",
+    "overviewAttention": "{count} 个需要处理",
+    "overviewEmpty": "{count} 个为空",
+    "overviewRewards": "{count} 个有可领取奖励",
+    "filterLabel": "显示账户",
+    "filter": {
+      "all": "全部",
+      "attention": "需要处理",
+      "active": "活跃",
+      "empty": "空"
+    },
+    "search": "查找账户",
+    "searchPlaceholder": "编号或昵称",
+    "sortLabel": "排序账户",
+    "sort": {
+      "newest": "最新优先",
+      "oldest": "最早优先",
+      "stake": "质押最多"
+    },
+    "column": {
+      "account": "账户",
+      "holdings": "持有",
+      "inUse": "使用中",
+      "status": "状态"
+    },
+    "baseUnits": "{amount} 基础单位",
+    "noHoldings": "无持有",
+    "moreHoldings": "另有 {count} 项",
+    "liquidity": "{count, plural, other {# 个流动性仓位}}",
+    "liquidityOut": "{count, plural, other {# 个流动性仓位}}，{out} 个超出区间",
+    "staked": "已质押 {staked} STATICS",
+    "stakedAllocated": "已质押 {staked} STATICS，已分配 {allocated}",
+    "nothingInUse": "未使用",
+    "status": {
+      "attention": "需要处理",
+      "active": "活跃",
+      "empty": "空 · 可关闭"
+    },
+    "attention": {
+      "out-of-range": "流动性超出区间，未在赚取。",
+      "stale-allocation": "有分配已不再计入。",
+      "unresolved": "此账户有尚未解决的义务。"
+    },
+    "rewardsReady": "可领取奖励",
+    "emptyTitle": "还没有账户",
+    "emptyHelp": "账户保存你质押的 STATICS、流动性和奖励。开设一个开始使用。",
+    "noMatch": "没有匹配的账户。",
+    "previousPage": "上一页账户",
+    "nextPage": "下一页账户",
+    "pageRange": "第 {from}–{to} 个，共 {total} 个"
   }
 }

@@ -23,7 +23,7 @@ import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
-import { PhaseOnePositions } from "@/components/positions/PhaseOnePositions";
+import { AccountsPage } from "@/components/positions/AccountsPage";
 
 function displayAmount(value: bigint, decimals = 18): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -37,7 +37,7 @@ export function PositionListPage() {
   const { active } = useDeployment();
   if (active.phaseOne)
     return (
-      <PhaseOnePositions
+      <AccountsPage
         key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
         deployment={active.phaseOne}
       />

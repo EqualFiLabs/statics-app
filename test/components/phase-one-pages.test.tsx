@@ -239,6 +239,7 @@ beforeEach(() => {
   mocks.replace.mockReset();
   mocks.directory.mockReset().mockResolvedValue(directoryPage([]));
   mocks.managed.mockReset().mockResolvedValue([]);
+  window.localStorage.clear();
   mocks.allocations.mockReset().mockResolvedValue({
     totalAllocated: parseEther("30"),
     lockedStake: parseEther("30"),
@@ -346,16 +347,183 @@ beforeEach(() => {
 });
 
 describe("focused Phase 1 Earn", () => {
-  it("retains Position catalog styling and links staking management to its focused route", async () => {
+  it("lists accounts like a ledger with holdings, status and filters", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [
+        position(1n),
+        { ...position(2n), activeLegCount: 1n },
+        { ...position(3n), stakedBalance: 0n },
+      ],
+      nextCursor: null,
+    });
+    mocks.managed.mockImplementation(async (positionId: bigint) =>
+      positionId === 2n
+        ? [
+            {
+              positionId,
+              poolId: hash("1"),
+              posmTokenId: 9n,
+              tickLower: -600,
+              tickUpper: 600,
+              liquidity: parseEther("10"),
+              active: true,
+            },
+          ]
+        : []
+    );
+    const original = mocks.read.getMockImplementation()!;
+    // The pool trades above the range, so that liquidity is all token1 and not earning.
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "getSlot0" ? [2n ** 96n * 2n, 13_863, 0, 0] : original(input)
+    );
+    window.localStorage.setItem(
+      `statics:account-nicknames:phase-one-fixture:${wallet.toLowerCase()}`,
+      JSON.stringify({ "1": "Savings" })
+    );
     withPhaseOne(<PositionListPage />);
-    expect(await screen.findByRole("link", { name: "Position #1" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Your Position NFTs" })).toBeInTheDocument();
+    const savings = await screen.findByRole("link", { name: /^Savings, Position NFT #1, Active/ });
+    expect(savings).toHaveAttribute("href", "/app/positions/1");
+    expect(within(savings).getByText("Active")).toBeInTheDocument();
+    const second = await screen.findByRole("link", { name: /^Account #2,/ });
+    await waitFor(() => expect(within(second).getByText("Needs attention")).toBeInTheDocument());
+    expect(within(second).getByText(/1 liquidity position, 1 out of range/)).toBeInTheDocument();
+    expect(
+      within(second).getByText("Liquidity is out of range and not earning.")
+    ).toBeInTheDocument();
+    expect(within(second).getByText("WETH")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /^3 accounts · 1 need attention · 1 empty/
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Empty/ }));
+    expect(within(screen.getByRole("list")).getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: /^Account #3,/ })).toHaveTextContent(
+      "Empty · can close"
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find an account" }), {
+      target: { value: "sav" },
+    });
+    expect(within(screen.getByRole("list")).getAllByRole("link")).toHaveLength(1);
+  });
+  it("marks account holdings incomplete when liquidity discovery fails", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [{ ...position(1n), activeLegCount: 1n }],
+      nextCursor: null,
+    });
+    mocks.managed.mockRejectedValue(new Error("Indexer unavailable"));
+    withPhaseOne(<PositionListPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Figures shown may be incomplete");
+    const row = screen.getByRole("link", { name: /^Account #1,/ });
+    expect(within(row).getByText("…")).toBeInTheDocument();
+    expect(within(row).queryByText("Nothing held")).not.toBeInTheDocument();
+  });
+  it("reports failed reward reads and avoids unrelated staking-management reads", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "pendingRewards"
+        ? Promise.reject(new Error("Reward RPC unavailable"))
+        : original(input)
+    );
+    withPhaseOne(<PositionListPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Figures shown may be incomplete");
+    expect(screen.getByRole("status")).not.toHaveTextContent("rewards ready on");
+    expect(
+      mocks.read.mock.calls.some(([input]) =>
+        ["maxRewardAssetsPerPosition", "rewardSelectionWithTiming", "rewardSelection"].includes(
+          input.functionName
+        )
+      )
+    ).toBe(false);
+  });
+  it("uses explicit base units when pool token decimals are unavailable", async () => {
+    const poolId = hash("a");
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [{ ...position(1n), activeLegCount: 1n }],
+      nextCursor: null,
+    });
+    mocks.managed.mockResolvedValue([
+      {
+        positionId: 1n,
+        poolId,
+        posmTokenId: 9n,
+        tickLower: -600,
+        tickUpper: 600,
+        liquidity: parseEther("10"),
+        active: true,
+      },
+    ]);
+    mocks.directory.mockResolvedValue(
+      directoryPage([
+        directoryPool(poolId, {
+          token0: { address: address("8"), symbol: "UNKNOWN", name: null, decimals: null },
+        }),
+      ])
+    );
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "getSlot0" ? [2n ** 96n, 0, 0, 0] : original(input)
+    );
+    withPhaseOne(<PositionListPage />);
+    expect(await screen.findByText(/base units/)).toBeInTheDocument();
+    expect(screen.getByText("UNKNOWN")).toBeInTheDocument();
+  });
+  it("refreshes account liquidity after a confirmed write with an unchanged position block", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [{ ...position(1n), activeLegCount: 1n }],
+      nextCursor: null,
+    });
+    mocks.managed.mockResolvedValue([
+      {
+        positionId: 1n,
+        poolId: hash("1"),
+        posmTokenId: 9n,
+        tickLower: -600,
+        tickUpper: 600,
+        liquidity: parseEther("10"),
+        active: true,
+      },
+    ]);
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "getSlot0" ? [2n ** 96n, 0, 0, 0] : original(input)
+    );
+    withPhaseOne(
+      <>
+        <ProtocolQueryReconciler />
+        <PositionListPage />
+      </>
+    );
+    await screen.findByText("WETH");
+    const reads = mocks.managed.mock.calls.length;
+    act(() =>
+      announceProtocolTransactionConfirmed({
+        wallet,
+        chainId: 31337,
+        deploymentId: "phase-one-fixture",
+        blockNumber: 11n,
+        kind: "phase-one-increase-liquidity",
+        scopes: protocolQueryScopes("phase-one-increase-liquidity"),
+      })
+    );
+    await waitFor(() => expect(mocks.managed.mock.calls.length).toBeGreaterThan(reads));
+  });
+  it("opens a new account from the accounts list", async () => {
+    withPhaseOne(<PositionListPage />);
+    expect(await screen.findByRole("link", { name: /^Account #1,/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stake STATICS" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Create position" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open account" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     expect(mocks.execute).not.toHaveBeenCalled();
   });
-  it("lists a newly created position without a reload once the indexer catches up", async () => {
+  it("lists a newly opened account without a reload once the indexer catches up", async () => {
     mocks.execute.mockImplementation(async (request) => {
       await request.verifyConfirmation?.({
         logs: [
@@ -383,13 +551,14 @@ describe("focused Phase 1 Earn", () => {
       return hash("f");
     });
     withPhaseOne(<PositionListPage />);
-    await screen.findByRole("link", { name: "Position #1" });
-    fireEvent.click(screen.getByRole("button", { name: "Create position" }));
+    await screen.findByRole("link", { name: /^Account #1,/ });
+    fireEvent.click(screen.getByRole("button", { name: "Open account" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
-    // The position card (not just the interim link) appears without a reload.
-    await waitFor(() => expect(document.querySelectorAll(".position-card")).toHaveLength(2), {
-      timeout: 5_000,
-    });
+    // The account row (not just the interim link) appears without a reload.
+    await waitFor(
+      () => expect(screen.getByRole("link", { name: /^Account #2,/ })).toBeInTheDocument(),
+      { timeout: 5_000 }
+    );
   });
   it("shows a multi-position table with a wallet-wide Collect and no management controls", async () => {
     withPhaseOne(<RewardsPage />);

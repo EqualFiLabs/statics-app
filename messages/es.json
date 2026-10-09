@@ -74,7 +74,7 @@
       "baskets": "Cestas",
       "create": "Crear cesta",
       "dollar": "Dólar",
-      "positions": "Position NFT",
+      "positions": "Cuentas",
       "loans": "Préstamos",
       "wallet": "Billetera",
       "faucet": "Faucet",
@@ -550,10 +550,10 @@
       "description": "Compra o vende un conjunto fijo de activos como una sola unidad. Verás exactamente qué contiene una cesta antes de comprar."
     },
     "positions": {
-      "label": "Position NFT",
-      "status": "Position NFT",
-      "title": "Tus Position NFTs",
-      "description": "Cada posición reúne tus cestas, préstamos y dólares. Gestiona la garantía, el staking y las recompensas desde aquí."
+      "label": "Cuentas",
+      "status": "Cuentas",
+      "title": "Tus cuentas",
+      "description": "Cada cuenta es un Position NFT. Abre una para ver sus saldos, historial y controles."
     },
     "loans": {
       "label": "Préstamos",
@@ -2258,5 +2258,67 @@
     "pageRange": "{from}–{to} de {total}",
     "addCoolingRow": "Solo reducir hasta {time}: puedes quitar de este pool, pero no añadir.",
     "addMax": "Puedes añadir hasta {amount}."
+  },
+  "accounts": {
+    "listLabel": "Tus cuentas",
+    "accountName": "Cuenta #{id}",
+    "nftName": "Position NFT #{id}",
+    "open": "Abrir cuenta",
+    "opening": "Abriendo…",
+    "fee": "Abrir una cuenta cuesta {fee} ETH.",
+    "connect": "Conecta una billetera para abrir una cuenta.",
+    "created": "{name} abierta. Verla",
+    "loading": "Cargando tus cuentas…",
+    "unavailable": "No se pudieron cargar algunos detalles. Las cifras pueden estar incompletas.",
+    "overviewAccounts": "{count, plural, one {# cuenta} other {# cuentas}}",
+    "overviewAttention": "{count} requieren atención",
+    "overviewEmpty": "{count} vacías",
+    "overviewRewards": "recompensas listas en {count}",
+    "filterLabel": "Mostrar cuentas",
+    "filter": {
+      "all": "Todas",
+      "attention": "Requieren atención",
+      "active": "Activas",
+      "empty": "Vacías"
+    },
+    "search": "Buscar una cuenta",
+    "searchPlaceholder": "Número o apodo",
+    "sortLabel": "Ordenar cuentas",
+    "sort": {
+      "newest": "Más recientes",
+      "oldest": "Más antiguas",
+      "stake": "Mayor stake"
+    },
+    "column": {
+      "account": "Cuenta",
+      "holdings": "Saldos",
+      "inUse": "En uso",
+      "status": "Estado"
+    },
+    "baseUnits": "{amount} unidades base",
+    "noHoldings": "Sin saldos",
+    "moreHoldings": "+{count} más",
+    "liquidity": "{count, plural, one {# posición de liquidez} other {# posiciones de liquidez}}",
+    "liquidityOut": "{count, plural, one {# posición de liquidez} other {# posiciones de liquidez}}, {out} fuera de rango",
+    "staked": "{staked} STATICS en stake",
+    "stakedAllocated": "{staked} STATICS en stake, {allocated} asignados",
+    "nothingInUse": "Sin uso",
+    "status": {
+      "attention": "Requiere atención",
+      "active": "Activa",
+      "empty": "Vacía · se puede cerrar"
+    },
+    "attention": {
+      "out-of-range": "La liquidez está fuera de rango y no genera.",
+      "stale-allocation": "Una asignación ya no cuenta.",
+      "unresolved": "Esta cuenta tiene obligaciones pendientes."
+    },
+    "rewardsReady": "Recompensas listas",
+    "emptyTitle": "Aún no tienes cuentas",
+    "emptyHelp": "Una cuenta guarda tu STATICS en stake, tu liquidez y tus recompensas. Abre una para empezar.",
+    "noMatch": "Ninguna cuenta coincide.",
+    "previousPage": "Cuentas anteriores",
+    "nextPage": "Siguientes cuentas",
+    "pageRange": "{from}–{to} de {total}"
   }
 }

@@ -74,7 +74,7 @@
       "baskets": "Baskets",
       "create": "Create basket",
       "dollar": "Dollar",
-      "positions": "Position NFT",
+      "positions": "Accounts",
       "loans": "Loans",
       "wallet": "Wallet",
       "faucet": "Faucet",
@@ -550,10 +550,10 @@
       "description": "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint."
     },
     "positions": {
-      "label": "Position NFT",
-      "status": "Position NFT",
-      "title": "Your Position NFTs",
-      "description": "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here."
+      "label": "Accounts",
+      "status": "Accounts",
+      "title": "Your accounts",
+      "description": "Each account is a Position NFT. Open one to see its balances, history and controls."
     },
     "loans": {
       "label": "Loans",
@@ -2258,5 +2258,67 @@
     "pageRange": "{from}–{to} of {total}",
     "addCoolingRow": "Reduce-only until {time}: you can remove from this pool, but not add to it.",
     "addMax": "You can add up to {amount}."
+  },
+  "accounts": {
+    "listLabel": "Your accounts",
+    "accountName": "Account #{id}",
+    "nftName": "Position NFT #{id}",
+    "open": "Open account",
+    "opening": "Opening…",
+    "fee": "Opening an account costs {fee} ETH.",
+    "connect": "Connect a wallet to open an account.",
+    "created": "{name} opened. View it",
+    "loading": "Loading your accounts…",
+    "unavailable": "Some account details could not be loaded. Figures shown may be incomplete.",
+    "overviewAccounts": "{count, plural, one {# account} other {# accounts}}",
+    "overviewAttention": "{count} need attention",
+    "overviewEmpty": "{count} empty",
+    "overviewRewards": "rewards ready on {count}",
+    "filterLabel": "Show accounts",
+    "filter": {
+      "all": "All",
+      "attention": "Needs attention",
+      "active": "Active",
+      "empty": "Empty"
+    },
+    "search": "Find an account",
+    "searchPlaceholder": "Number or nickname",
+    "sortLabel": "Sort accounts",
+    "sort": {
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "stake": "Largest stake"
+    },
+    "column": {
+      "account": "Account",
+      "holdings": "Holdings",
+      "inUse": "In use",
+      "status": "Status"
+    },
+    "baseUnits": "{amount} base units",
+    "noHoldings": "Nothing held",
+    "moreHoldings": "+{count} more",
+    "liquidity": "{count, plural, one {# liquidity position} other {# liquidity positions}}",
+    "liquidityOut": "{count, plural, one {# liquidity position} other {# liquidity positions}}, {out} out of range",
+    "staked": "{staked} STATICS staked",
+    "stakedAllocated": "{staked} STATICS staked, {allocated} allocated",
+    "nothingInUse": "Not in use",
+    "status": {
+      "attention": "Needs attention",
+      "active": "Active",
+      "empty": "Empty · can close"
+    },
+    "attention": {
+      "out-of-range": "Liquidity is out of range and not earning.",
+      "stale-allocation": "An allocation no longer counts.",
+      "unresolved": "This account has unresolved obligations."
+    },
+    "rewardsReady": "Rewards ready",
+    "emptyTitle": "No accounts yet",
+    "emptyHelp": "An account holds your staked STATICS, liquidity and rewards. Open one to get started.",
+    "noMatch": "No accounts match.",
+    "previousPage": "Previous accounts",
+    "nextPage": "Next accounts",
+    "pageRange": "{from}–{to} of {total}"
   }
 }
