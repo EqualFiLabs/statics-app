@@ -11,6 +11,7 @@ import {
   staticsRangeGaugeAbi,
 } from "@statics-protocol/sdk/phase-one";
 import { getAddress, parseAbi, zeroAddress, type Hex } from "viem";
+import { recordPositionStatement, statementCategories } from "./position-statement";
 import { allocationSnapshots, readTokenMetadata } from "./allocation-snapshots";
 import { activeGenesisCreditMutation } from "./genesis-credit";
 import {
@@ -74,7 +75,21 @@ const onPositionManager = sourceHandler(
   Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
 );
 const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
-const onPhaseOne = sourceHandler(Boolean(phaseOneDeploymentId && phaseOneDiamondAddress));
+const registerPhaseOne = sourceHandler(Boolean(phaseOneDeploymentId && phaseOneDiamondAddress));
+const statementHandlers = new Set<string>();
+const onPhaseOne: typeof ponder.on = (name, handler) => {
+  const eventName = name.slice("PhaseOneStatics:".length);
+  statementHandlers.add(eventName);
+  registerPhaseOne(name, async (input) => {
+    await handler(input);
+    await recordPositionStatement(
+      phaseOneDeploymentId!,
+      eventName,
+      input.event as unknown as Parameters<typeof recordPositionStatement>[2],
+      input.context
+    );
+  });
+};
 const onPublicHook = sourceHandler(Boolean(phaseOneDeploymentId && publicHookAddress));
 
 const phaseOneKey = (...parts: readonly (string | bigint)[]) =>
@@ -753,7 +768,8 @@ for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"]
       manager: getAddress(event.args.manager),
       tickLower: event.args.tickLower,
       tickUpper: event.args.tickUpper,
-      liquidity: event.args.liquidity,
+      liquidity:
+        "movement" in event.args ? event.args.movement.liquidityAfter : event.args.liquidity,
       active: true,
       updatedAtBlock: event.block.number,
     };
@@ -777,7 +793,7 @@ onPhaseOne("PhaseOneStatics:ManagedLiquidityChanged", async ({ event, context })
     .update(managedGaugePosition, {
       key: managedPositionKey(event.args.positionId, event.args.poolId),
     })
-    .set({ liquidity: event.args.liquidity, updatedAtBlock: event.block.number });
+    .set({ liquidity: event.args.movement.liquidityAfter, updatedAtBlock: event.block.number });
 });
 
 onPhaseOne("PhaseOneStatics:ManagedLiquidityRebalanced", async ({ event, context }) => {
@@ -792,7 +808,7 @@ onPhaseOne("PhaseOneStatics:ManagedLiquidityRebalanced", async ({ event, context
       manager: getAddress(event.args.manager),
       tickLower: event.args.tickLower,
       tickUpper: event.args.tickUpper,
-      liquidity: event.args.liquidity,
+      liquidity: event.args.movement.liquidityAfter,
       active: true,
       updatedAtBlock: event.block.number,
     });
@@ -1095,7 +1111,7 @@ onPhaseOne("PhaseOneStatics:RewardClaimed", async ({ event, context }) => {
     positionId: event.args.positionId,
     poolId: null,
     asset: getAddress(event.args.asset),
-    amount: event.args.amount,
+    amount: event.args.received,
     slot: null,
     actor: getAddress(event.args.receiver),
     transactionHash: event.transaction.hash,
@@ -1169,4 +1185,8 @@ for (const eventName of [
     await allocationIndex.reserve(context, event);
     await allocationIndex.touch(context, event);
   });
+}
+
+for (const eventName of Object.keys(statementCategories) as (keyof typeof statementCategories)[]) {
+  if (!statementHandlers.has(eventName)) onPhaseOne(`PhaseOneStatics:${eventName}`, async () => {});
 }

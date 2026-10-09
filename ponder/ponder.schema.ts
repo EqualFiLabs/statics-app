@@ -470,3 +470,74 @@ export const allocationDirectoryState = onchainTable("allocation_directory_state
   indexedAtBlock: t.bigint().notNull(),
   indexedAtTimestamp: t.bigint().notNull(),
 }));
+
+// Lifetime history remains independent from current ownership rows deleted on burn.
+export const positionStatementHistory = onchainTable("position_statement_history", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  positionId: t.bigint().notNull(),
+  owner: t.hex(),
+  lastOwner: t.hex(),
+  firstBlock: t.bigint().notNull(),
+  openingObserved: t.boolean().notNull(),
+}));
+export const positionStatementBlock = onchainTable(
+  "position_statement_block",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    digest: t.hex().notNull(),
+  }),
+  (t) => ({ boundary: index().on(t.deploymentId, t.blockNumber) })
+);
+export const positionStatement = onchainTable(
+  "position_statement",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    positionId: t.bigint().notNull(),
+    eventName: t.text().notNull(),
+    category: t.text().notNull(),
+    transactionHash: t.hex().notNull(),
+    logIndex: t.integer().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    transactionSender: t.hex().notNull(),
+    ownerBefore: t.hex(),
+    ownerAfter: t.hex(),
+    poolId: t.hex(),
+    posmTokenId: t.bigint(),
+    newPosmTokenId: t.bigint(),
+    payloadJson: t.text().notNull(),
+  }),
+  (t) => ({ history: index().on(t.deploymentId, t.positionId, t.blockNumber, t.logIndex) })
+);
+export const positionStatementMovement = onchainTable(
+  "position_statement_movement",
+  (t) => ({
+    key: t.text().primaryKey(),
+    statementKey: t.text().notNull(),
+    ordinal: t.integer().notNull(),
+    chainId: t.integer().notNull(),
+    asset: t.hex().notNull(),
+    space: t.text().notNull(),
+    direction: t.text().notNull(),
+    purpose: t.text().notNull(),
+    actor: t.hex(),
+    amount: t.bigint().notNull(),
+  }),
+  (t) => ({ parent: index().on(t.statementKey, t.ordinal) })
+);
+export const positionStatementConfig = onchainTable("position_statement_config", (t) => ({
+  key: t.text().primaryKey(),
+  stakingAsset: t.hex().notNull(),
+}));
+
+export const positionStatementRevision = onchainTable("position_statement_revision", (t) => ({
+  key: t.text().primaryKey(),
+  digest: t.hex().notNull(),
+}));

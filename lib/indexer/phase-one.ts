@@ -713,3 +713,59 @@ export async function loadAllocationDirectory(input: {
   if (!response.ok) throw new Error(`Allocation directory request failed (${response.status}).`);
   return parseAllocationDirectory(await response.json(), input.deploymentId);
 }
+
+export { parsePositionStatement } from "./position-statement";
+export type {
+  PositionStatementPage,
+  StatementCategory,
+  StatementPayload,
+} from "./position-statement";
+import { parsePositionStatement, type StatementCategory } from "./position-statement";
+export class StatementHistoryChangedError extends Error {
+  readonly code = "STATEMENT_HISTORY_CHANGED";
+  constructor() {
+    super("Statement history changed. Restart from the first page.");
+    this.name = "StatementHistoryChangedError";
+  }
+}
+export async function loadPositionStatement(input: {
+  deploymentId: string;
+  positionId: bigint;
+  indexerUrl?: string | null;
+  filters?: {
+    category?: StatementCategory;
+    poolId?: Hex;
+    asset?: Address;
+    fromBlock?: bigint;
+    toBlock?: bigint;
+    direction?: "asc" | "desc";
+    cursor?: string;
+    limit?: number;
+  };
+}) {
+  if (input.positionId < 0n || input.positionId >= 1n << 256n)
+    throw new Error("Invalid Position NFT ID.");
+  const base =
+    input.indexerUrl === undefined
+      ? configuredIndexerUrlForDeployment(input.deploymentId)
+      : input.indexerUrl;
+  if (!base) throw new Error("No indexer is configured for this deployment.");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(input.filters ?? {}))
+    if (value !== undefined) query.set(key, String(value));
+  const response = await fetchIndexer(
+    `${base}/phase-one/positions/${input.positionId}/statement${query.size ? `?${query}` : ""}`,
+    "no-store"
+  );
+  if (response.status === 409) {
+    const error = record(await response.json(), "statement error");
+    if (error.code === "STATEMENT_HISTORY_CHANGED") throw new StatementHistoryChangedError();
+  }
+  if (!response.ok) throw new Error(`Position statement request failed (${response.status}).`);
+  return parsePositionStatement(
+    await response.json(),
+    input.deploymentId,
+    input.positionId,
+    input.filters?.direction
+  );
+}
