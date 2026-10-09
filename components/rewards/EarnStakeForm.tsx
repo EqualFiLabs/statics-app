@@ -40,17 +40,20 @@ export function EarnStakeForm({
   action,
   positions,
   requestedPositionId,
+  initialMode = "stake",
 }: {
   deployment: PhaseOneDeployment;
   action: ReturnType<typeof usePhaseOneAction>;
   positions: readonly IndexedPhaseOnePosition[];
   requestedPositionId?: bigint;
+  /** The tab to open on, e.g. Unstake when arriving from an account's Withdraw. */
+  initialMode?: "stake" | "unstake";
 }) {
   const t = useTranslations("earnStake");
   const locale = useAppLocale();
   const queryClient = useQueryClient();
   const id = deployment.descriptor.deploymentId;
-  const [mode, setMode] = useState<"stake" | "unstake">("stake");
+  const [mode, setMode] = useState<"stake" | "unstake">(initialMode);
   const [amountInput, setAmountInput] = useState("");
   const [targetChoice, setTargetChoice] = useState<string | null>(null);
   const [pageChoice, setPageChoice] = useState<number | null>(null);

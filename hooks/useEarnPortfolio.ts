@@ -25,7 +25,7 @@ export function useEarnPortfolio(
   const action = usePhaseOneAction(
     deployment,
     view === "staking"
-      ? `${view}:${filters.positionId ?? "all"}:${filters.poolId ?? "all"}:${filters.asset ?? "all"}:${filters.share}`
+      ? `${view}:${filters.positionId ?? "all"}:${filters.poolId ?? "all"}:${filters.asset ?? "all"}:${filters.share}:${filters.mode ?? "stake"}`
       : ""
   );
   const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, action.wallet);

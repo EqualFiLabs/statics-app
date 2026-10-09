@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { toHex, type PublicClient } from "viem";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
+import { boundedGaugeRead } from "@/lib/rewards/gauge-reads";
 import { readPublicLiquidityFees } from "@/lib/phase-one/liquidity";
 
 const diamond = "0x1111111111111111111111111111111111111111" as const;
@@ -40,6 +41,36 @@ const deployment: PhaseOneDeployment = {
   supportedPools: [],
 };
 describe("managed liquidity fee estimates", () => {
+  it("bounds individual fee RPCs across an account with twenty pools", async () => {
+    let active = 0,
+      peak = 0;
+    const readContract = vi.fn().mockImplementation(async ({ functionName }) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      active--;
+      return functionName === "getPositionInfo" ? [10n ** 18n, 0n, 0n] : [1n << 128n, 0n];
+    });
+    const publicClient = { readContract } as unknown as PublicClient;
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        readPublicLiquidityFees({
+          publicClient,
+          deployment,
+          poolId,
+          posmTokenId: BigInt(index + 1),
+          tickLower: -60,
+          tickUpper: 60,
+          read: (call) => boundedGaugeRead(publicClient, call),
+        })
+      )
+    );
+    expect(readContract).toHaveBeenCalledTimes(40);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(results).toEqual(
+      Array.from({ length: 20 }, () => ({ amount0: 10n ** 18n, amount1: 0n }))
+    );
+  });
   it.each([0n, 1n << 128n])(
     "keeps token rounding and zero-fee assets accurate for growth %s",
     async (growth) => {

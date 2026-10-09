@@ -1,11 +1,9 @@
 "use client";
 import { useEffect } from "react";
 import { useQueries } from "@tanstack/react-query";
-import type { Hex } from "viem";
-import { staticsGaugeIncentivesAbi, v4StateViewReadAbi } from "@statics-protocol/sdk/phase-one";
+import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { loadIndexedManagedLiquidity } from "@/lib/indexer/phase-one";
-import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { claimScopeIncomplete, scopeRewardAmounts } from "@/lib/rewards/earn";
 import { boundedGaugeRead } from "@/lib/rewards/gauge-reads";
 import {
@@ -14,12 +12,12 @@ import {
   type AccountLiquidity,
   type AccountSummary,
 } from "@/lib/positions/accounts";
-import { useAllocationPools } from "./useAllocationDirectory";
+import { usePoolValuation } from "./usePoolValuation";
 import { mergeEarnRewardSources, useEarnRewardSources } from "./useEarnPortfolio";
 import { usePhaseOneAction } from "./usePhaseOneAction";
 import { usePhaseOnePositions } from "./usePhaseOnePositions";
 
-const ALL_SOURCES = ["global", "gauge", "lp-bribe", "allocator"] as const;
+export const ACCOUNT_REWARD_SOURCES = ["global", "gauge", "lp-bribe", "allocator"] as const;
 
 /**
  * Every account (Position NFT) the wallet owns, summarised for the accounts list: what it
@@ -59,11 +57,11 @@ export function useAccounts(deployment: PhaseOneDeployment) {
         ),
     })),
   });
-  const rewardQueries = useEarnRewardSources(deployment, positions.items, ALL_SOURCES);
+  const rewardQueries = useEarnRewardSources(deployment, positions.items, ACCOUNT_REWARD_SOURCES);
   const rewardRows = mergeEarnRewardSources(rewardQueries);
   const rewardUnavailable =
     rewardQueries.some((query) => query.isError) ||
-    claimScopeIncomplete(rewardRows, { sources: ALL_SOURCES });
+    claimScopeIncomplete(rewardRows, { sources: ACCOUNT_REWARD_SOURCES });
   const rewardsLoaded =
     rewardQueries.every((query) => query.data !== undefined) && !rewardUnavailable;
 
@@ -90,51 +88,12 @@ export function useAccounts(deployment: PhaseOneDeployment) {
       (liquidity[index]?.data ?? []).filter((leg) => leg.liquidity > 0n),
     ])
   );
-  const poolIds = [
-    ...new Map(
-      [...legsOf.values()].flat().map((leg) => [leg.poolId.toLowerCase(), leg.poolId])
-    ).values(),
-  ];
-  // Pools outside the reviewed manifest take token metadata from the indexer's directory.
-  const manifest = (poolId: Hex) =>
-    deployment.supportedPools.find((pool) => pool.poolId.toLowerCase() === poolId.toLowerCase());
-  const directory = useAllocationPools(
+  const valuation = usePoolValuation(
     deployment,
-    poolIds.filter((poolId) => !manifest(poolId))
+    action,
+    [...legsOf.values()].flat().map((leg) => leg.poolId)
   );
-  const tokensOf = (poolId: Hex): readonly [AccountAsset, AccountAsset] | undefined => {
-    const listed = manifest(poolId);
-    if (listed) return [listed.token0, listed.token1];
-    const indexed = directory.poolOf(poolId);
-    if (!indexed) return undefined;
-    const asset = (token: typeof indexed.token0): AccountAsset => ({
-      address: token.address,
-      symbol: token.symbol ?? token.address.slice(0, 6),
-      decimals: token.decimals,
-    });
-    return [asset(indexed.token0), asset(indexed.token1)];
-  };
-  const states = useQueries({
-    queries: poolIds.map((poolId) => ({
-      queryKey: protocolQueryKeys.phaseOnePool(id, poolId),
-      enabled: action.ready,
-      staleTime: 15_000,
-      retry: false,
-      queryFn: async () => {
-        const [sqrtPriceX96, tick] = await boundedGaugeRead(action.publicClient!, () =>
-          action.publicClient!.readContract({
-            address: deployment.contracts.stateView,
-            abi: v4StateViewReadAbi,
-            functionName: "getSlot0",
-            args: [poolId],
-          })
-        );
-        return { sqrtPriceX96, tick };
-      },
-    })),
-  });
-  const stateOf = (poolId: Hex) =>
-    states[poolIds.findIndex((entry) => entry.toLowerCase() === poolId.toLowerCase())]?.data;
+  const { tokensOf, stateOf } = valuation;
 
   const stakingAsset: AccountAsset = {
     address: deployment.contracts.statics,
@@ -175,7 +134,7 @@ export function useAccounts(deployment: PhaseOneDeployment) {
       allocated: allocation?.[3],
       staleAllocation: allocation ? allocation[1] - allocation[3] : undefined,
       rewardsReady: scopeRewardAmounts(rewardRows, {
-        sources: ALL_SOURCES,
+        sources: ACCOUNT_REWARD_SOURCES,
         positionId: position.positionId,
       }).some((entry) => entry.amount > 0n),
     });
@@ -187,17 +146,15 @@ export function useAccounts(deployment: PhaseOneDeployment) {
     loading:
       positions.isLoading ||
       allocations.some((query) => query.isLoading) ||
-      directory.loading ||
+      valuation.loading ||
       Boolean(positions.hasNextPage) ||
-      liquidity.some((query) => query.isLoading) ||
-      states.some((query) => query.isLoading),
+      liquidity.some((query) => query.isLoading),
     rewardsLoaded,
     unavailable:
       positions.isError ||
       allocations.some((query) => query.isError) ||
-      directory.unavailable ||
+      valuation.unavailable ||
       rewardUnavailable ||
-      liquidity.some((query) => query.isError) ||
-      states.some((query) => query.isError),
+      liquidity.some((query) => query.isError),
   };
 }

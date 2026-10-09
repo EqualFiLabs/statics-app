@@ -488,27 +488,33 @@ export async function readPublicLiquidityFees(input: {
   posmTokenId: bigint;
   tickLower: number;
   tickUpper: number;
+  read?: <T>(call: () => Promise<T>) => Promise<T>;
 }) {
   const { publicClient, deployment, poolId, tickLower, tickUpper, posmTokenId } = input;
+  const read = input.read ?? (<T>(call: () => Promise<T>) => call());
   const [position, growth] = await Promise.all([
-    publicClient.readContract({
-      address: deployment.contracts.stateView,
-      abi: v4StateViewReadAbi,
-      functionName: "getPositionInfo",
-      args: [
-        poolId,
-        deployment.contracts.positionManager,
-        tickLower,
-        tickUpper,
-        toHex(posmTokenId, { size: 32 }),
-      ],
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.stateView,
-      abi: v4StateViewReadAbi,
-      functionName: "getFeeGrowthInside",
-      args: [poolId, tickLower, tickUpper],
-    }),
+    read(() =>
+      publicClient.readContract({
+        address: deployment.contracts.stateView,
+        abi: v4StateViewReadAbi,
+        functionName: "getPositionInfo",
+        args: [
+          poolId,
+          deployment.contracts.positionManager,
+          tickLower,
+          tickUpper,
+          toHex(posmTokenId, { size: 32 }),
+        ],
+      })
+    ),
+    read(() =>
+      publicClient.readContract({
+        address: deployment.contracts.stateView,
+        abi: v4StateViewReadAbi,
+        functionName: "getFeeGrowthInside",
+        args: [poolId, tickLower, tickUpper],
+      })
+    ),
   ]);
   return pendingLpFees(position[0], growth[0], growth[1], position[1], position[2]);
 }

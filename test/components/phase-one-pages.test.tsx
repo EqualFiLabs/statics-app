@@ -31,10 +31,12 @@ const staticsBatchRewardsAbi = [
 ] as const;
 import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
 import { PositionListPage } from "@/components/positions/PositionListPage";
+import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
 import type { DeploymentOption, PhaseOneDeployment } from "@/lib/deployments/types";
 import {
   AllocationDirectoryChangedError,
+  StatementHistoryChangedError,
   type IndexedAllocationPool,
 } from "@/lib/indexer/phase-one";
 import { DeploymentContext } from "@/providers/deployment-context";
@@ -50,6 +52,7 @@ const mocks = vi.hoisted(() => ({
   allocations: vi.fn(),
   directory: vi.fn(),
   managed: vi.fn(),
+  statement: vi.fn(),
   block: vi.fn(),
   params: new URLSearchParams(),
   push: vi.fn(),
@@ -77,6 +80,7 @@ vi.mock("@/lib/indexer/phase-one", async (original) => ({
   loadIndexedAllocationSnapshot: mocks.allocations,
   loadAllocationDirectory: mocks.directory,
   loadIndexedManagedLiquidity: mocks.managed,
+  loadPositionStatement: mocks.statement,
 }));
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 const hash = (digit: string) => `0x${digit.repeat(64)}` as const;
@@ -214,6 +218,52 @@ const position = (id: bigint) => ({
   unresolvedObligationCount: 0n,
   updatedAtBlock: 1n,
 });
+/** A statement entry as the indexer parser returns it. */
+const statementEntry = (n: number, eventName: string, overrides: Record<string, unknown> = {}) => ({
+  key: `fixture:${hash("e")}:${n}`,
+  eventName,
+  category: "staking",
+  positionId: 1n,
+  transactionHash: hash("e"),
+  logIndex: n,
+  blockNumber: BigInt(100 - n),
+  blockHash: hash("b"),
+  // Two days apart for the first and later entries.
+  timestamp: n === 0 ? 1_700_200_000n : 1_700_000_000n - BigInt(n),
+  transactionSender: wallet,
+  ownerBefore: wallet,
+  ownerAfter: wallet,
+  poolId: null,
+  posmTokenId: null,
+  newPosmTokenId: null,
+  movements: [],
+  stakingAsset: null,
+  poolCurrencies: null,
+  payload: { positionId: 1n },
+  ...overrides,
+});
+const statementPage = (items: unknown[], nextCursor: string | null = null) => ({
+  deploymentId: "phase-one-fixture",
+  positionId: 1n,
+  historyStart: { blockNumber: 1n, openingObserved: true },
+  observationBoundary: {
+    blockNumber: 100n,
+    blockHash: hash("b"),
+    digest: hash("d"),
+    timestamp: 0n,
+  },
+  items,
+  nextCursor,
+});
+const walletMove = (symbol: string, direction: "debit" | "credit", amount: bigint) => ({
+  ordinal: 0,
+  asset: { address: tokens[0].address, symbol, name: symbol, decimals: 18 },
+  actor: wallet,
+  amount,
+  space: "wallet",
+  direction,
+  purpose: direction === "debit" ? "stake" : "reward-payout",
+});
 function withPhaseOne(ui: React.ReactElement, deployment = phaseOne) {
   const active = { ...option, phaseOne: deployment };
   return render(
@@ -239,6 +289,7 @@ beforeEach(() => {
   mocks.replace.mockReset();
   mocks.directory.mockReset().mockResolvedValue(directoryPage([]));
   mocks.managed.mockReset().mockResolvedValue([]);
+  mocks.statement.mockReset().mockResolvedValue(statementPage([]));
   window.localStorage.clear();
   mocks.allocations.mockReset().mockResolvedValue({
     totalAllocated: parseEther("30"),
@@ -347,6 +398,281 @@ beforeEach(() => {
 });
 
 describe("focused Phase 1 Earn", () => {
+  it("shows an account's balances, actions and what still blocks closing it", async () => {
+    mocks.statement.mockResolvedValue(
+      statementPage([statementEntry(9, "PositionCreated", { category: "lifecycle" })])
+    );
+    mocks.position.mockImplementation(async (id: bigint) => ({
+      ...position(id),
+      activeLegCount: 2n,
+    }));
+    mocks.managed.mockResolvedValue([
+      {
+        positionId: 1n,
+        poolId: hash("1"),
+        posmTokenId: 9n,
+        tickLower: -600,
+        tickUpper: 600,
+        liquidity: parseEther("10"),
+        active: true,
+      },
+    ]);
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "getSlot0" ? [2n ** 96n, 0, 0, 0] : original(input)
+    );
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    expect(await screen.findByRole("heading", { name: /^Account #1/ })).toBeInTheDocument();
+    expect(screen.getByText(/^Position NFT #1 · Opened /)).toBeInTheDocument();
+    const liquidity = screen.getByRole("region", { name: "In liquidity" });
+    expect(await within(liquidity).findByText("In range")).toBeInTheDocument();
+    expect(within(liquidity).getByText("STATICS / WETH")).toBeInTheDocument();
+    const staked = screen.getByRole("region", { name: "Staked" });
+    expect(within(staked).getByText("100")).toBeInTheDocument();
+    const checklist = await screen.findByRole("list", { name: "Still to do before closing" });
+    expect(
+      within(checklist).getByRole("link", { name: "Withdraw your liquidity from STATICS / WETH" })
+    ).toHaveAttribute("href", `/app/liquidity?positionId=1&poolId=${hash("1")}`);
+    expect(within(checklist).getByRole("link", { name: "Unstake 100 STATICS" })).toHaveAttribute(
+      "href",
+      "/app/rewards/staking?positionId=1&mode=unstake"
+    );
+    expect(screen.getByRole("button", { name: "Close account" })).toBeDisabled();
+    // Deposit offers the two ways to put money into this account.
+    fireEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    const sheet = await screen.findByRole("dialog", { name: "Deposit to Account #1" });
+    expect(within(sheet).getByRole("link", { name: /^Add liquidity/ })).toHaveAttribute(
+      "href",
+      "/app/liquidity?positionId=1"
+    );
+    expect(within(sheet).getByRole("link", { name: /^Stake STATICS/ })).toHaveAttribute(
+      "href",
+      "/app/rewards/staking?positionId=1"
+    );
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+    const withdraw = await screen.findByRole("dialog", { name: "Withdraw from Account #1" });
+    expect(within(withdraw).getByRole("link", { name: /^Unstake STATICS/ })).toHaveAttribute(
+      "href",
+      "/app/rewards/staking?positionId=1&mode=unstake"
+    );
+    fireEvent.keyDown(withdraw, { key: "Escape" });
+    // A nickname is saved in this browser and replaces the default name.
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nickname" }), {
+      target: { value: "  Rainy   day " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("heading", { name: /^Rainy day/ })).toBeInTheDocument();
+  });
+  it("shows stake unlocked by stale allocations without reading selection management", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [0, parseEther("100"), [], parseEther("30")]
+        : original(input)
+    );
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    const staked = await screen.findByRole("region", { name: "Staked" });
+    await waitFor(() =>
+      expect(within(staked).getByText("Free to unstake").parentElement).toHaveTextContent(
+        "70 STATICS"
+      )
+    );
+    expect(mocks.read.mock.calls.map(([request]) => request.functionName)).not.toEqual(
+      expect.arrayContaining([
+        "maxRewardAssetsPerPosition",
+        "rewardSelection",
+        "rewardSelectionWithTiming",
+        "stakePosition",
+      ])
+    );
+  });
+  it("does not invent an opening date when only later history was indexed", async () => {
+    mocks.statement.mockResolvedValue({
+      ...statementPage([statementEntry(9, "Staked")]),
+      historyStart: { blockNumber: 10n, openingObserved: false },
+    });
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    await screen.findByRole("heading", { name: /^Account #1/ });
+    await waitFor(() => expect(mocks.statement).toHaveBeenCalled());
+    expect(screen.queryByText(/^Position NFT #1 · Opened /)).not.toBeInTheDocument();
+  });
+  it("links exited LP dust to the pool's resolution screen", async () => {
+    mocks.position.mockImplementation(async (id: bigint) => ({
+      ...position(id),
+      activeLegCount: 1n,
+    }));
+    mocks.managed.mockResolvedValue([
+      {
+        positionId: 1n,
+        poolId: hash("1"),
+        posmTokenId: 9n,
+        tickLower: -60,
+        tickUpper: 60,
+        liquidity: 0n,
+        active: false,
+      },
+    ]);
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "lpLeg"
+        ? {
+            liquidity: 0n,
+            tickLower: -60,
+            tickUpper: 60,
+            claimable: [0n, 0n, 0n, 0n, 0n],
+            rewardRemainderRay: [0n, 1n, 0n, 0n, 0n],
+          }
+        : original(input)
+    );
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    expect(
+      await screen.findByRole("link", { name: "Finish resolving rewards from STATICS / WETH" })
+    ).toHaveAttribute("href", `/app/liquidity?positionId=1&poolId=${hash("1")}`);
+  });
+  it("labels statement accounting, unknown units and third-party recipients", async () => {
+    const other = address("9");
+    mocks.statement.mockImplementation(async ({ filters }) =>
+      filters?.direction === "asc"
+        ? statementPage([])
+        : statementPage([
+            statementEntry(1, "RewardClaimed", {
+              category: "rewards",
+              movements: [
+                {
+                  ...walletMove("USDC", "credit", 1_000_000n),
+                  actor: other,
+                  asset: { address: tokens[0].address, symbol: "USDC", name: null, decimals: null },
+                },
+                {
+                  ...walletMove("USDC", "debit", 1_000_000n),
+                  space: "internal",
+                  actor: null,
+                  purpose: "reward-payout-debit",
+                  ordinal: 1,
+                },
+              ],
+            }),
+            statementEntry(2, "Staked", { ownerBefore: other, ownerAfter: other }),
+          ])
+    );
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    const statement = await screen.findByRole("region", { name: "Statement" });
+    expect(await within(statement).findByText("+1000000 base units USDC")).toBeInTheDocument();
+    expect(
+      within(statement).getByText(`Received by ${other.slice(0, 6)}…${other.slice(-4)}`)
+    ).toBeInTheDocument();
+    expect(within(statement).getByText(/Prior owner activity/)).toBeInTheDocument();
+    expect(within(statement).queryByText("Internal settlement")).not.toBeInTheDocument();
+    fireEvent.click(within(statement).getByRole("checkbox", { name: "Show reward accounting" }));
+    expect(within(statement).getByText("Internal settlement")).toBeInTheDocument();
+  });
+  it("closes an empty account once nothing is attached", async () => {
+    mocks.position.mockImplementation(async (id: bigint) => ({
+      ...position(id),
+      stakedBalance: 0n,
+    }));
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    expect(await screen.findByText("Empty · can close")).toBeInTheDocument();
+    const close = screen.getByRole("button", { name: "Close account" });
+    await waitFor(() => expect(close).toBeEnabled());
+    fireEvent.click(close);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+    expect(mocks.execute.mock.calls.at(-1)![0].kind).toBe("phase-one-close-position");
+    expect(await screen.findByText("Account #1 is closed.")).toBeInTheDocument();
+  });
+  it("shows the account statement by day, hiding reward accounting until asked", async () => {
+    mocks.statement.mockImplementation(async ({ filters }) =>
+      filters?.direction === "asc"
+        ? statementPage([statementEntry(9, "PositionCreated")])
+        : filters?.cursor
+          ? statementPage([statementEntry(9, "PositionCreated", { category: "lifecycle" })])
+          : statementPage(
+              [
+                statementEntry(0, "Staked", {
+                  movements: [walletMove("STATICS", "debit", parseEther("100"))],
+                }),
+                statementEntry(1, "ManagedLiquidityProvided", {
+                  category: "liquidity",
+                  poolId: hash("1"),
+                  movements: [
+                    walletMove("WETH", "debit", parseEther("0.5")),
+                    { ...walletMove("STATICS", "debit", parseEther("20")), ordinal: 1 },
+                  ],
+                }),
+                statementEntry(2, "RewardStakeScheduled", {
+                  category: "rewards",
+                  payload: { positionId: 1n, asset: tokens[1].address },
+                }),
+                statementEntry(3, "RewardClaimed", {
+                  category: "rewards",
+                  movements: [walletMove("WETH", "credit", parseEther("1.25"))],
+                }),
+                statementEntry(4, "Transfer", {
+                  category: "lifecycle",
+                  ownerBefore: address("9"),
+                  payload: { tokenId: 1n, from: address("9"), to: wallet },
+                }),
+                statementEntry(5, "Unstaked", {
+                  movements: [walletMove("STATICS", "credit", parseEther("3"))],
+                }),
+              ],
+              "next-page"
+            )
+    );
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    const statement = await screen.findByRole("region", { name: "Statement" });
+    const entry = (name: string) => within(statement).getByText(name).closest("li")!;
+    await within(statement).findByText("Staked");
+    expect(entry("Staked")).toHaveTextContent("−100 STATICS");
+    expect(entry("Added liquidity · STATICS / WETH")).toHaveTextContent("−0.5 WETH−20 STATICS");
+    expect(entry("Collected staking rewards")).toHaveTextContent("+1.25 WETH");
+    expect(
+      entry(`Received from ${address("9").slice(0, 6)}…${address("9").slice(-4)}`)
+    ).toBeInTheDocument();
+    // Older entries belong to the previous owner.
+    expect(within(statement).getByRole("separator")).toHaveTextContent(
+      "Before you owned this account"
+    );
+    expect(within(statement).getAllByRole("heading", { level: 4 })).toHaveLength(2);
+    expect(within(statement).queryByText("WETH earning scheduled")).not.toBeInTheDocument();
+    fireEvent.click(within(statement).getByRole("checkbox", { name: "Show reward accounting" }));
+    expect(within(statement).getByText("WETH earning scheduled")).toBeInTheDocument();
+    fireEvent.click(within(statement).getByRole("button", { name: "Show older activity" }));
+    expect(await within(statement).findByText("Account opened")).toBeInTheDocument();
+    expect(mocks.statement).toHaveBeenCalledWith(
+      expect.objectContaining({ filters: expect.objectContaining({ cursor: "next-page" }) })
+    );
+    fireEvent.click(within(statement).getByRole("button", { name: "Liquidity" }));
+    await waitFor(() =>
+      expect(mocks.statement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ category: "liquidity" }),
+        })
+      )
+    );
+  });
+  it("restarts the statement when history changes under the cursor", async () => {
+    mocks.statement.mockRejectedValueOnce(new StatementHistoryChangedError());
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    const statement = await screen.findByRole("region", { name: "Statement" });
+    fireEvent.click(await within(statement).findByRole("button", { name: "Reload statement" }));
+    expect(await within(statement).findByText("No activity yet.")).toBeInTheDocument();
+  });
+  it("does not show another wallet's account", async () => {
+    mocks.position.mockImplementation(async (id: bigint) => ({
+      ...position(id),
+      owner: address("9"),
+    }));
+    withPhaseOne(<PositionDetailPage positionId={1n} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Account #1 belongs to another wallet."
+    );
+    expect(screen.queryByRole("button", { name: "Deposit" })).not.toBeInTheDocument();
+  });
   it("lists accounts like a ledger with holdings, status and filters", async () => {
     mocks.page.mockResolvedValue({
       deploymentId: "phase-one-fixture",
@@ -864,6 +1190,15 @@ describe("focused Phase 1 Earn", () => {
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(within(drawer).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("textbox", { name: "STATICS amount" })).toHaveValue("500");
+  });
+  it("opens the staking form on Unstake when linked with mode=unstake", async () => {
+    mocks.params = new URLSearchParams("positionId=1&mode=unstake");
+    withPhaseOne(<RewardsPage earnView="staking" />);
+    expect(await screen.findByRole("button", { name: "Unstake" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Stake" })).toHaveAttribute("aria-pressed", "false");
   });
   it("excludes gauge-locked stake from unstake Max", async () => {
     withPhaseOne(<RewardsPage earnView="staking" />);
@@ -1843,6 +2178,21 @@ describe("additional review regressions", () => {
     view.rerender(reviewTree());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Position #1/ })).toBeChecked();
+  });
+  it("clears a stake review when the URL switches to the Unstake tab", async () => {
+    mocks.params = new URLSearchParams("positionId=1");
+    const view = render(reviewTree());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
+    fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
+    await screen.findByRole("dialog", { name: "Stake into Position #1" });
+    mocks.params = new URLSearchParams("positionId=1&mode=unstake");
+    view.rerender(reviewTree());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unstake" })).toHaveAttribute("aria-pressed", "true");
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("disables unstake review when the allocation read failed", async () => {
     const base = mocks.read.getMockImplementation()!;

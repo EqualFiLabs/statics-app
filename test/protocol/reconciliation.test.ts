@@ -102,6 +102,35 @@ describe("confirmed transaction reconciliation", () => {
       })
     ).toBe(false);
   });
+  it("refreshes account statements after any account transaction in the deployment", () => {
+    const detail = {
+      wallet: `0x${"1".repeat(40)}` as Address,
+      chainId: 31337,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-statement", "local", "7", "page", "all"],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-statement", "local", "7", "page", "all"], {
+        ...detail,
+        kind: "phase-one-settle-rewards",
+        scopes: protocolQueryScopes("phase-one-settle-rewards"),
+      })
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-statement", "other", "7", "page", "all"],
+        detail
+      )
+    ).toBe(false);
+  });
 
   it("waits until the read RPC serves the confirmed block", async () => {
     const getBlockNumber = vi.fn().mockResolvedValueOnce(99n).mockResolvedValueOnce(100n);

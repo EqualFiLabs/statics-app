@@ -228,6 +228,7 @@ export function EarnPage({
             action={action}
             positions={positions.items}
             requestedPositionId={filters.positionId}
+            initialMode={filters.mode}
           />
         )
       ) : (

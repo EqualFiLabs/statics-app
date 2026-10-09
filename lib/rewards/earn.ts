@@ -18,6 +18,8 @@ export type EarnFilters = Readonly<{
   share: "lp" | "allocator";
   /** Allocations: stake (wei) to free from `positionId` for an unstake. */
   unlock?: bigint;
+  /** Staking: which tab the form opens on. */
+  mode?: "stake" | "unstake";
   invalid: boolean;
 }>;
 export function readEarnFilters(params: URLSearchParams): EarnFilters {
@@ -25,7 +27,8 @@ export function readEarnFilters(params: URLSearchParams): EarnFilters {
     pool = params.get("poolId"),
     asset = params.get("asset"),
     share = params.get("share"),
-    unlock = params.get("unlock");
+    unlock = params.get("unlock"),
+    mode = params.get("mode");
   const positionId =
     position !== null && /^\d+$/.test(position) && BigInt(position) <= maxUint256
       ? BigInt(position)
@@ -39,15 +42,17 @@ export function readEarnFilters(params: URLSearchParams): EarnFilters {
       unlock !== null && /^\d+$/.test(unlock) && BigInt(unlock) > 0n && BigInt(unlock) <= maxUint256
         ? BigInt(unlock)
         : undefined,
+    mode: mode === "stake" || mode === "unstake" ? mode : undefined,
     invalid:
-      ["positionId", "poolId", "asset", "share", "unlock"].some(
+      ["positionId", "poolId", "asset", "share", "unlock", "mode"].some(
         (key) => params.getAll(key).length > 1
       ) ||
       (unlock !== null && (!/^\d+$/.test(unlock) || BigInt(unlock) > maxUint256)) ||
       (position !== null && positionId === undefined) ||
       (pool !== null && !isHash(pool)) ||
       (asset !== null && !isAddress(asset)) ||
-      (share !== null && share !== "lp" && share !== "allocator"),
+      (share !== null && share !== "lp" && share !== "allocator") ||
+      (mode !== null && mode !== "stake" && mode !== "unstake"),
   };
 }
 export function earnHref(view: EarnView, filters: Partial<EarnFilters> = {}) {
@@ -57,6 +62,7 @@ export function earnHref(view: EarnView, filters: Partial<EarnFilters> = {}) {
     if (view !== "staking" && filters.poolId) params.set("poolId", filters.poolId);
     if (view !== "allocations" && filters.asset) params.set("asset", filters.asset);
     if (view === "allocations" && filters.unlock) params.set("unlock", String(filters.unlock));
+    if (view === "staking" && filters.mode === "unstake") params.set("mode", "unstake");
   }
   return `/app/rewards${view === "overview" ? "" : `/${view}`}${params.size ? `?${params}` : ""}`;
 }

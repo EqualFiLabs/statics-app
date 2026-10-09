@@ -31,6 +31,15 @@ describe("Earn navigation and amounts", () => {
     expect(earnHref("allocations", { positionId: 1n, unlock: 5n })).toBe(
       "/app/rewards/allocations?positionId=1&unlock=5"
     );
+    expect(readEarnFilters(new URLSearchParams("mode=unstake")).mode).toBe("unstake");
+    for (const mode of ["mode=withdraw", "mode=stake&mode=unstake"])
+      expect(readEarnFilters(new URLSearchParams(mode)).invalid).toBe(true);
+    expect(earnHref("staking", { positionId: 1n, mode: "unstake" })).toBe(
+      "/app/rewards/staking?positionId=1&mode=unstake"
+    );
+    expect(earnHref("allocations", { positionId: 1n, mode: "unstake" })).toBe(
+      "/app/rewards/allocations?positionId=1"
+    );
     expect(earnHref("gauge", { positionId: 1n, unlock: 5n })).toBe(
       "/app/rewards/gauge?positionId=1"
     );
