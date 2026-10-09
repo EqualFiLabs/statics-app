@@ -27,11 +27,12 @@ export const staticsGaugeIncentivesAbi = parseAbi([
     "function gaugeAllocationCooldown() view returns (uint40 cooldown)",
     "function gaugeAllocatorReward(bytes32 poolId,uint8 slot) view returns ((address asset,bytes32 eligibilityVersion,uint64 fundingRestrictionSequence,uint40 periodStart,uint40 periodFinish,uint40 lastUpdate,uint256 periodBudget,uint256 periodEmitted,uint256 globalIndexX160,uint256 indexedLiability,uint256 claimLiability,bool terminated) state)",
     "function previewGaugeAllocatorRewards(uint256 positionId,bytes32 poolId,uint8[] slots) view returns ((uint8 slot,address asset,uint256 allocation,uint256 amount)[] rewards)",
+    "function positionGaugeAllocatorPools(uint256 positionId,uint256 cursor,uint256 limit) view returns (bytes32[] poolIds,uint256 nextCursor)",
     "event GaugeReserveFunded(address indexed funder,uint256 amount,uint40 indexed maturityAt)",
     "event GaugeScheduleActivated(uint40 indexed scheduleStart,uint40 indexed firstPeriodFinish,uint256 budget)",
     "event GaugeReleaseBpsScheduled(uint16 releaseBps,uint40 indexed effectiveAt)",
     "event GaugeAllocationCooldownSet(uint40 cooldown)",
-    "event PositionGaugeAllocationsSet(uint256 indexed positionId,uint40 indexed nextAllocationAt,uint256 totalAllocated)",
+    "event PositionGaugeAllocationsSet(uint256 indexed positionId,uint40 indexed nextAllocationAt,uint256 totalAllocated,bytes32[] poolIds,uint256[] amounts)",
     "event PositionGaugeAllocationCooldownExtended(uint256 indexed positionId,uint40 indexed nextAllocationAt)",
     "event PositionGaugeAllocationsClearedByStakeLoss(uint256 indexed positionId,uint256 remainingStake)",
     "event GaugePeriodStarted(uint64 indexed period,uint40 indexed start,uint40 indexed finish,uint16 releaseBps,uint256 budget,uint256 totalAllocatedWeight)",
@@ -204,6 +205,15 @@ export function buildPreviewGaugeAllocatorRewardsCall(positionId, poolId, slots)
         args: [positionId, poolId, validatedSlots],
     });
 }
+export function buildPositionGaugeAllocatorPoolsCall(positionId, cursor, limit) {
+    if (limit < 1n || limit > 100n)
+        throw new Error("limit is out of range");
+    return encodeFunctionData({
+        abi: staticsGaugeIncentivesAbi,
+        functionName: "positionGaugeAllocatorPools",
+        args: [positionId, cursor, limit],
+    });
+}
 export function decodeGaugeReserveResult(data) {
     return decodeFunctionResult({ abi: staticsGaugeIncentivesAbi, functionName: "gaugeReserve", data });
 }
@@ -235,4 +245,12 @@ export function decodeGaugeAllocatorRewardsPreviewResult(data) {
         functionName: "previewGaugeAllocatorRewards",
         data,
     });
+}
+export function decodePositionGaugeAllocatorPoolsResult(data) {
+    const [poolIds, nextCursor] = decodeFunctionResult({
+        abi: staticsGaugeIncentivesAbi,
+        functionName: "positionGaugeAllocatorPools",
+        data,
+    });
+    return { poolIds, nextCursor };
 }

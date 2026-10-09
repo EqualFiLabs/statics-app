@@ -25,6 +25,7 @@ import {
   rewardRestriction,
   v4Position,
 } from "ponder:schema";
+import { positionStatementRoutes } from "./position-statement";
 import { allocationPoolRoutes } from "./allocation-pools";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
@@ -38,6 +39,7 @@ const phaseOneDeploymentId =
   process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID?.trim() || "unconfigured-phase-one";
 
 app.route("/", allocationPoolRoutes(phaseOneDeploymentId));
+app.route("/", positionStatementRoutes(phaseOneDeploymentId));
 
 const MAX_MARKET_RANGE_SECONDS = 31n * 24n * 60n * 60n;
 

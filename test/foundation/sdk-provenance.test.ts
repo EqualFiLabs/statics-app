@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { staticsAbi as rootAbi } from "@statics-protocol/sdk";
+import { staticsAbi as phaseOneAbi } from "@statics-protocol/sdk/phase-one";
 
 const root = resolve(import.meta.dirname, "../..");
 
@@ -17,12 +19,29 @@ describe("vendored Statics SDK", () => {
       batchRewardsSourceChecksums?: Record<string, string>;
       rewardSelectionTimingSource?: { repository: string; path: string; commit: string };
       rewardSelectionTimingSourceChecksums?: Record<string, string>;
+      positionStatementSource?: { repository: string; path: string; commit: string };
+      positionStatementProtocolCommit?: string;
+      positionStatementLegacyArtifactsCommit?: string;
+      positionStatementSourceChecksums?: Record<string, string>;
       sdkTreeState: "clean" | "dirty";
       sourceChecksums: Record<string, string>;
       extensionSourceChecksums?: Record<string, string>;
       checksums: Record<string, string>;
     };
     expect(provenance.protocolCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementProtocolCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementLegacyArtifactsCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(provenance.positionStatementSource).toEqual({
+      repository: "https://github.com/EqualFiLabs/statics-sdk",
+      path: ".",
+      commit: "543052f8805ddcce6cb77430e1a654f16b0adeef",
+    });
+    expect(Object.keys(provenance.positionStatementSourceChecksums ?? {}).sort()).toEqual([
+      "package.json",
+      "src/gauge-incentives.ts",
+      "src/index.ts",
+      "src/range-gauges.ts",
+    ]);
     expect(provenance.source).toEqual({
       repository: "https://github.com/EqualFiLabs/statics-sdk",
       path: ".",
@@ -71,6 +90,19 @@ describe("vendored Statics SDK", () => {
         .update(readFileSync(resolve(root, "vendor/statics-sdk", file)))
         .digest("hex");
       expect(actual, file).toBe(expected);
+    }
+  });
+
+  it("keeps governance revenue bindings compatible across root and Phase 1", () => {
+    for (const name of [
+      "nonSwapStakerShareBps",
+      "setNonSwapStakerShareBps",
+      "InvalidNonSwapStakerShareBps",
+      "NonSwapStakerShareBpsSet",
+    ]) {
+      const expected = phaseOneAbi.find((item) => "name" in item && item.name === name);
+      expect(expected, name).toBeDefined();
+      expect(rootAbi.filter((item) => "name" in item && item.name === name)).toEqual([expected]);
     }
   });
 

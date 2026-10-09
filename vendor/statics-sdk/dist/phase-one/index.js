@@ -1,11 +1,15 @@
-import { concatHex, encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, toHex, } from "viem";
+import { decodeFunctionResult, concatHex, encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, toHex, } from "viem";
+import { staticsBatchRewardsAbi, staticsAggregatedBatchRewardsAbi } from "./batch-rewards.js";
 import { staticsRangeGaugeAbi } from "./range-gauges.js";
 import { staticsGaugeIncentivesAbi } from "./gauge-incentives.js";
 import { staticsMarketTapeAbi, staticsSwapCallbackAbi } from "./market-tape.js";
+import { staticsPositionMarketAbi } from "./position-market.js";
 export { robinhoodChain } from "./generated/robinhoodChain.js";
 export * from "./gauge-incentives.js";
 export * from "./market-tape.js";
+export * from "./position-market.js";
 export * from "./range-gauges.js";
+export * from "./batch-rewards.js";
 export const BPS = 10000n;
 export const SHARE_SCALE = 10n ** 18n;
 export const MAX_LTV_BPS = 9500n;
@@ -726,6 +730,8 @@ export function allowsExposureIncrease(status) {
     return status === BasketStatus.Active;
 }
 export const staticsAbi = [
+    ...staticsBatchRewardsAbi,
+    ...staticsAggregatedBatchRewardsAbi,
     ...parseAbi([
         "function createBasket((string name,string symbol,address[] assets,uint256[] bundleAmounts,(uint256 minActionShares,uint256 feeShares)[] mintFeeTiers,(uint256 minActionShares,uint256 feeShares)[] redemptionFeeTiers,uint16 flashFeeBps,uint16 originationFeeBps,uint16 extensionFeeBps,uint16 ltvBps,uint16 recoveryPenaltyBps,uint40 loanDuration) params,(uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceAssetPerBasketX96,uint256 pairedAssetAmount)[] pools,uint256[] maxAmountsIn,uint256 launchDeadline) payable returns (uint256 basketId,address token)",
         "function mint(uint256 basketId,uint256 shares,address receiver,uint256[] maxAmountsIn) returns (uint256[] amountsIn)",
@@ -756,13 +762,11 @@ export const staticsAbi = [
         "function optOutRewardAssets(uint256 positionId,address[] assets)",
         "function claimRewards(uint256 positionId,address[] assets,address receiver,uint256[] minAmountsOut) returns (uint256[] amountsOut)",
         "function distributeTreasuryFees(address asset) returns (uint256 amount)",
-        "function pendingRewards(uint256 positionId,address[] assets) view returns (uint256[] amounts)",
-        "function stakePosition(uint256 positionId) view returns ((uint256 stakedBalance,uint16 rewardMultiplierBps,uint256 claimAssetCount,uint256 optedInAssetCount) position)",
         "function rewardAsset(address asset) view returns ((uint256 eligibleStake,uint256 eligibleWeight,uint256 pendingStake,uint256 pendingWeight,uint256 indexRay,uint256 indexedReserve,uint256 totalClaimable) state)",
-        "function positionRewardAssets(uint256 positionId) view returns (address[] assets)",
-        "function isRewardAssetOptedIn(uint256 positionId,address asset) view returns (bool)",
-        "function rewardSelection(uint256 positionId,address asset) view returns ((bool selected,uint256 eligibleStake,uint256 eligibleWeight,uint256 pendingStake,uint256 pendingWeight,uint40 eligibleAt) selection)",
         "function maxRewardAssetsPerPosition() pure returns (uint256)",
+        "function nonSwapStakerShareBps() view returns (uint16)",
+        "function setNonSwapStakerShareBps(uint16 shareBps)",
+        "error InvalidNonSwapStakerShareBps(uint256 shareBps)",
         "function rewardEligibilityDelay() pure returns (uint256)",
         "function rewardEligibilityBucketSize() pure returns (uint256)",
         "function stakingToken() view returns (address)",
@@ -891,7 +895,6 @@ export const staticsAbi = [
         "function positionPortfolioCounts(uint256 positionId) view returns ((uint256 basketCount,uint256 loanCount,uint256 globalRewardAssetCount,uint256 riskSeriesCount,uint256 morphoMarketCount) counts)",
         "function basketIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] basketIds,uint256 nextCursor)",
         "function loanIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] loanIds,uint256 nextCursor)",
-        "function globalRewardAssetsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (address[] assets,uint256 nextCursor)",
         "function riskSeriesIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] seriesIds,uint256 nextCursor)",
         "function quarantineBasket(uint256 basketId)",
         "function releaseBasketQuarantine(uint256 basketId)",
@@ -1023,7 +1026,8 @@ export const staticsAbi = [
         "event GlobalFeeAccrued(address indexed asset,uint256 grossFee,uint256 stakerAmount,uint256 treasuryAmount,uint256 indexRay)",
         "event SwapRewardCrystallized(address indexed asset,uint256 amount,uint256 eligibleWeight,uint256 indexRay,uint256 unfundedAmount)",
         "event SwapRewardFunded(address indexed asset,uint256 amount,uint256 unfundedAmount)",
-        "event RewardClaimed(uint256 indexed positionId,address indexed receiver,address indexed asset,uint256 amount)",
+        "event NonSwapStakerShareBpsSet(uint16 previousShareBps,uint16 newShareBps)",
+        "event RewardClaimed(uint256 indexed positionId,address indexed receiver,address indexed asset,uint256 debited,uint256 received)",
         "event TreasuryFeesDistributed(address indexed asset,address indexed treasury,uint256 amount)",
         "event RewardAssetOptedIn(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
         "event RewardStakeScheduled(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
@@ -1096,6 +1100,7 @@ export const staticsAbi = [
     ...staticsGaugeIncentivesAbi,
     ...staticsMarketTapeAbi,
     ...staticsSwapCallbackAbi,
+    ...staticsPositionMarketAbi,
 ];
 export const staticsFlashAssetBorrowerAbi = parseAbi([
     "function onStaticsFlashLoanAsset(address initiator,address asset,uint256 amount,uint256 fee,bytes data) returns (bytes32)",
@@ -3199,4 +3204,17 @@ export async function planRedeemUnderlyingRoutes(destinationToken, redeemQuote, 
         const route = await adapter.quoteExactInput({ tokenIn: asset, tokenOut: destinationToken, amountIn: amountOut });
         return { asset, amount: amountOut, sourceOrDestinationAmount: route.minAmountOut, execution: route.execution };
     }));
+}
+/** Configure only subsequent non-swap fees; the complementary share belongs to treasury. */
+export function buildSetNonSwapStakerShareBpsCall(shareBps) {
+    if (!Number.isInteger(shareBps) || shareBps < 0 || shareBps > 10_000) {
+        throw new Error("Non-swap staker share must be an integer from 0 to 10000 basis points.");
+    }
+    return encodeFunctionData({ abi: staticsAbi, functionName: "setNonSwapStakerShareBps", args: [shareBps] });
+}
+export function buildNonSwapStakerShareBpsCall() {
+    return encodeFunctionData({ abi: staticsAbi, functionName: "nonSwapStakerShareBps" });
+}
+export function decodeNonSwapStakerShareBpsResult(data) {
+    return decodeFunctionResult({ abi: staticsAbi, functionName: "nonSwapStakerShareBps", data });
 }

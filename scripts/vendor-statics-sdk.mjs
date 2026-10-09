@@ -39,6 +39,18 @@ const legacyArtifactsRoot = configuredLegacyArtifactsRoot
   ? resolve(repositoryRoot, configuredLegacyArtifactsRoot)
   : null;
 const destination = resolve(repositoryRoot, "vendor/statics-sdk");
+const priorProvenance = existsSync(resolve(destination, "provenance.json"))
+  ? JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8"))
+  : null;
+if (
+  existsSync(resolve(destination, "provenance.json")) &&
+  JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8"))
+    .positionStatementSource &&
+  !process.env.STATICS_POSITION_STATEMENT_SDK_REPOSITORY?.trim()
+)
+  throw new Error(
+    "Set STATICS_POSITION_STATEMENT_SDK_REPOSITORY to retain statement bindings during sync."
+  );
 if (
   existsSync(resolve(destination, "provenance.json")) &&
   JSON.parse(readFileSync(resolve(destination, "provenance.json"), "utf8"))
@@ -220,6 +232,9 @@ writeFileSync(
   `${JSON.stringify(
     {
       protocolCommit,
+      positionStatementLegacyArtifactsCommit:
+        priorProvenance?.positionStatementLegacyArtifactsCommit,
+      positionStatementProtocolCommit: priorProvenance?.positionStatementProtocolCommit,
       source: legacyProvenance?.source ?? {
         repository: configuredSdkRoot
           ? sdkSourceUrl.toString().replace(/\/$/u, "")
@@ -270,4 +285,8 @@ if (process.env.STATICS_BATCH_REWARDS_SDK_REPOSITORY?.trim()) {
 }
 if (process.env.STATICS_REWARD_SELECTION_TIMING_SDK_REPOSITORY?.trim()) {
   await import("./vendor-reward-selection-timing-sdk.mjs");
+}
+
+if (process.env.STATICS_POSITION_STATEMENT_SDK_REPOSITORY?.trim()) {
+  await import("./vendor-position-statements-sdk.mjs");
 }

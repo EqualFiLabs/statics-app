@@ -588,7 +588,7 @@ export function quoteExtension(snapshot, principals) {
 export function allowsExposureIncrease(status) {
     return status === BasketStatus.Active;
 }
-export const staticsAbi = parseAbi([
+export const staticsAbi = [...parseAbi([
     "function createBasket((string name,string symbol,address[] assets,uint256[] bundleAmounts,(uint256 minActionShares,uint256 feeShares)[] mintFeeTiers,(uint256 minActionShares,uint256 feeShares)[] redemptionFeeTiers,uint16 flashFeeBps,uint16 originationFeeBps,uint16 extensionFeeBps,uint16 ltvBps,uint16 recoveryPenaltyBps,uint40 loanDuration) params,(uint160 sqrtPriceAssetPerBasketX96,uint256 pairedAssetAmount)[] pools,uint256[] maxAmountsIn,uint256 launchDeadline) payable returns (uint256 basketId,address token)",
     "function mint(uint256 basketId,uint256 shares,address receiver,uint256[] maxAmountsIn) returns (uint256[] amountsIn)",
     "function redeem(uint256 basketId,uint256 shares,address receiver,uint256[] minAmountsOut) returns (uint256[] amountsOut)",
@@ -780,7 +780,7 @@ export const staticsAbi = parseAbi([
     "event Staked(uint256 indexed positionId,address indexed payer,uint256 amount,uint256 totalPositionStake)",
     "event Unstaked(uint256 indexed positionId,address indexed receiver,uint256 amount,uint256 totalPositionStake)",
     "event GlobalFeeAccrued(address indexed asset,uint256 grossFee,uint256 stakerAmount,uint256 treasuryAmount,uint256 indexRay)",
-    "event RewardClaimed(uint256 indexed positionId,address indexed receiver,address indexed asset,uint256 amount)",
+    "event RewardClaimed(uint256 indexed positionId,address indexed receiver,address indexed asset,uint256 debited,uint256 received)",
     "event TreasuryFeesDistributed(address indexed asset,address indexed treasury,uint256 amount)",
     "event RewardAssetOptedIn(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
     "event RewardStakeScheduled(uint256 indexed positionId,address indexed asset,uint256 actualPendingStake,uint256 effectivePendingWeight,uint40 eligibleAt)",
@@ -827,7 +827,7 @@ export const staticsAbi = parseAbi([
     "event LiquidityRewardAccrued(bytes32 indexed poolId,address indexed asset,uint256 amount,uint256 indexRay)",
     "event LiquidityRewardSettled(uint256 indexed positionId,uint256 indexed tokenId,address indexed asset,uint256 amount)",
     "event LiquidityRewardClaimed(uint256 indexed positionId,uint256 indexed tokenId,address indexed asset,address receiver,uint256 amount)",
-]);
+]), ...parseAbi(["struct LiquidityStatementMovement { uint128 liquidityBefore; uint128 liquidityAfter; address payer; address receiver; uint256 paid0; uint256 received0; uint256 paid1; uint256 received1; }","struct RebalanceSettlement { uint256 withdrawn0; uint256 withdrawn1; uint256 mintSpent0; uint256 mintReceived0; uint256 mintSpent1; uint256 mintReceived1; }","event ManagedLiquidityProvided(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address manager,int24 tickLower,int24 tickUpper,LiquidityStatementMovement movement)","event ManagedLiquidityAttached(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address manager,int24 tickLower,int24 tickUpper,uint128 liquidity)","event ManagedLiquidityChanged(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,LiquidityStatementMovement movement)","event ManagedLiquidityRebalanced(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed oldPosmTokenId,uint256 newPosmTokenId,address manager,int24 tickLower,int24 tickUpper,LiquidityStatementMovement movement,RebalanceSettlement settlement)","event ManagedLiquidityExited(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,LiquidityStatementMovement movement)","event ManagedLiquidityFeesCollected(uint256 indexed positionId,bytes32 indexed poolId,uint256 indexed posmTokenId,address receiver,uint256 amount0,uint256 amount1)","event PositionGaugeAllocationsSet(uint256 indexed positionId,uint40 indexed nextAllocationAt,uint256 totalAllocated,bytes32[] poolIds,uint256[] amounts)","function nonSwapStakerShareBps() view returns (uint16)","function setNonSwapStakerShareBps(uint16 shareBps)","error InvalidNonSwapStakerShareBps(uint256 shareBps)","event NonSwapStakerShareBpsSet(uint16 previousShareBps,uint16 newShareBps)"])];
 export const staticsPositionPortfolioAbi = parseAbi([
     "function positionPortfolioCounts(uint256 positionId) view returns ((uint256 basketCount,uint256 loanCount,uint256 liquidityPositionCount,uint256 globalRewardAssetCount,uint256 riskSeriesCount) counts)",
     "function basketIdsOfPosition(uint256 positionId,uint256 cursor,uint256 limit) view returns (uint256[] basketIds,uint256 nextCursor)",
@@ -1979,3 +1979,5 @@ export async function planRedeemUnderlyingRoutes(destinationToken, redeemQuote, 
 export * from "./batch-rewards.js";
 
 export * from "./position-market.js";
+
+export { staticsRangeGaugeAbi, staticsGaugeIncentivesAbi, buildSetNonSwapStakerShareBpsCall, buildNonSwapStakerShareBpsCall, decodeNonSwapStakerShareBpsResult } from "./phase-one/index.js";

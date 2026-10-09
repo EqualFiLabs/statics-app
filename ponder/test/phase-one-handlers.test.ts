@@ -10,6 +10,12 @@ vi.mock("ponder:registry", () => ({
 vi.mock("ponder:schema", () =>
   Object.fromEntries(
     [
+      "positionStatement",
+      "positionStatementMovement",
+      "positionStatementHistory",
+      "positionStatementBlock",
+      "positionStatementConfig",
+      "positionStatementRevision",
       "allocationToken",
       "allocatorStream",
       "allocationDirectoryPool",
@@ -45,6 +51,8 @@ type Row = Record<string, unknown> & { key: string };
 const rows = new Map<string, Row>();
 const readContract = vi.fn();
 const db = {
+  delete: async (table: string, identity: { key: string }) =>
+    rows.delete(`${table}:${identity.key}`),
   find: async (table: string, identity: { key: string }) => rows.get(`${table}:${identity.key}`),
   sql: {
     select: () => ({
@@ -56,11 +64,11 @@ const db = {
   },
   insert: (table: string) => ({
     values: (row: Row) => ({
-      then: (resolve: () => void, reject: (error: Error) => void) => {
+      then: (resolve: (value: Row) => void, reject: (error: Error) => void) => {
         const key = `${table}:${row.key}`;
         if (rows.has(key)) return reject(new Error("duplicate primary key"));
         rows.set(key, row);
-        resolve();
+        resolve(row);
       },
       onConflictDoUpdate: async (update: Row | ((row: Row) => Row)) => {
         const key = `${table}:${row.key}`,
@@ -77,6 +85,7 @@ const db = {
   update: (table: string, identity: { key: string }) => ({
     set: async (update: Record<string, unknown>) => {
       const key = `${table}:${identity.key}`;
+      if (!rows.has(key)) throw new Error("record not found");
       rows.set(key, { ...rows.get(key)!, ...update });
     },
   }),
@@ -84,20 +93,25 @@ const db = {
 const poolId = `0x${"a".repeat(64)}`;
 const base = {
   args: { positionId: 1n, poolId },
-  log: { address: process.env.PONDER_STATICS_DIAMOND_ADDRESS },
-  transaction: { hash: `0x${"b".repeat(64)}`, input: "0x1234" },
-  block: { number: 100n, timestamp: 1000n },
+  log: { address: process.env.PONDER_STATICS_DIAMOND_ADDRESS, logIndex: 0 },
+  transaction: { hash: `0x${"b".repeat(64)}`, from: `0x${"1".repeat(40)}`, input: "0x1234" },
+  block: { number: 100n, timestamp: 1000n, hash: `0x${"c".repeat(64)}` },
 };
+let logIndex = 0;
 const run = (name: string, event: unknown) =>
   handlers.get(`PhaseOneStatics:${name}`)!({
-    event,
+    event: { ...(event as object), log: { ...base.log, logIndex: logIndex++ } },
     context: { db, client: { readContract }, chain: { id: 4663 } },
   });
 beforeEach(() => {
   rows.clear();
+  logIndex = 0;
   readContract.mockReset();
   readContract.mockImplementation(
     async ({ functionName, args }: { functionName: string; args?: unknown[] }) => {
+      if (functionName === "symbol" || functionName === "name") return "Token";
+      if (functionName === "decimals") return 18;
+      if (functionName === "stakingToken") return `0x${"1".repeat(40)}`;
       if (functionName === "gaugePositionAllocations")
         return [2000, 5n, [{ poolId, amount: 5n, eligibilityVersion: poolId }], 5n];
       if (functionName === "poolRewardConfig")
@@ -152,6 +166,11 @@ describe("actual Phase 1 event handlers", () => {
     expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ blockNumber: 100n }));
   });
   it("upserts a previously exited managed leg when the position and pool are reused", async () => {
+    rows.set(`publicPool:phase-one:${poolId}`, {
+      key: `phase-one:${poolId}`,
+      currency0: `0x${"1".repeat(40)}`,
+      currency1: `0x${"2".repeat(40)}`,
+    });
     const provided = {
       ...base,
       args: {
@@ -161,10 +180,26 @@ describe("actual Phase 1 event handlers", () => {
         tickLower: -60,
         tickUpper: 60,
         liquidity: 100n,
+        movement: {
+          liquidityBefore: 0n,
+          liquidityAfter: 100n,
+          payer: `0x${"1".repeat(40)}`,
+          receiver: `0x${"1".repeat(40)}`,
+          paid0: 0n,
+          paid1: 0n,
+          received0: 0n,
+          received1: 0n,
+        },
       },
     };
     await run("ManagedLiquidityProvided", provided);
-    await run("ManagedLiquidityExited", base);
+    await run("ManagedLiquidityExited", {
+      ...provided,
+      args: {
+        ...provided.args,
+        movement: { ...provided.args.movement, liquidityBefore: 100n, liquidityAfter: 0n },
+      },
+    });
     await run("ManagedLiquidityAttached", {
       ...provided,
       args: { ...provided.args, posmTokenId: 11n },
@@ -375,5 +410,211 @@ describe("allocator funding and restriction observations", () => {
       readContract.mock.calls.some(([request]) => request.functionName === "gaugePoolWeight")
     ).toBe(false);
     expect(rows.get("gaugeReserveState:phase-one")?.totalAllocatedWeight).toBe(5n);
+  });
+});
+
+describe("Position NFT statement handlers", () => {
+  const first = `0x${"1".repeat(40)}`,
+    second = `0x${"2".repeat(40)}`,
+    asset = `0x${"3".repeat(40)}`;
+  const entries = () =>
+    [...rows.entries()]
+      .filter(([key]) => key.startsWith("positionStatement:"))
+      .map(([, row]) => row);
+  const movements = () =>
+    [...rows.entries()]
+      .filter(([key]) => key.startsWith("positionStatementMovement:"))
+      .map(([, row]) => row);
+  it("updates live position state and rejects unexplained missing current records", async () => {
+    const event = {
+      ...base,
+      args: { tokenId: 1n, stateNonce: 2n, activeLegCount: 1n, unresolvedObligationCount: 1n },
+    };
+    await expect(run("PositionStateChanged", event)).rejects.toThrow("record not found");
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: `0x${"0".repeat(40)}`, to: first },
+    });
+    await run("PositionStateChanged", event);
+    expect(rows.get("positionNft:phase-one:1")).toMatchObject({
+      activeLegCount: 1n,
+      unresolvedObligationCount: 1n,
+    });
+  });
+  it("preserves a transfer during safe-mint before PositionCreated is emitted", async () => {
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: `0x${"0".repeat(40)}`, to: first },
+    });
+    await run("Transfer", { ...base, args: { tokenId: 1n, from: first, to: second } });
+    await run("PositionCreated", { ...base, args: { positionId: 1n, owner: first } });
+    expect(rows.get("positionNft:phase-one:1")?.owner).toBe(second);
+    expect(rows.get("positionStatementHistory:phase-one:1")?.owner).toBe(second);
+    expect(entries()[1]).toMatchObject({ ownerBefore: null, ownerAfter: second });
+    expect(JSON.parse(entries()[1].payloadJson as string).owner).toBe(first);
+  });
+  it("keeps NFT lifetime ownership and closure independently of current ownership", async () => {
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: `0x${"0".repeat(40)}`, to: first },
+    });
+    await run("PositionCreated", { ...base, args: { positionId: 1n, owner: first } });
+    await run("Transfer", { ...base, args: { tokenId: 1n, from: first, to: second } });
+    await run("Transfer", { ...base, args: { tokenId: 1n, from: second, to: first } });
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: first, to: `0x${"0".repeat(40)}` },
+    });
+    await run("PositionStateChanged", {
+      ...base,
+      args: { tokenId: 1n, stateNonce: 2n, activeLegCount: 0n, unresolvedObligationCount: 0n },
+    });
+    await run("PositionClosed", { ...base, args: { positionId: 1n } });
+    expect(rows.has("positionNft:phase-one:1")).toBe(false);
+    expect(entries().map((r) => r.eventName)).toEqual([
+      "PositionCreated",
+      "Transfer",
+      "Transfer",
+      "PositionClosed",
+    ]);
+    expect(entries()[0]).toMatchObject({ ownerBefore: null, ownerAfter: first });
+    expect(entries()[1]).toMatchObject({ ownerBefore: first, ownerAfter: second });
+    expect(entries()[3]).toMatchObject({ ownerBefore: first, ownerAfter: null });
+    expect(rows.get("positionStatementHistory:phase-one:1")).toMatchObject({
+      owner: null,
+      lastOwner: first,
+      openingObserved: true,
+    });
+  });
+  it("records wallet rewards once and preserves distinct batch logs and retained entitlements", async () => {
+    for (const [name, amount] of [
+      ["RewardClaimed", 1n],
+      ["RewardClaimed", 2n],
+    ] as const)
+      await run(name, {
+        ...base,
+        args: { positionId: 1n, receiver: second, asset, debited: amount, received: amount },
+      });
+    await run("PositionRewardSettled", { ...base, args: { positionId: 1n, asset, amount: 3n } });
+    await run("PositionRewardEligibilityActivated", {
+      ...base,
+      args: {
+        positionId: 1n,
+        asset,
+        stake: 100n,
+        weight: 100n,
+        eligibleAt: 1,
+        activationIndexRay: 0n,
+      },
+    });
+    expect(entries()).toHaveLength(4);
+    expect(
+      movements()
+        .filter((r) => r.space === "wallet")
+        .map((r) => r.amount)
+    ).toEqual([1n, 2n]);
+    expect(
+      movements()
+        .filter((r) => r.space === "entitlement")
+        .map((r) => r.amount)
+    ).toEqual([3n]);
+    expect(handlers.has("PhaseOneStatics:AggregatedRewardPaid")).toBe(false);
+    expect(entries()[0].transactionSender).toBe(first);
+    expect(movements()[1].actor).toBe(second);
+    expect(rows.get("positionStatementHistory:phase-one:1")?.openingObserved).toBe(false);
+  });
+  it("separates internally recycled rebalance proceeds from wallet funding/refunds", async () => {
+    rows.set(`publicPool:phase-one:${poolId}`, {
+      key: `phase-one:${poolId}`,
+      currency0: first,
+      currency1: second,
+    });
+    rows.set(`managedGaugePosition:phase-one:1:${poolId}`, { key: `phase-one:1:${poolId}` });
+    await run("ManagedLiquidityRebalanced", {
+      ...base,
+      args: {
+        positionId: 1n,
+        poolId,
+        oldPosmTokenId: 8n,
+        newPosmTokenId: 9n,
+        manager: first,
+        tickLower: -60,
+        tickUpper: 60,
+        movement: {
+          liquidityBefore: 1n,
+          liquidityAfter: 2n,
+          payer: first,
+          receiver: second,
+          paid0: 1n,
+          received0: 2n,
+          paid1: 0n,
+          received1: 0n,
+        },
+        settlement: {
+          withdrawn0: 10n,
+          withdrawn1: 0n,
+          mintSpent0: 9n,
+          mintReceived0: 0n,
+          mintSpent1: 0n,
+          mintReceived1: 0n,
+        },
+      },
+    });
+    expect(
+      movements()
+        .filter((r) => r.space === "wallet")
+        .map((r) => [r.amount, r.actor])
+    ).toEqual([
+      [1n, first],
+      [2n, second],
+    ]);
+    expect(
+      movements()
+        .filter((r) => r.space === "internal")
+        .map((r) => r.amount)
+    ).toEqual([10n, 9n]);
+    expect(entries()[0]).toMatchObject({ posmTokenId: 8n, newPosmTokenId: 9n });
+  });
+  it("records exact intermediate allocation arrays rather than block-ending snapshots", async () => {
+    await run("PositionGaugeAllocationsSet", {
+      ...base,
+      args: {
+        positionId: 1n,
+        nextAllocationAt: 100,
+        totalAllocated: 2n,
+        poolIds: [poolId],
+        amounts: [2n],
+      },
+    });
+    await run("PositionGaugeAllocationsSet", {
+      ...base,
+      args: {
+        positionId: 1n,
+        nextAllocationAt: 100,
+        totalAllocated: 5n,
+        poolIds: [poolId],
+        amounts: [5n],
+      },
+    });
+    expect(entries().map((r) => JSON.parse(r.payloadJson as string).amounts)).toEqual([
+      ["2"],
+      ["5"],
+    ]);
+    expect(rows.get("positionGaugeState:phase-one:1")?.amountsJson).toBe('["5"]');
+  });
+  it("records fees including successful zero-output collection without synthetic transfers", async () => {
+    rows.set(`publicPool:phase-one:${poolId}`, {
+      key: `phase-one:${poolId}`,
+      currency0: first,
+      currency1: second,
+    });
+    for (const amount0 of [0n, 1n])
+      await run("ManagedLiquidityFeesCollected", {
+        ...base,
+        args: { positionId: 1n, poolId, posmTokenId: 8n, receiver: second, amount0, amount1: 0n },
+      });
+    expect(entries()).toHaveLength(2);
+    expect(movements()).toHaveLength(1);
+    expect(movements()[0]).toMatchObject({ purpose: "trading-fees", amount: 1n, actor: second });
   });
 });

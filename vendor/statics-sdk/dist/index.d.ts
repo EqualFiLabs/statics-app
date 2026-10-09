@@ -5728,7 +5728,10 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint256";
-        readonly name: "amount";
+        readonly name: "debited";
+    }, {
+        readonly type: "uint256";
+        readonly name: "received";
     }];
 }, {
     readonly name: "TreasuryFeesDistributed";
@@ -6680,7 +6683,335 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256";
         readonly name: "amount";
     }];
+}, {
+    readonly name: "ManagedLiquidityProvided";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "manager";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickLower";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickUpper";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }];
+}, {
+    readonly name: "ManagedLiquidityAttached";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "manager";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickLower";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickUpper";
+    }, {
+        readonly type: "uint128";
+        readonly name: "liquidity";
+    }];
+}, {
+    readonly name: "ManagedLiquidityChanged";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }];
+}, {
+    readonly name: "ManagedLiquidityRebalanced";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "oldPosmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "newPosmTokenId";
+    }, {
+        readonly type: "address";
+        readonly name: "manager";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickLower";
+    }, {
+        readonly type: "int24";
+        readonly name: "tickUpper";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint256";
+            readonly name: "withdrawn0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "withdrawn1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintSpent0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintReceived0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintSpent1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "mintReceived1";
+        }];
+        readonly name: "settlement";
+    }];
+}, {
+    readonly name: "ManagedLiquidityExited";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly type: "uint128";
+            readonly name: "liquidityBefore";
+        }, {
+            readonly type: "uint128";
+            readonly name: "liquidityAfter";
+        }, {
+            readonly type: "address";
+            readonly name: "payer";
+        }, {
+            readonly type: "address";
+            readonly name: "receiver";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received0";
+        }, {
+            readonly type: "uint256";
+            readonly name: "paid1";
+        }, {
+            readonly type: "uint256";
+            readonly name: "received1";
+        }];
+        readonly name: "movement";
+    }];
+}, {
+    readonly name: "ManagedLiquidityFeesCollected";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "bytes32";
+        readonly name: "poolId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "posmTokenId";
+        readonly indexed: true;
+    }, {
+        readonly type: "address";
+        readonly name: "receiver";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount0";
+    }, {
+        readonly type: "uint256";
+        readonly name: "amount1";
+    }];
+}, {
+    readonly name: "PositionGaugeAllocationsSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "positionId";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint40";
+        readonly name: "nextAllocationAt";
+        readonly indexed: true;
+    }, {
+        readonly type: "uint256";
+        readonly name: "totalAllocated";
+    }, {
+        readonly type: "bytes32[]";
+        readonly name: "poolIds";
+    }, {
+        readonly type: "uint256[]";
+        readonly name: "amounts";
+    }];
+}, {
+    readonly name: "nonSwapStakerShareBps";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint16";
+    }];
+}, {
+    readonly name: "setNonSwapStakerShareBps";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "shareBps";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "InvalidNonSwapStakerShareBps";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "shareBps";
+    }];
+}, {
+    readonly name: "NonSwapStakerShareBpsSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "previousShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "newShareBps";
+    }];
 }];
+
 export declare const staticsPositionPortfolioAbi: readonly [{
     readonly name: "positionPortfolioCounts";
     readonly type: "function";
@@ -11470,3 +11801,6 @@ export declare function planRedeemUnderlyingRoutes(destinationToken: Address, re
 export * from "./batch-rewards.js";
 
 export * from "./position-market.js";
+
+export { staticsRangeGaugeAbi, staticsGaugeIncentivesAbi, buildSetNonSwapStakerShareBpsCall, buildNonSwapStakerShareBpsCall, decodeNonSwapStakerShareBpsResult } from "./phase-one/index.js";
+export type { LiquidityStatementMovement, RebalanceSettlement, RangeGaugeEventName, RangeGaugeEventArgs, GaugeIncentiveEventName, GaugeIncentiveEventArgs } from "./phase-one/index.js";
