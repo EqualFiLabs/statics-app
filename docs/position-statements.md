@@ -14,6 +14,10 @@ items and `nextCursor`. Limits are 1–100. Integers in payloads/amounts are dec
 log index and metadata decimals are JSON numbers. The typed loader validates ABI widths,
 tuple/array fields, identities, ownership context, canonical order and pagination bounds.
 Amounts are parsed to bigint; small ABI integers (such as ticks) retain SDK number types.
+Liquidity entries expose indexed `poolCurrencies` in PoolKey order; staking entries expose
+the cached `stakingAsset`. Other entries use null for these identities. The loader derives
+the expected positive movement children from the payload and validates their exact count,
+order, assets, amounts, actors and accounting purpose, including successful zero outputs.
 
 Each canonical position event has one entry keyed by deployment/transaction/log index.
 `transactionSender` is transport context. It is not an inferred payer/original caller.
@@ -33,6 +37,8 @@ Mint/burn transfers update independent lifetime ownership rows. PositionCreated/
 supply opening/closing entries; ordinary transfers remain visible. StakingPositionCreated
 and AggregatedRewardPaid do not duplicate canonical creation/staking or individual claims.
 Successful zero fee collections remain visible with no positive movement children.
+The creation payload's owner is the original mint recipient. Ownership context follows
+observed transfers, including transfers inside the safe-mint callback before PositionCreated.
 
 Filtering by asset matches movement currencies and explicit reward assets. Pool filters
 also match exact allocation replacement arrays. Unknown NFTs return 404; valid empty filters

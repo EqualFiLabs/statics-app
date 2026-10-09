@@ -19,6 +19,7 @@ import {
   publicPool,
 } from "ponder:schema";
 import { readTokenMetadata } from "./allocation-snapshots";
+import { statementMovements } from "../../lib/indexer/statement-movements";
 
 import { statementCategories, type StatementEventName } from "../../lib/indexer/position-statement";
 export { statementCategories } from "../../lib/indexer/position-statement";
@@ -34,15 +35,6 @@ export function statementJson(value: unknown): string {
     typeof item === "bigint" || typeof item === "number" ? String(item) : item
   );
 }
-type Movement = {
-  asset: Address;
-  space: "wallet" | "internal" | "entitlement";
-  direction: "debit" | "credit";
-  purpose: string;
-  actor: Address | null;
-  amount: bigint;
-};
-
 export async function recordPositionStatement(
   deploymentId: string,
   name: string,
@@ -64,7 +56,9 @@ export async function recordPositionStatement(
         ? null
         : to
       : name === "PositionCreated"
-        ? getAddress(a.owner as string)
+        ? previous
+          ? previous.owner
+          : getAddress(a.owner as string)
         : name === "PositionClosed"
           ? null
           : (previous?.owner ?? null);
@@ -119,32 +113,13 @@ export async function recordPositionStatement(
   if (lifecycleOnly) return;
   const statementKey = `${deploymentId}:${event.transaction.hash}:${event.log.logIndex}`;
   const poolId = typeof a.poolId === "string" ? (a.poolId as Hex) : null;
-  const movements: Movement[] = [];
-  function move(
-    asset: Address,
-    space: Movement["space"],
-    direction: Movement["direction"],
-    purpose: string,
-    amount: unknown,
-    actor: Address | null = null
-  ) {
-    const quantity = BigInt(amount as bigint | string);
-    if (quantity > 0n)
-      movements.push({
-        asset: getAddress(asset),
-        space,
-        direction,
-        purpose,
-        actor,
-        amount: quantity,
-      });
-  }
+  let stakingAsset: Address | null = null;
   if (name === "Staked" || name === "Unstaked") {
     let config = await context.db.find(positionStatementConfig, { key: deploymentId });
     if (!config) {
-      const stakingAsset = getAddress(
+      const asset = getAddress(
         await context.client.readContract({
-          address: event.log.address as Address,
+          address: event.log.address,
           abi: staticsAbi,
           functionName: "stakingToken",
           blockNumber: event.block.number,
@@ -152,105 +127,19 @@ export async function recordPositionStatement(
       );
       config = await context.db
         .insert(positionStatementConfig)
-        .values({ key: deploymentId, stakingAsset });
+        .values({ key: deploymentId, stakingAsset: asset });
     }
-    move(
-      config.stakingAsset,
-      "wallet",
-      name === "Staked" ? "debit" : "credit",
-      name === "Staked" ? "stake" : "unstake",
-      a.amount,
-      getAddress((a.payer ?? a.receiver) as string)
-    );
+    stakingAsset = config.stakingAsset;
   }
-  if (name === "PositionCreationFeePaid") {
-    // The event proves the treasury receipt, not the original payer of a wrapped wallet call.
-    move(
-      zeroAddress,
-      "wallet",
-      "credit",
-      "creation-fee",
-      a.amount,
-      getAddress(a.treasury as string)
-    );
-  }
-  if (name.startsWith("ManagedLiquidity") && name !== "ManagedLiquidityAttached") {
+  let poolCurrencies: readonly Address[] | null = null;
+  if (name.startsWith("ManagedLiquidity")) {
     const pool = await context.db.find(publicPool, {
       key: `${deploymentId}:${poolId!.toLowerCase()}`,
     });
     if (!pool) throw new Error(`Missing indexed PoolKey for statement ${statementKey}`);
-    const currencies = [pool.currency0, pool.currency1] as const;
-    if (name === "ManagedLiquidityFeesCollected")
-      currencies.forEach((asset, i) =>
-        move(
-          asset,
-          "wallet",
-          "credit",
-          "trading-fees",
-          a[`amount${i}`],
-          getAddress(a.receiver as string)
-        )
-      );
-    else {
-      const m = a.movement as {
-        payer: Address;
-        receiver: Address;
-        paid0: bigint;
-        paid1: bigint;
-        received0: bigint;
-        received1: bigint;
-      };
-      currencies.forEach((asset, i) => {
-        move(
-          asset,
-          "wallet",
-          "debit",
-          "liquidity-funding",
-          m[i === 0 ? "paid0" : "paid1"],
-          m.payer
-        );
-        move(
-          asset,
-          "wallet",
-          "credit",
-          name === "ManagedLiquidityProvided" ||
-            name === "ManagedLiquidityRebalanced" ||
-            m.payer !== zeroAddress
-            ? "liquidity-refund"
-            : "liquidity-output",
-          m[i === 0 ? "received0" : "received1"],
-          m.receiver
-        );
-      });
-      if (name === "ManagedLiquidityRebalanced") {
-        const s = a.settlement as Record<string, bigint>;
-        currencies.forEach((asset, i) => {
-          move(asset, "internal", "credit", "rebalance-withdrawal", s[`withdrawn${i}`]);
-          move(asset, "internal", "debit", "rebalance-mint-spend", s[`mintSpent${i}`]);
-          move(asset, "internal", "credit", "rebalance-mint-return", s[`mintReceived${i}`]);
-        });
-      }
-    }
+    poolCurrencies = [pool.currency0, pool.currency1];
   }
-  if (
-    name === "RewardClaimed" ||
-    name === "LpRewardsClaimed" ||
-    name === "GaugeAllocatorRewardClaimed"
-  ) {
-    move(a.asset as Address, "internal", "debit", "reward-payout-debit", a.debited);
-    move(
-      a.asset as Address,
-      "wallet",
-      "credit",
-      "reward-payout",
-      a.received,
-      getAddress(a.receiver as string)
-    );
-  }
-  if (name === "PositionRewardSettled")
-    move(a.asset as Address, "entitlement", "credit", "reward-settlement", a.amount);
-  if (name === "LpRewardForfeited" || name === "GaugeAllocatorRewardForfeited")
-    move(a.asset as Address, "entitlement", "debit", "reward-forfeiture", a.amount);
+  const movements = statementMovements(name, a, { stakingAsset, poolCurrencies });
   if (typeof a.asset === "string") await readTokenMetadata(context, event, getAddress(a.asset));
   await context.db.insert(positionStatement).values({
     key: statementKey,

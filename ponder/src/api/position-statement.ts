@@ -8,6 +8,8 @@ import {
   positionStatementBlock as blocks,
   positionStatementMovement as movements,
   allocationToken as tokens,
+  publicPool as pools,
+  positionStatementConfig as config,
 } from "ponder:schema";
 
 const categories = ["lifecycle", "staking", "liquidity", "allocations", "rewards"];
@@ -119,6 +121,8 @@ export function statementPageSql(
       'key', page.key, 'positionId', position_id::text, 'eventName', event_name, 'category', category, 'transactionHash', tx, 'logIndex', log_index,
       'blockNumber', block_number::text, 'blockHash', block_hash, 'timestamp', time::text, 'transactionSender', sender, 'ownerBefore', owner_before, 'ownerAfter', owner_after,
       'poolId', pool_id, 'posmTokenId', posm::text, 'newPosmTokenId', new_posm::text, 'payload', payload::json,
+      'poolCurrencies', CASE WHEN category = 'liquidity' THEN (SELECT json_build_array(${pools.currency0}, ${pools.currency1}) FROM ${pools} WHERE ${pools.deploymentId} = ${deploymentId} AND lower(${pools.poolId}) = lower(pool_id)) ELSE NULL END,
+      'stakingAsset', CASE WHEN event_name IN ('Staked','Unstaked') THEN (SELECT ${config.stakingAsset} FROM ${config} WHERE ${config.key} = ${deploymentId}) ELSE NULL END,
       'movements', coalesce((SELECT json_agg(json_build_object(
         'ordinal', ${movements.ordinal}, 'asset', json_build_object('address', ${movements.asset}, 'symbol', ${tokens.symbol}, 'name', ${tokens.name}, 'decimals', ${tokens.decimals}),
         'space', ${movements.space}, 'direction', ${movements.direction}, 'purpose', ${movements.purpose}, 'actor', ${movements.actor}, 'amount', ${movements.amount}::text

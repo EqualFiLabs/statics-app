@@ -8,6 +8,7 @@ import {
   type Hex,
 } from "viem";
 import { staticsAbi } from "@statics-protocol/sdk/phase-one";
+import { statementMovements } from "./statement-movements";
 
 export const statementCategories = {
   PositionCreated: "lifecycle",
@@ -233,6 +234,31 @@ export function parsePositionStatement(
         purpose: m.purpose as (typeof purposes)[number],
       };
     });
+    const stakingAsset = nullable(row.stakingAsset, address);
+    const poolCurrencies = nullable(row.poolCurrencies, (value) => {
+      if (!Array.isArray(value) || value.length !== 2) return fail();
+      const currencies = value.map(address);
+      if (BigInt(currencies[0]) >= BigInt(currencies[1])) return fail();
+      return currencies;
+    });
+    if ((poolCurrencies !== null) !== eventName.startsWith("ManagedLiquidity")) return fail();
+    if ((stakingAsset !== null) !== ["Staked", "Unstaked"].includes(eventName)) return fail();
+    const expected = statementMovements(eventName, payload, { stakingAsset, poolCurrencies });
+    if (
+      expected.length !== movements.length ||
+      expected.some((e, i) => {
+        const actual = movements[i];
+        return (
+          e.asset !== actual.asset.address ||
+          e.actor !== actual.actor ||
+          e.amount !== actual.amount ||
+          e.space !== actual.space ||
+          e.direction !== actual.direction ||
+          e.purpose !== actual.purpose
+        );
+      })
+    )
+      return fail();
     const ownerBefore = nullable(row.ownerBefore, address),
       ownerAfter = nullable(row.ownerAfter, address);
     if (
@@ -244,7 +270,7 @@ export function parsePositionStatement(
     )
       return fail();
     if (eventName === "PositionClosed" && ownerAfter !== null) return fail();
-    if (eventName === "PositionCreated" && payload.owner !== ownerAfter) return fail();
+    if (eventName === "PositionCreated" && ownerBefore !== null) return fail();
     if (eventName === "PositionGaugeAllocationsSet") {
       const pools = payload.poolIds as Hex[],
         amounts = payload.amounts as bigint[];
@@ -273,6 +299,8 @@ export function parsePositionStatement(
       posmTokenId,
       newPosmTokenId,
       movements,
+      stakingAsset,
+      poolCurrencies,
       ...({ eventName, payload } as StatementPayload),
     };
   });

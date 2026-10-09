@@ -20,6 +20,8 @@ beforeAll(async () => {
     schema.positionStatementHistory,
     schema.positionStatementBlock,
     schema.allocationToken,
+    schema.publicPool,
+    schema.positionStatementConfig,
   ]) {
     const config = getTableConfig(table);
     await client.exec(
@@ -31,7 +33,7 @@ beforeAll(async () => {
 afterAll(() => client.close());
 beforeEach(async () => {
   await client.exec(
-    "TRUNCATE position_statement, position_statement_movement, position_statement_history, position_statement_block, allocation_token"
+    "TRUNCATE position_statement, position_statement_movement, position_statement_history, position_statement_block, allocation_token, public_pool, position_statement_config"
   );
   await database.insert(schema.positionStatementHistory).values({
     key: "selected:30",
@@ -49,6 +51,31 @@ beforeEach(async () => {
     blockHash: hash(100),
     blockTimestamp: 1000n,
     digest: hash(777),
+  });
+  await database.insert(schema.publicPool).values({
+    key: `selected:${hash(5)}`,
+    deploymentId: "selected",
+    poolId: hash(5),
+    currency0: wallet,
+    currency1: asset,
+    lpFee: 3000,
+    tickSpacing: 60,
+    hook: wallet,
+    creator: wallet,
+    initialSqrtPriceX96: 1n << 96n,
+    initialTick: 0,
+    inputFeeBps: 5,
+    outputFeeBps: 5,
+    feeRateOverridden: false,
+    polActivated: false,
+    gaugeInitialized: true,
+    gaugeStopped: false,
+    decommissionStarted: false,
+    decommissionFinalized: false,
+    decommissioned: false,
+    quarantined: false,
+    createdAtBlock: 90n,
+    updatedAtBlock: 90n,
   });
   for (const [i, block, category] of [
     [1, 90, "lifecycle"],
@@ -101,6 +128,8 @@ describe("lifetime statements over PostgreSQL", () => {
       asset: { address: asset, symbol: null, decimals: null },
     });
     expect(body.historyStart.openingObserved).toBe(true);
+    expect(body.items[1].poolCurrencies).toEqual([wallet, asset]);
+    expect(body.items[0].stakingAsset).toBeNull();
   });
   it("binds pages to a stable boundary while new blocks arrive", async () => {
     const first = await (await app.request("/phase-one/positions/30/statement?limit=1")).json();

@@ -708,7 +708,6 @@ onPhaseOne("PhaseOneStatics:PositionCreated", async ({ event, context }) => {
       updatedAtBlock: event.block.number,
     })
     .onConflictDoUpdate({
-      owner: getAddress(event.args.owner),
       updatedAtBlock: event.block.number,
     });
 });

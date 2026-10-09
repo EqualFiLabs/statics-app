@@ -424,6 +424,18 @@ describe("Position NFT statement handlers", () => {
     [...rows.entries()]
       .filter(([key]) => key.startsWith("positionStatementMovement:"))
       .map(([, row]) => row);
+  it("preserves a transfer during safe-mint before PositionCreated is emitted", async () => {
+    await run("Transfer", {
+      ...base,
+      args: { tokenId: 1n, from: `0x${"0".repeat(40)}`, to: first },
+    });
+    await run("Transfer", { ...base, args: { tokenId: 1n, from: first, to: second } });
+    await run("PositionCreated", { ...base, args: { positionId: 1n, owner: first } });
+    expect(rows.get("positionNft:phase-one:1")?.owner).toBe(second);
+    expect(rows.get("positionStatementHistory:phase-one:1")?.owner).toBe(second);
+    expect(entries()[1]).toMatchObject({ ownerBefore: null, ownerAfter: second });
+    expect(JSON.parse(entries()[1].payloadJson as string).owner).toBe(first);
+  });
   it("keeps NFT lifetime ownership and closure independently of current ownership", async () => {
     await run("Transfer", {
       ...base,
