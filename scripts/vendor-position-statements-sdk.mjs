@@ -69,9 +69,15 @@ const fragments = [
   ...allocationSource.matchAll(/^\s*"(event PositionGaugeAllocationsSet.*?)",?$/gm),
 ].map((m) => m[1]);
 if (fragments.length !== 9) throw new Error("Unexpected statement event fragments.");
+const governanceFragments = [
+  ...readFileSync(resolve(checkout, "src/index.ts"), "utf8").matchAll(
+    /^\s*"((?:function nonSwapStakerShareBps|function setNonSwapStakerShareBps|error InvalidNonSwapStakerShareBps|event NonSwapStakerShareBpsSet).*?)",?$/gm
+  ),
+].map((m) => m[1]);
+if (governanceFragments.length !== 4) throw new Error("Unexpected non-swap revenue ABI fragments.");
 const abi = javascript.match(/export const staticsAbi = parseAbi\(\[([\s\S]*?)\]\);/);
 if (!abi) throw new Error("Missing legacy ABI.");
-const binding = `export const staticsAbi = [...parseAbi([${abi[1]}]), ...parseAbi(${JSON.stringify(fragments)})] as const;`;
+const binding = `export const staticsAbi = [...parseAbi([${abi[1]}]), ...parseAbi(${JSON.stringify([...fragments, ...governanceFragments])})] as const;`;
 const input = resolve(scratch, "statement-abi.ts");
 writeFileSync(input, 'import { parseAbi } from "viem";\n' + binding);
 const program = ts.createProgram([input], {

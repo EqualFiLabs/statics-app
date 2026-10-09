@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { staticsAbi as rootAbi } from "@statics-protocol/sdk";
+import { staticsAbi as phaseOneAbi } from "@statics-protocol/sdk/phase-one";
 
 const root = resolve(import.meta.dirname, "../..");
 
@@ -88,6 +90,19 @@ describe("vendored Statics SDK", () => {
         .update(readFileSync(resolve(root, "vendor/statics-sdk", file)))
         .digest("hex");
       expect(actual, file).toBe(expected);
+    }
+  });
+
+  it("keeps governance revenue bindings compatible across root and Phase 1", () => {
+    for (const name of [
+      "nonSwapStakerShareBps",
+      "setNonSwapStakerShareBps",
+      "InvalidNonSwapStakerShareBps",
+      "NonSwapStakerShareBpsSet",
+    ]) {
+      const expected = phaseOneAbi.find((item) => "name" in item && item.name === name);
+      expect(expected, name).toBeDefined();
+      expect(rootAbi.filter((item) => "name" in item && item.name === name)).toEqual([expected]);
     }
   });
 

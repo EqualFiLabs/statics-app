@@ -6976,6 +6976,40 @@ export declare const staticsAbi: readonly [{
         readonly type: "uint256[]";
         readonly name: "amounts";
     }];
+}, {
+    readonly name: "nonSwapStakerShareBps";
+    readonly type: "function";
+    readonly stateMutability: "view";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly type: "uint16";
+    }];
+}, {
+    readonly name: "setNonSwapStakerShareBps";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "shareBps";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "InvalidNonSwapStakerShareBps";
+    readonly type: "error";
+    readonly inputs: readonly [{
+        readonly type: "uint256";
+        readonly name: "shareBps";
+    }];
+}, {
+    readonly name: "NonSwapStakerShareBpsSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly type: "uint16";
+        readonly name: "previousShareBps";
+    }, {
+        readonly type: "uint16";
+        readonly name: "newShareBps";
+    }];
 }];
 
 export declare const staticsPositionPortfolioAbi: readonly [{

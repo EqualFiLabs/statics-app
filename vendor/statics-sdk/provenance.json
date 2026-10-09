@@ -32,8 +32,8 @@
     "package.json": "047657d558934ac444d1d1d5b6e816593b9200cddb62e64703462033b54cb66e"
   },
   "checksums": {
-    "dist/index.js": "37aa8777ab4cbb0a619c20c4567bf9bc14880a1befe5a75d261f768d6f952b30",
-    "dist/index.d.ts": "ea474d66a59b3e08ac4973ae1915deabeb0843c97e53e89e07d4f69ccaead499",
+    "dist/index.js": "6e1ecf95b7565bf0cd9f37454aaabc52a4388a271681c9bd8025ff1006b163f0",
+    "dist/index.d.ts": "e6c5369c11ea8d9073f112a760facac8905ad6938216b3164d41f77660f337d8",
     "dist/genesis-credit.js": "9b9be92463d34e6f18354c96064ad2f43365078945a13e9df0df7c8dd852e42d",
     "dist/genesis-credit.d.ts": "ffef22c37b79e975da48093ce8e572db6bcdd5d8f0b34617f4fbc6cfbd60a779",
     "dist/generated/robinhoodChain.js": "69b5dbcb88d4f77e435c2ceaa7176ab51b727065dc12eb44200748922b48afec",
@@ -89,5 +89,5 @@
     "package.json": "98fa4239fadcf6659053e995f0d80c0e76588c9734297e85cea6cf634dee56e6"
   },
   "positionStatementLegacyArtifactsCommit": "96b52bc0076119b54522e071be217c4614fea506",
-  "positionStatementProtocolCommit": "595b2021721c17226ec4fbf153872022f6fb1930"
+  "positionStatementProtocolCommit": "df750c3f9517878b0c60d6dce0146a039bf25844"
 }
