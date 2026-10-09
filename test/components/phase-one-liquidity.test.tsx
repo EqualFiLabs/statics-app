@@ -539,7 +539,7 @@ it("shows unavailable indexed pools without crashing or hiding retained rewards"
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Manage rewards" })).toHaveAttribute(
     "href",
-    `/app/rewards/bribes?positionId=1&poolId=${poolId}`
+    `/app/rewards/gauge?positionId=1&poolId=${poolId}`
   );
   expect(mocks.execute).not.toHaveBeenCalled();
 });

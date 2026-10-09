@@ -72,6 +72,37 @@ describe("confirmed transaction reconciliation", () => {
     ).toBe(false);
   });
 
+  it("refreshes the shared allocation directory for its deployment after an allocation change", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-set-allocations" as const,
+      scopes: protocolQueryScopes("phase-one-set-allocations"),
+    };
+    // Not wallet-scoped: every wallet's view of pool weights changes.
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-allocation-directory", "local", "page", {}],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-allocation-directory", "other", "page", {}],
+        detail
+      )
+    ).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-allocation-directory", "local", "page", {}], {
+        ...detail,
+        kind: "phase-one-wrap-native",
+        scopes: protocolQueryScopes("phase-one-wrap-native"),
+      })
+    ).toBe(false);
+  });
+
   it("waits until the read RPC serves the confirmed block", async () => {
     const getBlockNumber = vi.fn().mockResolvedValueOnce(99n).mockResolvedValueOnce(100n);
 

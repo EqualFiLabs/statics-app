@@ -29,6 +29,8 @@ export type StakePreview =
       available: bigint;
       locked: bigint;
       exceedsAvailable: boolean;
+      /** How much more stake must be freed from allocations for this amount. */
+      shortfall: bigint;
       assets: readonly Readonly<{ asset: Address; fromMaturing: bigint; fromEarning: bigint }>[];
       remaining: bigint;
     }>;
@@ -132,6 +134,7 @@ export function previewUnstake(
     available,
     locked: input.target.allocation?.lockedStake ?? 0n,
     exceedsAvailable: input.amount > available,
+    shortfall: input.amount > available ? input.amount - available : 0n,
     assets: (input.target.rewardSelections ?? []).map((selection) => {
       const fromMaturing =
         input.amount < selection.pendingStake ? input.amount : selection.pendingStake;

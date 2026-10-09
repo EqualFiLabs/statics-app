@@ -82,6 +82,8 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-liquidity": "phase-one-liquidity",
   "phase-one-rewards": "phase-one-reward",
   "phase-one-gauges": "phase-one-reward",
+  // Shared pool directory (not wallet-scoped): weights and streams move with allocations.
+  "phase-one-allocation-directory": "phase-one-reward",
 };
 
 const walletScopedRoots = new Set([
@@ -137,6 +139,7 @@ const deploymentScopedRoots = new Set([
   "phase-one-liquidity",
   "phase-one-rewards",
   "phase-one-gauges",
+  "phase-one-allocation-directory",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {

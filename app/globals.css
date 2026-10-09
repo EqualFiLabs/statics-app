@@ -112,6 +112,25 @@ a {
   font: inherit;
 }
 
+/*
+ * One dropdown arrow for every select in the app. Browsers draw the native arrow against the
+ * right border regardless of padding, so it is replaced with a chevron inset from the edge.
+ * Component rules set `background` and `padding` with the shorthand, which would clear the
+ * chevron and its room, so these properties are marked important.
+ */
+select:not([multiple], [size]) {
+  appearance: none;
+  padding-inline-end: 2.25rem !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%) !important;
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - 0.85rem) 50% !important;
+  background-size: 0.3rem 0.3rem !important;
+  background-repeat: no-repeat !important;
+}
+
 ::selection {
   background: var(--green);
   color: var(--bg);

@@ -33,6 +33,10 @@ import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
 import { PositionListPage } from "@/components/positions/PositionListPage";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
 import type { DeploymentOption, PhaseOneDeployment } from "@/lib/deployments/types";
+import {
+  AllocationDirectoryChangedError,
+  type IndexedAllocationPool,
+} from "@/lib/indexer/phase-one";
 import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
@@ -44,6 +48,9 @@ const mocks = vi.hoisted(() => ({
   simulate: vi.fn(),
   call: vi.fn(),
   allocations: vi.fn(),
+  directory: vi.fn(),
+  managed: vi.fn(),
+  block: vi.fn(),
   params: new URLSearchParams(),
   push: vi.fn(),
   replace: vi.fn(),
@@ -59,14 +66,17 @@ vi.mock("wagmi", () => ({
     call: mocks.call,
     getBlockNumber: async () => 10n,
     simulateContract: mocks.simulate,
-    getBlock: async () => ({ timestamp: 3000n }),
+    getBlock: mocks.block,
   }),
 }));
 vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
-vi.mock("@/lib/indexer/phase-one", () => ({
+vi.mock("@/lib/indexer/phase-one", async (original) => ({
+  ...(await original<typeof import("@/lib/indexer/phase-one")>()),
   loadIndexedPhaseOnePositions: mocks.page,
   loadIndexedPhaseOnePosition: mocks.position,
   loadIndexedAllocationSnapshot: mocks.allocations,
+  loadAllocationDirectory: mocks.directory,
+  loadIndexedManagedLiquidity: mocks.managed,
 }));
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 const hash = (digit: string) => `0x${digit.repeat(64)}` as const;
@@ -78,6 +88,86 @@ const tokens = ["STATICS", "WETH", "TOKEN"].map((symbol, index) => ({
   decimals: 18,
   metadataSource: "reviewed-manifest" as const,
 }));
+const currentVersion = hash("a");
+/** A directory pool as the indexer parser returns it. */
+const directoryPool = (
+  poolId: `0x${string}`,
+  overrides: Partial<IndexedAllocationPool> = {}
+): IndexedAllocationPool =>
+  ({
+    poolId,
+    poolKey: {
+      currency0: tokens[0].address,
+      currency1: tokens[1].address,
+      hooks: address("9"),
+      fee: 3000,
+      tickSpacing: 60,
+    },
+    token0: { address: tokens[0].address, symbol: "STATICS", name: "Statics", decimals: 18 },
+    token1: { address: tokens[1].address, symbol: "WETH", name: "WETH", decimals: 18 },
+    creator: address("8"),
+    eligibility: { eligible: true, reasons: [] },
+    weight: parseEther("100"),
+    stale: false,
+    gaugeInitialized: true,
+    gaugeStopped: false,
+    decommissioned: false,
+    decommissionStarted: false,
+    decommissionFinalized: false,
+    quarantined: false,
+    restrictionFlags: { token0: false, token1: false },
+    currentVersion,
+    storedVersion: currentVersion,
+    allocatorStreams: [
+      {
+        slot: 1,
+        asset: { address: tokens[1].address, symbol: "WETH", name: "WETH", decimals: 18 },
+        allocatorShareBps: 5000,
+        eligibilityVersion: currentVersion,
+        fundingRestrictionSequence: 0n,
+        periodStart: 0n,
+        periodFinish: 2_000_000n,
+        lastUpdate: 0n,
+        periodBudget: parseEther("14"),
+        periodEmitted: 0n,
+        terminated: false,
+        observedAtBlock: 1n,
+        observedAtTimestamp: 1n,
+        funded: true,
+        paused: false,
+        invalidated: false,
+        rateNumerator: parseEther("14"),
+        rateDenominator: 1_209_600n,
+        nominalRatePerSecond: 0n,
+        ratePerSecond: 0n,
+      },
+    ],
+    incentiveStreamCount: 1,
+    createdAtBlock: 1n,
+    updatedAtBlock: 1n,
+    observedAtTimestamp: 1n,
+    weightObservedAtBlock: 1n,
+    ...overrides,
+  }) as IndexedAllocationPool;
+const directoryPage = (items: IndexedAllocationPool[]) => ({
+  deploymentId: "phase-one-fixture",
+  indexedAtBlock: 1n,
+  indexedAtTimestamp: 1n,
+  directoryRevision: 1n,
+  reserve: {
+    activated: true,
+    periodBudget: parseEther("700"),
+    periodStart: 0n,
+    periodFinish: 604_800n,
+    totalAllocatedWeight: parseEther("200"),
+    observedAtBlock: 1n,
+    observedAtTimestamp: 1n,
+    periodExpired: false,
+  },
+  items,
+  nextCursor: null,
+  total: items.length,
+});
 const phaseOne = {
   kind: "phase-one",
   descriptor: {
@@ -143,9 +233,12 @@ function withPhaseOne(ui: React.ReactElement, deployment = phaseOne) {
   );
 }
 beforeEach(() => {
+  mocks.block.mockReset().mockResolvedValue({ timestamp: 3000n });
   mocks.params = new URLSearchParams();
   mocks.push.mockReset();
   mocks.replace.mockReset();
+  mocks.directory.mockReset().mockResolvedValue(directoryPage([]));
+  mocks.managed.mockReset().mockResolvedValue([]);
   mocks.allocations.mockReset().mockResolvedValue({
     totalAllocated: parseEther("30"),
     lockedStake: parseEther("30"),
@@ -451,20 +544,15 @@ describe("focused Phase 1 Earn", () => {
     expect(decoded.args?.[1]).toMatchObject([{ positionId: 1n, slots: [0, 1] }]);
     expect(mocks.execute).not.toHaveBeenCalled();
   });
-  it("separates LP and allocator bribes without staking or allocation-management reads", async () => {
-    mocks.params = new URLSearchParams("share=allocator");
-    withPhaseOne(<RewardsPage earnView="bribes" />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Claim displayed rewards" })).toBeEnabled()
-    );
+  it("collects only allocator incentives on Allocations, with no LP reads", async () => {
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     expect(
       mocks.read.mock.calls.some(([input]) =>
-        ["stakePosition", "positionGaugePools", "gaugePositionAllocations", "lpLeg"].includes(
-          input.functionName
-        )
+        ["positionGaugePools", "lpLeg", "previewLpRewards"].includes(input.functionName)
       )
     ).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Claim displayed rewards" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collect" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     const decoded = decodeFunctionData({
       abi: staticsBatchRewardsAbi,
@@ -511,7 +599,12 @@ describe("focused Phase 1 Earn", () => {
     mocks.params = new URLSearchParams(
       `positionId=1&poolId=${hash("1")}&asset=${tokens[1].address}&share=allocator`
     );
-    withPhaseOne(<RewardsPage earnView="bribes" />);
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    expect(screen.queryByRole("link", { name: "Bribe Rewards" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Liquidity rewards" })).toHaveAttribute(
+      "href",
+      `/app/rewards/gauge?positionId=1&poolId=${hash("1")}&asset=${tokens[1].address}`
+    );
     expect(screen.getByRole("link", { name: "Staking" })).toHaveAttribute(
       "href",
       `/app/rewards/staking?positionId=1&asset=${tokens[1].address}`
@@ -538,12 +631,47 @@ describe("focused Phase 1 Earn", () => {
   });
   it("clearing one allocation preserves other pools, with no reward-source reads", async () => {
     withPhaseOne(<RewardsPage earnView="allocations" />);
-    const input = await screen.findByRole("textbox", { name: "Allocated STATICS" });
-    await waitFor(() => expect(input).toHaveValue("10"));
-    fireEvent.change(input, { target: { value: "0" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review allocation" }));
-    await screen.findByRole("button", { name: "Confirm transaction" });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await screen.findAllByRole("button", { name: /^Adjust allocation to / });
+    fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in / })[0]);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Remove Position #1 allocation to STATICS / WETH",
+      })
+    );
+    // Remove opens the editor on that allocation, ready for the amount to take off it.
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    const amount = within(editor).getByRole("textbox", {
+      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+    });
+    expect(amount).toHaveFocus();
+    const remove = within(editor).getByRole("button", {
+      name: "Remove from STATICS / WETH on Position #1",
+    });
+    // A partial removal takes exactly the amount entered.
+    fireEvent.change(amount, { target: { value: "4" } });
+    fireEvent.click(remove);
+    expect(within(editor).getByText("6 STATICS allocated")).toBeInTheDocument();
+    expect(amount).toHaveValue("");
+    expect(within(editor).getByText(/^Locked: 30 → 26 STATICS\./)).toBeInTheDocument();
+    fireEvent.change(amount, { target: { value: "80" } });
+    expect(remove).toBeDisabled();
+    expect(
+      within(editor).getByText("You can add up to 74 STATICS or remove up to 6 STATICS.")
+    ).toBeInTheDocument();
+    fireEvent.change(amount, { target: { value: "6" } });
+    fireEvent.click(remove);
+    expect(within(editor).getByText(/10 STATICS becomes free to unstake/)).toBeInTheDocument();
+    fireEvent.click(within(editor).getByRole("button", { name: "Add to changes" }));
+    // Removal is staged, not sent: the row shows it pending and the change set summarises it.
+    expect(await screen.findByText("Pending → 0")).toBeInTheDocument();
+    const changes = screen.getByRole("region", { name: "Actions for selected allocations" });
+    expect(within(changes).getByText("1 position · 1 transaction")).toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    fireEvent.click(within(changes).getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    expect(within(review).getByText("Position #1: STATICS / WETH 10 → 0")).toBeInTheDocument();
+    expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
     await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
     const decoded = decodeFunctionData({
       abi: staticsGaugeIncentivesAbi,
@@ -582,7 +710,7 @@ describe("focused Phase 1 Earn", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage allocations" })).toHaveAttribute(
       "href",
-      "/app/rewards/allocations?positionId=1"
+      "/app/rewards/allocations?positionId=1&unlock=1000000000000000000"
     );
   });
   it("previews the eligibility delay and allocation cooldown before staking", async () => {
@@ -800,16 +928,589 @@ describe("Earn review remediation", () => {
       expect.stringContaining("/app/rewards/allocations?positionId=1&poolId=")
     );
   });
-  it("keeps retained allocation pools valid when absent from enabled manifests", async () => {
-    mocks.params = new URLSearchParams(`poolId=${hash("3")}`);
-    mocks.allocations.mockResolvedValue({
-      totalAllocated: parseEther("30"),
-      lockedStake: parseEther("30"),
-      allocations: [{ poolId: hash("3"), amount: parseEther("30"), eligibilityVersion: hash("a") }],
-      nextAllocationAt: 0n,
+  it("shows weight share, directed emissions and weekly incentives per allocated pool", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            0,
+            parseEther("10"),
+            [{ poolId: hash("1"), amount: parseEther("10"), eligibilityVersion: currentVersion }],
+            parseEther("10"),
+          ]
+        : original(input)
+    );
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(filters?.search === hash("1") ? [directoryPool(hash("1"))] : [])
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    const row = (await screen.findByTitle(/Counts toward this pool's weight/)).closest("tr")!;
+    // 10 of 100 pool weight; 700 budget × 10 / 200 total weight; 14 WETH over two weeks → 7
+    // this week × 10%.
+    expect(within(row).getByText("10%")).toBeInTheDocument();
+    expect(within(row).getByText("35 STATICS")).toBeInTheDocument();
+    expect(within(row).getByText("0.7")).toBeInTheDocument();
+  });
+  it("flags a stale allocation and moves it to the suggested pool in one transaction", async () => {
+    const stopped = directoryPool(hash("2"), {
+      eligibility: { eligible: false, reasons: ["gauge-stopped"] },
+      gaugeStopped: true,
+      incentiveStreamCount: 0,
+      allocatorStreams: [],
+    });
+    const candidates = [
+      directoryPool(hash("1")),
+      directoryPool(hash("4"), {
+        token0: { address: tokens[2].address, symbol: "TOKEN", name: "Token", decimals: 18 },
+        incentiveStreamCount: 3,
+      }),
+    ];
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            0,
+            parseEther("30"),
+            [
+              { poolId: hash("1"), amount: parseEther("10"), eligibilityVersion: currentVersion },
+              { poolId: hash("2"), amount: parseEther("20"), eligibilityVersion: currentVersion },
+            ],
+            parseEther("10"),
+          ]
+        : original(input)
+    );
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(
+        filters?.search === hash("1")
+          ? [candidates[0]]
+          : filters?.search === hash("2")
+            ? [stopped]
+            : filters?.search
+              ? []
+              : candidates
+      )
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    const stale = (await screen.findByTitle(/This allocation no longer counts/)).closest("tr")!;
+    // Pool 1 is already in this position's set, so it beats the more incentivised pool 4.
+    expect(
+      within(stale).getByText(
+        "Gauge stopped · Suggested: STATICS / WETH (already in this position's pools)"
+      )
+    ).toBeInTheDocument();
+    // Move stages the suggested pool with this position's stake there plus its stale stake.
+    fireEvent.click(within(stale).getByRole("button", { name: /^Move the stale allocation in / }));
+    const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
+    expect(within(panel).getByText("30 STATICS allocated")).toBeInTheDocument();
+    expect(within(panel).getByText("Will be dropped")).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Drops the stale allocation to STATICS / WETH.")
+    ).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "Add to changes" }));
+    const changes = screen.getByRole("region", { name: "Actions for selected allocations" });
+    fireEvent.click(within(changes).getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    expect(
+      within(review).getByText("Removes the ineligible allocation to STATICS / WETH")
+    ).toBeInTheDocument();
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+    // The live set drops the stopped pool, which the contract would otherwise reject.
+    expect(
+      decodeFunctionData({
+        abi: staticsGaugeIncentivesAbi,
+        data: mocks.execute.mock.calls.at(-1)![0].data,
+      }).args
+    ).toEqual([1n, [hash("1")], [parseEther("30")]]);
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 pools that need attention" }));
+    expect(screen.getByRole("button", { name: /^Needs attention/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.queryByTitle(/Counts toward this pool's weight/)).not.toBeInTheDocument();
+    expect(screen.getByTitle(/This allocation no longer counts/)).toBeInTheDocument();
+  });
+  it("removes a stale-only allocation during cooldown without another eligible pool", async () => {
+    mocks.params = new URLSearchParams(`positionId=1&poolId=${hash("2")}`);
+    const stopped = directoryPool(hash("2"), {
+      eligibility: { eligible: false, reasons: ["gauge-stopped"] },
+      gaugeStopped: true,
+      incentiveStreamCount: 0,
+      allocatorStreams: [],
+    });
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(filters?.search === hash("2") ? [stopped] : [])
+    );
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            5_000,
+            parseEther("20"),
+            [{ poolId: hash("2"), amount: parseEther("20"), eligibilityVersion: currentVersion }],
+            0n,
+          ]
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    await screen.findByTitle(/This allocation no longer counts/);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Remove Position #1 allocation to STATICS / WETH",
+      })
+    );
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    expect(within(editor).getByRole("button", { name: "Clear all" })).toBeEnabled();
+    fireEvent.click(
+      within(editor).getByRole("button", {
+        name: "Remove from STATICS / WETH on Position #1",
+      })
+    );
+    expect(within(editor).getByRole("button", { name: "Add to changes" })).toBeEnabled();
+    fireEvent.click(within(editor).getByRole("button", { name: "Add to changes" }));
+    const changes = screen.getByRole("region", { name: "Actions for selected allocations" });
+    fireEvent.click(within(changes).getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
+    expect(
+      decodeFunctionData({
+        abi: staticsGaugeIncentivesAbi,
+        data: mocks.execute.mock.calls.at(-1)![0].data,
+      }).args
+    ).toEqual([1n, [], []]);
+  });
+  it("lists the pool directory with per-1,000 estimates, streams and a preset Allocate", async () => {
+    const stopped = directoryPool(hash("5"), {
+      eligibility: { eligible: false, reasons: ["gauge-stopped"] },
+      gaugeStopped: true,
+    });
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(
+        filters?.search
+          ? []
+          : filters?.eligible === "all"
+            ? [directoryPool(hash("1")), stopped]
+            : [directoryPool(hash("1"))]
+      )
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    await screen.findAllByRole("button", { name: /^Adjust allocation to / });
+    fireEvent.click(screen.getByRole("button", { name: "Browse pools" }));
+    const directory = () => screen.getByRole("dialog", { name: "Pool directory" });
+    // 7 WETH this week; a new 1,000 STATICS joins 100 of weight → 7 × 1,000 / 1,100.
+    await waitFor(() => expect(within(directory()).getByText("6.363636 WETH")).toBeInTheDocument());
+    expect(within(directory()).getByText("1 pool")).toBeInTheDocument();
+    fireEvent.click(
+      within(directory()).getByRole("button", { name: "Show incentive streams in STATICS / WETH" })
+    );
+    expect(
+      within(directory()).getByRole("list", {
+        name: "Allocator incentive streams in STATICS / WETH",
+      })
+    ).toHaveTextContent("50% to allocators");
+    fireEvent.click(within(directory()).getByRole("button", { name: "Include ineligible" }));
+    await waitFor(() =>
+      expect(
+        within(directory()).getAllByRole("button", { name: "Allocate to STATICS / WETH" })
+      ).toHaveLength(2)
+    );
+    const [open, closed] = within(directory()).getAllByRole("button", {
+      name: "Allocate to STATICS / WETH",
+    });
+    expect(closed).toBeDisabled();
+    expect(closed).toHaveAttribute("title", "This pool is not eligible for allocations.");
+    await waitFor(() => expect(open).toBeEnabled());
+    // Browsers focus a clicked button; the dialog returns focus there when it closes.
+    open.focus();
+    fireEvent.click(open);
+    const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
+    const input = within(panel).getByRole("textbox", {
+      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+    });
+    expect(within(panel).getByText("10 STATICS allocated")).toBeInTheDocument();
+    // The allocation dialog stacks over the directory: Escape closes only the top dialog and
+    // focus returns to the Allocate control that opened it.
+    expect(directory()).not.toBe(panel);
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Manage allocations" })).not.toBeInTheDocument()
+    );
+    expect(directory()).toBeInTheDocument();
+    expect(open).toHaveFocus();
+    // Staging returns to the directory, which shows the change set at its foot.
+    fireEvent.click(open);
+    const again = await screen.findByRole("dialog", { name: "Manage allocations" });
+    fireEvent.change(
+      within(again).getByRole("textbox", {
+        name: "Amount to add to or remove from STATICS / WETH, Position #1",
+      }),
+      { target: { value: "5" } }
+    );
+    fireEvent.click(
+      within(again).getByRole("button", { name: "Remove from STATICS / WETH on Position #1" })
+    );
+    fireEvent.click(within(again).getByRole("button", { name: "Add to changes" }));
+    expect(within(directory()).getByText("1 position · 1 transaction")).toBeInTheDocument();
+    expect(
+      within(directory()).getByRole("button", { name: "Show incentive streams in STATICS / WETH" })
+    ).toBeInTheDocument();
+    fireEvent.keyDown(directory(), { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Pool directory" })).not.toBeInTheDocument()
+    );
+    expect(
+      within(screen.getByRole("region", { name: "Actions for selected allocations" })).getByText(
+        "1 position · 1 transaction"
+      )
+    ).toBeInTheDocument();
+  });
+  it("marks an expired indexed incentive as ended using the chain clock", async () => {
+    const observed = directoryPool(hash("1"));
+    mocks.directory.mockResolvedValue(
+      directoryPage([
+        directoryPool(hash("1"), {
+          allocatorStreams: [{ ...observed.allocatorStreams[0], periodFinish: 2_000n }],
+        }),
+      ])
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse pools" }));
+    const directory = await screen.findByRole("dialog", { name: "Pool directory" });
+    expect(within(directory).queryByText(/6\.363636 WETH/)).not.toBeInTheDocument();
+    fireEvent.click(
+      await within(directory).findByRole("button", {
+        name: "Show incentive streams in STATICS / WETH",
+      })
+    );
+    expect(
+      within(directory).getByRole("list", {
+        name: "Allocator incentive streams in STATICS / WETH",
+      })
+    ).toHaveTextContent("Ended");
+    expect(within(directory).queryByText("Active")).not.toBeInTheDocument();
+  });
+  it("searches the directory in the indexer and restarts after a mid-paging change", async () => {
+    let page = 0;
+    mocks.directory.mockImplementation(async ({ filters }) => {
+      if (filters?.search?.startsWith("0x")) return directoryPage([]);
+      if (filters?.cursor) throw new AllocationDirectoryChangedError();
+      page += 1;
+      return {
+        ...directoryPage([directoryPool(hash(String(page)))]),
+        nextCursor: "next",
+        total: 2,
+      };
     });
     withPhaseOne(<RewardsPage earnView="allocations" />);
-    await screen.findByRole("textbox", { name: "Allocated STATICS" });
+    await screen.findAllByRole("button", { name: /^Adjust allocation to / });
+    fireEvent.click(screen.getByRole("button", { name: "Browse pools" }));
+    const directory = () => screen.getByRole("dialog", { name: "Pool directory" });
+    const more = await within(directory()).findByRole("button", { name: "Load more · 1" });
+    await waitFor(() => expect(more).toBeEnabled());
+    fireEvent.click(more);
+    await waitFor(() =>
+      expect(mocks.directory.mock.calls.some(([input]) => input.filters?.cursor === "next")).toBe(
+        true
+      )
+    );
+    expect(await within(directory()).findByText(/The directory changed/)).toBeInTheDocument();
+    fireEvent.click(within(directory()).getByRole("button", { name: "Restart list" }));
+    await waitFor(() =>
+      expect(within(directory()).queryByText(/The directory changed/)).not.toBeInTheDocument()
+    );
+    fireEvent.change(within(directory()).getByRole("searchbox", { name: "Search pools" }), {
+      target: { value: "WETH" },
+    });
+    await waitFor(() =>
+      expect(mocks.directory.mock.calls.some(([input]) => input.filters?.search === "WETH")).toBe(
+        true
+      )
+    );
+  });
+  it("only lets a position in cooldown reduce its allocation", async () => {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            5_000,
+            parseEther("10"),
+            [{ poolId: hash("1"), amount: parseEther("10"), eligibilityVersion: currentVersion }],
+            parseEther("10"),
+          ]
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
+    const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
+    const input = within(panel).getByRole("textbox", {
+      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+    });
+    const add = within(panel).getByRole("button", { name: "Add to STATICS / WETH on Position #1" }),
+      remove = within(panel).getByRole("button", {
+        name: "Remove from STATICS / WETH on Position #1",
+      });
+    expect(within(panel).getByText(/^Reduce-only until/)).toBeInTheDocument();
+    expect(within(panel).getByRole("searchbox", { name: "Add a pool" })).toBeDisabled();
+    fireEvent.change(input, { target: { value: "2" } });
+    expect(add).toBeDisabled();
+    expect(remove).toBeEnabled();
+    expect(
+      within(panel).getByText(/^Reduce-only until .*: you can remove from this pool, but not add/)
+    ).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "4" } });
+    fireEvent.click(remove);
+    expect(within(panel).getByText("6 STATICS allocated")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Add to changes" })).toBeEnabled();
+    // During cooldown a reduced pool may go back up, but not past its amount on chain.
+    fireEvent.change(input, { target: { value: "5" } });
+    expect(add).toBeDisabled();
+    fireEvent.change(input, { target: { value: "4" } });
+    expect(add).toBeEnabled();
+    // A reduction during cooldown leaves the cooldown where it is.
+    expect(
+      within(panel).getByText(/^Reductions don't extend this position's cooldown/)
+    ).toBeInTheDocument();
+  });
+  it("sends one transaction per position and keeps confirmed ones when stopped", async () => {
+    mocks.page.mockResolvedValue({
+      deploymentId: "phase-one-fixture",
+      indexedAtBlock: 1n,
+      items: [position(1n), position(2n)],
+      nextCursor: null,
+    });
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            0,
+            parseEther("10"),
+            [{ poolId: hash("1"), amount: parseEther("10"), eligibilityVersion: currentVersion }],
+            parseEther("10"),
+          ]
+        : original(input)
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
+    const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
+    // One position at a time: pick each from the dropdown and clear its allocation.
+    for (const id of ["1", "2"]) {
+      // Positions are chosen on their own full-screen list.
+      fireEvent.click(within(panel).getByRole("button", { name: /^Position #\d+ selected\./ }));
+      const picker = await screen.findByRole("dialog", { name: "Choose a position" });
+      fireEvent.click(
+        within(picker).getByRole("button", { name: new RegExp(`^Position #${id},`) })
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Choose a position" })).not.toBeInTheDocument()
+      );
+      fireEvent.change(
+        within(panel).getByRole("textbox", {
+          name: `Amount to add to or remove from STATICS / WETH, Position #${id}`,
+        }),
+        { target: { value: "10" } }
+      );
+      fireEvent.click(
+        within(panel).getByRole("button", {
+          name: `Remove from STATICS / WETH on Position #${id}`,
+        })
+      );
+    }
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Position #2 selected. Choose another position" })
+    );
+    const picker = await screen.findByRole("dialog", { name: "Choose a position" });
+    const first = within(picker).getByRole("button", { name: /^Position #1, 1 change, / });
+    expect(first).toHaveAttribute("aria-pressed", "false");
+    expect(within(picker).getByRole("button", { name: /^Position #2,/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    fireEvent.keyDown(picker, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Choose a position" })).not.toBeInTheDocument()
+    );
+    expect(within(panel).getByText("2 positions changed")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "Add to changes" }));
+    const changes = () => screen.getByRole("region", { name: "Actions for selected allocations" });
+    expect(within(changes()).getByText("2 positions · 2 transactions")).toBeInTheDocument();
+    // Ask to stop while the first transaction is being sent.
+    mocks.execute.mockImplementationOnce(async () => {
+      // A real wallet prompt takes time; let the progress and Stop control render first.
+      fireEvent.click(await screen.findByRole("button", { name: "Stop after this transaction" }));
+      return hash("f");
+    });
+    fireEvent.click(within(changes()).getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    expect(
+      await screen.findByText(/^Stopped\. Confirmed positions stay confirmed/)
+    ).toBeInTheDocument();
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-set-allocations");
+    // The confirmed position leaves the change set; the other is still staged.
+    await waitFor(() =>
+      expect(within(changes()).getByText("1 position · 1 transaction")).toBeInTheDocument()
+    );
+  });
+  it("stops between gauge checkpoint prerequisites", async () => {
+    mocks.block.mockResolvedValue({ timestamp: 3_000n + 4n * 604_800n });
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) => {
+      if (input.functionName === "gaugeReserve")
+        return {
+          activated: true,
+          periodFinish: 3_000,
+          lastCheckpoint: 3_000,
+          periodBudget: 0n,
+          totalAllocatedWeight: 0n,
+        };
+      if (input.functionName === "maxGaugeCatchupPeriods") return 1;
+      return original(input);
+    });
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    fireEvent.click(within(editor).getByRole("button", { name: "Clear all" }));
+    fireEvent.click(within(editor).getByRole("button", { name: "Add to changes" }));
+    const changes = screen.getByRole("region", { name: "Actions for selected allocations" });
+    mocks.execute.mockImplementationOnce(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Stop after this transaction" }));
+      return hash("f");
+    });
+    fireEvent.click(within(changes).getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
+    expect(
+      await screen.findByText(/^Stopped\. Confirmed positions stay confirmed/)
+    ).toBeInTheDocument();
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-checkpoint-schedule");
+  });
+  it("opens the editor pre-filled to free an unstake shortfall and reviews it directly", async () => {
+    mocks.params = new URLSearchParams(`positionId=1&unlock=${parseEther("15")}`);
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    await waitFor(() =>
+      expect(within(editor).getByText(/^Pre-filled to free 15 STATICS/)).toBeInTheDocument()
+    );
+    // The largest allocation (20 to pool 2) gives up the 15.
+    expect(within(editor).getByText("10 STATICS allocated")).toBeInTheDocument();
+    expect(within(editor).getByText("5 STATICS allocated")).toBeInTheDocument();
+    expect(within(editor).getByText(/15 STATICS becomes free to unstake/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(editor).getByRole("button", { name: "Add & review" })).toBeEnabled()
+    );
+    fireEvent.click(within(editor).getByRole("button", { name: "Add & review" }));
+    const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
+    expect(within(review).getByText(/^Position #1: .* 20 → 5$/)).toBeInTheDocument();
+  });
+  it("adds a pool from the editor's search and shows it in the stake split", async () => {
+    const extra = directoryPool(hash("4"), {
+      token0: { address: tokens[2].address, symbol: "TOKEN", name: "Token", decimals: 18 },
+    });
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(
+        filters?.search?.startsWith("0x")
+          ? filters.search === hash("4")
+            ? [extra]
+            : [directoryPool(filters.search as `0x${string}`)]
+          : [extra]
+      )
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    fireEvent.click(await within(editor).findByRole("button", { name: "+ TOKEN / WETH" }));
+    const input = within(editor).getByRole("textbox", {
+      name: "Amount to add to or remove from TOKEN / WETH, Position #1",
+    });
+    const add = within(editor).getByRole("button", { name: "Add to TOKEN / WETH on Position #1" });
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.click(add);
+    expect(within(editor).getByText(/^Locked: 30 → 35 STATICS\./)).toBeInTheDocument();
+    expect(within(editor).getByRole("img", { name: /TOKEN \/ WETH 5%/ })).toBeInTheDocument();
+    // Phones summarise the impact in one footer line that expands to the full list.
+    const summary = within(editor).getByRole("button", {
+      name: /^Locked 30 → 35 · Starts cooldown/,
+    });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(within(editor).getAllByText(/^Locked: 30 → 35 STATICS\./)).toHaveLength(2);
+    // In % of stake, 5 adds 5% of this position's 100 STATICS.
+    fireEvent.click(within(editor).getByRole("button", { name: "% of stake" }));
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.click(add);
+    expect(within(input.closest("li")!).getByText("10 STATICS allocated")).toBeInTheDocument();
+    // Max inside the box fills what can still be added: 100 staked − 30 elsewhere − 10 here.
+    fireEvent.click(
+      within(editor).getByRole("button", {
+        name: "Fill the most you can add to or remove from TOKEN / WETH",
+      })
+    );
+    expect(input).toHaveValue("60");
+    // Switching units clears an amount typed in the other unit.
+    fireEvent.click(within(editor).getByRole("button", { name: "STATICS" }));
+    expect(input).toHaveValue("");
+    fireEvent.click(within(editor).getByRole("button", { name: "Add to changes" }));
+    expect(
+      within(screen.getByRole("region", { name: "Actions for selected allocations" })).getByText(
+        "1 position · 1 transaction"
+      )
+    ).toBeInTheDocument();
+  });
+  it("adds a pool from its own screen on phones and returns to that pool's amount", async () => {
+    const extra = directoryPool(hash("4"), {
+      token0: { address: tokens[2].address, symbol: "TOKEN", name: "Token", decimals: 18 },
+    });
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(
+        filters?.search?.startsWith("0x")
+          ? filters.search === hash("4")
+            ? [extra]
+            : [directoryPool(filters.search as `0x${string}`)]
+          : [extra]
+      )
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
+    const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
+    fireEvent.click(within(editor).getByRole("button", { name: "+ Add pool" }));
+    const picker = await screen.findByRole("dialog", { name: "Add a pool to Position #1" });
+    expect(within(picker).getByRole("searchbox", { name: "Add a pool" })).toHaveFocus();
+    fireEvent.click(await within(picker).findByRole("button", { name: "+ TOKEN / WETH" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Add a pool to Position #1" })
+      ).not.toBeInTheDocument()
+    );
+    expect(
+      within(editor).getByRole("textbox", {
+        name: "Amount to add to or remove from TOKEN / WETH, Position #1",
+      })
+    ).toHaveFocus();
+  });
+  it("keeps retained allocation pools valid when absent from enabled manifests", async () => {
+    mocks.params = new URLSearchParams(`poolId=${hash("3")}`);
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation((input) =>
+      input.functionName === "gaugePositionAllocations"
+        ? [
+            0,
+            parseEther("30"),
+            [{ poolId: hash("3"), amount: parseEther("30"), eligibilityVersion: currentVersion }],
+            parseEther("30"),
+          ]
+        : original(input)
+    );
+    mocks.directory.mockImplementation(async ({ filters }) =>
+      directoryPage(filters?.search === hash("3") ? [directoryPool(hash("3"))] : [])
+    );
+    withPhaseOne(<RewardsPage earnView="allocations" />);
+    const row = (await screen.findByTitle(/Counts toward this pool's weight/)).closest("tr")!;
+    expect(within(row).getByText("30 STATICS")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Reset filters" })).not.toBeInTheDocument();
   });
 });

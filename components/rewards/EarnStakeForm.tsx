@@ -753,7 +753,12 @@ export function EarnStakeForm({
         {preview?.kind === "unstake" && preview.exceedsAvailable && preview.locked > 0n && (
           <p className="earn-muted">
             {t("lockedHelp", { amount: statics(preview.locked) })}{" "}
-            <Link href={earnHref("allocations", { positionId: preview.positionId })}>
+            <Link
+              href={earnHref("allocations", {
+                positionId: preview.positionId,
+                unlock: preview.shortfall < preview.locked ? preview.shortfall : preview.locked,
+              })}
+            >
               {t("deallocate")}
             </Link>
           </p>

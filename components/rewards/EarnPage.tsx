@@ -1,36 +1,24 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import type { Hex } from "viem";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { ActionReview } from "@/components/phase-one/ActionReview";
 import { useEarnPortfolio, mergeEarnRewardSources } from "@/hooks/useEarnPortfolio";
-import { portfolioRewardAmounts } from "@/lib/phase-one/reward-portfolio";
 import {
   earnViews,
   earnHref,
   readEarnFilters,
-  rewardRowKey,
-  rewardDisplay,
-  rewardPoolName,
-  rewardToken,
-  scopeRewardAmounts,
   sourceForView,
   type EarnView,
   type RewardClaimScope,
-  type EarnFilters,
-  claimScopeIncomplete,
 } from "@/lib/rewards/earn";
-import { BatchRewardClaim } from "./BatchRewardClaim";
-import { RewardAmounts } from "./RewardAmounts";
-import { EarnPositionManagement } from "./EarnPositionManagement";
 import { EarnPositionsTable } from "./EarnPositionsTable";
 import { EarnStakeForm } from "./EarnStakeForm";
 import { LiquidityRewardsTable } from "./LiquidityRewardsTable";
-import { BribeSchedule } from "./BribeSchedule";
+import { AllocationsTable } from "./AllocationsTable";
 import styles from "./earn.module.css";
 
 export function EarnPage({
@@ -68,7 +56,7 @@ export function EarnPage({
   }, [redirectUrl, router]);
   const data = useEarnPortfolio(deployment, view, filters),
     { action, positions } = data;
-  const sources = sourceForView(view, filters.share),
+  const sources = sourceForView(view),
     rows = mergeEarnRewardSources(data.rewards);
   const loading =
     action.ready && positions.items.length > 0 && data.rewards.some((query) => query.isLoading);
@@ -92,23 +80,14 @@ export function EarnPage({
     poolId: view === "staking" ? undefined : filters.poolId,
     asset: filters.asset,
   };
-  const context = `${view}:${params}:${action.wallet}:${deployment.descriptor.deploymentId}:${positions.items.map((position) => position.positionId).join(",")}`;
-  const [selection, setSelection] = useState<{ context: string; rows: string[] }>({
-    context,
-    rows: [],
-  });
-  const selected = selection.context === context ? selection.rows : [];
-  const [paging, setPaging] = useState({ context, page: 0 });
-  const page = paging.context === context ? paging.page : 0;
-  const [funding, setFunding] = useState<{ context: string; poolId: Hex } | null>(null);
+  // Tables keep their selection and staged edits while ownership and reward reads load; they
+  // reset only when the wallet, network, deployment or filters change.
+  const tableKey = `${view}:${params}:${action.wallet}:${deployment.descriptor.deploymentId}:${deployment.descriptor.chainId}:${deployment.contracts.diamond}:${action.walletState.chainId}`;
   const poolIds = [
     ...new Map(
       [
         ...deployment.supportedPools.map((pool) => pool.poolId),
         ...rows.flatMap((row) => row.pools.map((pool) => pool.poolId)),
-        ...data.allocations.flatMap(
-          (query) => query.data?.allocations.map((entry) => entry.poolId) ?? []
-        ),
       ].map((pool) => [pool.toLowerCase(), pool])
     ).values(),
   ];
@@ -133,98 +112,20 @@ export function EarnPage({
     !data.ownershipIncomplete &&
     filters.positionId !== undefined &&
     !positions.items.some((position) => position.positionId === filters.positionId);
+  // Allocations focuses pools from the indexer directory, which the manifest may not list.
   const unknownPool =
-    view !== "staking" &&
+    view === "gauge" &&
     !loading &&
     !data.ownershipLoading &&
-    !data.allocations.some((query) => query.isPending || query.isError) &&
     filters.poolId &&
     !poolIds.some((pool) => pool.toLowerCase() === filters.poolId?.toLowerCase());
   const unknownAsset =
-    view !== "staking" &&
+    view === "gauge" &&
     !loading &&
     !data.ownershipLoading &&
     filters.asset &&
     !assets.some((asset) => asset.toLowerCase() === filters.asset?.toLowerCase());
   const invalid = filters.invalid || missingPosition || unknownPool || unknownAsset;
-  const ownedFilteredPositions = positions.items.filter(
-    (position) => filters.positionId === undefined || position.positionId === filters.positionId
-  );
-  const poolRows = [
-    ...new Map(
-      rows
-        .flatMap((row) =>
-          row.pools
-            .filter((pool) => (sources.includes("allocator") ? pool.hasAllocator : pool.hasLp))
-            .map((pool) => [pool.poolId.toLowerCase(), pool.poolId] as const)
-        )
-        .filter(
-          ([, pool]) => !filters.poolId || pool.toLowerCase() === filters.poolId.toLowerCase()
-        )
-    ).values(),
-  ]
-    .map((poolId) => ({
-      poolId,
-      positions: rows.filter((row) =>
-        row.pools.some(
-          (pool) =>
-            pool.poolId.toLowerCase() === poolId.toLowerCase() &&
-            (sources.includes("allocator") ? pool.hasAllocator : pool.hasLp) &&
-            (!filters.asset ||
-              !pool.rewards ||
-              sources.some((source) =>
-                portfolioRewardAmounts(row, source, pool.poolId).some(
-                  (entry) => entry.asset.toLowerCase() === filters.asset?.toLowerCase()
-                )
-              ))
-        )
-      ),
-    }))
-    .filter((pool) => pool.positions.length > 0);
-  const filteredKeys = poolRows.flatMap((pool) =>
-    pool.positions.map((position) => rewardRowKey(position.positionId, pool.poolId))
-  );
-  const select = (keys: string[], checked: boolean) =>
-    setSelection({
-      context,
-      rows: [
-        ...new Set(
-          checked ? [...selected, ...keys] : selected.filter((key) => !keys.includes(key))
-        ),
-      ],
-    });
-  const navigateFilter = (key: keyof EarnFilters, value: string) => {
-    const next = new URLSearchParams(params.toString());
-    if (value) next.set(key, value);
-    else next.delete(key);
-    router.push(`/app/rewards/${view}${next.size ? `?${next}` : ""}`);
-  };
-  const allocationLoading = data.allocations.some((query) => query.isPending);
-  const allocationIncomplete =
-    data.ownershipIncomplete || data.allocations.some((query) => query.isError);
-  const staked = positions.items.reduce((total, position) => total + position.stakedBalance, 0n);
-  const allocated = data.allocations.reduce(
-    (total, query) => total + (query.data?.totalAllocated ?? 0n),
-    0n
-  );
-  const unallocated = data.allocations.reduce((total, query, index) => {
-    const stake = positions.items[index]?.stakedBalance ?? 0n;
-    return (
-      total +
-      (query.data && stake > query.data.totalAllocated ? stake - query.data.totalAllocated : 0n)
-    );
-  }, 0n);
-  const managementPosition =
-    filters.positionId !== undefined
-      ? ownedFilteredPositions[0]
-      : [...positions.items].sort((a, b) => (a.positionId < b.positionId ? -1 : 1))[0];
-  const allocationValue = (amount: bigint) =>
-    !action.wallet
-      ? t(action.walletState.status === "loading" ? "loading" : "unavailable")
-      : !data.allocations.some((query) => query.data) && (allocationLoading || allocationIncomplete)
-        ? t(allocationLoading ? "loading" : "unavailable")
-        : `${rewardDisplay(amount, 18).display} STATICS`;
-  const scopeKey = `${context}:${invalid}`;
   const heading = view === "overview" ? t("title") : t(view);
   const refresh = () =>
     void cache.invalidateQueries({
@@ -238,20 +139,6 @@ export function EarnPage({
         query.queryKey[1] === deployment.descriptor.deploymentId &&
         query.queryKey.includes(action.wallet),
     });
-  const managementPanel =
-    view === "allocations" && managementPosition ? (
-      <section className={styles.manager} aria-label={t("positionManagement")}>
-        <h2>{t("position", { id: String(managementPosition.positionId) })}</h2>
-        <EarnPositionManagement
-          key={`${context}:${managementPosition.positionId}`}
-          deployment={deployment}
-          positionId={managementPosition.positionId}
-          initialPoolId={filters.poolId ?? null}
-          feature="allocations"
-          onPoolChange={(poolId) => navigateFilter("poolId", poolId)}
-        />
-      </section>
-    ) : null;
   return (
     <div className={styles.page}>
       {view !== "overview" && (
@@ -320,7 +207,7 @@ export function EarnPage({
       ) : view === "gauge" ? (
         !invalid && (
           <LiquidityRewardsTable
-            key={`${scopeKey}:${deployment.descriptor.chainId}:${deployment.contracts.diamond}:${action.walletState.chainId}`}
+            key={tableKey}
             deployment={deployment}
             action={action}
             rows={rows}
@@ -345,295 +232,20 @@ export function EarnPage({
         )
       ) : (
         !invalid && (
-          <>
-            {view === "bribes" && (
-              <div className={styles.nav} role="group" aria-label={t("bribeShare")}>
-                <Link
-                  href={earnHref("bribes", { ...filters, share: "lp" })}
-                  aria-current={filters.share === "lp" ? "page" : undefined}
-                >
-                  {t("lpShare")}
-                </Link>
-                <Link
-                  href={earnHref("bribes", { ...filters, share: "allocator" })}
-                  aria-current={filters.share === "allocator" ? "page" : undefined}
-                >
-                  {t("allocatorShare")}
-                </Link>
-              </div>
-            )}
-            <div className={styles.filters}>
-              <label>
-                {t("positionFilter")}
-                <select
-                  value={filters.positionId === undefined ? "" : String(filters.positionId)}
-                  onChange={(event) => navigateFilter("positionId", event.target.value)}
-                >
-                  <option value="">{t("allPositions")}</option>
-                  {positions.items.map((position) => (
-                    <option key={String(position.positionId)} value={String(position.positionId)}>
-                      {t("position", { id: String(position.positionId) })}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {view !== "allocations" && (
-                <label>
-                  {t("poolFilter")}
-                  <select
-                    value={filters.poolId ?? ""}
-                    onChange={(event) => navigateFilter("poolId", event.target.value)}
-                  >
-                    <option value="">{t("allPools")}</option>
-                    {poolIds.map((pool) => (
-                      <option key={pool} value={pool}>
-                        {rewardPoolName(deployment, pool)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {view !== "allocations" && (
-                <label>
-                  {t("assetFilter")}
-                  <select
-                    value={filters.asset ?? ""}
-                    onChange={(event) => navigateFilter("asset", event.target.value)}
-                  >
-                    <option value="">{t("allAssets")}</option>
-                    {assets.map((asset) => (
-                      <option key={asset} value={asset}>
-                        {rewardToken(deployment, asset)?.symbol ?? asset}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-            {view === "allocations" ? (
-              <>
-                <div className={styles.summary}>
-                  <div>
-                    <p>{t("staked")}</p>
-                    <strong>{rewardDisplay(staked, 18).display} STATICS</strong>
-                  </div>
-                  <div>
-                    <p>{t("allocated")}</p>
-                    <strong>{allocationValue(allocated)}</strong>
-                  </div>
-                  <div>
-                    <p>{t("unallocated")}</p>
-                    <strong>{allocationValue(unallocated)}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className={styles.toolbar}>
-                  <SelectionCheckbox
-                    keys={filteredKeys}
-                    selected={selected}
-                    onChange={select}
-                    label={t("selectAll")}
-                  />
-                  <div className={styles.assets}>
-                    <span className={styles.muted}>
-                      {t("selected", { count: selected.length })}
-                    </span>
-                    {selected.length > 0 && (
-                      <BatchRewardClaim
-                        deployment={deployment}
-                        rows={rows}
-                        loading={loading || data.ownershipLoading}
-                        incomplete={
-                          data.ownershipIncomplete ||
-                          data.rewards.some((query) => query.isError) ||
-                          claimScopeIncomplete(rows, { ...scope, selectedRows: selected })
-                        }
-                        scope={{ ...scope, selectedRows: selected }}
-                        scopeKey={scopeKey}
-                        label={t("claimSelected")}
-                      />
-                    )}
-                    <BatchRewardClaim
-                      deployment={deployment}
-                      rows={rows}
-                      loading={loading || data.ownershipLoading}
-                      incomplete={incomplete}
-                      scope={scope}
-                      scopeKey={scopeKey}
-                      label={t("claimDisplayed")}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className={styles.list} aria-label={t("rewardList")}>
-                    {poolRows.slice(page * 10, (page + 1) * 10).map((pool) => {
-                      const keys = pool.positions.map((position) =>
-                        rewardRowKey(position.positionId, pool.poolId)
-                      );
-                      return (
-                        <article className={styles.row} key={pool.poolId}>
-                          <div className={styles.rowHeading}>
-                            <div>
-                              <SelectionCheckbox
-                                keys={keys}
-                                selected={selected}
-                                onChange={select}
-                                label={rewardPoolName(deployment, pool.poolId)}
-                              />
-                              <p className={styles.muted}>
-                                {t("positionCount", { count: pool.positions.length })}
-                              </p>
-                            </div>
-                            <RewardAmounts
-                              deployment={deployment}
-                              amounts={scopeRewardAmounts(rows, {
-                                ...scope,
-                                poolId: pool.poolId,
-                              })}
-                              empty={!loading && !incomplete}
-                            />
-                          </div>
-                          <details className={styles.breakdown}>
-                            <summary>{t("positionBreakdown")}</summary>
-                            {pool.positions.map((position) => (
-                              <div className={styles.child} key={String(position.positionId)}>
-                                <SelectionCheckbox
-                                  keys={[rewardRowKey(position.positionId, pool.poolId)]}
-                                  selected={selected}
-                                  onChange={select}
-                                  label={t("position", { id: String(position.positionId) })}
-                                />
-                                <RewardAmounts
-                                  deployment={deployment}
-                                  amounts={scopeRewardAmounts(rows, {
-                                    ...scope,
-                                    positionId: position.positionId,
-                                    poolId: pool.poolId,
-                                  })}
-                                />
-                              </div>
-                            ))}
-                          </details>
-                          <div className={styles.links}>
-                            <Link
-                              href={
-                                view === "bribes" && filters.share === "allocator"
-                                  ? earnHref("allocations", {
-                                      positionId:
-                                        filters.positionId ?? pool.positions[0].positionId,
-                                      poolId: pool.poolId,
-                                    })
-                                  : `/app/liquidity?positionId=${filters.positionId ?? pool.positions[0].positionId}&poolId=${pool.poolId}`
-                              }
-                            >
-                              {t(
-                                view === "bribes" && filters.share === "allocator"
-                                  ? "viewAllocations"
-                                  : "manageLiquidity"
-                              )}
-                            </Link>
-                            <Link href={earnHref("gauge", { ...filters, poolId: pool.poolId })}>
-                              {t("gauge")}
-                            </Link>
-                            {view === "bribes" && (
-                              <button
-                                className="ui-button ui-button--ghost ui-button--sm"
-                                type="button"
-                                onClick={() =>
-                                  setFunding(
-                                    funding?.context === context && funding.poolId === pool.poolId
-                                      ? null
-                                      : { context, poolId: pool.poolId }
-                                  )
-                                }
-                              >
-                                {t("funding")}
-                              </button>
-                            )}
-                          </div>
-                          {funding?.context === context && funding.poolId === pool.poolId && (
-                            <BribeSchedule
-                              deployment={deployment}
-                              poolId={pool.poolId}
-                              share={filters.share}
-                            />
-                          )}
-                        </article>
-                      );
-                    })}
-                    {!loading && !poolRows.length && (
-                      <p className={styles.empty}>{t("noMatching")}</p>
-                    )}
-                  </div>
-                </div>
-                {poolRows.length > 10 && (
-                  <div className={styles.pagination}>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--secondary ui-button--sm"
-                      disabled={page === 0}
-                      onClick={() => setPaging({ context, page: page - 1 })}
-                    >
-                      {t("previous")}
-                    </button>
-                    <span>
-                      {t("page", { current: page + 1, total: Math.ceil(poolRows.length / 10) })}
-                    </span>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--secondary ui-button--sm"
-                      disabled={(page + 1) * 10 >= poolRows.length}
-                      onClick={() => setPaging({ context, page: page + 1 })}
-                    >
-                      {t("next")}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-            {view === "allocations" && managementPanel}
-            {!data.ownershipLoading && !positions.items.length && (
-              <div className={styles.empty}>
-                <p>{t("noPositions")}</p>
-                <Link className="ui-button ui-button--secondary" href="/app/positions">
-                  {t("createPosition")}
-                </Link>
-              </div>
-            )}
-          </>
+          <AllocationsTable
+            key={tableKey}
+            deployment={deployment}
+            action={action}
+            positions={positions.items}
+            rows={rows}
+            loading={loading || data.ownershipLoading}
+            incomplete={data.ownershipIncomplete || data.rewards.some((query) => query.isError)}
+            initialPoolId={filters.poolId}
+            initialUnlock={filters.unlock}
+            scope={scope}
+          />
         )
       )}
     </div>
-  );
-}
-function SelectionCheckbox({
-  keys,
-  selected,
-  onChange,
-  label,
-}: {
-  keys: string[];
-  selected: readonly string[];
-  onChange: (keys: string[], checked: boolean) => void;
-  label: string;
-}) {
-  const ref = useRef<HTMLInputElement>(null),
-    count = keys.filter((key) => selected.includes(key)).length;
-  useLayoutEffect(() => {
-    if (ref.current) ref.current.indeterminate = count > 0 && count < keys.length;
-  }, [count, keys.length]);
-  return (
-    <label>
-      <input
-        ref={ref}
-        type="checkbox"
-        checked={keys.length > 0 && count === keys.length}
-        disabled={!keys.length}
-        onChange={(event) => onChange(keys, event.target.checked)}
-      />
-      {label}
-    </label>
   );
 }

@@ -7,20 +7,25 @@ import {
   type RewardSource,
 } from "@/lib/phase-one/reward-portfolio";
 
-export const earnViews = ["staking", "gauge", "bribes", "allocations"] as const;
+// The former Bribes view is retired: LP incentives live in Liquidity rewards and allocator
+// incentives in Allocations. Old /rewards/bribes links redirect (see the feature route).
+export const earnViews = ["staking", "gauge", "allocations"] as const;
 export type EarnView = "overview" | (typeof earnViews)[number];
 export type EarnFilters = Readonly<{
   positionId?: bigint;
   poolId?: Hex;
   asset?: Address;
   share: "lp" | "allocator";
+  /** Allocations: stake (wei) to free from `positionId` for an unstake. */
+  unlock?: bigint;
   invalid: boolean;
 }>;
 export function readEarnFilters(params: URLSearchParams): EarnFilters {
   const position = params.get("positionId"),
     pool = params.get("poolId"),
     asset = params.get("asset"),
-    share = params.get("share");
+    share = params.get("share"),
+    unlock = params.get("unlock");
   const positionId =
     position !== null && /^\d+$/.test(position) && BigInt(position) <= maxUint256
       ? BigInt(position)
@@ -30,8 +35,15 @@ export function readEarnFilters(params: URLSearchParams): EarnFilters {
     poolId: pool && isHash(pool) ? pool : undefined,
     asset: asset && isAddress(asset) ? asset : undefined,
     share: share === "allocator" ? "allocator" : "lp",
+    unlock:
+      unlock !== null && /^\d+$/.test(unlock) && BigInt(unlock) > 0n && BigInt(unlock) <= maxUint256
+        ? BigInt(unlock)
+        : undefined,
     invalid:
-      ["positionId", "poolId", "asset", "share"].some((key) => params.getAll(key).length > 1) ||
+      ["positionId", "poolId", "asset", "share", "unlock"].some(
+        (key) => params.getAll(key).length > 1
+      ) ||
+      (unlock !== null && (!/^\d+$/.test(unlock) || BigInt(unlock) > maxUint256)) ||
       (position !== null && positionId === undefined) ||
       (pool !== null && !isHash(pool)) ||
       (asset !== null && !isAddress(asset)) ||
@@ -44,11 +56,11 @@ export function earnHref(view: EarnView, filters: Partial<EarnFilters> = {}) {
     if (filters.positionId !== undefined) params.set("positionId", String(filters.positionId));
     if (view !== "staking" && filters.poolId) params.set("poolId", filters.poolId);
     if (view !== "allocations" && filters.asset) params.set("asset", filters.asset);
-    if (view === "bribes" && filters.share) params.set("share", filters.share);
+    if (view === "allocations" && filters.unlock) params.set("unlock", String(filters.unlock));
   }
   return `/app/rewards${view === "overview" ? "" : `/${view}`}${params.size ? `?${params}` : ""}`;
 }
-export function sourceForView(view: EarnView, share: EarnFilters["share"]): RewardSource[] {
+export function sourceForView(view: EarnView): RewardSource[] {
   return view === "overview"
     ? ["global", "gauge", "lp-bribe", "allocator"]
     : view === "staking"
@@ -56,9 +68,8 @@ export function sourceForView(view: EarnView, share: EarnFilters["share"]): Rewa
       : view === "gauge"
         ? // Liquidity rewards: protocol emissions and LP-share incentives both pay in-range LPs.
           ["gauge", "lp-bribe"]
-        : view === "bribes"
-          ? [share === "lp" ? "lp-bribe" : "allocator"]
-          : [];
+        : // Allocations: incentives earned by allocated stake.
+          ["allocator"];
 }
 export function rewardRowKey(positionId: bigint, poolId?: Hex) {
   return `${positionId}:${poolId?.toLowerCase() ?? "global"}`;

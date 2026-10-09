@@ -1,8 +1,15 @@
 "use client";
-import { useEffect, useLayoutEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import styles from "./earn.module.css";
+
+/**
+ * Open dialogs, oldest first. Dialogs can stack (a pool directory with an allocation dialog
+ * over it); only the topmost one handles Escape and traps Tab. The newer overlay is appended
+ * later in the document, so it renders above and marks the older one inert while open.
+ */
+const openDialogs: symbol[] = [];
 
 export function ReviewDrawer({
   title,
@@ -10,11 +17,14 @@ export function ReviewDrawer({
   onClose,
   children,
   variant = "drawer",
+  className = "",
 }: {
   title: string;
   busy?: boolean;
   /** "modal" centers a compact dialog; "fullscreen" fills the viewport. */
   variant?: "drawer" | "modal" | "fullscreen";
+  /** Extra class for the dialog element. */
+  className?: string;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -25,8 +35,14 @@ export function ReviewDrawer({
   useLayoutEffect(() => {
     current.current = { busy, onClose };
   }, [busy, onClose]);
+  // The opener, read before content can autofocus one of its own controls.
+  const [opener] = useState(() =>
+    typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)
+  );
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
+    const token = Symbol("dialog");
+    openDialogs.push(token);
+    const previous = opener;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const overlay = root.current?.parentElement;
@@ -38,8 +54,10 @@ export function ReviewDrawer({
     ) as HTMLElement[];
     const inert = siblings.map((node) => ({ node, previous: node.inert }));
     for (const { node } of inert) node.inert = true;
-    root.current?.focus();
+    // Content may focus its own first control (an autofocused input); otherwise focus the dialog.
+    if (!root.current?.contains(document.activeElement)) root.current?.focus();
     const keydown = (event: KeyboardEvent) => {
+      if (openDialogs.at(-1) !== token) return;
       // A nested wallet dialog owns its keyboard interaction while signing.
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("#headlessui-portal-root, #privy-dialog")) return;
@@ -89,12 +107,17 @@ export function ReviewDrawer({
     };
     document.addEventListener("keydown", keydown, true);
     return () => {
+      openDialogs.splice(openDialogs.indexOf(token), 1);
       document.removeEventListener("keydown", keydown, true);
       document.body.style.overflow = overflow;
       for (const { node, previous } of inert) node.inert = previous;
-      if (previous?.isConnected) previous.focus();
+      // Return focus to the opener unless something outside the dialog already took it, such
+      // as a field the closing action revealed and focused.
+      const active = document.activeElement;
+      if (previous?.isConnected && (!active || active === document.body || !active.isConnected))
+        previous.focus();
     };
-  }, []);
+  }, [opener]);
   return createPortal(
     <div
       className={`${styles.overlay} ${variant === "modal" ? styles.overlayCentered : ""}`}
@@ -108,11 +131,11 @@ export function ReviewDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={
+        className={`${
           variant === "modal"
             ? styles.modal
             : `${styles.drawer} ${variant === "fullscreen" ? styles.fullScreenDialog : ""}`
-        }
+        } ${className}`}
       >
         <header className={styles.drawerHeader}>
           <h2 id={titleId}>{title}</h2>

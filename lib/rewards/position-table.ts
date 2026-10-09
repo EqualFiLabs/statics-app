@@ -28,6 +28,12 @@ export type EarnPositionRow = Readonly<{
     lockedStake: bigint;
     nextAllocationAt: bigint;
     poolCount: number;
+    /** The position's current allocation set, including any stale (ineligible) pools. */
+    active?: readonly Readonly<{
+      poolId: `0x${string}`;
+      amount: bigint;
+      eligibilityVersion: `0x${string}`;
+    }>[];
   }>;
   unavailable: boolean;
 }>;

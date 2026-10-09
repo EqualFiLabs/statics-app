@@ -4,10 +4,7 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { usePhaseOneAction } from "./usePhaseOneAction";
 import { usePhaseOnePositions } from "./usePhaseOnePositions";
-import {
-  loadIndexedAllocationSnapshot,
-  type IndexedPhaseOnePosition,
-} from "@/lib/indexer/phase-one";
+import type { IndexedPhaseOnePosition } from "@/lib/indexer/phase-one";
 import {
   discoverPositionRewardPools,
   mapRewardReads,
@@ -37,38 +34,15 @@ export function useEarnPortfolio(
     if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
   // Staking is management-only; its form reads selections, not claimable rewards.
-  const sources = view === "staking" ? [] : sourceForView(view, filters.share);
+  const sources = view === "staking" ? [] : sourceForView(view);
   const rewardPositions = positions.items.filter(
     (position) => filters.positionId === undefined || position.positionId === filters.positionId
   );
   const rewards = useEarnRewardSources(deployment, rewardPositions, sources, filters.poolId);
-  const id = deployment.descriptor.deploymentId;
-  const allocationQuery = useQueries({
-    queries:
-      view === "allocations"
-        ? positions.items.map((position) => ({
-            queryKey: [
-              "phase-one-position",
-              id,
-              action.wallet,
-              String(position.positionId),
-              "indexed-allocations",
-            ],
-            enabled: Boolean(action.wallet),
-            staleTime: 30_000,
-            retry: false,
-            queryFn: () =>
-              limitedAllocationRead(() =>
-                loadIndexedAllocationSnapshot(position.positionId, id, action.wallet!)
-              ),
-          }))
-        : [],
-  });
   return {
     action,
     positions,
     rewards,
-    allocations: allocationQuery,
     ownershipLoading:
       positions.isLoading || positions.isFetchingNextPage || Boolean(positions.hasNextPage),
     ownershipIncomplete: positions.isError,
@@ -289,21 +263,6 @@ export function mergeEarnRewardSources(
       });
     }
   return [...rows.values()];
-}
-
-let allocationReads = 0;
-const waitingAllocationReads: (() => void)[] = [];
-async function limitedAllocationRead<T>(read: () => Promise<T>): Promise<T> {
-  if (allocationReads >= 4)
-    await new Promise<void>((resolve) => waitingAllocationReads.push(resolve));
-  else allocationReads++;
-  try {
-    return await read();
-  } finally {
-    const next = waitingAllocationReads.shift();
-    if (next) next();
-    else allocationReads--;
-  }
 }
 
 let activeEarnReads = 0;

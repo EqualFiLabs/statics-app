@@ -40,6 +40,7 @@ import {
 } from "@/lib/phase-one/liquidity";
 import { buildGaugeRewardResolution } from "@/lib/phase-one/gauges";
 import { gaugePrerequisites } from "@/lib/phase-one/reward-actions";
+import { earnHref } from "@/lib/rewards/earn";
 import { listedPublicPool, readPublicPoolState } from "@/lib/phase-one/pools";
 import { priceToAlignedTick, tickPrice, fractionalRewardAmount } from "@/lib/phase-one/prices";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
@@ -502,7 +503,7 @@ function LiquidityPositionCard({
           {configured ? `${configured.token0.symbol} / ${configured.token1.symbol}` : leg.poolId}
         </strong>
         <p>{ux("unavailablePool", { id: String(leg.positionId) })}</p>
-        <Link href={`/app/rewards/bribes?positionId=${leg.positionId}&poolId=${leg.poolId}`}>
+        <Link href={earnHref("gauge", { positionId: leg.positionId, poolId: leg.poolId })}>
           {ux("manageRewards")}
         </Link>
       </section>

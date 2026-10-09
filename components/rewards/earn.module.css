@@ -283,6 +283,8 @@
   margin: 0;
 }
 .drawerBody {
+  /* Keep layered content (sticky table columns) below the sticky header. */
+  isolation: isolate;
   padding: 24px;
   display: grid;
   gap: 22px;
@@ -1164,5 +1166,613 @@
   .earnPositionsSection .compactPoolToggle > .statusPill {
     max-width: 50%;
     white-space: normal;
+  }
+}
+
+/* Allocation pool directory. */
+.directory {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.directory .tableHeading p {
+  margin: 4px 0 0;
+}
+.directoryAmounts {
+  display: inline-grid;
+  gap: 2px;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+.streamList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.streamList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.directory select {
+  min-height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+
+/* Allocation editor: one position's allocations, edited as one replacement set. */
+.allocationEditor {
+  display: grid;
+  gap: 16px;
+}
+.allocationEditor .muted {
+  margin: 0;
+}
+/* The selected position; opens the full-screen position picker. */
+.positionTrigger,
+.positionOption {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.positionTrigger:hover,
+.positionOption:hover {
+  border-color: var(--accent);
+}
+.positionTriggerHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.positionTriggerAction {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.positionPicker {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 640px);
+  margin: 0 auto;
+}
+.positionPicker .search {
+  width: 100%;
+}
+.positionPicker .search input {
+  font-size: var(--text-base);
+}
+.drawerBody .positionOptions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .positionOptions li {
+  margin: 0;
+}
+.positionOption {
+  gap: 8px;
+  background: var(--app-surface);
+}
+.positionOption[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.positionOption .stakeBar {
+  height: 6px;
+}
+.editorCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.editorStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.editorStats > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.editorStats strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+/* The position's stake: one segment per pool, the rest is free. */
+.stakeBar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.stakeBar span {
+  transition: width 160ms ease;
+}
+.stakeBar span + span {
+  box-shadow: -2px 0 var(--app-sunken);
+}
+.stakeBar span,
+.stakeSwatch {
+  background: var(--accent);
+}
+.stakeBar span[data-index="1"],
+.stakeSwatch[data-index="1"] {
+  background: color-mix(in srgb, var(--accent) 70%, var(--app-overlay));
+}
+.stakeBar span[data-index="2"],
+.stakeSwatch[data-index="2"] {
+  background: color-mix(in srgb, var(--accent) 48%, var(--app-overlay));
+}
+.stakeBar span[data-index="3"],
+.stakeSwatch[data-index="3"] {
+  background: color-mix(in srgb, var(--warning) 70%, var(--app-overlay));
+}
+.stakeBar span[data-index="4"],
+.stakeSwatch[data-index="4"] {
+  background: color-mix(in srgb, var(--warning) 45%, var(--app-overlay));
+}
+.stakeSwatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+.editorRow[data-stale] .stakeSwatch {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--warning);
+}
+.editorNotice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+.editorNotice[data-tone="warning"] {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.editorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.editorToolbar > .statusTabs {
+  margin-right: auto;
+}
+.editorRows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .editorRows li {
+  margin: 0;
+}
+.editorRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.editorRow[data-focus] {
+  border-color: var(--accent);
+}
+.editorRow[data-stale] {
+  border-style: dashed;
+}
+.editorRowHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.inputUnit {
+  flex: none;
+  min-width: 3.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.editorEstimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.editorAdd {
+  display: grid;
+  gap: 8px;
+}
+.editorAdd .search {
+  width: 100%;
+}
+.editorSuggestions {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .editorSuggestions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+}
+.editorImpact {
+  display: grid;
+  gap: 8px;
+}
+.editorImpact h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.editorImpact ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-xs);
+  color: var(--app-text-secondary);
+}
+.drawerBody .editorImpact li {
+  margin: 0;
+}
+.editorImpact li[data-tone="warning"] {
+  color: var(--warning);
+}
+.editorImpact li[data-tone="negative"] {
+  color: var(--negative);
+}
+@media (max-width: 680px) {
+  .editorStats {
+    grid-template-columns: 1fr;
+  }
+}
+.allocationInput {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.allocationInput input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+  text-align: right;
+}
+.allocationInput input[aria-invalid="true"] {
+  border-color: var(--negative);
+}
+.changeSet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.changeSetSummary {
+  display: grid;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+@media (max-width: 680px) {
+  .allocationRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Allocation dialog: wider than the asset modal, rows scroll inside, a full sheet on phones. */
+.allocationModal {
+  width: min(100%, 640px);
+}
+.allocationModal .drawerBody {
+  overflow-y: auto;
+}
+@media (max-width: 680px) {
+  .overlayCentered:has(.allocationModal) {
+    padding: 0;
+  }
+  .allocationModal {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+}
+/* Pinned to the bottom of a scrolling dialog. */
+.dialogFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -24px -24px;
+  padding: 12px 24px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--shadow-lg);
+}
+/* An amount box with its unit and Max inside the border. */
+.amountBox {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.amountBox:focus-within {
+  border-color: var(--accent);
+}
+.amountBox[data-invalid] {
+  border-color: var(--negative);
+}
+.allocationInput .amountBox input {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.amountBox .inputUnit {
+  min-width: 0;
+}
+.inputMax {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--accent);
+  font: 600 var(--text-caption) var(--font-sans);
+  cursor: pointer;
+}
+.inputMax:disabled {
+  color: var(--app-text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.editorAmount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.editorAmount strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.editorRow > .cellMeta[data-tone="negative"] {
+  color: var(--negative);
+}
+/* Phone-only parts of the allocation editor; hidden on wider screens. */
+.editorStatsLine,
+.footerImpactToggle,
+.footerImpact,
+.editorAbout,
+.editorAddButton {
+  display: none;
+}
+@media (max-width: 680px) {
+  .allocationModal .drawerHeader {
+    padding: 14px 16px;
+  }
+  .allocationModal .drawerBody {
+    gap: 14px;
+    padding: 16px;
+  }
+  .allocationModal .dialogFooter {
+    margin: 0 -16px -16px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  /* Flatten the card and rows so content gets the screen width. */
+  .editorCard {
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .editorStats {
+    display: none;
+  }
+  .editorStatsLine {
+    display: block;
+    margin: 0;
+    color: var(--app-text-secondary);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .drawerBody .editorRows {
+    gap: 0;
+    padding: 0;
+    border-top: 1px solid var(--app-border);
+  }
+  .drawerBody .editorSuggestions {
+    padding: 0;
+  }
+  /* Name and current amount on one line, the amount box, then Add and Remove. */
+  .editorRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 14px 0;
+    border: 0;
+    border-bottom: 1px solid var(--app-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .editorRow[data-focus] {
+    padding-left: 10px;
+    box-shadow: inset 3px 0 var(--accent);
+  }
+  .editorRow[data-stale] {
+    border-style: solid;
+  }
+  .editorRow > * {
+    grid-column: 1 / -1;
+  }
+  .editorRow > .editorRowHeading {
+    grid-column: 1;
+  }
+  .editorRow > .editorAmount {
+    grid-row: 1;
+    grid-column: 2;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    text-align: right;
+  }
+  .editorRow .allocationInput {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .editorRow .amountBox {
+    flex: 1 1 100%;
+    min-height: var(--control-height);
+  }
+  .editorRow .allocationInput > :global(.ui-button) {
+    flex: 1 1 0;
+    min-height: var(--control-height);
+  }
+  /* 16px text stops iOS Safari zooming into a focused field. */
+  .allocationEditor input,
+  .allocationInput .amountBox input {
+    font-size: var(--text-base);
+  }
+  /* One impact line in the footer, expandable; the inline section is hidden. */
+  .editorImpact {
+    display: none;
+  }
+  .footerImpactToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--app-text-secondary);
+    font: var(--text-xs) var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .footerImpact {
+    display: block;
+    max-height: 40dvh;
+    margin-bottom: 10px;
+    overflow-y: auto;
+  }
+  .footerImpact ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--app-text-secondary);
+    font-size: var(--text-xs);
+  }
+  .drawerBody .footerImpact li {
+    margin: 0;
+  }
+  .footerImpact li[data-tone="warning"] {
+    color: var(--warning);
+  }
+  .footerImpact li[data-tone="negative"] {
+    color: var(--negative);
+  }
+  .allocationEditor .dialogFooter .changeSetSummary {
+    flex-basis: 100%;
+  }
+  .allocationEditor .dialogFooter .changeSetSummary .cellMeta {
+    display: none;
+  }
+  .allocationEditor .dialogFooter .changeSet > :global(.ui-button) {
+    flex: 1 1 0;
+    min-height: var(--control-height);
+  }
+}
+
+/* Allocation editor, phones, pass 2: pinned picker, intro on demand, add-pool screen. */
+@media (max-width: 680px) {
+  .editorIntro {
+    display: none;
+  }
+  .editorAbout {
+    display: block;
+    font-size: var(--text-xs);
+  }
+  .editorAbout summary {
+    color: var(--app-text-secondary);
+    cursor: pointer;
+  }
+  .editorAbout p {
+    margin: 8px 0 0;
+  }
+  .allocationModal .editorAdd {
+    display: none;
+  }
+  .editorAddButton {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--control-height);
+  }
+  .fullScreenDialog .editorAdd {
+    display: grid;
+  }
+  .fullScreenDialog .editorSuggestions li {
+    justify-content: space-between;
+  }
+  .editorToolbar > .statusTabs {
+    display: flex;
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+  .editorToolbar > .statusTabs > button {
+    flex: 1 1 0;
+  }
+  .editorToolbar > :global(.ui-button) {
+    flex: 1 1 0;
   }
 }

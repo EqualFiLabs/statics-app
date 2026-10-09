@@ -34,6 +34,47 @@ describe("review drawer keyboard and dismissal", () => {
     unmount();
     expect(document.body.style.overflow).not.toBe("hidden");
   });
+  it("lets only the topmost of stacked dialogs handle Escape and Tab", () => {
+    const closeOuter = vi.fn(),
+      closeInner = vi.fn();
+    const { rerender } = render(
+      <ReviewDrawer title="Directory" variant="fullscreen" onClose={closeOuter}>
+        <button>Allocate</button>
+      </ReviewDrawer>
+    );
+    const opener = screen.getByRole("button", { name: "Allocate" });
+    opener.focus();
+    const stacked = (
+      <>
+        <ReviewDrawer title="Directory" variant="fullscreen" onClose={closeOuter}>
+          <button>Allocate</button>
+        </ReviewDrawer>
+        <ReviewDrawer title="Adjust" variant="modal" onClose={closeInner}>
+          <button>Add changes</button>
+        </ReviewDrawer>
+      </>
+    );
+    rerender(stacked);
+    const outer = screen.getByRole("dialog", { name: "Directory" }),
+      inner = screen.getByRole("dialog", { name: "Adjust" });
+    expect(document.activeElement).toBe(inner);
+    // The lower dialog's overlay is inert while another dialog sits over it.
+    expect((outer.parentElement as HTMLElement).inert).toBe(true);
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add changes" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(closeInner).toHaveBeenCalledTimes(1);
+    expect(closeOuter).not.toHaveBeenCalled();
+    rerender(
+      <ReviewDrawer title="Directory" variant="fullscreen" onClose={closeOuter}>
+        <button>Allocate</button>
+      </ReviewDrawer>
+    );
+    expect((outer.parentElement as HTMLElement).inert).toBeFalsy();
+    expect(document.activeElement).toBe(opener);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(closeOuter).toHaveBeenCalledTimes(1);
+  });
   it("leaves a nested wallet portal interactive and lets its Escape handler run", () => {
     const portal = document.createElement("div");
     portal.id = "headlessui-portal-root";

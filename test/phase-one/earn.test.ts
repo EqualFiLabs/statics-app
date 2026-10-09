@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { maxUint256 } from "viem";
-import { readEarnFilters, earnHref, rewardDisplay, rewardRowKey } from "@/lib/rewards/earn";
+import {
+  readEarnFilters,
+  earnHref,
+  earnViews,
+  rewardDisplay,
+  rewardRowKey,
+} from "@/lib/rewards/earn";
 import { parseIndexedAllocationSnapshot } from "@/lib/indexer/phase-one";
 const owner = `0x${"1".repeat(40)}` as const,
   pool = `0x${"2".repeat(64)}` as const,
@@ -18,6 +24,16 @@ describe("Earn navigation and amounts", () => {
     ])
       expect(readEarnFilters(new URLSearchParams(filter)).invalid).toBe(true);
     expect(readEarnFilters(new URLSearchParams("positionId=0")).positionId).toBe(0n);
+    expect(readEarnFilters(new URLSearchParams("positionId=1&unlock=5")).unlock).toBe(5n);
+    expect(readEarnFilters(new URLSearchParams("unlock=0")).unlock).toBeUndefined();
+    for (const unlock of ["unlock=-1", "unlock=1.5", "unlock=1&unlock=2"])
+      expect(readEarnFilters(new URLSearchParams(unlock)).invalid).toBe(true);
+    expect(earnHref("allocations", { positionId: 1n, unlock: 5n })).toBe(
+      "/app/rewards/allocations?positionId=1&unlock=5"
+    );
+    expect(earnHref("gauge", { positionId: 1n, unlock: 5n })).toBe(
+      "/app/rewards/gauge?positionId=1"
+    );
   });
   it("preserves only applicable filters between features", () => {
     const filters = readEarnFilters(
@@ -28,7 +44,7 @@ describe("Earn navigation and amounts", () => {
     expect(earnHref("allocations", filters)).toBe(
       `/app/rewards/allocations?positionId=30&poolId=${pool}`
     );
-    expect(earnHref("bribes", filters)).toContain("share=allocator");
+    expect(earnViews).not.toContain("bribes");
   });
   it("never rounds tiny positive rewards to zero and retains exact values", () => {
     expect(rewardDisplay(1n, 18)).toEqual({ display: "<0.000001", exact: "0.000000000000000001" });

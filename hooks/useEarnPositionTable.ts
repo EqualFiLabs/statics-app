@@ -145,6 +145,11 @@ export function useEarnPositionTable(
               nextAllocationAt: BigInt(allocations[0]),
               totalAllocated: allocations[1],
               poolCount: allocations[2].length,
+              active: allocations[2].map((entry) => ({
+                poolId: entry.poolId,
+                amount: entry.amount,
+                eligibilityVersion: entry.eligibilityVersion,
+              })),
               lockedStake: allocations[3],
             },
           };
