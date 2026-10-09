@@ -36,7 +36,7 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
   test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const { path, heading, copy } of [
+  for (const { path, heading, copy, target } of [
     {
       path: "/app/genesis",
       heading: "Manage your Operators NFTs",
@@ -44,8 +44,8 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
     },
     {
       path: "/app/positions",
-      heading: "Your Position NFTs",
-      copy: "Create or reuse a position for staking, rewards, and liquidity.",
+      heading: "Your accounts",
+      copy: "Each account is a Position NFT. Open one to see its balances, history and controls.",
     },
     {
       path: "/app/rewards",
@@ -64,22 +64,30 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
     },
     {
       path: "/app/rewards/bribes?share=lp",
-      heading: "Bribe Rewards",
-      copy: "Community-funded incentives for LPs and allocators.",
+      target: "/app/rewards/gauge",
+      heading: "Liquidity rewards",
+      copy: "STATICS emissions and incentives earned by your in-range liquidity.",
     },
     {
       path: "/app/rewards/allocations",
       heading: "Allocations",
-      copy: "Direct your staked STATICS toward pool emissions.",
+      copy: "Point staked STATICS at pools to direct emissions to their LPs and earn allocator incentives.",
     },
     {
       path: "/app/liquidity",
       heading: "Your liquidity",
       copy: "Provide liquidity to earn trading fees and pool incentives.",
     },
+    {
+      path: "/app/rewards/bribes?share=allocator&positionId=34",
+      target: "/app/rewards/allocations?positionId=34",
+      heading: "Allocations",
+      copy: "Point staked STATICS at pools to direct emissions to their LPs and earn allocator incentives.",
+    },
     { path: "/app/activity", heading: "Transactions", copy: "Your activity" },
   ]) {
     await page.goto(path);
+    if (target) await expect(page).toHaveURL(new URL(target, page.url()).toString());
     await expect(page.locator("#dapp-content")).toBeVisible();
     await expect(page.getByText("ROUTE UNAVAILABLE", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/Application error/i)).toHaveCount(0);
