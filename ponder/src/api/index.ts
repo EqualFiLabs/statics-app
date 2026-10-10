@@ -26,6 +26,7 @@ import {
   v4Position,
 } from "ponder:schema";
 import { positionStatementRoutes } from "./position-statement";
+import { dexMarketRoutes } from "./dex-market";
 import { allocationPoolRoutes } from "./allocation-pools";
 import { decodeCursor, encodeCursor, readLimit } from "./pagination";
 import { recoverableGenesisCreditPage } from "./genesis-credits";
@@ -38,6 +39,7 @@ const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim() || "unconfigured";
 const phaseOneDeploymentId =
   process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID?.trim() || "unconfigured-phase-one";
 
+app.route("/", dexMarketRoutes(phaseOneDeploymentId));
 app.route("/", allocationPoolRoutes(phaseOneDeploymentId));
 app.route("/", positionStatementRoutes(phaseOneDeploymentId));
 
