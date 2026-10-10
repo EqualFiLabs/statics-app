@@ -1038,12 +1038,17 @@ html:has(.landing-page) {
    Copy remains live HTML; supplied bust replaces the PSD bust layer. */
 .landing-page {
   position: relative;
-  max-width: 1440px;
-  margin-inline: auto;
   background: #050605 url("/assets/visual-direction/psd-background.webp") center top / 100% 100%
     no-repeat;
   font-family: var(--font-site-sans), var(--font-sans);
   text-transform: none;
+}
+
+/* Keep the approved composition centered while its backdrop fills wide screens. */
+.landing-page .landing-content {
+  position: relative;
+  max-width: 1440px;
+  margin-inline: auto;
 }
 
 .landing-page::before {
@@ -1466,6 +1471,21 @@ html:has(.landing-page) {
   font-size: 14px;
   letter-spacing: -0.035em;
   text-transform: uppercase;
+}
+
+/* Feather the scene edges when the design canvas no longer meets the viewport. */
+@media (width > 1440px) {
+  .landing-page .psd-scene {
+    mask-image:
+      linear-gradient(#000 82%, transparent),
+      linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+    mask-composite: intersect;
+  }
+
+  .landing-page .psd-planet {
+    mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+    mask-composite: add;
+  }
 }
 
 @media (width <= 1200px) {
