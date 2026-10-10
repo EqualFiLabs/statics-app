@@ -37,7 +37,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
     new Intl.NumberFormat(locale, {
       notation: "compact",
       maximumFractionDigits: digits,
-      ...(value > 0 && value < 0.0001
+      ...(value > 0 && value < 10 ** -digits
         ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
         : {}),
     }).format(value);
@@ -55,7 +55,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
         notation: price ? "standard" : "compact",
         minimumFractionDigits: price ? Math.min(2, fraction) : 0,
         maximumFractionDigits: price ? fraction : 2,
-        ...(amount > 0 && amount < 0.000000000001
+        ...(amount > 0 && amount < (price ? 0.000000000001 : 0.01)
           ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
           : {}),
       }).format(amount)}`;

@@ -423,6 +423,17 @@ beforeEach(() => {
 });
 
 describe("DEX overview", () => {
+  it("keeps tiny positive quote totals visible instead of rounding them to zero", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "summary")
+        return { ...sample.summary, current: { ...sample.summary.current, volume: "1" } };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const totals = await screen.findByRole("region", { name: "Market totals" });
+    expect(await within(totals).findByText("≈ $1E-6")).toBeInTheDocument();
+  });
   it("keeps emission expiry independent from a failed summary and marks incomplete volume", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
