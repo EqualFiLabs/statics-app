@@ -1,17 +1,59 @@
 "use client";
 
+import {
+  Activity,
+  ArrowLeftRight,
+  CircleDollarSign,
+  Coins,
+  Droplets,
+  Gift,
+  LayoutGrid,
+  Layers,
+  Plus,
+  Settings2,
+  ShieldCheck,
+  Wallet,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
+import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId } from "@/lib/dapp-navigation";
-import { appNavigationGroupsForStage, appTabNavigationForStage } from "@/lib/site-config";
+import {
+  appNavigationGroupsForCapabilities,
+  appTabNavigationForCapabilities,
+} from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
+
+const navigationIcons: Record<string, LucideIcon> = {
+  overview: LayoutGrid,
+  swap: ArrowLeftRight,
+  earn: Gift,
+  liquidity: Droplets,
+  baskets: Layers,
+  create: Plus,
+  dollar: CircleDollarSign,
+  positions: Wallet,
+  genesis: ShieldCheck,
+  loans: Coins,
+  wallet: Wallet,
+  faucet: Droplets,
+  activity: Activity,
+  tools: Wrench,
+};
+
+function NavigationIcon({ name }: { name: string }) {
+  const Icon = navigationIcons[name] ?? Settings2;
+  return <Icon className="dapp-nav-icon" size={18} strokeWidth={1.6} aria-hidden="true" />;
+}
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -219,8 +261,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPath = pathname ?? "/app";
   const wallet = useWalletState();
   const { active, options } = useDeployment();
-  const navigationGroups = appNavigationGroupsForStage(active.descriptor.stage);
-  const tabNavigation = appTabNavigationForStage(active.descriptor.stage);
+  const navigationGroups = appNavigationGroupsForCapabilities(active.descriptor.capabilities);
+  const tabNavigation = appTabNavigationForCapabilities(active.descriptor.capabilities);
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -232,13 +274,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeId = getDappRouteId(currentPath);
+  const detailParent = currentPath.startsWith("/app/positions/")
+    ? "positions"
+    : currentPath.startsWith("/app/baskets/")
+      ? "baskets"
+      : routeId === "genesisRecoveries"
+        ? "genesis"
+        : null;
   const useLaunchRouteCopy =
     active.descriptor.stage === "launch" &&
     (routeId === "overview" || routeId === "swap" || routeId === "genesis");
   const tLaunchRoutes = useTranslations("launchRoutes");
   const routeCopy = {
     label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
-    status: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.status`) : tRoutes(`${routeId}.status`),
     title: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.title`) : tRoutes(`${routeId}.title`),
     description: useLaunchRouteCopy
       ? tLaunchRoutes(`${routeId}.description`)
@@ -343,12 +391,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       aria-current={currentActive ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
+                      <NavigationIcon name={item.messageKey} />
                       {active.descriptor.stage === "launch" && item.capability !== "wallet"
                         ? tLaunchRoutes(`${item.messageKey}.label`)
                         : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                      <NavigationIcon name={item.messageKey} />
                       {tItems(item.messageKey)}
                       <small>{tCommon("planned")}</small>
                     </span>
@@ -370,11 +420,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Every route names itself. This used to be gated to /app, which left
               every other destination -- Genesis included -- with no <h1> at all
               and no statement of what the page is for. */}
-          <section className="dapp-intro">
-            <p className="dapp-eyebrow">{routeCopy.status}</p>
-            <h1>{routeCopy.title}</h1>
-            <p>{routeCopy.description}</p>
-          </section>
+          {/* Phase 1 Earn and the DEX overview carry their own headings. */}
+          {!(
+            active.phaseOne &&
+            (currentPath.startsWith("/app/rewards") || routeId === "overview")
+          ) && (
+            <div className="dapp-page-intro">
+              {detailParent && (
+                <Link className="dapp-header-breadcrumb" href={`/app/${detailParent}`}>
+                  ← {tRoutes(`${detailParent}.label`)}
+                </Link>
+              )}
+              <AppPageHeader
+                feature={routeId}
+                title={routeCopy.title}
+                description={routeCopy.description}
+                compact={detailParent !== null}
+              />
+            </div>
+          )}
 
           {wallet.error && (
             <p className="dapp-inline-error" role="alert">

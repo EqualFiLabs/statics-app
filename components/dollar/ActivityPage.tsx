@@ -8,8 +8,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { SurfaceEmptyState } from "@/components/common/EmptyState";
 import { deriveSurfaceState, isSurfaceReady } from "@/lib/surface-state";
 import {
-  readProtocolActivityAcrossChains,
-  readActivityChainIds,
+  readProtocolActivityAcrossDeployments,
   subscribeProtocolActivity,
   type ProtocolActivity,
 } from "@/lib/dollar/activity";
@@ -74,10 +73,12 @@ function protocolStatus(activity: ProtocolActivity): string {
 
 function chainName(chainId: number): string {
   if (chainId === ACROSS_SOLANA_CHAIN_ID) return "Solana";
+  const network = getFundingNetwork(chainId);
+  if (network) return network.label;
   if (chainId === robinhoodMainnet.id) return robinhoodMainnet.name;
   if (chainId === robinhoodTestnet.id) return robinhoodTestnet.name;
   if (chainId === anvil.id) return anvil.name;
-  return getFundingNetwork(chainId)?.label ?? `Chain ${chainId}`;
+  return `Chain ${chainId}`;
 }
 
 function evmExplorerUrl(chainId: number, hash: string): string | null {
@@ -221,10 +222,15 @@ export function ActivityPage() {
     subscribeProtocolActivity,
     () =>
       evmAddress
-        ? readProtocolActivityAcrossChains(
+        ? readProtocolActivityAcrossDeployments(
             evmAddress,
-            [...chainIds, ...readActivityChainIds(evmAddress, active.descriptor.deploymentId)],
-            active.descriptor.deploymentId
+            chainIds,
+            [
+              active.descriptor.deploymentId,
+              active.launch?.descriptor.deploymentId,
+              active.phaseOne?.descriptor.deploymentId,
+              active.protocol?.descriptor.deploymentId,
+            ].filter((id): id is string => Boolean(id))
           )
         : emptyProtocolActivity,
     () => emptyProtocolActivity
@@ -337,8 +343,12 @@ export function ActivityPage() {
           empty={{
             title: t("emptyTitle"),
             description: t("emptyDescription"),
-            action: { label: t("getDollar"), href: "/app/dollar" },
-            secondary: { label: t("addFunds"), href: "/app/portal" },
+            action: active.descriptor.capabilities.includes("dollar")
+              ? { label: t("getDollar"), href: "/app/dollar" }
+              : { label: t("addFunds"), href: "/app/portal" },
+            secondary: active.descriptor.capabilities.includes("dollar")
+              ? { label: t("addFunds"), href: "/app/portal" }
+              : undefined,
           }}
         />
       ) : (

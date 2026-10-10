@@ -13,6 +13,125 @@ import {
 } from "@/lib/protocol/reconciliation";
 
 describe("confirmed transaction reconciliation", () => {
+  it("refreshes Phase 1 positions after close and reward catch-up", () => {
+    expect(protocolQueryScopes("phase-one-close-position")).toContain("phase-one-position");
+    expect(protocolQueryScopes("phase-one-checkpoint-schedule")).toContain("phase-one-reward");
+    expect(protocolQueryScopes("phase-one-claim-lp-rewards")).toContain("phase-one-liquidity");
+    expect(protocolQueryScopes("phase-one-forfeit-lp-reward")).toContain("phase-one-liquidity");
+  });
+
+  it("refreshes liquidity catalog, fee previews, and wallet balances only for the matching wallet and deployment", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+    for (const root of [
+      "phase-one-liquidity-catalog",
+      "phase-one-liquidity-fees",
+      "phase-one-liquidity-balances",
+      "phase-one-liquidity-native-balance",
+    ]) {
+      expect(queryMatchesProtocolReconciliation([root, "local", detail.wallet], detail)).toBe(true);
+      expect(queryMatchesProtocolReconciliation([root, "other", detail.wallet], detail)).toBe(
+        false
+      );
+      expect(
+        queryMatchesProtocolReconciliation(
+          [root, "local", "0x0000000000000000000000000000000000000002"],
+          detail
+        )
+      ).toBe(false);
+    }
+    expect(protocolQueryScopes("phase-one-wrap-native")).toEqual(["wallet"]);
+  });
+
+  it("refreshes Earn wallet balances on a scoped stake receipt", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-stake" as const,
+      scopes: protocolQueryScopes("phase-one-stake"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(["earn-wallet-balance", "local", detail.wallet], detail)
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["earn-wallet-balance", "other", detail.wallet], detail)
+    ).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["earn-wallet-balance", "local", "0x0000000000000000000000000000000000000002"],
+        detail
+      )
+    ).toBe(false);
+  });
+
+  it("refreshes the shared allocation directory for its deployment after an allocation change", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-set-allocations" as const,
+      scopes: protocolQueryScopes("phase-one-set-allocations"),
+    };
+    // Not wallet-scoped: every wallet's view of pool weights changes.
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-allocation-directory", "local", "page", {}],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-allocation-directory", "other", "page", {}],
+        detail
+      )
+    ).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-allocation-directory", "local", "page", {}], {
+        ...detail,
+        kind: "phase-one-wrap-native",
+        scopes: protocolQueryScopes("phase-one-wrap-native"),
+      })
+    ).toBe(false);
+  });
+  it("refreshes account statements after any account transaction in the deployment", () => {
+    const detail = {
+      wallet: `0x${"1".repeat(40)}` as Address,
+      chainId: 31337,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-statement", "local", "7", "page", "all"],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-statement", "local", "7", "page", "all"], {
+        ...detail,
+        kind: "phase-one-settle-rewards",
+        scopes: protocolQueryScopes("phase-one-settle-rewards"),
+      })
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-statement", "other", "7", "page", "all"],
+        detail
+      )
+    ).toBe(false);
+  });
+
   it("waits until the read RPC serves the confirmed block", async () => {
     const getBlockNumber = vi.fn().mockResolvedValueOnce(99n).mockResolvedValueOnce(100n);
 
@@ -39,6 +158,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet: "0x0000000000000000000000000000000000000001" as Address,
       chainId: 46_630,
+      deploymentId: "release",
       blockNumber: 123n,
       kind: "mint-basket" as const,
       scopes: protocolQueryScopes("mint-basket"),
@@ -48,6 +168,18 @@ describe("confirmed transaction reconciliation", () => {
 
     expect(listener).toHaveBeenCalledWith(detail);
     unsubscribe();
+  });
+
+  it("uses one immediate refresh by default", async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn();
+      scheduleProtocolReconciliation(refresh);
+      await vi.runAllTimersAsync();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("runs bounded refresh passes and supports cancellation", async () => {
@@ -77,6 +209,7 @@ describe("confirmed transaction reconciliation", () => {
       announceProtocolTransactionConfirmed({
         wallet,
         chainId: 46_630,
+        deploymentId: "release",
         blockNumber: 100n,
         kind: "repay-loan",
         scopes: protocolQueryScopes("repay-loan"),
@@ -87,6 +220,7 @@ describe("confirmed transaction reconciliation", () => {
       announceProtocolTransactionConfirmed({
         wallet,
         chainId: 46_630,
+        deploymentId: "release",
         blockNumber: 101n,
         kind: "repay-loan",
         scopes: protocolQueryScopes("repay-loan"),
@@ -107,6 +241,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet,
       chainId: 46_630,
+      deploymentId: "release",
       blockNumber: 100n,
       kind: "repay-loan" as const,
       scopes: protocolQueryScopes("repay-loan"),
@@ -166,6 +301,7 @@ describe("confirmed transaction reconciliation", () => {
     const detail = {
       wallet,
       chainId: 4_663,
+      deploymentId: "robinhood-genesis",
       blockNumber: 100n,
       kind: "buy-genesis" as const,
       scopes: protocolQueryScopes("buy-genesis"),
@@ -193,5 +329,32 @@ describe("confirmed transaction reconciliation", () => {
     expect(queryMatchesProtocolReconciliation(["loan-catalog", "release", wallet], detail)).toBe(
       false
     );
+  });
+
+  it("keeps Phase 1 reconciliation scoped to its deployment", () => {
+    const wallet = "0x0000000000000000000000000000000000000001" as Address;
+    const detail = {
+      wallet,
+      chainId: 4_663,
+      deploymentId: "robinhood-phase-one",
+      blockNumber: 100n,
+      kind: "phase-one-provide-liquidity" as const,
+      scopes: protocolQueryScopes("phase-one-provide-liquidity"),
+    };
+
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-liquidity", "robinhood-phase-one", wallet, "7", "0xpool"],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["phase-one-liquidity", "robinhood-testnet-phase-one", wallet, "7", "0xpool"],
+        detail
+      )
+    ).toBe(false);
+    expect(detail.scopes).toContain("phase-one-position");
+    expect(detail.scopes).toContain("phase-one-reward");
   });
 });

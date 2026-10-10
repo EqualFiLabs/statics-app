@@ -1,0 +1,145 @@
+.header {
+  --header-art: url("/assets/visual-direction/refraction.webp");
+  --header-art-size: 320px;
+
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  min-height: 152px;
+  padding: 26px 30px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--app-bg);
+}
+
+.header::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--app-bg) 35%, var(--visual-shade) 70%, transparent),
+    var(--header-art) right center / var(--header-art-size) auto no-repeat;
+  content: "";
+  pointer-events: none;
+}
+
+.header[data-feature="overview"] {
+  --header-art: url("/assets/visual-direction/terrain.webp");
+  --header-art-size: 400px;
+}
+
+.header[data-feature="swap"] {
+  --header-art: url("/assets/visual-direction/orbits.webp");
+}
+
+.header[data-feature="positions"],
+.header[data-feature="loans"] {
+  --header-art: url("/assets/visual-direction/vault.webp");
+}
+
+.header[data-feature="liquidity"],
+.header[data-feature="faucet"] {
+  --header-art: url("/assets/visual-direction/waves.webp");
+  --header-art-size: 380px;
+}
+
+.header[data-feature="rewards"],
+.header[data-feature="baskets"],
+.header[data-feature="create"] {
+  --header-art: url("/assets/visual-direction/glass.webp");
+  --header-art-size: 270px;
+}
+
+.header[data-feature="genesis"],
+.header[data-feature="genesisRecoveries"] {
+  --header-art: url("/assets/visual-direction/robinhood-bust.webp");
+  --header-art-size: 250px;
+}
+
+.header[data-feature="activity"],
+.header[data-feature="tools"] {
+  --header-art: url("/assets/visual-direction/data-field.webp");
+}
+
+.header[data-feature="dollar"] {
+  --header-art: url("/assets/visual-direction/planet.webp");
+}
+
+.copy {
+  min-width: 0;
+  max-width: 70%;
+}
+
+.copy h1 {
+  margin: 0 0 8px;
+  font-size: var(--text-4xl);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  max-width: 620px;
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  max-width: 100%;
+  align-self: flex-end;
+}
+
+.compact {
+  min-height: 120px;
+  padding-block: 20px;
+}
+
+.compact h1 {
+  font-size: var(--text-3xl);
+}
+
+@media (width <= 700px) {
+  .header {
+    --header-art-size: 220px;
+
+    min-height: 140px;
+    padding: 22px;
+  }
+
+  .header::before {
+    background-image:
+      linear-gradient(
+        90deg,
+        var(--app-bg) 10%,
+        color-mix(in srgb, var(--app-bg) 70%, transparent) 55%,
+        color-mix(in srgb, var(--app-bg) 25%, transparent)
+      ),
+      var(--header-art);
+    background-size:
+      auto,
+      220px auto;
+  }
+
+  .copy {
+    max-width: 100%;
+  }
+
+  .copy h1 {
+    font-size: var(--text-3xl);
+  }
+
+  .compact {
+    min-height: 112px;
+    padding-block: 18px;
+  }
+}

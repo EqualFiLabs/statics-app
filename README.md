@@ -13,9 +13,9 @@ multichain funding.
 - **Review status:** Internal review
 - **License:** Business Source License 1.1
 
-Contract addresses are accepted only from a checked-in deployment manifest. Before enabling a
-transaction path, the application reads deployed bytecode and verifies its runtime code hash
-against that manifest.
+Public contract addresses come from checked-in deployment manifests. Phase 1 configuration
+uses local chain, address, and PoolKey checks; swaps and Phase 1 actions do not run deployment
+audits. The existing full-protocol Dollar deployment validation remains separate.
 
 ## Application boundaries
 
@@ -98,6 +98,22 @@ Server-only configuration:
 
 The server integrations read these values only from their process environment. They are never
 copied into browser configuration.
+
+### Local Robinhood mainnet fork
+
+Anvil can keep Robinhood's mainnet chain ID while serving the app entirely on localhost. Set
+`NEXT_PUBLIC_APP_ENV=development`, `NEXT_PUBLIC_APP_NETWORK=anvil`,
+`NEXT_PUBLIC_ANVIL_CHAIN_ID=4663`, and `NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8663`.
+Both local Genesis and Phase 1 manifests must identify chain `4663`; point the local indexer
+at the same fork and use a dedicated database. Without the chain override, existing local
+deployments continue to use `31337`.
+
+This configuration uses the local RPC for app reads and Privy wallet submissions. The network
+selector offers the fork once rather than also offering mainnet under the same chain ID.
+If the same-origin Robinhood proxies are used, configure their server-only read and wallet
+upstreams to the local Anvil URL too. External wallets must have their Robinhood RPC changed
+to that URL; selecting chain `4663` alone does not change an existing wallet's endpoint.
+A public RPC host is only needed for clients connecting from another machine.
 
 The `STATICS_ROBINHOOD_*` values back the same-origin, read-only browser RPC proxy. Use a dedicated
 authenticated provider application/key for them. Ponder must use a different provider key so
@@ -273,8 +289,10 @@ npm run launch-fork:generate-volume -- --eth 1 --cycles 5
 ```
 
 These are fork-local balances and transactions. They do not move real ETH or change Robinhood
-mainnet. Deployment runs under Robinhood identity, then the interactive fork changes to Local
-Anvil chain `31337`. The app's existing network selector can therefore move among Local Anvil,
+mainnet. This Genesis-only launcher deploys under Robinhood identity, then changes to Local
+Anvil chain `31337`. For an integrated Genesis and Phase 1 fork that retains `4663`, use the
+configuration described in **Local Robinhood mainnet fork** above. The default launch helper's
+network selector can move among Local Anvil,
 Robinhood mainnet, and Robinhood testnet without a second deployment control. Canonical
 STATICS/WETH trades still use the real Robinhood V4 contracts copied into the fork. The controls
 accept a fixed set of bounded operations and cannot submit arbitrary calldata.
@@ -347,6 +365,29 @@ STATICS_PROTOCOL_REPOSITORY=/path/to/statics npm run test:integration:local
 It deploys ephemeral local contracts and exercises value-moving lifecycles with confirmed receipts.
 It is local execution evidence, not Robinhood testnet transaction evidence.
 
+For an already-running Phase 1 fork, configure the app with both Genesis and Phase 1 manifests,
+then run the additive acceptance checks:
+
+```bash
+STATICS_FORK_ROOT=/path/to/existing-phase-one-fork \
+  npx vitest run --config vitest.phase-one-fork.config.ts
+CONNECTED_DAPP_URL=http://127.0.0.1:3000 \
+  npx playwright test --config playwright.genesis-fork.config.ts phase-one-fork.spec.ts
+```
+
+The transaction suite requires `manifest.json` and `cleanup-launch-manifest.json` in that folder,
+uses only loopback Anvil at port `8663` with chain ID `31337` or `4663` matching both manifests,
+and reuses its existing contracts.
+It submits local transactions, funds fixture accounts, advances the fork clock, and configures a
+reward slot through local impersonation. It does not start another Anvil or map Uniswap API
+execution to a mainnet chain. Uniswap execution uses component fixtures. A live production
+integration check is a separate read-only quote on the selected network. The browser suite checks
+the configured page layouts and disconnected states; wallet signing is covered separately by
+component and fork transaction tests.
+
+Use a separate recoverable indexer database for this rehearsal, as described in
+[`docs/phase-one-indexer-replay.md`](docs/phase-one-indexer-replay.md).
+
 ## Deployment manifests and SDK
 
 - [`deployments/README.md`](deployments/README.md) documents public deployment generation and
@@ -355,6 +396,8 @@ It is local execution evidence, not Robinhood testnet transaction evidence.
   vendored SDK artifacts.
 - `npm run sdk:sync` rebuilds those artifacts from the checkout named by
   `STATICS_PROTOCOL_REPOSITORY`.
+- Staking previews use the additive reward-selection timing view when supported. See
+  [`docs/staking-timing.md`](docs/staking-timing.md) for compatibility and SDK overlay setup.
 
 ## Security
 

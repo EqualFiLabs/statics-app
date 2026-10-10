@@ -146,3 +146,448 @@ export const marketCandle = onchainTable(
   }),
   (table) => ({ market: index().on(table.deploymentId, table.poolId, table.bucketTimestamp) })
 );
+
+export const publicPool = onchainTable(
+  "public_pool",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    creator: table.hex().notNull(),
+    currency0: table.hex().notNull(),
+    currency1: table.hex().notNull(),
+    hook: table.hex().notNull(),
+    lpFee: table.integer().notNull(),
+    tickSpacing: table.integer().notNull(),
+    initialSqrtPriceX96: table.bigint().notNull(),
+    initialTick: table.integer().notNull(),
+    inputFeeBps: table.integer().notNull(),
+    outputFeeBps: table.integer().notNull(),
+    feeRateOverridden: table.boolean().notNull(),
+    quarantined: table.boolean().notNull(),
+    decommissioned: table.boolean().notNull(),
+    polActivated: table.boolean().notNull(),
+    gaugeInitialized: table.boolean().notNull(),
+    gaugeStopped: table.boolean().notNull(),
+    decommissionStarted: table.boolean().notNull(),
+    decommissionFinalized: table.boolean().notNull(),
+    createdAtBlock: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({
+    inventory: index().on(table.deploymentId, table.decommissioned, table.poolId),
+    creator: index().on(table.deploymentId, table.creator, table.poolId),
+  })
+);
+
+export const rewardRestriction = onchainTable(
+  "reward_restriction",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    asset: table.hex().notNull(),
+    restricted: table.boolean().notNull(),
+    nonce: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ asset: index().on(table.deploymentId, table.asset) })
+);
+
+export const phaseOneMarketSwap = onchainTable(
+  "phase_one_market_swap",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    sequence: table.bigint().notNull(),
+    amount0: table.bigint().notNull(),
+    amount1: table.bigint().notNull(),
+    staticsFee0: table.bigint().notNull(),
+    staticsFee1: table.bigint().notNull(),
+    finalTick: table.integer().notNull(),
+    nativeLpFee: table.integer().notNull(),
+    flags: table.integer().notNull(),
+    internal: table.boolean().notNull(),
+    transactionHash: table.hex().notNull(),
+    blockNumber: table.bigint().notNull(),
+    blockTimestamp: table.bigint().notNull(),
+    logIndex: table.integer().notNull(),
+  }),
+  (table) => ({
+    market: index().on(
+      table.deploymentId,
+      table.poolId,
+      table.sequence,
+      table.blockNumber,
+      table.logIndex
+    ),
+  })
+);
+
+export const phaseOneMarketObservation = onchainTable(
+  "phase_one_market_observation",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    observationId: table.bigint().notNull(),
+    sequence: table.bigint().notNull(),
+    timestamp: table.bigint().notNull(),
+    tick: table.integer().notNull(),
+    nativeLpFee: table.integer().notNull(),
+    flags: table.integer().notNull(),
+    tickCumulative: table.bigint().notNull(),
+    externalVolume0: table.bigint().notNull(),
+    externalVolume1: table.bigint().notNull(),
+    internalVolume0: table.bigint().notNull(),
+    internalVolume1: table.bigint().notNull(),
+    staticsFees0: table.bigint().notNull(),
+    staticsFees1: table.bigint().notNull(),
+    externalSwapCount: table.bigint().notNull(),
+    internalSwapCount: table.bigint().notNull(),
+    blockNumber: table.bigint().notNull(),
+  }),
+  (table) => ({
+    market: index().on(table.deploymentId, table.poolId, table.timestamp, table.observationId),
+  })
+);
+
+export const positionNft = onchainTable(
+  "position_nft",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    positionId: table.bigint().notNull(),
+    owner: table.hex().notNull(),
+    stakedBalance: table.bigint().notNull(),
+    activeLegCount: table.bigint().notNull(),
+    unresolvedObligationCount: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ owner: index().on(table.deploymentId, table.owner, table.positionId) })
+);
+
+export const managedGaugePosition = onchainTable(
+  "managed_gauge_position",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    positionId: table.bigint().notNull(),
+    poolId: table.hex().notNull(),
+    posmTokenId: table.bigint().notNull(),
+    manager: table.hex().notNull(),
+    tickLower: table.integer().notNull(),
+    tickUpper: table.integer().notNull(),
+    liquidity: table.bigint().notNull(),
+    active: table.boolean().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({
+    position: index().on(table.deploymentId, table.positionId, table.poolId),
+    pool: index().on(table.deploymentId, table.poolId, table.active),
+  })
+);
+
+export const poolRewardSlot = onchainTable(
+  "pool_reward_slot",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    slot: table.integer().notNull(),
+    asset: table.hex().notNull(),
+    allocatorShareBps: table.integer().notNull(),
+    lpFunded: table.bigint().notNull(),
+    allocatorFunded: table.bigint().notNull(),
+    periodFinish: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ pool: index().on(table.deploymentId, table.poolId, table.slot) })
+);
+
+export const gaugeReserveState = onchainTable("gauge_reserve_state", (table) => ({
+  key: table.text().primaryKey(),
+  deploymentId: table.text().notNull(),
+  activated: table.boolean().notNull(),
+  releaseBps: table.integer().notNull(),
+  pendingReleaseBps: table.integer().notNull(),
+  pendingReleaseAt: table.bigint().notNull(),
+  deferredMaturityAt: table.bigint().notNull(),
+  scheduleStart: table.bigint().notNull(),
+  lastCheckpoint: table.bigint().notNull(),
+  periodStart: table.bigint().notNull(),
+  periodFinish: table.bigint().notNull(),
+  currentPeriod: table.bigint().notNull(),
+  allocationCooldown: table.bigint().notNull(),
+  available: table.bigint().notNull(),
+  deferred: table.bigint().notNull(),
+  committed: table.bigint().notNull(),
+  periodBudget: table.bigint().notNull(),
+  periodAccounted: table.bigint().notNull(),
+  totalAllocatedWeight: table.bigint().notNull(),
+  globalIndexX160: table.bigint().notNull(),
+  unsettledRoutingLiability: table.bigint().notNull(),
+  updatedAtBlock: table.bigint().notNull(),
+  updatedAtTimestamp: table.bigint().notNull(),
+}));
+
+export const gaugePoolState = onchainTable(
+  "gauge_pool_state",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    poolId: table.hex().notNull(),
+    weight: table.bigint().notNull(),
+    storedVersion: table.hex().notNull(),
+    currentVersion: table.hex().notNull(),
+    restrictionSequence: table.bigint().notNull(),
+    indexCursorX160: table.bigint().notNull(),
+    pendingReward: table.bigint().notNull(),
+    stale: table.boolean().notNull(),
+    lastCredited: table.bigint().notNull(),
+    lastRecycled: table.bigint().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ pool: index().on(table.deploymentId, table.poolId) })
+);
+
+export const gaugePeriod = onchainTable(
+  "gauge_period",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    period: table.bigint().notNull(),
+    start: table.bigint().notNull(),
+    finish: table.bigint().notNull(),
+    releaseBps: table.integer().notNull(),
+    budget: table.bigint().notNull(),
+    totalAllocatedWeight: table.bigint().notNull(),
+    blockNumber: table.bigint().notNull(),
+  }),
+  (table) => ({ periods: index().on(table.deploymentId, table.period) })
+);
+
+export const positionGaugeState = onchainTable(
+  "position_gauge_state",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    positionId: table.bigint().notNull(),
+    nextAllocationAt: table.bigint().notNull(),
+    totalAllocated: table.bigint().notNull(),
+    lockedStake: table.bigint().notNull(),
+    poolIdsJson: table.text().notNull(),
+    amountsJson: table.text().notNull(),
+    eligibilityVersionsJson: table.text().notNull(),
+    transactionHash: table.hex().notNull(),
+    updatedAtBlock: table.bigint().notNull(),
+  }),
+  (table) => ({ position: index().on(table.deploymentId, table.positionId) })
+);
+
+export const phaseOneActivity = onchainTable(
+  "phase_one_activity",
+  (table) => ({
+    key: table.text().primaryKey(),
+    deploymentId: table.text().notNull(),
+    kind: table.text().notNull(),
+    positionId: table.bigint(),
+    poolId: table.hex(),
+    asset: table.hex(),
+    amount: table.bigint(),
+    slot: table.integer(),
+    actor: table.hex(),
+    transactionHash: table.hex().notNull(),
+    blockNumber: table.bigint().notNull(),
+    blockTimestamp: table.bigint().notNull(),
+    logIndex: table.integer().notNull(),
+  }),
+  (table) => ({
+    history: index().on(table.deploymentId, table.blockNumber, table.logIndex),
+    position: index().on(table.deploymentId, table.positionId, table.blockNumber),
+    pool: index().on(table.deploymentId, table.poolId, table.blockNumber),
+  })
+);
+
+export const allocationToken = onchainTable("allocation_token", (t) => ({
+  key: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
+  address: t.hex().notNull(),
+  symbol: t.text(),
+  name: t.text(),
+  decimals: t.integer(),
+  observedAtBlock: t.bigint().notNull(),
+}));
+
+export const allocatorStream = onchainTable(
+  "allocator_stream",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    slot: t.integer().notNull(),
+    asset: t.hex().notNull(),
+    allocatorShareBps: t.integer().notNull(),
+    eligibilityVersion: t.hex().notNull(),
+    fundingRestrictionSequence: t.bigint().notNull(),
+    periodStart: t.bigint().notNull(),
+    periodFinish: t.bigint().notNull(),
+    lastUpdate: t.bigint().notNull(),
+    periodBudget: t.bigint().notNull(),
+    periodEmitted: t.bigint().notNull(),
+    terminated: t.boolean().notNull(),
+    observedAtBlock: t.bigint().notNull(),
+    observedAtTimestamp: t.bigint().notNull(),
+  }),
+  (t) => ({ pool: index().on(t.deploymentId, t.poolId, t.slot) })
+);
+
+// Materialized browsing data: all filtering, numeric sorting and paging happen in SQL.
+export const allocationDirectoryPool = onchainTable(
+  "allocation_directory_pool",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    eligible: t.boolean().notNull(),
+    weight: t.bigint().notNull(),
+    incentiveStreamCount: t.integer().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    searchText: t.text().notNull(),
+    detailsJson: t.text().notNull(),
+  }),
+  (t) => ({
+    weight: index().on(t.deploymentId, t.weight, t.poolId),
+    incentives: index().on(t.deploymentId, t.incentiveStreamCount, t.poolId),
+    created: index().on(t.deploymentId, t.createdAtBlock, t.poolId),
+  })
+);
+
+export const allocationDirectoryState = onchainTable("allocation_directory_state", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  revision: t.bigint().notNull(),
+  indexedAtBlock: t.bigint().notNull(),
+  indexedAtTimestamp: t.bigint().notNull(),
+}));
+
+// Lifetime history remains independent from current ownership rows deleted on burn.
+export const positionStatementHistory = onchainTable("position_statement_history", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  positionId: t.bigint().notNull(),
+  owner: t.hex(),
+  lastOwner: t.hex(),
+  firstBlock: t.bigint().notNull(),
+  openingObserved: t.boolean().notNull(),
+}));
+export const positionStatementBlock = onchainTable(
+  "position_statement_block",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    digest: t.hex().notNull(),
+  }),
+  (t) => ({ boundary: index().on(t.deploymentId, t.blockNumber) })
+);
+export const positionStatement = onchainTable(
+  "position_statement",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    positionId: t.bigint().notNull(),
+    eventName: t.text().notNull(),
+    category: t.text().notNull(),
+    transactionHash: t.hex().notNull(),
+    logIndex: t.integer().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    transactionSender: t.hex().notNull(),
+    ownerBefore: t.hex(),
+    ownerAfter: t.hex(),
+    poolId: t.hex(),
+    posmTokenId: t.bigint(),
+    newPosmTokenId: t.bigint(),
+    payloadJson: t.text().notNull(),
+  }),
+  (t) => ({ history: index().on(t.deploymentId, t.positionId, t.blockNumber, t.logIndex) })
+);
+export const positionStatementMovement = onchainTable(
+  "position_statement_movement",
+  (t) => ({
+    key: t.text().primaryKey(),
+    statementKey: t.text().notNull(),
+    ordinal: t.integer().notNull(),
+    chainId: t.integer().notNull(),
+    asset: t.hex().notNull(),
+    space: t.text().notNull(),
+    direction: t.text().notNull(),
+    purpose: t.text().notNull(),
+    actor: t.hex(),
+    amount: t.bigint().notNull(),
+  }),
+  (t) => ({ parent: index().on(t.statementKey, t.ordinal) })
+);
+export const positionStatementConfig = onchainTable("position_statement_config", (t) => ({
+  key: t.text().primaryKey(),
+  stakingAsset: t.hex().notNull(),
+}));
+
+export const positionStatementRevision = onchainTable("position_statement_revision", (t) => ({
+  key: t.text().primaryKey(),
+  digest: t.hex().notNull(),
+}));
+
+/** Unified DEX sources; payloads retain exact integer strings and source provenance. */
+export const dexPool = onchainTable(
+  "dex_pool",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    details: t.text().notNull(),
+    updatedAtBlock: t.bigint().notNull(),
+  }),
+  (t) => ({ scope: index().on(t.deploymentId, t.poolId) })
+);
+export const dexRange = onchainTable(
+  "dex_range",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    details: t.text().notNull(),
+    updatedAtBlock: t.bigint().notNull(),
+  }),
+  (t) => ({ scope: index().on(t.deploymentId, t.poolId) })
+);
+export const dexHistory = onchainTable(
+  "dex_history",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    kind: t.text().notNull(),
+    details: t.text().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    timestamp: t.bigint().notNull(),
+    logIndex: t.integer().notNull(),
+  }),
+  (t) => ({
+    scope: index().on(t.deploymentId, t.poolId, t.timestamp, t.blockNumber, t.logIndex),
+    time: index().on(t.deploymentId, t.timestamp),
+  })
+);
+export const dexState = onchainTable("dex_state", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  revision: t.bigint().notNull(),
+  blockHash: t.hex().notNull(),
+  blockNumber: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+}));

@@ -1,10 +1,27 @@
 import { ponder } from "ponder:registry";
-import { genesisActivationRegistryAbi, staticsAbi } from "@statics-protocol/sdk";
+import { eq } from "ponder";
+import {
+  genesisActivationRegistryAbi,
+  staticsAbi as legacyStaticsAbi,
+} from "@statics-protocol/sdk";
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
-import { getAddress, zeroAddress } from "viem";
+import {
+  staticsAbi as phaseOneStaticsAbi,
+  staticsGaugeIncentivesAbi,
+  staticsMarketTapeAbi,
+  staticsRangeGaugeAbi,
+} from "@statics-protocol/sdk/phase-one";
+import { getAddress, parseAbi, zeroAddress, type Hex } from "viem";
+import { recordPositionStatement, statementCategories } from "./position-statement";
+import { allocationSnapshots, readTokenMetadata } from "./allocation-snapshots";
 import { activeGenesisCreditMutation } from "./genesis-credit";
-import { genesisTransferMutation, genesisWeightChangedMutation } from "./genesis";
+import {
+  genesisConsecutiveTransferMutations,
+  genesisTransferMutation,
+  genesisWeightChangedMutation,
+} from "./genesis";
 import { configuredAddress } from "./source-config";
+import { dexIndexer, type DexEvent } from "./dex-indexer";
 
 import {
   activeGenesisCredit,
@@ -14,12 +31,38 @@ import {
   harvestedFee,
   marketCandle,
   marketSwap,
+  gaugePeriod,
+  managedGaugePosition,
+  phaseOneActivity,
+  phaseOneMarketObservation,
+  phaseOneMarketSwap,
+  poolRewardSlot,
+  positionGaugeState,
+  positionNft,
+  positionStatementHistory,
+  publicPool,
+  rewardRestriction,
   v4Position,
 } from "ponder:schema";
 import { absoluteAmount, candleBucket, marketCandleKey, marketSwapMetrics } from "./market";
+import {
+  allocationSnapshotJson,
+  normalizeGaugeAllocationSnapshot,
+  phaseOneEntityKey,
+  phaseOneMinuteCandle,
+  mergeMinuteCandle,
+  unpackBalanceDelta,
+  unpackUint128Pair,
+} from "./phase-one";
 
 const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim();
 if (!deploymentId) throw new Error("PONDER_DEPLOYMENT_ID is required.");
+const phaseOneDeploymentId = process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID?.trim();
+const publicHookAddress = configuredAddress("PONDER_PUBLIC_HOOK_ADDRESS");
+const phaseOneDiamondAddress = configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS");
+if (publicHookAddress && !phaseOneDeploymentId) {
+  throw new Error("PONDER_PHASE_ONE_DEPLOYMENT_ID is required with PONDER_PUBLIC_HOOK_ADDRESS.");
+}
 const entityKey = (id: bigint) => `${deploymentId}:${id}`;
 const eventKey = (transactionHash: string, logIndex: number) =>
   `${deploymentId}:${transactionHash}:${logIndex}`;
@@ -35,12 +78,54 @@ const onPositionManager = sourceHandler(
   Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
 );
 const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
+const registerPhaseOne = sourceHandler(Boolean(phaseOneDeploymentId && phaseOneDiamondAddress));
+const statementHandlers = new Set<string>();
+const dex = dexIndexer(phaseOneDeploymentId || deploymentId, deploymentId);
+const dexEnabled = Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS"));
+const onPhaseOne: typeof ponder.on = (name, handler) => {
+  const eventName = name.slice("PhaseOneStatics:".length);
+  statementHandlers.add(eventName);
+  registerPhaseOne(name, async (input) => {
+    await handler(input);
+    if (dexEnabled) await dex.diamond(eventName, input.context, input.event as unknown as DexEvent);
+    await recordPositionStatement(
+      phaseOneDeploymentId!,
+      eventName,
+      input.event as unknown as Parameters<typeof recordPositionStatement>[2],
+      input.context
+    );
+  });
+};
+const onPublicHook = sourceHandler(Boolean(phaseOneDeploymentId && publicHookAddress));
+
+const phaseOneKey = (...parts: readonly (string | bigint)[]) =>
+  phaseOneEntityKey(phaseOneDeploymentId!, ...parts);
+const phaseOneEventKey = (transactionHash: string, logIndex: number) =>
+  phaseOneKey(transactionHash, BigInt(logIndex));
+
+const allocationIndex = allocationSnapshots(
+  phaseOneDeploymentId || "unconfigured-phase-one",
+  phaseOneDiamondAddress || zeroAddress,
+  dexEnabled ? (context, event) => dex.observe(context, event as DexEvent) : undefined
+);
+const rewardRestrictionReadAbi = parseAbi([
+  "function rewardRestricted(address) view returns (bool)",
+  "function rewardRestrictionNonce(address) view returns (uint64)",
+]);
+
+function rewardSlotKey(poolId: Hex, slot: number): string {
+  return phaseOneKey(poolId.toLowerCase(), BigInt(slot));
+}
+
+function managedPositionKey(positionId: bigint, poolId: Hex): string {
+  return phaseOneKey(positionId, poolId.toLowerCase());
+}
 
 onStatics("Statics:LoanOriginated", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
-    abi: staticsAbi,
+    abi: legacyStaticsAbi,
     functionName: "recoveryGracePeriod",
     blockNumber: event.block.number,
   });
@@ -60,7 +145,7 @@ onStatics("Statics:LoanExtended", async ({ event, context }) => {
   const maturity = BigInt(event.args.maturity);
   const recoveryGracePeriod = await context.client.readContract({
     address: event.log.address,
-    abi: staticsAbi,
+    abi: legacyStaticsAbi,
     functionName: "recoveryGracePeriod",
     blockNumber: event.block.number,
   });
@@ -121,14 +206,32 @@ ponder.on("GenesisVault:GenesisCreditExtended", async ({ event, context }) => {
   }
 });
 
+ponder.on("GenesisVault:GenesisCreditDrawn", async ({ event, context }) => {
+  const mutation = activeGenesisCreditMutation({
+    type: "drawn",
+    deploymentId,
+    genesisId: event.args.genesisId,
+    principal: event.args.newPrincipal,
+    blockNumber: event.block.number,
+  });
+  if (mutation.type === "update") {
+    await context.db.update(activeGenesisCredit, { key: mutation.key }).set(mutation.values);
+  }
+});
+
 ponder.on("GenesisVault:GenesisCreditRepaid", async ({ event, context }) => {
   const mutation = activeGenesisCreditMutation({
     type: "repaid",
     deploymentId,
     genesisId: event.args.genesisId,
+    principal: event.args.remainingPrincipal,
+    blockNumber: event.block.number,
   });
-  if (mutation.type === "delete")
+  if (mutation.type === "delete") {
     await context.db.delete(activeGenesisCredit, { key: mutation.key });
+  } else if (mutation.type === "update") {
+    await context.db.update(activeGenesisCredit, { key: mutation.key }).set(mutation.values);
+  }
 });
 
 ponder.on("GenesisVault:GenesisCreditRecovered", async ({ event, context }) => {
@@ -160,6 +263,25 @@ onPositionManager("PositionManager:Transfer", async ({ event, context }) => {
       owner: getAddress(event.args.to),
       updatedAtBlock: event.block.number,
     });
+});
+
+ponder.on("StaticsGenesis:ConsecutiveTransfer", async ({ event, context }) => {
+  const mutations = genesisConsecutiveTransferMutations({
+    deploymentId,
+    fromTokenId: event.args.fromTokenId,
+    toTokenId: event.args.toTokenId,
+    from: event.args.fromAddress,
+    to: event.args.toAddress,
+    vault: genesisVault,
+    blockNumber: event.block.number,
+  });
+  for (const mutation of mutations) {
+    if (mutation.type === "delete") {
+      await context.db.delete(genesisNft, { key: mutation.key });
+    } else {
+      await context.db.insert(genesisNft).values(mutation.row).onConflictDoUpdate(mutation.update);
+    }
+  }
 });
 
 ponder.on("StaticsGenesis:Transfer", async ({ event, context }) => {
@@ -291,6 +413,7 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
 });
 
 onPoolManager("PoolManager:Swap", async ({ event, context }) => {
+  await dex.swap(context, event as unknown as DexEvent);
   const metrics = marketSwapMetrics(event.args.amount0, event.args.amount1);
   await context.db.insert(marketSwap).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
@@ -345,3 +468,769 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
       lastBlock: event.block.number,
     }));
 });
+
+onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => {
+  if (!publicHookAddress) throw new Error("Public hook address is required for public pools.");
+  const gauge = await context.client.readContract({
+    address: event.log.address,
+    abi: staticsRangeGaugeAbi,
+    functionName: "gaugePool",
+    args: [event.args.poolId],
+    blockNumber: event.block.number,
+  });
+  const feeRate = await context.client.readContract({
+    address: event.log.address,
+    abi: phaseOneStaticsAbi,
+    functionName: "protocolPoolFeeRate",
+    args: [event.args.poolId],
+    blockNumber: event.block.number,
+  });
+  await context.db
+    .insert(publicPool)
+    .values({
+      key: phaseOneKey(event.args.poolId),
+      deploymentId: phaseOneDeploymentId!,
+      poolId: event.args.poolId,
+      creator: getAddress(event.args.creator),
+      currency0: getAddress(event.args.currency0),
+      currency1: getAddress(event.args.currency1),
+      hook: publicHookAddress,
+      lpFee: event.args.lpFee,
+      tickSpacing: event.args.tickSpacing,
+      initialSqrtPriceX96: event.args.sqrtPriceX96,
+      initialTick: event.args.tick,
+      inputFeeBps: feeRate.inputFeeBps,
+      outputFeeBps: feeRate.outputFeeBps,
+      feeRateOverridden: feeRate.overridden,
+      quarantined: false,
+      decommissioned: false,
+      polActivated: false,
+      gaugeInitialized: gauge.initialized,
+      gaugeStopped: gauge.stopped,
+      decommissionStarted: false,
+      decommissionFinalized: false,
+      createdAtBlock: event.block.number,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({
+      creator: getAddress(event.args.creator),
+      currency0: getAddress(event.args.currency0),
+      currency1: getAddress(event.args.currency1),
+      hook: publicHookAddress,
+      lpFee: event.args.lpFee,
+      tickSpacing: event.args.tickSpacing,
+      initialSqrtPriceX96: event.args.sqrtPriceX96,
+      initialTick: event.args.tick,
+      inputFeeBps: feeRate.inputFeeBps,
+      outputFeeBps: feeRate.outputFeeBps,
+      feeRateOverridden: feeRate.overridden,
+      updatedAtBlock: event.block.number,
+    });
+  await allocationIndex.pool(context, event, event.args.poolId);
+});
+
+onPhaseOne("PhaseOneStatics:ProtocolPolActivated", async ({ event, context }) => {
+  await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+    polActivated: true,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onPublicHook("PublicHook:DefaultFeeRateSet", async ({ event, context }) => {
+  const pools = await context.db.sql
+    .select()
+    .from(publicPool)
+    .where(eq(publicPool.deploymentId, phaseOneDeploymentId!));
+  // Default changes affect only inherited rates. No contract or metadata reads are needed.
+  for (const pool of pools) {
+    if (pool.deploymentId !== phaseOneDeploymentId || pool.feeRateOverridden) continue;
+    await context.db.update(publicPool, { key: pool.key }).set({
+      inputFeeBps: event.args.inputFeeBps,
+      outputFeeBps: event.args.outputFeeBps,
+      updatedAtBlock: event.block.number,
+    });
+  }
+});
+
+onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
+  if (!phaseOneDiamondAddress || !publicHookAddress) {
+    throw new Error("Phase 1 addresses are required for public pool fee indexing.");
+  }
+  const pool = await context.client.readContract({
+    address: phaseOneDiamondAddress,
+    abi: phaseOneStaticsAbi,
+    functionName: "protocolPool",
+    args: [event.args.poolId],
+    blockNumber: event.block.number,
+  });
+  await context.db
+    .insert(publicPool)
+    .values({
+      key: phaseOneKey(event.args.poolId),
+      deploymentId: phaseOneDeploymentId!,
+      poolId: event.args.poolId,
+      creator: getAddress(pool.creator),
+      currency0: getAddress(pool.key.currency0),
+      currency1: getAddress(pool.key.currency1),
+      hook: publicHookAddress,
+      lpFee: pool.key.fee,
+      tickSpacing: pool.key.tickSpacing,
+      initialSqrtPriceX96: 0n,
+      initialTick: 0,
+      inputFeeBps: event.args.inputFeeBps,
+      outputFeeBps: event.args.outputFeeBps,
+      feeRateOverridden: event.args.overridden,
+      quarantined: false,
+      decommissioned: pool.decommissioned,
+      polActivated: pool.polActivated,
+      gaugeInitialized: true,
+      gaugeStopped: pool.decommissioned,
+      decommissionStarted: pool.decommissioned,
+      decommissionFinalized: false,
+      createdAtBlock: event.block.number,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({
+      inputFeeBps: event.args.inputFeeBps,
+      outputFeeBps: event.args.outputFeeBps,
+      feeRateOverridden: event.args.overridden,
+      updatedAtBlock: event.block.number,
+    });
+  await allocationIndex.directory(context, event, event.args.poolId);
+});
+
+onPublicHook("PublicHook:PoolDecommissioned", async ({ event, context }) => {
+  await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+    decommissioned: true,
+    updatedAtBlock: event.block.number,
+  });
+  await allocationIndex.directory(context, event, event.args.poolId);
+});
+
+onPhaseOne("PhaseOneStatics:ProtocolPoolQuarantineSet", async ({ event, context }) => {
+  await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+    quarantined: event.args.quarantined,
+    updatedAtBlock: event.block.number,
+  });
+  await allocationIndex.directory(context, event, event.args.poolId);
+});
+
+for (const eventName of ["RewardRestrictionAdded", "RewardRestrictionRemoved"] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const asset = getAddress(event.args.asset);
+    const restricted = await context.client.readContract({
+      address: event.log.address,
+      abi: rewardRestrictionReadAbi,
+      functionName: "rewardRestricted",
+      args: [asset],
+      blockNumber: event.block.number,
+    });
+    const nonce = await context.client.readContract({
+      address: event.log.address,
+      abi: rewardRestrictionReadAbi,
+      functionName: "rewardRestrictionNonce",
+      args: [asset],
+      blockNumber: event.block.number,
+    });
+    const row = {
+      key: phaseOneKey(asset.toLowerCase()),
+      deploymentId: phaseOneDeploymentId!,
+      asset,
+      restricted,
+      nonce,
+      updatedAtBlock: event.block.number,
+    };
+    await context.db.insert(rewardRestriction).values(row).onConflictDoUpdate(row);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.affectedByRestriction(context, event, asset);
+    await allocationIndex.touch(context, event);
+  });
+}
+
+onPhaseOne("PhaseOneStatics:MarketSwapRecorded", async ({ event, context }) => {
+  const delta = unpackBalanceDelta(event.args.poolDelta);
+  const fees = unpackUint128Pair(event.args.staticsFeesPacked);
+  await context.db.insert(phaseOneMarketSwap).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    poolId: event.args.poolId,
+    sequence: event.args.sequence,
+    amount0: delta.amount0,
+    amount1: delta.amount1,
+    staticsFee0: fees.amount0,
+    staticsFee1: fees.amount1,
+    finalTick: event.args.finalTick,
+    nativeLpFee: event.args.nativeLpFee,
+    flags: event.args.flags,
+    internal: (event.args.flags & 4) !== 0,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+  const minute = phaseOneMinuteCandle({
+    ...delta,
+    finalTick: event.args.finalTick,
+    flags: event.args.flags,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+  });
+  if (minute)
+    await context.db
+      .insert(marketCandle)
+      .values({
+        ...minute,
+        key: marketCandleKey(phaseOneDeploymentId!, event.args.poolId, event.block.timestamp),
+        deploymentId: phaseOneDeploymentId!,
+        poolId: event.args.poolId,
+      })
+      .onConflictDoUpdate((row) => mergeMinuteCandle(row, minute));
+});
+
+onPhaseOne("PhaseOneStatics:MarketObservationCommitted", async ({ event, context }) => {
+  const observation = await context.client.readContract({
+    address: event.log.address,
+    abi: staticsMarketTapeAbi,
+    functionName: "marketObservation",
+    args: [event.args.poolId, event.args.observationId],
+    blockNumber: event.block.number,
+  });
+  await context.db.insert(phaseOneMarketObservation).values({
+    key: phaseOneKey(event.args.poolId, event.args.observationId),
+    deploymentId: phaseOneDeploymentId!,
+    poolId: event.args.poolId,
+    observationId: event.args.observationId,
+    sequence: observation.sequence,
+    timestamp: BigInt(observation.timestamp),
+    tick: observation.tick,
+    nativeLpFee: observation.nativeLpFee,
+    flags: observation.flags,
+    tickCumulative: observation.tickCumulative,
+    externalVolume0: observation.externalVolume0,
+    externalVolume1: observation.externalVolume1,
+    internalVolume0: observation.internalVolume0,
+    internalVolume1: observation.internalVolume1,
+    staticsFees0: observation.staticsFees0,
+    staticsFees1: observation.staticsFees1,
+    externalSwapCount: observation.externalSwapCount,
+    internalSwapCount: observation.internalSwapCount,
+    blockNumber: event.block.number,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:PositionCreated", async ({ event, context }) => {
+  await context.db
+    .insert(positionNft)
+    .values({
+      key: phaseOneKey(event.args.positionId),
+      deploymentId: phaseOneDeploymentId!,
+      positionId: event.args.positionId,
+      owner: getAddress(event.args.owner),
+      stakedBalance: 0n,
+      activeLegCount: 0n,
+      unresolvedObligationCount: 0n,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({
+      updatedAtBlock: event.block.number,
+    });
+});
+
+onPhaseOne("PhaseOneStatics:Transfer", async ({ event, context }) => {
+  const key = phaseOneKey(event.args.tokenId);
+  if (event.args.to === zeroAddress) {
+    await context.db.delete(positionNft, { key });
+    return;
+  }
+  await context.db
+    .insert(positionNft)
+    .values({
+      key,
+      deploymentId: phaseOneDeploymentId!,
+      positionId: event.args.tokenId,
+      owner: getAddress(event.args.to),
+      stakedBalance: 0n,
+      activeLegCount: 0n,
+      unresolvedObligationCount: 0n,
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate({
+      owner: getAddress(event.args.to),
+      updatedAtBlock: event.block.number,
+    });
+});
+
+onPhaseOne("PhaseOneStatics:Staked", async ({ event, context }) => {
+  await context.db.update(positionNft, { key: phaseOneKey(event.args.positionId) }).set({
+    stakedBalance: event.args.totalPositionStake,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:Unstaked", async ({ event, context }) => {
+  await context.db.update(positionNft, { key: phaseOneKey(event.args.positionId) }).set({
+    stakedBalance: event.args.totalPositionStake,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:PositionStateChanged", async ({ event, context }) => {
+  const identity = { key: phaseOneKey(event.args.tokenId) };
+  if (!(await context.db.find(positionNft, identity))) {
+    // Closing burns the NFT before emitting its final state change.
+    const history = await context.db.find(positionStatementHistory, identity);
+    if (history?.owner === null && history.lastOwner !== null) return;
+  }
+  await context.db.update(positionNft, identity).set({
+    activeLegCount: event.args.activeLegCount,
+    unresolvedObligationCount: event.args.unresolvedObligationCount,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+for (const eventName of ["ManagedLiquidityProvided", "ManagedLiquidityAttached"] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    await allocationIndex.pool(context, event, event.args.poolId);
+    await allocationIndex.reserve(context, event);
+    const state = {
+      posmTokenId: event.args.posmTokenId,
+      manager: getAddress(event.args.manager),
+      tickLower: event.args.tickLower,
+      tickUpper: event.args.tickUpper,
+      liquidity:
+        "movement" in event.args ? event.args.movement.liquidityAfter : event.args.liquidity,
+      active: true,
+      updatedAtBlock: event.block.number,
+    };
+    await context.db
+      .insert(managedGaugePosition)
+      .values({
+        key: managedPositionKey(event.args.positionId, event.args.poolId),
+        deploymentId: phaseOneDeploymentId!,
+        positionId: event.args.positionId,
+        poolId: event.args.poolId,
+        ...state,
+      })
+      .onConflictDoUpdate(state);
+  });
+}
+
+onPhaseOne("PhaseOneStatics:ManagedLiquidityChanged", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .update(managedGaugePosition, {
+      key: managedPositionKey(event.args.positionId, event.args.poolId),
+    })
+    .set({ liquidity: event.args.movement.liquidityAfter, updatedAtBlock: event.block.number });
+});
+
+onPhaseOne("PhaseOneStatics:ManagedLiquidityRebalanced", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .update(managedGaugePosition, {
+      key: managedPositionKey(event.args.positionId, event.args.poolId),
+    })
+    .set({
+      posmTokenId: event.args.newPosmTokenId,
+      manager: getAddress(event.args.manager),
+      tickLower: event.args.tickLower,
+      tickUpper: event.args.tickUpper,
+      liquidity: event.args.movement.liquidityAfter,
+      active: true,
+      updatedAtBlock: event.block.number,
+    });
+});
+
+onPhaseOne("PhaseOneStatics:ManagedLiquidityExited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .update(managedGaugePosition, {
+      key: managedPositionKey(event.args.positionId, event.args.poolId),
+    })
+    .set({ liquidity: 0n, active: false, updatedAtBlock: event.block.number });
+});
+
+onPhaseOne("PhaseOneStatics:PoolRewardAssetAppended", async ({ event, context }) => {
+  await readTokenMetadata(context, event, getAddress(event.args.asset));
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db.insert(poolRewardSlot).values({
+    key: rewardSlotKey(event.args.poolId, event.args.slot),
+    deploymentId: phaseOneDeploymentId!,
+    poolId: event.args.poolId,
+    slot: event.args.slot,
+    asset: getAddress(event.args.asset),
+    allocatorShareBps: 0,
+    lpFunded: 0n,
+    allocatorFunded: 0n,
+    periodFinish: 0n,
+    updatedAtBlock: event.block.number,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:PoolRewardAllocatorShareSet", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .update(poolRewardSlot, { key: rewardSlotKey(event.args.poolId, event.args.slot) })
+    .set({
+      allocatorShareBps: event.args.allocatorShareBps,
+      updatedAtBlock: event.block.number,
+    });
+});
+
+onPhaseOne("PhaseOneStatics:PoolRewardFunded", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .insert(poolRewardSlot)
+    .values({
+      key: rewardSlotKey(event.args.poolId, event.args.slot),
+      deploymentId: phaseOneDeploymentId!,
+      poolId: event.args.poolId,
+      slot: event.args.slot,
+      asset: getAddress(event.args.asset),
+      allocatorShareBps: 0,
+      lpFunded: event.args.lpAmount,
+      allocatorFunded: 0n,
+      periodFinish: BigInt(event.args.periodFinish),
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate((row) => ({
+      asset: getAddress(event.args.asset),
+      lpFunded: row.lpFunded + event.args.lpAmount,
+      periodFinish: BigInt(event.args.periodFinish),
+      updatedAtBlock: event.block.number,
+    }));
+});
+
+onPhaseOne("PhaseOneStatics:PoolAllocatorRewardFunded", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db
+    .insert(poolRewardSlot)
+    .values({
+      key: rewardSlotKey(event.args.poolId, event.args.slot),
+      deploymentId: phaseOneDeploymentId!,
+      poolId: event.args.poolId,
+      slot: event.args.slot,
+      asset: getAddress(event.args.asset),
+      allocatorShareBps: 0,
+      lpFunded: 0n,
+      allocatorFunded: event.args.allocatorAmount,
+      periodFinish: BigInt(event.args.periodFinish),
+      updatedAtBlock: event.block.number,
+    })
+    .onConflictDoUpdate((row) => ({
+      asset: getAddress(event.args.asset),
+      allocatorFunded: row.allocatorFunded + event.args.allocatorAmount,
+      periodFinish: BigInt(event.args.periodFinish),
+      updatedAtBlock: event.block.number,
+    }));
+});
+
+for (const eventName of [
+  "GaugeReserveFunded",
+  "GaugeScheduleActivated",
+  "GaugeReleaseBpsScheduled",
+  "GaugeAllocationCooldownSet",
+] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
+  });
+}
+
+onPhaseOne("PhaseOneStatics:GaugePeriodStarted", async ({ event, context }) => {
+  await context.db.insert(gaugePeriod).values({
+    key: phaseOneKey(event.args.period),
+    deploymentId: phaseOneDeploymentId!,
+    period: event.args.period,
+    start: BigInt(event.args.start),
+    finish: BigInt(event.args.finish),
+    releaseBps: event.args.releaseBps,
+    budget: event.args.budget,
+    totalAllocatedWeight: event.args.totalAllocatedWeight,
+    blockNumber: event.block.number,
+  });
+
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.touch(context, event);
+});
+
+for (const eventName of [
+  "PositionGaugeAllocationsSet",
+  "PositionGaugeAllocationCooldownExtended",
+  "PositionGaugeAllocationsClearedByStakeLoss",
+] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const previous = await context.db.find(positionGaugeState, {
+      key: phaseOneKey(event.args.positionId),
+    });
+    const priorPools = previous ? (JSON.parse(previous.poolIdsJson) as Hex[]) : [];
+    const snapshot = normalizeGaugeAllocationSnapshot(
+      await context.client.readContract({
+        address: event.log.address,
+        abi: staticsGaugeIncentivesAbi,
+        functionName: "gaugePositionAllocations",
+        args: [event.args.positionId],
+        blockNumber: event.block.number,
+      })
+    );
+    // All snapshots describe the block's ending state, never an inferred outer calldata state.
+    const row = {
+      key: phaseOneKey(event.args.positionId),
+      deploymentId: phaseOneDeploymentId!,
+      positionId: event.args.positionId,
+      nextAllocationAt: BigInt(snapshot.nextAllocationAt),
+      totalAllocated: snapshot.totalAllocated,
+      lockedStake: snapshot.lockedStake,
+      ...allocationSnapshotJson(snapshot),
+      transactionHash: event.transaction.hash,
+      updatedAtBlock: event.block.number,
+    };
+    await context.db.insert(positionGaugeState).values(row).onConflictDoUpdate(row);
+    const affected = new Set(
+      [...priorPools, ...snapshot.active.map((a) => a.poolId)].map((id) => id.toLowerCase() as Hex)
+    );
+    for (const poolId of affected) await allocationIndex.pool(context, event, poolId);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
+  });
+}
+
+onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardCredited", async ({ event, context }) => {
+  await allocationIndex.weight(context, event, event.args.poolId, {
+    lastCredited: event.args.amount,
+  });
+  await allocationIndex.streams(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.directory(context, event, event.args.poolId);
+  await allocationIndex.touch(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "protocol-gauge-reward-credited",
+    positionId: null,
+    poolId: event.args.poolId,
+    asset: null,
+    amount: event.args.amount,
+    slot: 0,
+    actor: null,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:ProtocolGaugeRewardRecycled", async ({ event, context }) => {
+  await allocationIndex.weight(context, event, event.args.poolId, {
+    lastRecycled: event.args.amount,
+  });
+  await allocationIndex.streams(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await allocationIndex.directory(context, event, event.args.poolId);
+  await allocationIndex.touch(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "protocol-gauge-reward-recycled",
+    positionId: null,
+    poolId: event.args.poolId,
+    asset: null,
+    amount: event.args.amount,
+    slot: 0,
+    actor: null,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardClaimed", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "allocator-reward-claimed",
+    positionId: event.args.positionId,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.received,
+    slot: event.args.slot,
+    actor: getAddress(event.args.receiver),
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:GaugeAllocatorRewardForfeited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "allocator-reward-forfeited",
+    positionId: event.args.positionId,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    slot: event.args.slot,
+    actor: null,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:LpRewardsClaimed", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "lp-reward-claimed",
+    positionId: event.args.positionId,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.received,
+    slot: event.args.slot,
+    actor: getAddress(event.args.receiver),
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:LpRewardForfeited", async ({ event, context }) => {
+  await allocationIndex.pool(context, event, event.args.poolId);
+  await allocationIndex.reserve(context, event);
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "lp-reward-forfeited",
+    positionId: event.args.positionId,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.amount,
+    slot: event.args.slot,
+    actor: null,
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:RewardClaimed", async ({ event, context }) => {
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "global-reward-claimed",
+    positionId: event.args.positionId,
+    poolId: null,
+    asset: getAddress(event.args.asset),
+    amount: event.args.received,
+    slot: null,
+    actor: getAddress(event.args.receiver),
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:ProtocolPoolRevenueSettled", async ({ event, context }) => {
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "protocol-revenue-settled",
+    positionId: null,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.grossAmount,
+    slot: null,
+    actor: getAddress(event.args.caller),
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+onPhaseOne("PhaseOneStatics:CreatorRevenueClaimed", async ({ event, context }) => {
+  await context.db.insert(phaseOneActivity).values({
+    key: phaseOneEventKey(event.transaction.hash, event.log.logIndex),
+    deploymentId: phaseOneDeploymentId!,
+    kind: "creator-revenue-claimed",
+    positionId: null,
+    poolId: event.args.poolId,
+    asset: getAddress(event.args.asset),
+    amount: event.args.received,
+    slot: null,
+    actor: getAddress(event.args.receiver),
+    transactionHash: event.transaction.hash,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+    logIndex: event.log.logIndex,
+  });
+});
+
+for (const eventName of [
+  "PoolGaugeStopped",
+  "GeneralPoolDecommissionStarted",
+  "GeneralPoolDecommissionFinalized",
+] as const) {
+  onPhaseOne(`PhaseOneStatics:${eventName}`, async ({ event, context }) => {
+    const gauge = await context.client.readContract({
+      address: event.log.address,
+      abi: staticsRangeGaugeAbi,
+      functionName: "gaugePool",
+      args: [event.args.poolId],
+      blockNumber: event.block.number,
+    });
+    const existing = await context.db.find(publicPool, { key: phaseOneKey(event.args.poolId) });
+    if (existing)
+      await context.db.update(publicPool, { key: phaseOneKey(event.args.poolId) }).set({
+        gaugeInitialized: gauge.initialized,
+        gaugeStopped: gauge.stopped,
+        decommissioned: existing.decommissioned || eventName !== "PoolGaugeStopped",
+        decommissionStarted: existing.decommissionStarted || eventName !== "PoolGaugeStopped",
+        decommissionFinalized:
+          existing.decommissionFinalized || eventName === "GeneralPoolDecommissionFinalized",
+        updatedAtBlock: event.block.number,
+      });
+    await allocationIndex.pool(context, event, event.args.poolId);
+    await allocationIndex.reserve(context, event);
+    await allocationIndex.touch(context, event);
+  });
+}
+
+for (const eventName of Object.keys(statementCategories) as (keyof typeof statementCategories)[]) {
+  if (!statementHandlers.has(eventName)) onPhaseOne(`PhaseOneStatics:${eventName}`, async () => {});
+}
+
+if (dexEnabled) {
+  ponder.on("DexCanonicalPoolManager:Initialize", async ({ event, context }) => {
+    await dex.initialize(context, event as unknown as DexEvent, "genesis");
+  });
+  ponder.on("DexCanonicalPoolManager:ModifyLiquidity", async ({ event, context }) => {
+    await dex.modify(context, event as unknown as DexEvent);
+  });
+  ponder.on("DexPublicPoolManager:ModifyLiquidity", async ({ event, context }) => {
+    if (event.args.id !== dex.canonical) await dex.modify(context, event as unknown as DexEvent);
+  });
+  ponder.on("DexPublicPoolManager:Swap", async ({ event, context }) => {
+    if (event.args.id !== dex.canonical) await dex.swap(context, event as unknown as DexEvent);
+  });
+}

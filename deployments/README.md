@@ -55,3 +55,39 @@ approved rather than state on a build machine.
 The manifest is only half the check. `verifyDollarDeployment` re-reads every
 runtime code hash from the connected chain before any transaction path is
 offered, so a manifest that has drifted from the chain fails closed.
+
+## Phase 1 manifests
+
+Genesis and Phase 1 use separate reviewed artifacts and coexist on the selected
+network. Genesis remains in `robinhood-genesis.json`; Phase 1 contracts, periphery
+dependencies, and supported PoolKeys belong in a manifest registered by
+`phase-one-manifests.ts`.
+
+The Phase 1 parser checks chain and address configuration, canonical PoolKey
+ordering, PoolId derivation, hook identity, and token metadata locally. Runtime
+hashes, facet inventories, and fingerprints are optional provenance. Swaps and
+Phase 1 actions do not repeat deployment audits or wait for unrelated reward,
+gauge, or treasury reads. A configured manifest enables its declared capabilities;
+unavailable basket, Dollar, and loan operations remain gated.
+
+### Adding discovered pools
+
+Registered pools missing from the manifest appear in the app as unreviewed. Run the command
+without PoolIds to list them, then rerun with the ones to approve and commit the diff:
+
+```
+npm run deployment:add-pools -- --manifest path/to/manifest.json --indexer <indexer URL> <poolId>...
+```
+
+The entry uses the indexer's PoolKey, registration block and token metadata. Tokens already in the
+manifest keep their curated metadata.
+
+Local development may supply `NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST`, but
+only for chain `31337` and only when `NEXT_PUBLIC_APP_ENV=development`.
+
+The swap card selects the Genesis canonical pair first, then the first enabled
+Phase 1 pool matching the pair, then Uniswap on the selected network. Direct
+Statics quote errors remain errors. Routing stays internal to the card. Liquidity,
+Positions, Rewards, and Activity extend the existing screens. Liquidity recovery
+uses receipts, transaction history, and indexed ownership; saved workflow records
+are no longer read or written.

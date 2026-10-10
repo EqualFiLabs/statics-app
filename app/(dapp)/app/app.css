@@ -1671,7 +1671,7 @@
   font-weight: 500;
 }
 
-.approval-tools-summary > button,
+.approval-tools-summary-action > button,
 .approval-tools-state button {
   min-height: var(--control-height-sm);
   padding: 0 1rem;
@@ -1685,23 +1685,26 @@
   cursor: pointer;
 }
 
-.approval-tools-summary > button:hover:not(:disabled),
+.approval-tools-summary-action > button:hover:not(:disabled),
 .approval-tools-state button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.approval-tools-summary > button:disabled,
+.approval-tools-summary-action > button:disabled,
 .approval-tools-state button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.approval-tools-summary > button {
+.approval-tools-summary-action {
+  align-content: center;
+}
+
+.approval-tools-summary-action > button {
   min-width: 220px;
   border-color: var(--negative);
   background: var(--negative-wash);
   color: var(--negative);
-  border-radius: 0;
 }
 
 .approval-tools-note {
@@ -1794,49 +1797,6 @@
 
 .swap-page > * {
   min-width: 0;
-}
-
-.trade-market-stats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-md);
-  background: var(--app-border);
-}
-
-.trade-market-stats > div {
-  display: grid;
-  gap: 0.25rem;
-  min-width: 0;
-  padding: 0.7rem;
-  background: var(--app-surface);
-}
-
-.trade-market-stats span,
-.trade-market-stats p {
-  color: var(--app-text-muted);
-  font-size: var(--text-xs);
-}
-
-.trade-market-stats strong {
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.trade-market-stats p {
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: 0.65rem;
-  background: var(--app-surface);
-}
-
-@media (max-width: 560px) {
-  .trade-market-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .wallet-network-row {
@@ -2608,6 +2568,15 @@
   background: var(--app-surface);
 }
 
+.portal-swap-fields {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .portal-panel > * {
   min-width: 0;
 }
@@ -2641,6 +2610,7 @@
 }
 
 .portal-asset-field input {
+  flex: 1 1 0;
   width: 100%;
   min-width: 0;
   padding: 0;
@@ -2661,8 +2631,9 @@
 }
 
 .portal-asset-field select {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 6rem;
+  max-width: 60%;
   min-height: 2.375rem;
   padding: 0 0.75rem;
   border: 1px solid var(--app-border-strong);
@@ -2865,6 +2836,34 @@
   color: var(--app-text-muted);
 }
 
+/* A token from an unreviewed pool: its address must be checked before trading. */
+.portal-unreviewed {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+}
+
+.portal-unreviewed strong {
+  color: var(--warning);
+}
+
+.portal-unreviewed p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.portal-unreviewed label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .portal-error {
   margin: 0;
   padding: 0.8rem 1rem;
@@ -2873,6 +2872,37 @@
   font-size: var(--text-sm);
   line-height: 1.5;
   border-radius: var(--radius-lg);
+}
+
+/* A pool in the liquidity picker whose token has not been reviewed. */
+.liquidity-unreviewed-pill {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* The exact pools a reviewed multi-pool swap will use. */
+.portal-review-route {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.portal-review-route small {
+  color: var(--app-text-muted);
+}
+
+.portal-review-route p {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
 }
 
 .portal-review {
@@ -5903,8 +5933,7 @@
   border-radius: 0;
 }
 
-/* Mode tabs and the settings gear share a row, so the gear stays reachable
- * whichever panel is open rather than being repeated inside each one. */
+/* Keep the Portal mode tabs clear of the containing wallet dialog close button. */
 .portal-header {
   display: flex;
   gap: 0.5rem;
@@ -5913,39 +5942,14 @@
   border-bottom: 1px solid var(--app-border);
 }
 
+.wallet-dialog.is-wide .portal-header {
+  padding-inline-end: 3.5rem;
+}
+
 .portal-header .portal-mode-tabs {
   flex: 1;
   min-width: 0;
   border-bottom: 0;
-}
-
-.portal-settings-button {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  margin-right: 0.35rem;
-  color: var(--app-text-muted);
-  border: 1px solid transparent;
-  background: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.portal-settings-button svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-}
-
-.portal-settings-button:hover {
-  color: var(--app-text);
-  border-color: var(--app-border-strong);
-  background: var(--app-raised);
 }
 
 .portal-slippage-dialog {
@@ -6650,7 +6654,7 @@
     grid-template-columns: 1fr;
   }
 
-  .approval-tools-summary > button {
+  .approval-tools-summary-action > button {
     min-height: 52px;
   }
 
@@ -7429,7 +7433,9 @@
 }
 
 .genesis-timeline-segment.is-grace {
-  background: var(--warning-wash);
+  /* One hour of a 30-day term: keep it visible as a sliver. */
+  min-width: 4px;
+  background: var(--warning);
   color: var(--warning);
 }
 
@@ -7444,6 +7450,34 @@
   bottom: 0;
   width: 2px;
   background: var(--app-text);
+}
+
+.genesis-timeline-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+.genesis-timeline-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.genesis-timeline-key li::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--radius-sm);
+  background: currentcolor;
+}
+.genesis-timeline-key .is-grace {
+  color: var(--warning);
+}
+.genesis-timeline-key .is-danger {
+  color: var(--negative);
 }
 
 .genesis-timeline-marks {
@@ -7781,4 +7815,832 @@
 
 .vault-strip a:hover {
   text-decoration: underline;
+}
+
+/* Earn: staking and claims share a position, while pool controls stay scoped. */
+.earn-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.earn-toolbar,
+.earn-card-heading,
+.earn-reward-heading,
+.earn-allocation summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.earn-toolbar {
+  padding: 0.25rem 0;
+  flex-wrap: wrap;
+}
+
+.earn-page h2,
+.earn-page h3,
+.earn-page p {
+  margin: 0;
+}
+
+.earn-page h2 {
+  font-size: var(--text-xl);
+}
+
+.earn-page .earn-muted {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.earn-position-select {
+  width: min(100%, 16rem);
+}
+
+.earn-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.earn-stake-card,
+.earn-rewards-card {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.75rem;
+}
+
+.earn-page .earn-position-badge {
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.earn-balances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.earn-balances > div {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.earn-balances span,
+.earn-balances small {
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.earn-balances strong {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.earn-mode {
+  display: flex;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+
+.earn-mode button {
+  flex: 1;
+  background: transparent;
+  color: var(--app-text-secondary);
+}
+
+.earn-mode button[aria-pressed="true"] {
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.earn-amount-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.5rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+
+.earn-amount-field:focus-within {
+  border-color: var(--accent);
+}
+
+.earn-amount-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+}
+
+.earn-asset-selection {
+  display: grid;
+  gap: 0.875rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.earn-assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.earn-assets button[aria-pressed="true"] {
+  border-color: var(--app-text-secondary);
+  background: var(--app-raised);
+}
+
+.earn-asset-check {
+  width: 1rem;
+}
+
+.earn-reward-groups {
+  display: grid;
+}
+
+.earn-reward-group {
+  display: grid;
+  gap: 0.625rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.earn-page .earn-reward-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.earn-page .earn-reward-empty {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+
+.earn-review:empty {
+  display: none;
+}
+
+.earn-review {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.earn-review .position-panel {
+  margin: 0;
+  padding: 1rem;
+  background: var(--app-raised);
+  box-shadow: none;
+}
+
+.earn-review ul {
+  padding-left: 1.25rem;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.earn-review button:not(.dollar-submit) {
+  min-height: var(--control-height-sm);
+  margin-top: 0.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.earn-success {
+  color: var(--accent);
+  font-size: var(--text-sm);
+}
+
+.earn-allocation {
+  padding: 1.25rem 1.75rem;
+}
+
+.earn-allocation summary {
+  min-height: var(--control-height-sm);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.earn-allocation summary::before {
+  content: "+";
+  color: var(--app-text-secondary);
+}
+
+.earn-allocation[open] summary::before {
+  content: "−";
+}
+
+.earn-allocation summary > span:first-child {
+  flex: 1;
+}
+
+.earn-allocation[open] > p {
+  margin-top: 0.75rem;
+}
+
+.earn-allocation-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.25rem;
+}
+
+.earn-allocation-content > div {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+@media (width <= 800px) {
+  .earn-main,
+  .earn-allocation-content {
+    grid-template-columns: 1fr;
+  }
+
+  .earn-stake-card,
+  .earn-rewards-card,
+  .earn-allocation {
+    padding: 1.25rem;
+  }
+}
+
+.earn-page .basket-field {
+  margin-top: 0;
+}
+
+.earn-page .basket-field input {
+  font-size: var(--text-base);
+}
+
+@media (width <= 800px) {
+  .earn-position-select {
+    width: 100%;
+  }
+}
+
+/* Managed liquidity: positions, range selection, and reviewed actions. */
+.liquidity-experience {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 76rem;
+  margin: 0 auto;
+}
+.liquidity-heading,
+.liquidity-card-heading,
+.liquidity-pair-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.liquidity-heading h2,
+.liquidity-experience h3,
+.liquidity-experience h4,
+.liquidity-experience p {
+  margin: 0;
+}
+.liquidity-heading > div {
+  display: grid;
+  gap: 0.5rem;
+}
+.liquidity-heading h2 {
+  font-size: var(--text-2xl);
+}
+.liquidity-muted {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.liquidity-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.liquidity-back:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.liquidity-empty {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+.liquidity-empty p {
+  max-width: 26rem;
+  color: var(--app-text-secondary);
+}
+.liquidity-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--app-raised);
+  color: var(--accent);
+  font-size: var(--text-2xl);
+}
+.liquidity-position-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-position-card {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr auto auto;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: left;
+  color: var(--app-text);
+  cursor: pointer;
+}
+.liquidity-position-card > div {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.liquidity-position-card strong {
+  overflow-wrap: anywhere;
+}
+.liquidity-position-card > div > span {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.liquidity-position-card:hover {
+  border-color: var(--accent);
+}
+.liquidity-pool-step {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 38rem;
+  width: 100%;
+  margin: 0 auto;
+}
+.liquidity-step {
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.liquidity-pool-options {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-pool-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-bg);
+  color: var(--app-text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.liquidity-pool-option.is-selected {
+  border-color: var(--accent);
+  background: var(--app-raised);
+}
+.liquidity-pool-option > span:last-child {
+  margin-left: auto;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.liquidity-pair-icons {
+  display: flex;
+  padding-right: 0.5rem;
+}
+.liquidity-pair-icons > span {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 2px solid var(--app-surface);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--app-bg);
+  font-weight: 700;
+}
+.liquidity-pair-icons > span + span {
+  margin-left: -0.6rem;
+  background: var(--app-text-secondary);
+}
+.liquidity-destination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.liquidity-destination label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--app-text-secondary);
+}
+.liquidity-destination select,
+.liquidity-experience input:not([type="range"]),
+.liquidity-experience select {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font: inherit;
+}
+.liquidity-create {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+.liquidity-managed {
+  display: grid;
+  gap: 1.5rem;
+}
+.liquidity-pair-heading {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.liquidity-pair-heading h3 {
+  font-size: var(--text-xl);
+}
+.liquidity-fee {
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+/* Pool and position facts beside the range and deposit editor; they stack on narrow screens. */
+.liquidity-workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+.liquidity-side {
+  display: grid;
+  flex: 1 1 300px;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 380px;
+}
+.liquidity-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 999 1 560px;
+  gap: 1rem;
+  min-width: 0;
+}
+.liquidity-side .liquidity-detail-summary {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.liquidity-total {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+.liquidity-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.liquidity-token-input[data-unused] {
+  opacity: 0.55;
+}
+@media (max-width: 760px) {
+  .liquidity-side {
+    max-width: none;
+  }
+}
+.liquidity-price-card,
+.liquidity-deposit-card {
+  display: grid;
+  /* One column at the card's width; content never widens the card on a phone. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  min-width: 0;
+  padding: 1.75rem;
+}
+.liquidity-card-heading h4 {
+  margin-top: 0.3rem;
+  font-size: var(--text-lg);
+}
+.liquidity-orientation {
+  font-size: var(--text-xs);
+  padding: 0.5rem 0.75rem;
+}
+.liquidity-segmented {
+  display: flex;
+  padding: 0.3rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-bg);
+}
+.liquidity-segmented button,
+.liquidity-presets button {
+  flex: 1;
+  padding: 0.65rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--app-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.liquidity-segmented button[aria-pressed="true"],
+.liquidity-presets button[aria-pressed="true"] {
+  background: var(--app-raised);
+  color: var(--app-text);
+}
+.liquidity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.liquidity-status::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentcolor;
+}
+.liquidity-status.is-out {
+  color: var(--app-text-secondary);
+}
+.liquidity-settings label {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.liquidity-settings {
+  position: relative;
+}
+.liquidity-settings summary {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.liquidity-settings[open] label {
+  position: absolute;
+  z-index: 2;
+  top: 2.75rem;
+  right: 0;
+  width: 14rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+  box-shadow: var(--shadow-md);
+}
+.liquidity-deposit-card fieldset {
+  display: grid;
+  gap: 1.25rem;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  border: 0;
+}
+.liquidity-deposits {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-token-input {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-bg);
+}
+.liquidity-token-input > label {
+  font-size: var(--text-xs);
+  color: var(--app-text-secondary);
+}
+.liquidity-token-input > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.liquidity-token-input input {
+  width: 100%;
+  padding: 0.25rem 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: var(--text-2xl) !important;
+  box-shadow: none;
+}
+.liquidity-input-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: var(--text-xs);
+  color: var(--app-text-secondary);
+}
+.liquidity-input-meta button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.liquidity-review-button {
+  width: 100%;
+}
+.liquidity-inline-review {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-inline-review:empty {
+  display: none;
+}
+.liquidity-inline-review .position-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--app-bg);
+}
+.liquidity-inline-review ul {
+  padding-left: 1.25rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.liquidity-inline-review .dollar-submit {
+  width: 100%;
+  min-height: 2.75rem;
+}
+.liquidity-inline-review button:not(.dollar-submit) {
+  padding: 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--app-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.liquidity-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.liquidity-detail-summary .ui-card {
+  display: grid;
+  gap: 1.25rem;
+}
+.liquidity-holdings {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-holdings > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.liquidity-holdings strong,
+.liquidity-reward-value {
+  overflow-wrap: anywhere;
+}
+.liquidity-detail-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.liquidity-minimums summary {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.liquidity-withdrawal {
+  display: grid;
+  gap: 1rem;
+}
+.liquidity-withdrawal > strong {
+  font-size: var(--text-3xl);
+}
+.liquidity-withdrawal label {
+  display: grid;
+  gap: 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--app-text-secondary);
+}
+.liquidity-withdrawal input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.liquidity-presets {
+  display: flex;
+  gap: 0.5rem;
+}
+.liquidity-presets button {
+  border: 1px solid var(--app-border);
+}
+.liquidity-expected,
+.liquidity-minimums {
+  display: grid;
+  gap: 0.75rem;
+}
+.liquidity-expected > p {
+  font-size: var(--text-sm);
+  color: var(--app-text-secondary);
+}
+.liquidity-obligations {
+  display: grid;
+  gap: 1rem;
+}
+.liquidity-obligation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+@media (max-width: 760px) {
+  .liquidity-editor,
+  .liquidity-detail-summary {
+    grid-template-columns: 1fr;
+  }
+  .liquidity-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .liquidity-position-card {
+    grid-template-columns: 1fr auto;
+  }
+  .liquidity-position-card > div:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .liquidity-price-card,
+  .liquidity-deposit-card {
+    padding: 1.25rem;
+  }
+  .liquidity-pool-option {
+    flex-wrap: wrap;
+  }
+  .liquidity-destination label {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .liquidity-card-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.liquidity-funding {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.liquidity-list-fees {
+  font-size: var(--text-sm);
+}
+@media (max-width: 760px) {
+  .liquidity-position-card .liquidity-list-fees {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
 }

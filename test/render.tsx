@@ -1,13 +1,21 @@
-import type { ReactElement, ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render as testingLibraryRender, type RenderOptions } from "@testing-library/react";
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 
 import english from "@/messages/en.json";
 
+function TestQueries({ children }: { children: ReactNode }) {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
 function EnglishMessages({ children }: { children: ReactNode }) {
   return (
     <NextIntlClientProvider locale="en" messages={english}>
-      {children}
+      <TestQueries>{children}</TestQueries>
     </NextIntlClientProvider>
   );
 }
@@ -25,7 +33,7 @@ export function renderWithLocale(
   function LocaleMessages({ children }: { children: ReactNode }) {
     return (
       <NextIntlClientProvider locale={locale} messages={messages}>
-        {children}
+        <TestQueries>{children}</TestQueries>
       </NextIntlClientProvider>
     );
   }

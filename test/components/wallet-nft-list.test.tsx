@@ -14,7 +14,7 @@ describe("wallet NFT list localization", () => {
 
     expect(screen.getByRole("heading", { name: "Aún no hay NFT" })).toBeInTheDocument();
     expect(
-      screen.getByText(/Las posiciones y las posiciones de liquidez aparecen aquí/)
+      screen.getByText(/Las cuentas \(Position NFT\) y las posiciones de liquidez aparecen aquí/)
     ).toBeInTheDocument();
   });
 });

@@ -51,7 +51,14 @@ describe("DApp wallet shell", () => {
       network: "Robinhood Chain",
       chainId: 4_663,
       stage: "launch",
-      capabilities: [],
+      capabilities: [
+        "overview",
+        "canonical-statics-market",
+        "genesis-vault",
+        "wallet",
+        "activity",
+        "approval-tools",
+      ],
       available: true,
     } as const;
     const active = {

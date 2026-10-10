@@ -294,15 +294,17 @@ function ApprovalToolsRuntime({ deployment }: { deployment: StaticsDeployment })
           <span>{t("active")}</span>
           <strong>{active.length}</strong>
         </div>
-        <button
-          type="button"
-          onClick={() => void revokeAll()}
-          disabled={busy || active.length === 0}
-        >
-          {bulkProgress
-            ? t("revoking", { current: bulkProgress.current, total: bulkProgress.total })
-            : t("revokeAll")}
-        </button>
+        <div className="approval-tools-summary-action">
+          <button
+            type="button"
+            onClick={() => void revokeAll()}
+            disabled={busy || active.length === 0}
+          >
+            {bulkProgress
+              ? t("revoking", { current: bulkProgress.current, total: bulkProgress.total })
+              : t("revokeAll")}
+          </button>
+        </div>
       </div>
 
       <p className="approval-tools-note">{t("revokeNote")}</p>

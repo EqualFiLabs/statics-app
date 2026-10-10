@@ -24,15 +24,24 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
 export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescriptor): boolean {
   const capability = getDappRouteCapability(pathname);
   if (capability === null) return true;
-  if (descriptor.stage === "full-protocol") return true;
-  return (
-    capability === "overview" ||
-    capability === "canonical-statics-market" ||
-    capability === "genesis-vault" ||
-    capability === "wallet" ||
-    capability === "activity" ||
-    capability === "approval-tools"
-  );
+  if (descriptor.capabilities.includes(capability)) return true;
+  if (pathname === "/app/swap") {
+    return descriptor.capabilities.includes("public-direct-swaps");
+  }
+  if (pathname === "/app/liquidity") {
+    return descriptor.capabilities.includes("public-lp-positions");
+  }
+  if (capability === "positions") {
+    return descriptor.capabilities.includes("position-staking");
+  }
+  if (pathname === "/app/rewards") {
+    return (
+      descriptor.capabilities.includes("global-rewards") ||
+      descriptor.capabilities.includes("lp-rewards") ||
+      descriptor.capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
 }
 export type DappRoutePresentation = {
   label: string;
@@ -58,7 +67,7 @@ const routePresentations = {
     status: "Portfolio",
     title: "Your portfolio",
     description:
-      "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
+      "Everything you hold in one place: your assets, accounts, and rewards waiting to be claimed.",
   },
   swap: {
     label: "Swap",
@@ -92,8 +101,7 @@ const routePresentations = {
     label: "Add funds",
     status: "Add funds",
     title: "Add funds to Statics",
-    description:
-      "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar.",
+    description: "Bring funds in from another network or token using swaps and bridges.",
   },
   baskets: {
     label: "Baskets",
@@ -103,11 +111,11 @@ const routePresentations = {
       "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
-    label: "Position NFT",
-    status: "Position NFT",
-    title: "Your Position NFTs",
+    label: "Accounts",
+    status: "Accounts",
+    title: "Your accounts",
     description:
-      "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
+      "Each account is a Position NFT. Open one to see its balances, history and controls.",
   },
   loans: {
     label: "Loans",
@@ -117,18 +125,17 @@ const routePresentations = {
       "Money you have borrowed against locked collateral. Review what you owe, what is locked, and when each loan is due.",
   },
   rewards: {
-    label: "Rewards",
-    status: "Rewards",
-    title: "Your rewards",
-    description:
-      "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
+    label: "Earn",
+    status: "Earn",
+    title: "Earn",
+    description: "Stake STATICS, choose your reward assets, and collect rewards.",
   },
   genesis: {
     label: "Operator NFT",
     status: "Operator NFT",
     title: "Manage your Operators NFTs",
     description:
-      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to an account for additional reward weight.",
   },
   genesisRecoveries: {
     label: "Recoveries",

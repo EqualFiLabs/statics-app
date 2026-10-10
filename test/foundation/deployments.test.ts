@@ -109,6 +109,27 @@ describe("deployment registry", () => {
     ).toThrow("Every local launch contract requires a runtime code hash");
   });
 
+  it("uses a chain-4663 local manifest without offering mainnet under the same ID", () => {
+    const manifest = { ...launchManifest(), deploymentId: LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID };
+    const environment = {
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
+      NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663",
+      NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify(manifest),
+    };
+    const options = deploymentRegistry(environment);
+    expect(options.map((option) => option.networkId)).toEqual(["anvil", "robinhood-testnet"]);
+    expect(options[0].descriptor.chainId).toBe(4_663);
+    expect(options[0].launch?.source).toBe("development-fixture");
+    expect(options[0].protocol).toBeNull();
+    expect(() =>
+      deploymentRegistry({
+        ...environment,
+        NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST: JSON.stringify({ ...manifest, chainId: 31_337 }),
+      })
+    ).toThrow("must identify the Anvil deployment");
+  });
+
   it("publishes the reviewed mainnet Genesis launch manifest", () => {
     const [mainnet, testnet] = deploymentRegistry({ NEXT_PUBLIC_APP_ENV: "production" });
     expect(mainnet?.descriptor.available).toBe(true);

@@ -3,11 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   applyPercent,
   bpsToPercentInput,
+  formatRewardAmount,
   parseRecipientAddress,
   percentInputToBps,
 } from "@/lib/protocol/ux";
 
 describe("user-facing protocol inputs", () => {
+  it("distinguishes small claimable rewards from zero", () => {
+    expect(formatRewardAmount(50_411_171_450_737n, 18, 8)).toBe("0.00005041");
+    expect(formatRewardAmount(1n, 18, 8)).toBe("<0.00000001");
+    expect(formatRewardAmount(1n, 18, 2)).toBe("<0.01");
+    expect(formatRewardAmount(0n, 18, 8)).toBe("0");
+    expect(formatRewardAmount(1_234_560_000_000_000_000_000n, 18, 2)).toBe("1,234.56");
+  });
+
   it("scales known balances without rounding up", () => {
     expect(applyPercent(101n, 25)).toBe(25n);
     expect(applyPercent(101n, 100)).toBe(101n);

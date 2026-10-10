@@ -51,7 +51,7 @@ test("keeps the landing route outside wallet runtime", async ({ page }) => {
   const expectNoBrowserFailures = monitorBrowserFailures(page);
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /static assets.*own your position/i })
+    page.getByRole("heading", { name: /create markets.*grow liquidity/i })
   ).toBeVisible();
   await expect(page.locator(".dapp-network")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(0);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 
@@ -34,5 +34,27 @@ describe("funding network registry", () => {
 
   it("lists Anvil first, where someone running the local stack will look", () => {
     expect(fundingNetworks[0].key).toBe("anvil");
+  });
+
+  it("resolves the local RPC once when a fork shares Robinhood's chain ID", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_NETWORK", "anvil");
+    vi.stubEnv("NEXT_PUBLIC_ANVIL_CHAIN_ID", "4663");
+    vi.stubEnv("NEXT_PUBLIC_ANVIL_RPC_URL", "http://127.0.0.1:8663");
+    vi.resetModules();
+    try {
+      const { fundingNetworks: networks, getFundingNetwork: getNetwork } =
+        await import("@/lib/funding-networks");
+      expect(networks.filter((network) => network.chain.id === 4_663)).toHaveLength(1);
+      expect(getNetwork(4_663)?.chain.rpcUrls.default.http).toEqual(["http://127.0.0.1:8663/"]);
+      expect(getNetwork(4_663)?.supportsUniswap).toBe(false);
+      expect(getNetwork(8_453)?.label).toBe("Base");
+      const { getTransactionExplorerUrl, getAddressExplorerUrlForChain } =
+        await import("@/lib/wallet-config");
+      expect(getTransactionExplorerUrl(4_663, "0x1234")).toBeNull();
+      expect(getAddressExplorerUrlForChain(4_663, "0x1234")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 });

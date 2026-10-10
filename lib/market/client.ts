@@ -102,7 +102,3 @@ async function loadMarket(path: string, signal?: AbortSignal): Promise<StaticsMa
 export function loadMarketOverview(signal?: AbortSignal): Promise<StaticsMarketOverview> {
   return loadMarket("/api/market/overview", signal);
 }
-
-export function loadMarketSpotOverview(signal?: AbortSignal): Promise<StaticsMarketOverview> {
-  return loadMarket("/api/market/spot", signal);
-}

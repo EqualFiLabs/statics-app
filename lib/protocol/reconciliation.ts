@@ -4,7 +4,7 @@ import type { Address, PublicClient } from "viem";
 import type { ProtocolActivityKind } from "@/lib/dollar/activity";
 
 const RPC_CATCH_UP_DELAYS_MS = [0, 250, 750, 1_500, 3_000] as const;
-const QUERY_RECONCILIATION_DELAYS_MS = [0, 1_500, 4_000, 8_000] as const;
+const QUERY_RECONCILIATION_DELAYS_MS = [0] as const;
 
 export const PROTOCOL_TRANSACTION_CONFIRMED_EVENT = "statics:protocol-transaction-confirmed";
 
@@ -17,11 +17,16 @@ export type ProtocolQueryScope =
   | "dollar"
   | "wallet"
   | "approval"
-  | "genesis";
+  | "genesis"
+  | "phase-one-market"
+  | "phase-one-position"
+  | "phase-one-liquidity"
+  | "phase-one-reward";
 
 export type ProtocolTransactionConfirmedDetail = Readonly<{
   wallet: Address;
   chainId: number;
+  deploymentId: string;
   blockNumber: bigint;
   kind: ProtocolActivityKind;
   scopes: readonly ProtocolQueryScope[];
@@ -54,11 +59,35 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "launch-genesis-owned": "genesis",
   "genesis-vault-swap": "genesis",
   "genesis-vault-wallet": "genesis",
+  "genesis-vault-next": "genesis",
+  "genesis-vault-balances": "genesis",
   "genesis-vault-epoch": "genesis",
   "launch-genesis-credit": "genesis",
   "launch-genesis-recoveries": "genesis",
   "nft-image": "genesis",
   "genesis-traits": "genesis",
+  "phase-one-pools": "phase-one-market",
+  "phase-one-pool": "phase-one-market",
+  "direct-swap-allowances": "approval",
+  "phase-one-positions": "phase-one-position",
+  "phase-one-position": "phase-one-position",
+  "phase-one-stake-allowance": "approval",
+  "phase-one-liquidity-allowance": "approval",
+  "phase-one-wallet-lp": "phase-one-liquidity",
+  "phase-one-liquidity-catalog": "phase-one-liquidity",
+  "phase-one-liquidity-balances": "wallet",
+  "earn-wallet-balance": "wallet",
+  "phase-one-liquidity-native-balance": "wallet",
+  "phase-one-liquidity-fees": "phase-one-liquidity",
+  "phase-one-liquidity": "phase-one-liquidity",
+  "phase-one-rewards": "phase-one-reward",
+  "phase-one-gauges": "phase-one-reward",
+  // Shared pool directory (not wallet-scoped): weights and streams move with allocations.
+  "phase-one-allocation-directory": "phase-one-reward",
+  // Account statements are public history, keyed by deployment and Position NFT.
+  "phase-one-statement": "phase-one-reward",
+  // DEX overview market data, shared by every wallet on the deployment.
+  "phase-one-dex": "phase-one-market",
 };
 
 const walletScopedRoots = new Set([
@@ -79,10 +108,85 @@ const walletScopedRoots = new Set([
   "launch-genesis-owned",
   "genesis-vault-swap",
   "genesis-vault-wallet",
+  "genesis-vault-balances",
   "launch-genesis-credit",
+  "phase-one-stake-allowance",
+  "phase-one-liquidity-allowance",
+  "phase-one-wallet-lp",
+  "direct-swap-allowances",
+  "phase-one-positions",
+  "phase-one-position",
+  "phase-one-liquidity-catalog",
+  "phase-one-liquidity-balances",
+  "earn-wallet-balance",
+  "phase-one-liquidity-native-balance",
+  "phase-one-liquidity-fees",
+  "phase-one-liquidity",
+  "phase-one-rewards",
+  "phase-one-gauges",
+]);
+
+const deploymentScopedRoots = new Set([
+  "phase-one-pools",
+  "phase-one-pool",
+  "phase-one-stake-allowance",
+  "phase-one-liquidity-allowance",
+  "phase-one-wallet-lp",
+  "direct-swap-allowances",
+  "phase-one-positions",
+  "phase-one-position",
+  "phase-one-liquidity-catalog",
+  "phase-one-liquidity-balances",
+  "earn-wallet-balance",
+  "phase-one-liquidity-native-balance",
+  "phase-one-liquidity-fees",
+  "phase-one-liquidity",
+  "phase-one-rewards",
+  "phase-one-gauges",
+  "phase-one-allocation-directory",
+  "phase-one-statement",
+  "phase-one-dex",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
+  if (kind === "phase-one-wrap-native") return ["wallet"];
+  if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
+  if (
+    kind === "phase-one-claim-lp-rewards" ||
+    kind === "phase-one-forfeit-lp-reward" ||
+    kind === "phase-one-claim-batch-rewards"
+  )
+    return ["phase-one-liquidity", "phase-one-position", "phase-one-reward", "wallet"];
+  if (kind === "phase-one-approve-token" || kind === "phase-one-approve-permit2") {
+    return ["approval", "phase-one-market", "phase-one-liquidity", "wallet"];
+  }
+  if (
+    kind === "phase-one-create-position" ||
+    kind === "phase-one-close-position" ||
+    kind === "phase-one-stake" ||
+    kind === "phase-one-unstake" ||
+    kind === "phase-one-reward-selection" ||
+    kind === "phase-one-claim-global-rewards" ||
+    kind === "phase-one-set-allocations" ||
+    kind === "phase-one-claim-allocator-rewards" ||
+    kind === "phase-one-forfeit-allocator-reward"
+  ) {
+    return ["phase-one-position", "phase-one-reward", "wallet"];
+  }
+  if (
+    kind === "phase-one-provide-liquidity" ||
+    kind === "phase-one-attach-liquidity" ||
+    kind === "phase-one-increase-liquidity" ||
+    kind === "phase-one-decrease-liquidity" ||
+    kind === "phase-one-collect-fees" ||
+    kind === "phase-one-rebalance-liquidity" ||
+    kind === "phase-one-exit-liquidity"
+  ) {
+    return ["phase-one-liquidity", "phase-one-position", "phase-one-reward", "wallet"];
+  }
+  if (kind.startsWith("phase-one-checkpoint-") || kind.startsWith("phase-one-settle-")) {
+    return ["phase-one-reward", "phase-one-market"];
+  }
   if (kind === "buy-genesis" || kind === "redeem-genesis" || kind === "approve-genesis") {
     return ["genesis", "wallet"];
   }
@@ -139,6 +243,7 @@ export function queryMatchesProtocolReconciliation(
   const root = typeof queryKey[0] === "string" ? queryKey[0] : "";
   const scope = scopeRoots[root];
   if (!scope || !detail.scopes.includes(scope)) return false;
+  if (deploymentScopedRoots.has(root) && queryKey[1] !== detail.deploymentId) return false;
   if (!walletScopedRoots.has(root)) return true;
   const addresses = queryKey.filter((part): part is string =>
     /^0x[0-9a-f]{40}$/i.test(String(part))

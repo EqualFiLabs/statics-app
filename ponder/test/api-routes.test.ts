@@ -2,14 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("ponder:api", () => ({ db: {} }));
 vi.mock("ponder:schema", () => ({
+  allocationDirectoryPool: {},
+  allocationDirectoryState: {},
   activeGenesisCredit: {},
   activeLoan: {},
   v4Position: {},
   genesisNft: {},
   genesisRewardClaim: {},
   harvestedFee: {},
+  gaugePoolState: {},
+  gaugeReserveState: {},
+  managedGaugePosition: {},
   marketCandle: {},
   marketSwap: {},
+  phaseOneActivity: {},
+  phaseOneMarketObservation: {},
+  phaseOneMarketSwap: {},
+  poolRewardSlot: {},
+  positionGaugeState: {},
+  positionNft: {},
+  publicPool: {},
+  rewardRestriction: {},
 }));
 
 import { recoverableGenesisCreditPage } from "../src/api/genesis-credits";
@@ -70,6 +83,23 @@ describe("indexer API routes", () => {
     "/market/activity?from=0&to=2678401",
     `/market/activity?from=1&to=2&pool=0x${"12".repeat(31)}`,
   ])("rejects invalid market activity query %s", async (path) => {
+    const response = await app.request(path);
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    "/phase-one/market/swaps",
+    "/phase-one/market/swaps?pool=0x12",
+    `/phase-one/market/swaps?pool=0x${"12".repeat(32)}&limit=501`,
+    "/phase-one/market/observations",
+    "/phase-one/market/observations?pool=0x12",
+    "/phase-one/market/candles",
+    `/phase-one/market/candles?pool=0x${"12".repeat(32)}&from=1&to=2&resolution=2`,
+    "/phase-one/wallets/not-an-address/positions",
+    "/phase-one/positions/not-a-number",
+    "/phase-one/gauges?pool=0x12",
+    "/phase-one/activity?limit=0",
+  ])("rejects invalid Phase 1 read query %s", async (path) => {
     const response = await app.request(path);
     expect(response.status).toBe(400);
   });

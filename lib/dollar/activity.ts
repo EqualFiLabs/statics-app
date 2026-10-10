@@ -86,7 +86,34 @@ export type DollarActivityKind =
   | "link-genesis"
   | "unlink-genesis"
   | "claim-creator-revenue"
-  | "distribute-partner-revenue";
+  | "distribute-partner-revenue"
+  | "phase-one-wrap-native"
+  | "phase-one-approve-token"
+  | "phase-one-approve-permit2"
+  | "phase-one-swap"
+  | "phase-one-close-position"
+  | "phase-one-create-position"
+  | "phase-one-provide-liquidity"
+  | "phase-one-attach-liquidity"
+  | "phase-one-increase-liquidity"
+  | "phase-one-decrease-liquidity"
+  | "phase-one-collect-fees"
+  | "phase-one-rebalance-liquidity"
+  | "phase-one-exit-liquidity"
+  | "phase-one-stake"
+  | "phase-one-unstake"
+  | "phase-one-reward-selection"
+  | "phase-one-claim-global-rewards"
+  | "phase-one-claim-batch-rewards"
+  | "phase-one-set-allocations"
+  | "phase-one-claim-lp-rewards"
+  | "phase-one-forfeit-lp-reward"
+  | "phase-one-claim-allocator-rewards"
+  | "phase-one-forfeit-allocator-reward"
+  | "phase-one-checkpoint-schedule"
+  | "phase-one-checkpoint-pool"
+  | "phase-one-settle-rewards"
+  | "phase-one-settle-revenue";
 
 /** Wall clock for an activity record. Impure, so it stays out of components. */
 export function activityTimestamp(): number {
@@ -264,4 +291,41 @@ export function subscribeDollarActivity(listener: () => void): () => void {
     window.removeEventListener(activityEvent, listener);
     window.removeEventListener("storage", listener);
   };
+}
+
+const deploymentsActivityCache = new Map<
+  string,
+  { sources: DollarActivity[][]; value: DollarActivity[] }
+>();
+export function readProtocolActivityAcrossDeployments(
+  wallet: Address,
+  chainIds: readonly number[],
+  deploymentIds: readonly string[]
+): DollarActivity[] {
+  const ids = [...new Set(deploymentIds)].sort();
+  const sources = ids.map((id) =>
+    readProtocolActivityAcrossChains(wallet, [...chainIds, ...readActivityChainIds(wallet, id)], id)
+  );
+  const key = `${wallet.toLowerCase()}:${ids.join(",")}:${chainIds.join(",")}`;
+  const cached = deploymentsActivityCache.get(key);
+  if (
+    cached &&
+    cached.sources.length === sources.length &&
+    cached.sources.every((source, index) => source === sources[index])
+  )
+    return cached.value;
+  const seen = new Set<string>();
+  const value = sources
+    .flat()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .filter((entry) => {
+      const hash = entry.hash ? `${entry.chainId}:${entry.hash.toLowerCase()}` : null;
+      if (seen.has(entry.id) || (hash && seen.has(hash))) return false;
+      seen.add(entry.id);
+      if (hash) seen.add(hash);
+      return true;
+    })
+    .slice(0, 100);
+  deploymentsActivityCache.set(key, { sources, value });
+  return value;
 }

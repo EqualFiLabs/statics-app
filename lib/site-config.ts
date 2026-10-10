@@ -53,8 +53,8 @@ export function readPublicEnvironment(
 
 export const primaryNavigation: readonly SiteNavigationItem[] = [
   { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
-  { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
-  { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
+  { label: "Markets", messageKey: "markets", kind: "anchor", href: "#markets" },
+  { label: "Gauges", messageKey: "gauges", kind: "anchor", href: "#gauges" },
   { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
   {
     label: "Docs",
@@ -291,4 +291,45 @@ export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNa
     "wallet",
   ];
   return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));
+}
+
+export function isNavigationItemAvailable(
+  item: AppNavigationItem,
+  capabilities: readonly DeploymentCapability[]
+): boolean {
+  if (capabilities.includes(item.capability)) return true;
+  if (item.capability === "canonical-statics-market") {
+    return capabilities.includes("public-direct-swaps");
+  }
+  if (item.capability === "protocol-liquidity") {
+    return capabilities.includes("public-lp-positions");
+  }
+  if (item.capability === "positions") {
+    return capabilities.includes("position-staking");
+  }
+  if (item.capability === "protocol-rewards") {
+    return (
+      capabilities.includes("global-rewards") ||
+      capabilities.includes("lp-rewards") ||
+      capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
+}
+
+export function appNavigationGroupsForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationGroup[] {
+  return appNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isNavigationItemAvailable(item, capabilities)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function appTabNavigationForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationItem[] {
+  return appTabNavigation.filter((item) => isNavigationItemAvailable(item, capabilities));
 }

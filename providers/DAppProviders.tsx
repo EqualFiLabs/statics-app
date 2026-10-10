@@ -19,7 +19,7 @@ import {
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
 import { createConfig, useSetActiveWallet, WagmiProvider } from "@privy-io/wagmi";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createWalletClient, custom, getAddress } from "viem";
 import { useAccount } from "wagmi";
@@ -31,12 +31,9 @@ import {
 } from "@/lib/wallet-config";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
-import { verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
+import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
-import {
-  queryMatchesProtocolReconciliation,
-  subscribeToProtocolReconciliation,
-} from "@/lib/protocol/reconciliation";
+import { ProtocolQueryReconciler } from "./ProtocolQueryReconciler";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import { DeploymentProvider, useDeployment } from "./deployment-context";
 import {
@@ -51,6 +48,7 @@ const walletEnvironment = readWalletEnvironment({
   NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   NEXT_PUBLIC_PRIVY_CLIENT_ID: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID,
   NEXT_PUBLIC_ANVIL_RPC_URL: process.env.NEXT_PUBLIC_ANVIL_RPC_URL,
+  NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
 });
 const transports = createWalletTransports(walletEnvironment);
 const wagmiConfig = createConfig({
@@ -121,7 +119,15 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
   const targetChain =
     walletEnvironment.supportedChains.find((chain) => chain.id === active.descriptor.chainId) ??
     walletEnvironment.defaultChain;
-  const localFork = active.launch?.source === "development-fixture";
+  const localFork = active.networkId === "anvil";
+  const localForkOption = options.find((option) => option.networkId === "anvil");
+  const localForkDeployment = useMemo(
+    () =>
+      localForkOption
+        ? { source: "development-fixture" as const, descriptor: localForkOption.descriptor }
+        : null,
+    [localForkOption]
+  );
   const fundingNetwork = getFundingNetwork(fundingChainId) ?? getFundingNetwork(8_453)!;
   const activeFundingNetworks = fundingNetworkSummaries;
 
@@ -236,7 +242,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       targetChainId: targetChain.id,
       isTargetChain: chainId === targetChain.id,
       fundingChainId,
-      fundingNetworkName: localFork ? "Local Anvil" : fundingNetwork.label,
+      fundingNetworkName: fundingNetwork.label,
       fundingWalletOnSelectedChain: chainId === fundingChainId,
       fundingNetworks: activeFundingNetworks,
       explorerUrl: address && !localFork ? getAddressExplorerUrl(targetChain, address) : null,
@@ -296,7 +302,15 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }),
       getEthereumProvider: async () => {
         if (!selectedWallet) return null;
-        return selectedWallet.getEthereumProvider();
+        const provider = await selectedWallet.getEthereumProvider();
+        if (localForkDeployment && chainId === localForkDeployment.descriptor.chainId) {
+          return localForkWalletProvider(
+            provider,
+            localForkDeployment,
+            walletEnvironment.anvilRpcUrl
+          );
+        }
+        return provider;
       },
       sendEvmTransaction: async (request) => {
         if (!selectedWallet || !address) throw new Error("Connect a wallet before continuing.");
@@ -308,8 +322,8 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }
 
         const provider = await selectedWallet.getEthereumProvider();
-        if (localFork && active.launch) {
-          await verifyLocalForkWalletProvider(provider, active.launch);
+        if (localForkDeployment) {
+          await verifyLocalForkWalletProvider(provider, localForkDeployment, request.chainId);
         }
 
         if (walletKind === "embedded") {
@@ -385,7 +399,6 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       fundingNetwork,
       login,
       locallyDisconnected,
-      active.launch,
       active.descriptor.chainId,
       active.descriptor.deploymentId,
       promptExternalWallet,
@@ -397,6 +410,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       status,
       targetChain,
       localFork,
+      localForkDeployment,
       activeFundingNetworks,
       walletKind,
       options,
@@ -501,23 +515,6 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
       </SolanaWalletContext.Provider>
     </WalletContext.Provider>
   );
-}
-
-function ProtocolQueryReconciler() {
-  const queryClient = useQueryClient();
-
-  useEffect(
-    () =>
-      subscribeToProtocolReconciliation((detail) =>
-        queryClient.refetchQueries({
-          type: "active",
-          predicate: (query) => queryMatchesProtocolReconciliation(query.queryKey, detail),
-        })
-      ),
-    [queryClient]
-  );
-
-  return null;
 }
 
 export function DAppProviders({ children }: { children: React.ReactNode }) {

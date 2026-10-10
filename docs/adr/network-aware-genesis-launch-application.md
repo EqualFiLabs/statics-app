@@ -56,13 +56,15 @@ The application has one dedicated Swap page with a two-option selector:
 Token | NFT
 ```
 
-Token mode reuses the Portal EVM swap card and limits it to ETH, WETH, and STATICS. STATICS pairs
-are quoted and executed directly through the reviewed canonical Uniswap v4 `PoolKey`. It reuses the
-existing amount, balance, slippage, review, approval, wallet, error, and confirmation behavior.
+Token mode reuses the Portal EVM swap card on the selected Statics network. It selects the
+Genesis canonical pair first, then the first enabled Phase 1 pool matching the pair, then the
+Uniswap API for unsupported pairs. A direct quote error does not change routes. Native ETH
+settlement wraps or unwraps WETH internally. The card preserves token selection, balances,
+slippage, review, approval, wallet, error, and confirmation behavior. Routing has no separate
+tab or pool selector. Quotes retain the 350 ms debounce and do not run deployment audits.
 The dedicated Swap page does not show bridge or Solana controls.
 
-The Portal retains its broader funding experience. Its EVM swap card gains the same canonical
-STATICS route while unrelated pairs continue through the existing routing service.
+The Portal retains its existing funding network selection and broader funding experience.
 
 NFT mode is the Genesis Vault conversion surface:
 

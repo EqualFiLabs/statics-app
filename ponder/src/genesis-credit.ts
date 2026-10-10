@@ -29,8 +29,16 @@ type ExtendedTransition = Readonly<{
   blockNumber: bigint;
 }>;
 
+type PrincipalTransition = Readonly<{
+  type: "drawn" | "repaid";
+  deploymentId: string;
+  genesisId: bigint;
+  principal: bigint;
+  blockNumber: bigint;
+}>;
+
 type ClosedTransition = Readonly<{
-  type: "repaid" | "recovered";
+  type: "recovered";
   deploymentId: string;
   genesisId: bigint;
 }>;
@@ -40,12 +48,14 @@ export type ActiveGenesisCreditMutation =
   | Readonly<{
       type: "update";
       key: string;
-      values: Pick<ActiveGenesisCreditRow, "maturity" | "recoverableAt" | "updatedAtBlock">;
+      values:
+        | Pick<ActiveGenesisCreditRow, "maturity" | "recoverableAt" | "updatedAtBlock">
+        | Pick<ActiveGenesisCreditRow, "principal" | "updatedAtBlock">;
     }>
   | Readonly<{ type: "delete"; key: string }>;
 
 export function activeGenesisCreditMutation(
-  transition: OpenedTransition | ExtendedTransition | ClosedTransition
+  transition: OpenedTransition | ExtendedTransition | PrincipalTransition | ClosedTransition
 ): ActiveGenesisCreditMutation {
   const key = `${transition.deploymentId}:${transition.genesisId}`;
   if (transition.type === "opened") {
@@ -72,6 +82,14 @@ export function activeGenesisCreditMutation(
         recoverableAt: transition.recoverableAt,
         updatedAtBlock: transition.blockNumber,
       },
+    };
+  }
+  if (transition.type === "drawn" || transition.type === "repaid") {
+    if (transition.principal === 0n) return { type: "delete", key };
+    return {
+      type: "update",
+      key,
+      values: { principal: transition.principal, updatedAtBlock: transition.blockNumber },
     };
   }
   return { type: "delete", key };

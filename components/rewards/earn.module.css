@@ -1,0 +1,1766 @@
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+.toolbar,
+.rowHeading,
+.drawerHeader,
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.muted {
+  color: var(--app-text-muted);
+  margin: 0;
+  line-height: 1.6;
+}
+.breadcrumb {
+  color: var(--app-text-muted);
+  text-decoration: none;
+  font-size: var(--text-xs);
+}
+.nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--app-border);
+}
+.nav a {
+  padding: 9px 14px;
+  border-radius: var(--radius-xl);
+  color: var(--app-text-muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  font-size: var(--text-xs);
+}
+.nav a[aria-current="page"] {
+  background: var(--app-raised);
+  color: var(--app-text);
+  border-color: var(--app-border);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.card {
+  padding: 26px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-xl);
+  background: var(--app-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 242px;
+}
+.card:hover {
+  border-color: var(--app-text-muted);
+}
+.card h2 {
+  font-size: var(--text-xl);
+  margin: 0;
+}
+.card p {
+  margin: 0;
+}
+.card a {
+  align-self: flex-start;
+  margin-top: auto;
+  text-decoration: none;
+}
+.value {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.value small {
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+  margin-left: 6px;
+}
+.badge {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  border: 1px solid var(--app-border);
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+}
+.assets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.amount {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.amount abbr {
+  text-decoration: none;
+  cursor: help;
+}
+.amount small {
+  color: var(--app-text-muted);
+}
+.list {
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  overflow: hidden;
+}
+.row {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--app-border);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rowHeading {
+  align-items: flex-start;
+}
+.rowHeading h3 {
+  font-size: var(--text-base);
+  margin: 0 0 8px;
+}
+.rowHeading label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.rowHeading input {
+  accent-color: var(--accent);
+}
+.breakdown {
+  margin: 14px 0 0 27px;
+}
+.breakdown summary {
+  color: var(--app-text-muted);
+  cursor: pointer;
+  font-size: var(--text-caption);
+}
+.child {
+  padding: 14px 0;
+  border-top: 1px solid var(--app-border);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.child label {
+  margin-right: auto;
+}
+.links {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: var(--text-caption);
+}
+.links a {
+  color: var(--app-text-muted);
+}
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.filters label {
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+}
+.filters select {
+  max-width: 260px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-border);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+}
+.notice {
+  padding: 16px 20px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  color: var(--app-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--app-text-muted);
+}
+.summary {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+}
+.summary p {
+  margin: 0 0 8px;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.manager {
+  max-width: 720px;
+}
+.manager :global(.earn-stake-card) {
+  padding: 24px;
+}
+.manager :global(.earn-allocation) {
+  padding: 24px;
+}
+.manager :global(.earn-assets) {
+  max-height: 200px;
+  overflow: auto;
+}
+.pagination {
+  justify-content: flex-end;
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+}
+.toolbar {
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+}
+.toolbar label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: color-mix(in srgb, var(--app-bg) 65%, transparent);
+  display: flex;
+  justify-content: flex-end;
+  backdrop-filter: blur(3px);
+}
+.drawer {
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  width: min(100%, 520px);
+  background: var(--app-surface);
+  border-left: 1px solid var(--app-border);
+  height: 100dvh;
+  overflow-y: auto;
+  outline: none;
+  box-shadow: var(--shadow-lg);
+}
+.drawerHeader {
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--app-border);
+  position: sticky;
+  top: 0;
+  background: var(--app-surface);
+  z-index: 1;
+}
+.drawerHeader h2 {
+  font-size: var(--text-2xl);
+  margin: 0;
+}
+.drawerBody {
+  /* Keep layered content (sticky table columns) below the sticky header. */
+  isolation: isolate;
+  padding: 24px;
+  display: grid;
+  gap: 22px;
+}
+.drawerBody ul {
+  padding-left: 18px;
+}
+.drawerBody li {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.recipient {
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+  color: var(--app-text-muted);
+}
+.payouts {
+  display: grid;
+  gap: 12px;
+}
+.payouts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.payouts .amount {
+  font-size: var(--text-lg);
+}
+.transactions {
+  display: grid;
+  gap: 8px;
+}
+.transactions a {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+@media (max-width: 680px) {
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .card {
+    min-height: 205px;
+    padding: 22px;
+  }
+  .nav {
+    gap: 4px;
+  }
+  .nav a {
+    padding: 8px 10px;
+  }
+  .row {
+    padding: 16px;
+  }
+  .rowHeading {
+    flex-wrap: wrap;
+  }
+  .rowHeading .assets {
+    width: 100%;
+    padding-left: 27px;
+  }
+  .filters label {
+    flex: 1;
+  }
+  .filters select {
+    width: 100%;
+    max-width: 100%;
+  }
+  .drawer {
+    width: 100%;
+    border: 0;
+  }
+  .drawerHeader {
+    padding: 18px;
+  }
+  .drawerBody {
+    padding: 20px;
+  }
+  .summary {
+    gap: 24px;
+  }
+  .toolbar {
+    gap: 14px;
+  }
+}
+
+.amountDisclosure {
+  position: relative;
+}
+.amountDisclosure > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.amountDisclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.amountDisclosure > summary:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+.exact {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+  color: var(--app-text-secondary);
+  overflow-wrap: anywhere;
+  padding: 10px 0;
+  max-width: 300px;
+}
+
+.metric .amount {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+}
+.metric .amount small {
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+.stakingLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 410px);
+  gap: 24px;
+  align-items: start;
+}
+.stakingLayout .manager {
+  position: sticky;
+  top: 100px;
+}
+.manager > h2 {
+  margin-top: 0;
+  font-size: var(--text-xl);
+}
+@media (max-width: 1000px) {
+  .stakingLayout {
+    grid-template-columns: 1fr;
+  }
+  .stakingLayout .manager {
+    position: static;
+    order: -1;
+  }
+}
+
+/* Multi-position table (Earn overview). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.positionsSection {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.summaryChips {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.summaryChip {
+  flex: 1 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+}
+.attentionChip {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: var(--warning-wash);
+}
+.attentionChip .chipLabel {
+  color: var(--warning);
+}
+.chipHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chipLabel {
+  font-size: var(--text-xs);
+  color: var(--app-text-muted);
+}
+.chipValue {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.chipValue small,
+.chipMeta {
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+  font-weight: 400;
+}
+.tableHeading h2 {
+  margin: 8px 0 0;
+  font-size: var(--text-xl);
+}
+.controlBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.statusTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.statusTabs button {
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--app-text-muted);
+  font: 500 var(--text-xs) var(--font-sans);
+  cursor: pointer;
+}
+.statusTabs button[aria-pressed="true"] {
+  background: var(--app-overlay);
+  color: var(--app-text);
+}
+.tabCount {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-muted);
+}
+.controlActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.search input {
+  width: 220px;
+  max-width: 100%;
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+.tableFrame {
+  overflow-x: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.positionsTable {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+.positionsTable th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--app-text-muted);
+  border-bottom: 1px solid var(--app-border);
+  white-space: nowrap;
+}
+.positionsTable td {
+  padding: 14px;
+  border-bottom: 1px solid var(--app-border);
+  vertical-align: middle;
+  font-size: var(--text-sm);
+}
+.positionsTable tbody tr:hover td {
+  background: var(--app-surface);
+}
+.positionsTable .numeric {
+  text-align: right;
+}
+.positionsTable .numeric .assets {
+  justify-content: flex-end;
+}
+.checkCell {
+  width: 44px;
+}
+.checkCell input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.sortButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sortButton:hover {
+  color: var(--app-text);
+}
+.selectedRow td {
+  background: var(--accent-wash);
+}
+.hiddenRow td {
+  opacity: 0.6;
+}
+.positionName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--app-raised);
+  color: var(--app-text-muted);
+}
+.statusPill[data-tone="positive"] {
+  background: var(--accent-wash);
+  color: var(--positive);
+}
+.statusPill[data-tone="warning"] {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.statusPill[data-tone="negative"] {
+  background: var(--negative-wash);
+  color: var(--negative);
+}
+.dangerText {
+  color: var(--negative);
+  font-weight: 500;
+}
+.cellMeta {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--app-text-muted);
+}
+.allocationBar {
+  display: flex;
+  height: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.allocationBar span {
+  background: var(--accent);
+}
+.allocationBar span[data-tone="negative"] {
+  background: var(--negative);
+}
+.rowActions {
+  text-align: right;
+  white-space: nowrap;
+}
+.rowActions > * + * {
+  margin-left: 6px;
+}
+.tableEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 32px 16px;
+  color: var(--app-text-muted);
+}
+.tableEmpty p {
+  margin: 0;
+}
+.loadMore {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+}
+.bulkBar {
+  position: fixed;
+  bottom: calc(16px + var(--tabbar-clearance, env(safe-area-inset-bottom)));
+  z-index: 30;
+  box-sizing: border-box;
+  max-height: calc(100dvh - var(--tabbar-clearance, 0px) - 100px);
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--app-overlay);
+  box-shadow: var(--shadow-lg);
+}
+@media (width <= 900px) {
+  .bulkBar {
+    bottom: calc(75px + env(safe-area-inset-bottom));
+  }
+}
+.bulkClear {
+  margin-left: auto;
+}
+
+/* Stake / unstake form (Staking tab). */
+.stakeForm {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.stakeFormHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stakeFormHeading h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+.positionPicker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.positionPicker legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--app-text-muted);
+}
+.pickerOption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--control-height);
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+.pickerLabel {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+.assetsButton {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.pickerOption[data-checked="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-wash);
+}
+.pickerLabel:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pickerOption input {
+  accent-color: var(--accent);
+}
+.pickerMain {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.stakePreview {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+.stakePreview h3 {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+}
+.stakePreview ul {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 4px;
+  padding-left: 18px;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.pickerPager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Reward asset modal. */
+.overlayCentered {
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 480px);
+  max-height: min(720px, calc(100dvh - 32px));
+  overflow: hidden;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  outline: none;
+  box-shadow: var(--shadow-lg);
+}
+.modal .drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+.assetList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  cursor: pointer;
+}
+.assetRow[data-checked="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-wash);
+}
+.assetRow:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.assetName {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.assetName strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A round dot that matches the position picker's radio buttons, for multi-select. */
+.selectionDot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid var(--app-text-muted);
+  border-radius: 50%;
+  appearance: none;
+  background: transparent;
+  cursor: inherit;
+}
+.selectionDot:checked {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 45%, transparent 50%);
+}
+.selectionDot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.assetFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+.assetFooter > span {
+  margin-right: auto;
+}
+.assetSearch input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 14px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+
+/* Liquidity rewards. */
+/* Expanded position content must not resize the pool summary columns. */
+.liquidityTable {
+  table-layout: fixed;
+  min-width: 1080px;
+}
+.liquidityTable th {
+  white-space: normal;
+}
+.liquidityTable .rowActions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--app-sunken);
+  box-shadow: -1px 0 var(--app-border);
+  white-space: normal;
+}
+.liquidityTable .rangeWrap {
+  min-width: 0;
+}
+.expandButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-sm);
+  background: var(--app-raised);
+  color: var(--app-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.legCell {
+  display: grid;
+  gap: 6px;
+  padding-left: 38px;
+}
+.rangeWrap {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+.rangeTrack {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.rangeSpan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: var(--warning);
+}
+.rangeSpan[data-in-range="true"] {
+  background: var(--accent);
+}
+.rangeMarker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  background: var(--app-text);
+}
+
+/* Compact liquidity view: details expand below a stable summary row. */
+.compactSummary,
+.summaryDetails,
+.compactPools {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.summaryMore {
+  align-self: flex-end;
+}
+.fullScreenDialog {
+  width: 100%;
+  border-left: 0;
+}
+.compactFrame {
+  min-width: 0;
+}
+.compactPool {
+  overflow: clip;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.compactPool[data-selected] {
+  border-color: var(--accent);
+}
+.compactPoolHeading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.compactPoolHeading > input,
+.compactPositionHeading > input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.compactPoolToggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.compactPoolName {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.compactPoolDetails {
+  display: grid;
+  gap: 20px;
+  padding: 20px 16px;
+  border-top: 1px solid var(--app-border);
+}
+.compactMetrics {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  min-width: 0;
+}
+.compactMetrics > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+.compactMetrics dt {
+  flex: 1;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+.compactMetrics dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.compactMetrics .assets {
+  justify-content: flex-end;
+}
+.compactActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.compactPositionsTitle,
+.compactPosition h4 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.compactPositionHeading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.compactPosition {
+  display: grid;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--app-border);
+}
+.compactPosition .rangeWrap {
+  min-width: 0;
+}
+@media (width < 1200px) {
+  .liquiditySection .controlBar,
+  .earnPositionsSection .controlBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .liquiditySection .statusTabs,
+  .earnPositionsSection .statusTabs {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .liquiditySection .search,
+  .liquiditySection .search input,
+  .earnPositionsSection .search,
+  .earnPositionsSection .search input {
+    width: 100%;
+  }
+  .liquiditySection .bulkBar,
+  .earnPositionsSection .bulkBar {
+    flex-wrap: wrap;
+  }
+}
+
+.compactSort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+.compactSort select {
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: inherit;
+}
+@media (width < 1200px) {
+  .earnPositionsSection .controlActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .earnPositionsSection .compactSort select {
+    flex: 1;
+  }
+  .earnPositionsSection .compactPoolToggle > .statusPill {
+    max-width: 50%;
+    white-space: normal;
+  }
+}
+
+/* Allocation pool directory. */
+.directory {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.directory .tableHeading p {
+  margin: 4px 0 0;
+}
+.directoryAmounts {
+  display: inline-grid;
+  gap: 2px;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+.streamList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.streamList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.directory select {
+  min-height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+
+/* Allocation editor: one position's allocations, edited as one replacement set. */
+.allocationEditor {
+  display: grid;
+  gap: 16px;
+}
+.allocationEditor .muted {
+  margin: 0;
+}
+/* The selected position; opens the full-screen position picker. */
+.positionTrigger,
+.positionOption {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.positionTrigger:hover,
+.positionOption:hover {
+  border-color: var(--accent);
+}
+.positionTriggerHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.positionTriggerAction {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.positionPicker {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 640px);
+  margin: 0 auto;
+}
+.positionPicker .search {
+  width: 100%;
+}
+.positionPicker .search input {
+  font-size: var(--text-base);
+}
+.drawerBody .positionOptions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .positionOptions li {
+  margin: 0;
+}
+.positionOption {
+  gap: 8px;
+  background: var(--app-surface);
+}
+.positionOption[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.positionOption .stakeBar {
+  height: 6px;
+}
+.editorCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-sunken);
+}
+.editorStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.editorStats > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.editorStats strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+/* The position's stake: one segment per pool, the rest is free. */
+.stakeBar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--app-overlay);
+}
+.stakeBar span {
+  transition: width 160ms ease;
+}
+.stakeBar span + span {
+  box-shadow: -2px 0 var(--app-sunken);
+}
+.stakeBar span,
+.stakeSwatch {
+  background: var(--accent);
+}
+.stakeBar span[data-index="1"],
+.stakeSwatch[data-index="1"] {
+  background: color-mix(in srgb, var(--accent) 70%, var(--app-overlay));
+}
+.stakeBar span[data-index="2"],
+.stakeSwatch[data-index="2"] {
+  background: color-mix(in srgb, var(--accent) 48%, var(--app-overlay));
+}
+.stakeBar span[data-index="3"],
+.stakeSwatch[data-index="3"] {
+  background: color-mix(in srgb, var(--warning) 70%, var(--app-overlay));
+}
+.stakeBar span[data-index="4"],
+.stakeSwatch[data-index="4"] {
+  background: color-mix(in srgb, var(--warning) 45%, var(--app-overlay));
+}
+.stakeSwatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+.editorRow[data-stale] .stakeSwatch {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--warning);
+}
+.editorNotice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+.editorNotice[data-tone="warning"] {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.editorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.editorToolbar > .statusTabs {
+  margin-right: auto;
+}
+.editorRows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .editorRows li {
+  margin: 0;
+}
+.editorRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.editorRow[data-focus] {
+  border-color: var(--accent);
+}
+.editorRow[data-stale] {
+  border-style: dashed;
+}
+.editorRowHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.inputUnit {
+  flex: none;
+  min-width: 3.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.editorEstimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.editorAdd {
+  display: grid;
+  gap: 8px;
+}
+.editorAdd .search {
+  width: 100%;
+}
+.editorSuggestions {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drawerBody .editorSuggestions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+}
+.editorImpact {
+  display: grid;
+  gap: 8px;
+}
+.editorImpact h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.editorImpact ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-xs);
+  color: var(--app-text-secondary);
+}
+.drawerBody .editorImpact li {
+  margin: 0;
+}
+.editorImpact li[data-tone="warning"] {
+  color: var(--warning);
+}
+.editorImpact li[data-tone="negative"] {
+  color: var(--negative);
+}
+@media (max-width: 680px) {
+  .editorStats {
+    grid-template-columns: 1fr;
+  }
+}
+.allocationInput {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.allocationInput input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+  text-align: right;
+}
+.allocationInput input[aria-invalid="true"] {
+  border-color: var(--negative);
+}
+.changeSet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.changeSetSummary {
+  display: grid;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+@media (max-width: 680px) {
+  .allocationRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Allocation dialog: wider than the asset modal, rows scroll inside, a full sheet on phones. */
+.allocationModal {
+  width: min(100%, 640px);
+}
+.allocationModal .drawerBody {
+  overflow-y: auto;
+}
+@media (max-width: 680px) {
+  .overlayCentered:has(.allocationModal) {
+    padding: 0;
+  }
+  .allocationModal {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+}
+/* Pinned to the bottom of a scrolling dialog. */
+.dialogFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -24px -24px;
+  padding: 12px 24px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--shadow-lg);
+}
+/* An amount box with its unit and Max inside the border. */
+.amountBox {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-surface);
+}
+.amountBox:focus-within {
+  border-color: var(--accent);
+}
+.amountBox[data-invalid] {
+  border-color: var(--negative);
+}
+.allocationInput .amountBox input {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.amountBox .inputUnit {
+  min-width: 0;
+}
+.inputMax {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--accent);
+  font: 600 var(--text-caption) var(--font-sans);
+  cursor: pointer;
+}
+.inputMax:disabled {
+  color: var(--app-text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.editorAmount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.editorAmount strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.editorRow > .cellMeta[data-tone="negative"] {
+  color: var(--negative);
+}
+/* Phone-only parts of the allocation editor; hidden on wider screens. */
+.editorStatsLine,
+.footerImpactToggle,
+.footerImpact,
+.editorAbout,
+.editorAddButton {
+  display: none;
+}
+@media (max-width: 680px) {
+  .allocationModal .drawerHeader {
+    padding: 14px 16px;
+  }
+  .allocationModal .drawerBody {
+    gap: 14px;
+    padding: 16px;
+  }
+  .allocationModal .dialogFooter {
+    margin: 0 -16px -16px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  /* Flatten the card and rows so content gets the screen width. */
+  .editorCard {
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .editorStats {
+    display: none;
+  }
+  .editorStatsLine {
+    display: block;
+    margin: 0;
+    color: var(--app-text-secondary);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .drawerBody .editorRows {
+    gap: 0;
+    padding: 0;
+    border-top: 1px solid var(--app-border);
+  }
+  .drawerBody .editorSuggestions {
+    padding: 0;
+  }
+  /* Name and current amount on one line, the amount box, then Add and Remove. */
+  .editorRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 14px 0;
+    border: 0;
+    border-bottom: 1px solid var(--app-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .editorRow[data-focus] {
+    padding-left: 10px;
+    box-shadow: inset 3px 0 var(--accent);
+  }
+  .editorRow[data-stale] {
+    border-style: solid;
+  }
+  .editorRow > * {
+    grid-column: 1 / -1;
+  }
+  .editorRow > .editorRowHeading {
+    grid-column: 1;
+  }
+  .editorRow > .editorAmount {
+    grid-row: 1;
+    grid-column: 2;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    text-align: right;
+  }
+  .editorRow .allocationInput {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .editorRow .amountBox {
+    flex: 1 1 100%;
+    min-height: var(--control-height);
+  }
+  .editorRow .allocationInput > :global(.ui-button) {
+    flex: 1 1 0;
+    min-height: var(--control-height);
+  }
+  /* 16px text stops iOS Safari zooming into a focused field. */
+  .allocationEditor input,
+  .allocationInput .amountBox input {
+    font-size: var(--text-base);
+  }
+  /* One impact line in the footer, expandable; the inline section is hidden. */
+  .editorImpact {
+    display: none;
+  }
+  .footerImpactToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--app-text-secondary);
+    font: var(--text-xs) var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .footerImpact {
+    display: block;
+    max-height: 40dvh;
+    margin-bottom: 10px;
+    overflow-y: auto;
+  }
+  .footerImpact ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--app-text-secondary);
+    font-size: var(--text-xs);
+  }
+  .drawerBody .footerImpact li {
+    margin: 0;
+  }
+  .footerImpact li[data-tone="warning"] {
+    color: var(--warning);
+  }
+  .footerImpact li[data-tone="negative"] {
+    color: var(--negative);
+  }
+  .allocationEditor .dialogFooter .changeSetSummary {
+    flex-basis: 100%;
+  }
+  .allocationEditor .dialogFooter .changeSetSummary .cellMeta {
+    display: none;
+  }
+  .allocationEditor .dialogFooter .changeSet > :global(.ui-button) {
+    flex: 1 1 0;
+    min-height: var(--control-height);
+  }
+}
+
+/* Allocation editor, phones, pass 2: pinned picker, intro on demand, add-pool screen. */
+@media (max-width: 680px) {
+  .editorIntro {
+    display: none;
+  }
+  .editorAbout {
+    display: block;
+    font-size: var(--text-xs);
+  }
+  .editorAbout summary {
+    color: var(--app-text-secondary);
+    cursor: pointer;
+  }
+  .editorAbout p {
+    margin: 8px 0 0;
+  }
+  .allocationModal .editorAdd {
+    display: none;
+  }
+  .editorAddButton {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--control-height);
+  }
+  .fullScreenDialog .editorAdd {
+    display: grid;
+  }
+  .fullScreenDialog .editorSuggestions li {
+    justify-content: space-between;
+  }
+  .editorToolbar > .statusTabs {
+    display: flex;
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+  .editorToolbar > .statusTabs > button {
+    flex: 1 1 0;
+  }
+  .editorToolbar > :global(.ui-button) {
+    flex: 1 1 0;
+  }
+}
+
+.nav a[aria-current="page"] {
+  border-color: var(--app-border-strong);
+  box-shadow: inset 0 -2px var(--accent);
+}

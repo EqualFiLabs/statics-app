@@ -727,7 +727,7 @@ function DollarActionPanel({
         }
         if (mode === "supply") {
           const refreshedSupply = await supplyState.refetch();
-          if (!refreshedSupply.data) throw new Error("The current Position state is unavailable.");
+          if (!refreshedSupply.data) throw new Error("The current account state is unavailable.");
           if (
             refreshedSupply.data.positionId === null &&
             supplyPositionOverride !== null &&

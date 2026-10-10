@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PoolSwapFee } from "@/components/common/PoolSwapFee";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -64,6 +65,8 @@ import {
 import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
+import { PhaseOneLiquidity } from "@/components/liquidity/PhaseOneLiquidity";
 
 export type Mode = "create" | "stake" | "activate" | "increase" | "claim" | "unstake";
 
@@ -288,8 +291,24 @@ export function LiquidityContributionForm({
   );
 }
 
-export function LiquidityPage() {
+export function LiquidityPage({
+  initialPositionId = null,
+  initialPoolId = null,
+}: {
+  initialPositionId?: bigint | null;
+  initialPoolId?: Hex | null;
+}) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.phaseOne)
+    return (
+      <PhaseOneLiquidity
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}:${initialPositionId}:${initialPoolId}`}
+        deployment={active.phaseOne}
+        initialPositionId={initialPositionId}
+        initialPoolId={initialPoolId}
+      />
+    );
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Liquidity" />;
   return (
     <ProtocolActionScope>
@@ -700,7 +719,7 @@ function LiquidityRuntime() {
       await send(
         "stake-lp-nft",
         `Stake Liquidity position #${position.tokenId}`,
-        `Position #${positionNft}`,
+        `Account #${positionNft}`,
         diamond,
         buildStakeLiquidityPositionCall(positionNft, position.tokenId),
         {
@@ -1207,10 +1226,14 @@ function LiquidityRuntime() {
                 <h4>
                   {item.basketSymbol} / {item.asset.symbol}
                 </h4>
-                <span>
-                  {Number(item.lpFee) / 10_000}% LP fee · {Number(item.hookFees.inputFeeBps) / 100}%
-                  hook in
-                </span>
+                <PoolSwapFee
+                  source="phase-one"
+                  lpFee={Number(item.lpFee)}
+                  hook={{
+                    inputBps: Number(item.hookFees.inputFeeBps),
+                    outputBps: Number(item.hookFees.outputFeeBps),
+                  }}
+                />
               </button>
               <details>
                 <summary>Technical details</summary>
@@ -1348,7 +1371,7 @@ function LiquidityRuntime() {
               <div className="remaining-section-heading">
                 <div>
                   <p className="dapp-section-label">Selected LP NFT</p>
-                  <h3>Liquidity position #{position?.tokenId.toString() ?? "—"}</h3>
+                  <h3>Liquidity position #{position?.tokenId.toString() ?? "-"}</h3>
                 </div>
                 <span className={`remaining-status ${position?.staked ? "is-active" : ""}`}>
                   {position?.staked ? "earning" : "wallet-owned"}

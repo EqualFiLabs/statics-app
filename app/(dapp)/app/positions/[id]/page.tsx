@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
 
 export const metadata: Metadata = {
-  title: "Position details | Statics",
+  title: "Account details | Statics",
   description: "Manage collateral, staking, and reward selections for a Statics PositionNFT.",
 };
 

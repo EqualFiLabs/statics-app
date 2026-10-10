@@ -1,16 +1,23 @@
 import { launchDeploymentManifests } from "@/deployments/launch-manifests";
 import { deploymentManifests } from "@/deployments/manifests";
+import { phaseOneDeploymentManifests } from "@/deployments/phase-one-manifests";
 import {
   parseLaunchDeploymentManifest,
   type LaunchDeploymentManifest,
 } from "@/lib/deployments/launch-manifest";
+import {
+  parsePhaseOneDeploymentManifest,
+  type PhaseOneDeploymentManifest,
+} from "@/lib/deployments/phase-one-manifest";
 import { clientDollarEnvironment, readDollarDeployment } from "@/lib/dollar/deployment";
 import { parseDeploymentManifest } from "@/lib/dollar/manifest";
+import { localChainId } from "@/lib/wallet/local-chain";
 import type {
   DeploymentCapability,
   DeploymentDescriptor,
   DeploymentOption,
   LaunchDeployment,
+  PhaseOneDeployment,
   ProtocolDeployment,
   StaticsDeployment,
   StaticsNetworkId,
@@ -19,6 +26,9 @@ import type {
 export const ROBINHOOD_GENESIS_DEPLOYMENT_ID = "robinhood-genesis";
 export const ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID = "robinhood-testnet-genesis";
 export const LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID = "local-anvil-genesis";
+export const ROBINHOOD_PHASE_ONE_DEPLOYMENT_ID = "robinhood-phase-one";
+export const ROBINHOOD_TESTNET_PHASE_ONE_DEPLOYMENT_ID = "robinhood-testnet-phase-one";
+export const LOCAL_PHASE_ONE_DEPLOYMENT_ID = "local-anvil-phase-one";
 
 const commonCapabilities: readonly DeploymentCapability[] = [
   "overview",
@@ -44,6 +54,7 @@ function target(
   network: string,
   chainId: number,
   launch: LaunchDeployment | null,
+  phaseOne: PhaseOneDeployment | null,
   protocol: ProtocolDeployment | null
 ): DeploymentOption {
   const deploymentId =
@@ -56,23 +67,24 @@ function target(
     new Set<DeploymentCapability>([
       ...commonCapabilities,
       ...(launch?.descriptor.capabilities ?? []),
+      ...(phaseOne?.descriptor.capabilities ?? []),
       ...(protocol?.descriptor.capabilities ?? []),
     ])
   );
   const descriptor: DeploymentDescriptor = {
     deploymentId,
-    label: protocol ? "Statics Protocol" : "Statics Operators launch",
+    label: phaseOne || protocol ? "Statics Protocol" : "Statics Operators launch",
     network,
     chainId,
-    stage: protocol ? "full-protocol" : "launch",
+    stage: protocol ? "full-protocol" : phaseOne ? "phase-one" : "launch",
     capabilities,
-    available: Boolean(launch || protocol),
+    available: Boolean(launch || phaseOne || protocol),
     unavailableReason:
-      launch || protocol
+      launch || phaseOne || protocol
         ? undefined
         : `The reviewed ${network} deployment manifest has not been published yet.`,
   };
-  return { networkId, descriptor, launch, protocol };
+  return { networkId, descriptor, launch, phaseOne, protocol };
 }
 
 function localLaunch(environment: Record<string, string | undefined>): LaunchDeployment | null {
@@ -90,7 +102,7 @@ function localLaunch(environment: Record<string, string | undefined>): LaunchDep
   }
   if (
     manifest.deploymentId !== LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID ||
-    manifest.chainId !== 31_337
+    manifest.chainId !== localChainId(environment)
   ) {
     throw new Error("The local launch manifest must identify the Anvil deployment.");
   }
@@ -106,6 +118,32 @@ function localLaunch(environment: Record<string, string | undefined>): LaunchDep
 function publicLaunch(deploymentId: string): LaunchDeployment | null {
   const manifest = launchDeploymentManifests[deploymentId];
   return manifest ? parseLaunchDeploymentManifest(manifest) : null;
+}
+
+function localPhaseOne(environment: Record<string, string | undefined>): PhaseOneDeployment | null {
+  const raw = environment.NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST?.trim();
+  if (!raw) return null;
+  if (environment.NEXT_PUBLIC_APP_ENV !== "development") {
+    throw new Error("A local Phase 1 manifest is only allowed in development.");
+  }
+  let manifest: PhaseOneDeploymentManifest;
+  try {
+    manifest = JSON.parse(raw) as PhaseOneDeploymentManifest;
+  } catch {
+    throw new Error("NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST must be valid JSON.");
+  }
+  if (
+    manifest.deploymentId !== LOCAL_PHASE_ONE_DEPLOYMENT_ID ||
+    manifest.chainId !== localChainId(environment)
+  ) {
+    throw new Error("The local Phase 1 manifest must identify the Anvil deployment.");
+  }
+  return parsePhaseOneDeploymentManifest(manifest, "development-fixture");
+}
+
+function publicPhaseOne(deploymentId: string): PhaseOneDeployment | null {
+  const manifest = phaseOneDeploymentManifests[deploymentId];
+  return manifest ? parsePhaseOneDeploymentManifest(manifest) : null;
 }
 
 function protocolDeployment(
@@ -152,8 +190,11 @@ function publicEnvironment(): Record<string, string | undefined> {
     ...clientDollarEnvironment(),
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_APP_NETWORK: process.env.NEXT_PUBLIC_APP_NETWORK,
+    NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
     NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST:
       process.env.NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST,
+    NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST:
+      process.env.NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST,
   };
 }
 
@@ -165,14 +206,22 @@ export function deploymentRegistry(
   if (appEnvironment !== "development" && environment.NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST) {
     throw new Error("A local launch manifest is only allowed in development.");
   }
+  if (
+    appEnvironment !== "development" &&
+    environment.NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST
+  ) {
+    throw new Error("A local Phase 1 manifest is only allowed in development.");
+  }
   if (appEnvironment === "development") {
+    const chainId = localChainId(environment);
     options.push(
       target(
         "anvil",
-        "Local Anvil",
-        31_337,
+        chainId === 4_663 ? "Robinhood mainnet fork" : "Local Anvil",
+        chainId,
         localLaunch(environment),
-        protocolDeployment(31_337, environment)
+        localPhaseOne(environment),
+        chainId === 31_337 ? protocolDeployment(31_337, environment) : null
       )
     );
   }
@@ -182,6 +231,7 @@ export function deploymentRegistry(
       "Robinhood Chain",
       4_663,
       publicLaunch(ROBINHOOD_GENESIS_DEPLOYMENT_ID),
+      publicPhaseOne(ROBINHOOD_PHASE_ONE_DEPLOYMENT_ID),
       protocolDeployment(4_663, environment)
     ),
     target(
@@ -189,10 +239,18 @@ export function deploymentRegistry(
       "Robinhood Chain Testnet",
       46_630,
       publicLaunch(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID),
+      publicPhaseOne(ROBINHOOD_TESTNET_PHASE_ONE_DEPLOYMENT_ID),
       protocolDeployment(46_630, environment)
     )
   );
-  return options;
+  // A chain ID can target only one RPC in a wallet session. Keep the local
+  // fork's manifests when it shares Robinhood's ID; do not offer mainnet with it.
+  return options.filter(
+    (option, index) =>
+      options.findIndex(
+        (candidate) => candidate.descriptor.chainId === option.descriptor.chainId
+      ) === index
+  );
 }
 
 export function defaultNetworkId(
@@ -212,7 +270,7 @@ export function findDeployment(
 }
 
 export function hasCapability(
-  deployment: DeploymentDescriptor | StaticsDeployment,
+  deployment: DeploymentDescriptor | PhaseOneDeployment | StaticsDeployment,
   capability: DeploymentCapability
 ): boolean {
   const descriptor = "descriptor" in deployment ? deployment.descriptor : deployment;

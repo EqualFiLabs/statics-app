@@ -12,6 +12,8 @@ for (const key of new Set([...Object.keys(process.env), ...configuredKeys])) {
 }
 process.env.NEXT_PUBLIC_APP_ENV = "development";
 process.env.NEXT_PUBLIC_APP_NETWORK = "robinhood-testnet";
+process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID = "31337";
+process.env.NEXT_PUBLIC_ANVIL_RPC_URL = "http://127.0.0.1:8545";
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) throw new Error("A command is required.");

@@ -19,7 +19,14 @@ const launchDescriptor = {
   network: "Robinhood Chain",
   chainId: 4_663,
   stage: "launch",
-  capabilities: [],
+  capabilities: [
+    "overview",
+    "canonical-statics-market",
+    "genesis-vault",
+    "wallet",
+    "activity",
+    "approval-tools",
+  ],
   available: true,
 } as const;
 
@@ -27,9 +34,19 @@ const fullDescriptor = {
   ...launchDescriptor,
   deploymentId: "full",
   stage: "full-protocol",
+  capabilities: [...launchDescriptor.capabilities, "positions"],
 } as const;
 
-function option(descriptor: typeof launchDescriptor | typeof fullDescriptor): DeploymentOption {
+const phaseOneDescriptor = {
+  ...launchDescriptor,
+  deploymentId: "phase-one",
+  stage: "phase-one",
+  capabilities: [...launchDescriptor.capabilities, "position-staking"],
+} as const;
+
+function option(
+  descriptor: typeof launchDescriptor | typeof fullDescriptor | typeof phaseOneDescriptor
+): DeploymentOption {
   return {
     networkId: "robinhood",
     descriptor,
@@ -38,7 +55,9 @@ function option(descriptor: typeof launchDescriptor | typeof fullDescriptor): De
   };
 }
 
-function renderGuard(descriptor: typeof launchDescriptor | typeof fullDescriptor) {
+function renderGuard(
+  descriptor: typeof launchDescriptor | typeof fullDescriptor | typeof phaseOneDescriptor
+) {
   const active = option(descriptor);
   return render(
     <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
@@ -75,12 +94,25 @@ describe("DappRouteGuard", () => {
     }
   );
 
-  it("leaves full-protocol Positions untouched", () => {
-    pathname = "/app/positions";
-    renderGuard(fullDescriptor);
-    expect(screen.getByText("Route content")).toBeInTheDocument();
-    expect(replace).not.toHaveBeenCalled();
-  });
+  it.each(["/app/positions", "/app/positions/1042"])(
+    "leaves full-protocol Positions route %s untouched",
+    (route) => {
+      pathname = route;
+      renderGuard(fullDescriptor);
+      expect(screen.getByText("Route content")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["/app/positions", "/app/positions/1042"])(
+    "allows Phase 1 Positions route %s without redirecting",
+    (route) => {
+      pathname = route;
+      renderGuard(phaseOneDescriptor);
+      expect(screen.getByText("Route content")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    }
+  );
 
   it("leaves unknown routes to Next.js instead of treating them as Overview", () => {
     pathname = "/app/unknown";

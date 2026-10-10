@@ -56,8 +56,8 @@ describe("protocol availability", () => {
   it("renders Position NFT actions but disables the onchain mutation", () => {
     renderUnavailable(<PositionListPage />);
 
-    expect(screen.getByRole("heading", { name: "Your Position NFTs" })).toBeInTheDocument();
-    for (const button of screen.getAllByRole("button", { name: "Create position" })) {
+    expect(screen.getByRole("heading", { name: "Your accounts" })).toBeInTheDocument();
+    for (const button of screen.getAllByRole("button", { name: "Open account" })) {
       expect(button).toBeDisabled();
     }
     expect(screen.getByTitle(/enabled when Statics Protocol is live/i)).toHaveAttribute(
@@ -68,7 +68,7 @@ describe("protocol availability", () => {
 
   it("keeps rewards, loans, and Dollar controls rendered and disabled", () => {
     const rewards = renderUnavailable(<RewardsPage />);
-    expect(screen.getByRole("button", { name: "Create staking position" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open account and stake" })).toBeDisabled();
     rewards.unmount();
 
     const loans = renderUnavailable(<LoansPage />);

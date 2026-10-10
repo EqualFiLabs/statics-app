@@ -38,6 +38,7 @@
     "assets:token-logos:verify": "node scripts/generate-token-logo-assets.mjs --verify",
     "verify:assets": "npm run assets:operators:verify && npm run assets:token-logos:verify",
     "deployment:manifest": "node scripts/generate-deployment-manifest.mjs",
+    "deployment:add-pools": "node scripts/add-phase-one-pools.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",

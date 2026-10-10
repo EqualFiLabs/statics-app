@@ -4,15 +4,27 @@ import { getAddress, parseAbi, zeroAddress, zeroHash } from "viem";
 import {
   genesisActivationRegistryAbi,
   genesisLaunchDistributorAbi,
-  staticsAbi,
+  staticsAbi as legacyStaticsAbi,
   staticsFeeReceiverAbi,
   staticsGenesisAbi,
   v4PositionManagerReadAbi,
 } from "@statics-protocol/sdk";
 
 import { staticsGenesisCreditAbi } from "@statics-protocol/sdk/genesis-credit";
+import {
+  staticsAbi as phaseOneStaticsAbi,
+  staticsGaugeIncentivesAbi,
+  staticsMarketTapeAbi,
+  staticsRangeGaugeAbi,
+  staticsSwapFeeHookAbi,
+} from "@statics-protocol/sdk/phase-one";
 
-import { configuredAddress, configuredCanonicalPool } from "./src/source-config";
+import { uniqueAbi } from "./src/abi";
+import {
+  configuredAddress,
+  configuredCanonicalPool,
+  configuredLogBlockRange,
+} from "./src/source-config";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -37,19 +49,32 @@ const chainId = Number(required("PONDER_CHAIN_ID"));
 if (!Number.isSafeInteger(chainId) || chainId <= 0) {
   throw new Error("PONDER_CHAIN_ID must be a positive integer.");
 }
+const logBlockRange = configuredLogBlockRange();
 const deploymentStartBlock = optionalStartBlock("PONDER_DEPLOYMENT_START_BLOCK", 0);
 const poolManagerEventsAbi = parseAbi([
+  "event Initialize(bytes32 indexed id,address indexed currency0,address indexed currency1,uint24 fee,int24 tickSpacing,address hooks,uint160 sqrtPriceX96,int24 tick)",
+  "event ModifyLiquidity(bytes32 indexed id,address indexed sender,int24 tickLower,int24 tickUpper,int256 liquidityDelta,bytes32 salt)",
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
 ]);
+const phaseOnePolicyEventsAbi = parseAbi([
+  "event ProtocolPoolQuarantineSet(bytes32 indexed poolId,address indexed caller,bool quarantined)",
+  "event RewardRestrictionAdded(address indexed asset,address indexed caller)",
+  "event RewardRestrictionRemoved(address indexed asset)",
+]);
 const staticsAddress = configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS");
+const publicHookAddress = configuredAddress("PONDER_PUBLIC_HOOK_ADDRESS");
 const positionManagerAddress = configuredAddress("PONDER_POSITION_MANAGER_ADDRESS");
 const poolManagerAddress = configuredAddress("PONDER_POOL_MANAGER_ADDRESS");
 const canonicalPoolId = configuredCanonicalPool(poolManagerAddress);
 
 function activeContracts<T extends Record<string, unknown>>(contracts: T): T {
   if (!staticsAddress) delete contracts.Statics;
+  if (!staticsAddress) delete contracts.PhaseOneStatics;
+  if (!publicHookAddress) delete contracts.PublicHook;
   if (!positionManagerAddress) delete contracts.PositionManager;
   if (!poolManagerAddress) delete contracts.PoolManager;
+  if (!poolManagerAddress) delete contracts.DexPublicPoolManager;
+  if (!poolManagerAddress) delete contracts.DexCanonicalPoolManager;
   return contracts;
 }
 
@@ -73,14 +98,36 @@ export default createConfig({
       id: chainId,
       rpc: required(`PONDER_RPC_URL_${chainId}`),
       pollingInterval: chainId === 4_663 ? 2_000 : undefined,
+      ...(logBlockRange !== undefined ? { ethGetLogsBlockRange: logBlockRange } : {}),
     },
   },
   contracts: activeContracts({
     Statics: {
       chain: "active",
-      abi: staticsAbi,
+      abi: legacyStaticsAbi,
       address: staticsAddress ?? zeroAddress,
       startBlock: optionalStartBlock("PONDER_STATICS_START_BLOCK", deploymentStartBlock),
+    },
+    PhaseOneStatics: {
+      chain: "active",
+      abi: uniqueAbi([
+        ...phaseOneStaticsAbi,
+        ...staticsGaugeIncentivesAbi,
+        ...staticsMarketTapeAbi,
+        ...staticsRangeGaugeAbi,
+        ...phaseOnePolicyEventsAbi,
+      ]),
+      address: staticsAddress ?? zeroAddress,
+      startBlock: optionalStartBlock(
+        "PONDER_PHASE_ONE_START_BLOCK",
+        optionalStartBlock("PONDER_STATICS_START_BLOCK", deploymentStartBlock)
+      ),
+    },
+    PublicHook: {
+      chain: "active",
+      abi: staticsSwapFeeHookAbi,
+      address: publicHookAddress ?? zeroAddress,
+      startBlock: optionalStartBlock("PONDER_PHASE_ONE_START_BLOCK", deploymentStartBlock),
     },
     PositionManager: {
       chain: "active",
@@ -123,6 +170,28 @@ export default createConfig({
         "PONDER_STATICS_FEE_RECEIVER_START_BLOCK",
         deploymentStartBlock
       ),
+    },
+    DexPublicPoolManager: {
+      chain: "active",
+      abi: poolManagerEventsAbi,
+      address: poolManagerAddress ?? zeroAddress,
+      startBlock: optionalStartBlock("PONDER_PHASE_ONE_START_BLOCK", deploymentStartBlock),
+    },
+    DexCanonicalPoolManager: {
+      chain: "active",
+      abi: poolManagerEventsAbi,
+      address: poolManagerAddress ?? zeroAddress,
+      startBlock: optionalStartBlock(
+        "PONDER_CANONICAL_LIQUIDITY_START_BLOCK",
+        optionalStartBlock("PONDER_GENESIS_START_BLOCK", 0)
+      ),
+      filter: [
+        { event: "Initialize", args: { id: canonicalPoolId ?? zeroHash } },
+        { event: "ModifyLiquidity", args: { id: canonicalPoolId ?? zeroHash } },
+      ] as (
+        | { event: "Initialize"; args: { id: `0x${string}` } }
+        | { event: "ModifyLiquidity"; args: { id: `0x${string}` } }
+      )[],
     },
     PoolManager: {
       chain: "active",
