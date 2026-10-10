@@ -52,6 +52,37 @@ describe("multi-pool paths", () => {
     expect(paths[0]!.at(-1)!.intermediateCurrency).toBe(D);
     expect(candidatePaths(A, D, pools, 2)).toHaveLength(2);
   });
+  it("bounds dense parallel-pool discovery and preserves reviewed-path priority", () => {
+    let keyReads = 0;
+    const parallel = Array.from({ length: 400 }, (_, i) => {
+      const routePool = pool("1", i < 200 ? A : B, i < 200 ? B : D, i % 2 === 0);
+      const key = routePool.poolKey;
+      return {
+        ...routePool,
+        poolId: `0x${BigInt(i + 1)
+          .toString(16)
+          .padStart(64, "0")}` as `0x${string}`,
+        get poolKey() {
+          keyReads++;
+          return key;
+        },
+      };
+    });
+    const paths = candidatePaths(A, D, parallel);
+    expect(paths).toHaveLength(8);
+    expect(paths.every((path) => path.length === 2 && path.every((hop) => hop.reviewed))).toBe(
+      true
+    );
+    expect(keyReads).toBeLessThanOrEqual(parallel.length + 16);
+    expect(candidatePaths(A, D, [...parallel].reverse())).toEqual(paths);
+    expect(
+      candidatePaths(
+        A,
+        D,
+        parallel.map((p) => ({ ...p, reviewed: false }))
+      )
+    ).toHaveLength(8);
+  });
   it("never reuses a token, uses closed pools, or returns a single pool", () => {
     expect(candidatePaths(A, B, [pool("1", A, B)])).toEqual([]);
     expect(

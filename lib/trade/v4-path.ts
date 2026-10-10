@@ -38,7 +38,9 @@ const lower = (address: Address) => address.toLowerCase();
 
 /**
  * Simple paths of 2 to `maxPools` pools from `input` to `output`, fewest pools first and,
- * among those, paths through reviewed pools first. Single-pool trades are routed directly.
+ * among those, paths through reviewed pools first. Traversal inspects at most 4,096 edges and
+ * retains at most eight candidates; the bound may omit routes in unusually dense graphs.
+ * Single-pool trades are routed directly.
  */
 export function candidatePaths(
   input: Address,
@@ -47,43 +49,103 @@ export function candidatePaths(
   maxPools = 3,
   limit = 8
 ): PathHop[][] {
-  const usable = pools.filter((pool) => pool.swappable);
-  const found: PathHop[][] = [];
-  const walk = (at: Address, hops: PathHop[], seen: Set<string>) => {
-    if (hops.length >= maxPools) return;
-    for (const pool of usable) {
-      const { currency0, currency1 } = pool.poolKey;
-      const next =
-        lower(currency0) === lower(at)
-          ? currency1
-          : lower(currency1) === lower(at)
-            ? currency0
-            : null;
-      if (!next || seen.has(lower(next)) || hops.some((hop) => hop.poolId === pool.poolId))
-        continue;
-      const hop: PathHop = {
-        poolId: pool.poolId,
-        intermediateCurrency: getAddress(next),
-        fee: pool.poolKey.fee,
-        tickSpacing: pool.poolKey.tickSpacing,
-        hooks: pool.poolKey.hooks,
-        reviewed: pool.reviewed !== false,
-      };
-      if (lower(next) === lower(output)) {
-        if (hops.length >= 1) found.push([...hops, hop]);
-        continue;
-      }
-      walk(next, [...hops, hop], new Set([...seen, lower(next)]));
-    }
-  };
-  walk(getAddress(input), [], new Set([lower(input)]));
-  return found
+  if (
+    !Number.isInteger(maxPools) ||
+    maxPools < 2 ||
+    maxPools > 3 ||
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 8
+  )
+    return [];
+  const inputId = lower(input),
+    outputId = lower(output);
+  if (inputId === outputId) return [];
+  type Edge = { next: Address; hop: PathHop; unreviewed: number };
+  const adjacent = new Map<string, Edge[]>();
+  const usable = pools
+    .filter((pool) => pool.swappable)
     .sort(
       (a, b) =>
-        a.length - b.length ||
-        a.filter((hop) => !hop.reviewed).length - b.filter((hop) => !hop.reviewed).length
+        Number(a.reviewed === false) - Number(b.reviewed === false) ||
+        lower(a.poolId).localeCompare(lower(b.poolId))
+    );
+  for (const pool of usable) {
+    const key = pool.poolKey;
+    for (const [from, to] of [
+      [key.currency0, key.currency1],
+      [key.currency1, key.currency0],
+    ]) {
+      const edge = {
+        next: getAddress(to!),
+        unreviewed: Number(pool.reviewed === false),
+        hop: {
+          poolId: pool.poolId,
+          intermediateCurrency: getAddress(to!),
+          fee: key.fee,
+          tickSpacing: key.tickSpacing,
+          hooks: key.hooks,
+          reviewed: pool.reviewed !== false,
+        },
+      };
+      const id = lower(from!);
+      const list = adjacent.get(id) ?? [];
+      list.push(edge);
+      adjacent.set(id, list);
+    }
+  }
+  // Each bit records a feasible unreviewed-pool count for an exact remaining hop count.
+  // This linear pass prunes disconnected/dead-end branches before bounded path traversal.
+  const reachable: Map<string, number>[] = [new Map([[outputId, 1]])];
+  for (let steps = 1; steps <= maxPools; steps++) {
+    const level = new Map<string, number>();
+    for (const [at, edges] of adjacent) {
+      let mask = 0;
+      for (const edge of edges)
+        mask |= (reachable[steps - 1]!.get(lower(edge.next)) ?? 0) << edge.unreviewed;
+      if (mask) level.set(at, mask);
+    }
+    reachable.push(level);
+  }
+  const found: PathHop[][] = [];
+  let visits = 0;
+  const maxEdgeVisits = 4096;
+  const walk = (
+    at: string,
+    remaining: number,
+    unreviewed: number,
+    hops: PathHop[],
+    seen: Set<string>
+  ) => {
+    if (
+      found.length >= limit ||
+      visits >= maxEdgeVisits ||
+      !((reachable[remaining]!.get(at) ?? 0) & (1 << unreviewed))
     )
-    .slice(0, limit);
+      return;
+    if (remaining === 0) {
+      found.push(hops);
+      return;
+    }
+    for (const edge of adjacent.get(at) ?? []) {
+      if (found.length >= limit || visits >= maxEdgeVisits) return;
+      visits++;
+      const next = lower(edge.next),
+        budget = unreviewed - edge.unreviewed;
+      if (
+        budget < 0 ||
+        seen.has(next) ||
+        hops.some((hop) => lower(hop.poolId) === lower(edge.hop.poolId)) ||
+        !((reachable[remaining - 1]!.get(next) ?? 0) & (1 << budget))
+      )
+        continue;
+      walk(next, remaining - 1, budget, [...hops, edge.hop], new Set([...seen, next]));
+    }
+  };
+  for (let length = 2; length <= maxPools; length++)
+    for (let unreviewed = 0; unreviewed <= length; unreviewed++)
+      walk(inputId, length, unreviewed, [], new Set([inputId]));
+  return found;
 }
 
 const pathKeys = (path: readonly PathHop[]) =>
