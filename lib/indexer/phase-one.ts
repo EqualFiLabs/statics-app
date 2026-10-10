@@ -9,8 +9,8 @@ export type IndexedPublicPool = Readonly<{
   poolKey: LaunchPoolKey;
   initialSqrtPriceX96: bigint;
   initialTick: number;
-  inputFeeBps: number;
-  outputFeeBps: number;
+  inputFeePips: number;
+  outputFeePips: number;
   feeRateOverridden: boolean;
   quarantined: boolean;
   rewardRestrictions: Readonly<{ token0: boolean; token1: boolean }>;
@@ -137,8 +137,8 @@ export function parseIndexedPublicPools(
         },
         initialSqrtPriceX96: unsignedBigint(row.initialSqrtPriceX96, "initial price"),
         initialTick: integer(row.initialTick, "initial tick"),
-        inputFeeBps: integer(row.inputFeeBps, "input fee"),
-        outputFeeBps: integer(row.outputFeeBps, "output fee"),
+        inputFeePips: integer(row.inputFeePips, "input fee"),
+        outputFeePips: integer(row.outputFeePips, "output fee"),
         feeRateOverridden: boolean(row.feeRateOverridden, "fee override flag"),
         quarantined: boolean(row.quarantined, "quarantine flag"),
         rewardRestrictions: {

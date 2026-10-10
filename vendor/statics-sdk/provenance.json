@@ -18,13 +18,13 @@
   "phaseOneSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "6770d0caef5b94b8f102d2a33534970fb31b681e"
+    "commit": "749f9d599d68c28d84dd81e78723233b387fd832"
   },
   "phaseOneSourceChecksums": {
-    "src/index.ts": "1f20360d32c8c52ec8c8934d66d60a9bb76be4326e9d5e722d082b9b35a3e55b",
-    "src/gauge-incentives.ts": "e8b2cb783d8fcdab3007e546ec29593dd8f4f87c180f9180b2f665d5b703e244",
+    "src/index.ts": "7425123f9588459e27a292101fc945ce2085b6f6afd904bb6e3ffda68b0c2eb2",
+    "src/gauge-incentives.ts": "9267c956734f78d9f968c466b3b20dbaf283e2df36d39080b21060075eeac3f6",
     "src/market-tape.ts": "c519039d5bfadc16810d20cd7cbc003aabb82e0c9fceca73f086eee743df4d6d",
-    "src/range-gauges.ts": "310b4a3d8c9053e75c1ea8022cb456d87899fd360d0b2ee52fe9959ff2b42f55",
+    "src/range-gauges.ts": "f70ee8a616fa1b666a4183df021e62bb807d904c2e5a4b2c3b142dfec88a0d9d",
     "package.json": "98fa4239fadcf6659053e995f0d80c0e76588c9734297e85cea6cf634dee56e6"
   },
   "sourceChecksums": {
@@ -38,16 +38,16 @@
     "dist/genesis-credit.d.ts": "ffef22c37b79e975da48093ce8e572db6bcdd5d8f0b34617f4fbc6cfbd60a779",
     "dist/generated/robinhoodChain.js": "69b5dbcb88d4f77e435c2ceaa7176ab51b727065dc12eb44200748922b48afec",
     "dist/generated/robinhoodChain.d.ts": "f6a12b08c2b8cd85c769583f8ffcc632719c75d638803c17a83f51bcc2984337",
-    "dist/phase-one/index.js": "19901eeef7b45c4e2f4c2b5237b846e459ba003cd2599a7daec5dc8cf61a14c3",
-    "dist/phase-one/index.d.ts": "f106ea91b7c508bff51b34650de1184b02e014ecfb34a2870a257122f80b3369",
+    "dist/phase-one/index.js": "8f026e32c06000382d7828602dff6ee964b0909fb0ab8e97073236ce12750122",
+    "dist/phase-one/index.d.ts": "8cb7ea715828a603852acbf631120ea1e9aa02b06c0b6d7709db03126e1175f2",
     "dist/phase-one/gauge-incentives.js": "d19b73ed0a39cd0cfbd10139494b93edd37262b169fec1e6aea4b98ccb7fe22e",
     "dist/phase-one/gauge-incentives.d.ts": "674a6053dabc8d9cbfb4a21057510c6a135309199ea0a5d81c7c06c7ab488059",
     "dist/phase-one/market-tape.js": "96a4049d36914fa16ed19e421493085d36eaef562c73e6afe5911c09c0c73d27",
     "dist/phase-one/market-tape.d.ts": "1915d80d993d214ae16532af3c1251895b48a3220c08685a0f3dd1c34bce6850",
     "dist/phase-one/range-gauges.js": "7c30b0314a3eee9459831a0a7ffd17dfc3c2be08b1c0cf3c20e3f290c0ecd570",
     "dist/phase-one/range-gauges.d.ts": "50a16728e2d9229c8a87c345c23a522a3e95326dbb6fb15e20ec75b2c600cae5",
-    "dist/phase-one/generated/robinhoodChain.js": "30d4a618c61a835c469019ed59e0e7894c995c648c7e73db9c742aa010849c53",
-    "dist/phase-one/generated/robinhoodChain.d.ts": "2b1c6402c7189ca7aee68cf5d9fdf73456abdab7af5115926a8c86f2567edd48",
+    "dist/phase-one/generated/robinhoodChain.js": "f9511f43d31a6f0a05da25a61c3fdf2e918a93cde7e6088c1db49872961667c3",
+    "dist/phase-one/generated/robinhoodChain.d.ts": "e13abf020ce75d37d24af611ee0ea323c108e1cfdc624d28f5d9d4de6a91116b",
     "dist/batch-rewards.js": "65c3abb83fee22fb7fdb1bc9546dee30d0fd0ef30376cda6d8a6dc718979d70e",
     "dist/batch-rewards.d.ts": "edfc506d90c0acb02f75b97a3b8c007ec562444da481d1c18d6f3d8564341055",
     "dist/position-market.js": "8b87ca0578f11bdd9881f352e17a89e9c25704e32fb0b671fb4c2f7506501874",

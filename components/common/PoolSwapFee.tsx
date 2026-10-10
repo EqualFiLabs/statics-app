@@ -20,14 +20,14 @@ export function PoolSwapFee({
     new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(
       value
     );
-  const fee = swapFeePercent(lpFee, source === "genesis" ? { inputBps: 0, outputBps: 0 } : hook);
+  const fee = swapFeePercent(lpFee, source === "genesis" ? { inputPips: 0, outputPips: 0 } : hook);
   if (fee.total === null) return <span className={className}>{t("feeUnavailable")}</span>;
   const breakdown =
     hook && fee.statics !== null && fee.statics > 0
       ? t("feeBreakdown", {
           lp: percent(fee.lp),
-          input: percent(hook.inputBps / 100),
-          output: percent(hook.outputBps / 100),
+          input: percent(hook.inputPips / 10_000),
+          output: percent(hook.outputPips / 10_000),
         })
       : undefined;
   return (

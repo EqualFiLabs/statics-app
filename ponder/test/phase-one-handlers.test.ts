@@ -630,42 +630,42 @@ it("updates default hook rates without overwriting overrides or another deployme
       key: id,
       deploymentId,
       feeRateOverridden: overridden,
-      inputFeeBps: 5,
-      outputFeeBps: 5,
+      inputFeePips: 500,
+      outputFeePips: 500,
       updatedAtBlock: 99n,
     });
   const handler = handlers.get("PublicHook:DefaultFeeRateSet")!;
   await handler({
-    event: { ...base, args: { inputFeeBps: 10, outputFeeBps: 15 } },
+    event: { ...base, args: { inputFeePips: 1000, outputFeePips: 1500 } },
     context: { db, client: { readContract }, chain: { id: 4663 } },
   });
   expect(rows.get("publicPool:default")).toMatchObject({
-    inputFeeBps: 10,
-    outputFeeBps: 15,
+    inputFeePips: 1000,
+    outputFeePips: 1500,
     updatedAtBlock: 100n,
   });
   expect(rows.get("publicPool:override")).toMatchObject({
-    inputFeeBps: 5,
-    outputFeeBps: 5,
+    inputFeePips: 500,
+    outputFeePips: 500,
     updatedAtBlock: 99n,
   });
   expect(rows.get("publicPool:other")).toMatchObject({
-    inputFeeBps: 5,
-    outputFeeBps: 5,
+    inputFeePips: 500,
+    outputFeePips: 500,
     updatedAtBlock: 99n,
   });
   expect(readContract).not.toHaveBeenCalled();
   await handler({
     event: {
       ...base,
-      args: { inputFeeBps: 0, outputFeeBps: 0 },
+      args: { inputFeePips: 0, outputFeePips: 0 },
       block: { ...base.block, number: 101n },
     },
     context: { db, client: { readContract }, chain: { id: 4663 } },
   });
   expect(rows.get("publicPool:default")).toMatchObject({
-    inputFeeBps: 0,
-    outputFeeBps: 0,
+    inputFeePips: 0,
+    outputFeePips: 0,
     updatedAtBlock: 101n,
   });
 });

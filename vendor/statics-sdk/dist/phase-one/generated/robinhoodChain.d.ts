@@ -3,15 +3,13 @@ export declare const robinhoodChain: {
     readonly chainId: 4663;
     readonly forkBlock: 45234855;
     readonly forkBlockHash: "0xd65b81057261cc49ef60573d9f500ec9563257d673e10f1ff8d3d7c6ce33670d";
-    readonly inputFeeBps: 50;
-    readonly outputFeeBps: 50;
+    readonly inputFeePips: 500;
+    readonly outputFeePips: 500;
     readonly hookPermissionMask: "0x10ec";
     readonly liquidityCalibration: {
-        readonly inputFeeBps: 50;
-        readonly outputFeeBps: 50;
+        readonly inputFeePips: 500;
+        readonly outputFeePips: 500;
         readonly hookPermissionMask: "0x10ec";
-        readonly canonicalLpFeePips: 3000;
-        readonly canonicalTickSpacing: 10;
         readonly polShareBps: 1500;
         readonly basketStakerShareBps: 3000;
         readonly staticsStakerShareBps: 3000;

@@ -11,6 +11,7 @@ export * from "./position-market.js";
 export * from "./range-gauges.js";
 export * from "./batch-rewards.js";
 export const BPS = 10000n;
+export const PIPS = 1000000n;
 export const SHARE_SCALE = 10n ** 18n;
 export const MAX_LTV_BPS = 9500n;
 export const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
@@ -389,23 +390,23 @@ export function encodeSqrtPriceAssetPerBasketX96(assetAmountRaw, basketAmountRaw
 export function encodeSqrtPriceBPerAX96(tokenBAmountRaw, tokenAAmountRaw) {
     return encodeSqrtPriceAssetPerBasketX96(tokenBAmountRaw, tokenAAmountRaw);
 }
-export function quoteExactInputHookFee(realizedAmount, hookFeeBps) {
-    if (realizedAmount < 0n || hookFeeBps < 0n || hookFeeBps > BPS)
+export function quoteExactInputHookFee(realizedAmount, hookFeePips) {
+    if (realizedAmount < 0n || hookFeePips < 0n || hookFeePips > PIPS)
         throw new Error("invalid hook fee input");
-    return mulDivUp(realizedAmount, hookFeeBps, BPS);
+    return mulDivUp(realizedAmount, hookFeePips, PIPS);
 }
-export function quoteExactOutputHookFee(netAmount, hookFeeBps) {
-    if (netAmount < 0n || hookFeeBps < 0n || hookFeeBps >= BPS)
+export function quoteExactOutputHookFee(netAmount, hookFeePips) {
+    if (netAmount < 0n || hookFeePips < 0n || hookFeePips >= PIPS)
         throw new Error("invalid hook fee input");
-    return hookFeeBps === 0n ? 0n : mulDivUp(netAmount, hookFeeBps, BPS - hookFeeBps);
+    return hookFeePips === 0n ? 0n : mulDivUp(netAmount, hookFeePips, PIPS - hookFeePips);
 }
 export function splitSwapFee(chargedAmount, configuration, basketStakersEligible, staticsStakersEligible) {
     const shareTotal = configuration.polShareBps + configuration.basketStakerShareBps + configuration.staticsStakerShareBps
         + configuration.treasuryShareBps;
     if (chargedAmount < 0n
-        || configuration.inputFeeBps < 0n
-        || configuration.outputFeeBps < 0n
-        || configuration.inputFeeBps + configuration.outputFeeBps > 200n
+        || configuration.inputFeePips < 0n
+        || configuration.outputFeePips < 0n
+        || configuration.inputFeePips + configuration.outputFeePips > 20000n
         || configuration.polShareBps < 0n
         || configuration.basketStakerShareBps < 0n
         || configuration.staticsStakerShareBps < 0n
@@ -437,13 +438,13 @@ export function splitSwapFee(chargedAmount, configuration, basketStakersEligible
         treasuryAmount,
     };
 }
-export function effectiveCanonicalFees(lpFeePips, inputFeeBps, outputFeeBps) {
+export function effectiveCanonicalFees(lpFeePips, inputFeePips, outputFeePips) {
     if (lpFeePips < 0n || lpFeePips > 999999n)
         throw new Error("native LP fee outside protocol bounds");
-    if (inputFeeBps < 0n || outputFeeBps < 0n || inputFeeBps + outputFeeBps > 200n) {
+    if (inputFeePips < 0n || outputFeePips < 0n || inputFeePips + outputFeePips > 20000n) {
         throw new Error("invalid hook fees");
     }
-    return { lpFeePips, inputFeeBps, outputFeeBps };
+    return { lpFeePips, inputFeePips, outputFeePips };
 }
 export function getSqrtPriceAtTick(tick) {
     if (!Number.isInteger(tick) || tick < MIN_TICK || tick > MAX_TICK)
@@ -926,12 +927,12 @@ export const staticsAbi = [
         "function installPermissionedPoolIntegration(address hook,address router,address positionManager,address quoter)",
         "function permissionedLiquidityIntegration() view returns (address hook,address router,address positionManager,address quoter,bool installed)",
         "function canonicalPool(uint256 basketId,address asset) view returns ((bytes32 poolId,address basketToken,address asset,address currency0,address currency1,address hook,uint24 lpFee,int24 tickSpacing,int24 spotTick) pool)",
-        "function quotePool((address tokenA,address tokenB,uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceBPerAX96,(uint16 inputFeeBps,uint16 outputFeeBps) initialFeeRate,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline) params) view returns (((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,bytes32 poolId,uint160 sqrtPriceX96,uint256 creationFee,uint256 polActivationFee,uint256 totalNativeFee,bytes32 authorizationDigest) quote)",
-        "function createPool((address tokenA,address tokenB,uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceBPerAX96,(uint16 inputFeeBps,uint16 outputFeeBps) initialFeeRate,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline) params,bytes creatorAuthorization) payable returns (bytes32 poolId)",
+        "function quotePool((address tokenA,address tokenB,uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceBPerAX96,(uint16 inputFeePips,uint16 outputFeePips) initialFeeRate,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline) params) view returns (((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) key,bytes32 poolId,uint160 sqrtPriceX96,uint256 creationFee,uint256 polActivationFee,uint256 totalNativeFee,bytes32 authorizationDigest) quote)",
+        "function createPool((address tokenA,address tokenB,uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceBPerAX96,(uint16 inputFeePips,uint16 outputFeePips) initialFeeRate,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline) params,bytes creatorAuthorization) payable returns (bytes32 poolId)",
         "function invalidatePoolCreationNonce(uint256 nonce)",
         "function setPoolCreationFee(uint256 amount)",
-        "function setDefaultProtocolPoolFeeRate((uint16 inputFeeBps,uint16 outputFeeBps) feeRate)",
-        "function setProtocolPoolFeeRate(bytes32 poolId,(uint16 inputFeeBps,uint16 outputFeeBps) feeRate)",
+        "function setDefaultProtocolPoolFeeRate((uint16 inputFeePips,uint16 outputFeePips) feeRate)",
+        "function setProtocolPoolFeeRate(bytes32 poolId,(uint16 inputFeePips,uint16 outputFeePips) feeRate)",
         "function clearProtocolPoolFeeRate(bytes32 poolId)",
         "function setBasketFeeAllocation((uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
         "function setGeneralFeeAllocation((uint16 polShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
@@ -958,8 +959,8 @@ export const staticsAbi = [
         "function isPoolCreationNonceUsed(address creator,uint256 nonce) view returns (bool used)",
         "function basketFeeAllocation() view returns ((uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
         "function generalFeeAllocation() view returns ((uint16 polShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
-        "function defaultProtocolPoolFeeRate() view returns ((uint16 inputFeeBps,uint16 outputFeeBps) feeRate)",
-        "function protocolPoolFeeRate(bytes32 poolId) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,bool overridden) feeRate)",
+        "function defaultProtocolPoolFeeRate() view returns ((uint16 inputFeePips,uint16 outputFeePips) feeRate)",
+        "function protocolPoolFeeRate(bytes32 poolId) view returns ((uint16 inputFeePips,uint16 outputFeePips,bool overridden) feeRate)",
         "function protocolPoolCreator(bytes32 poolId) view returns (address creator)",
         "function protocolPoolMaintenanceConfig() view returns ((uint16 revenueTipBps) config)",
         "function protocolPolPosition(uint256 positionId) view returns ((uint256 positionId,bytes32 poolId,address manager,uint256 posmTokenId,int24 tickLower,int24 tickUpper,uint128 liquidity,bool active) position)",
@@ -1053,8 +1054,8 @@ export const staticsAbi = [
         "event ProtocolPoolCreated(bytes32 indexed poolId,address indexed creator,address indexed currency0,address currency1,uint24 lpFee,int24 tickSpacing,uint160 sqrtPriceX96,int24 tick)",
         "event PoolCreationFeeSet(uint256 amount)",
         "event PoolCreationNonceInvalidated(address indexed creator,uint256 indexed nonce)",
-        "event DefaultProtocolPoolFeeRateSet(uint16 inputFeeBps,uint16 outputFeeBps)",
-        "event ProtocolPoolFeeRateSet(bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps)",
+        "event DefaultProtocolPoolFeeRateSet(uint16 inputFeePips,uint16 outputFeePips)",
+        "event ProtocolPoolFeeRateSet(bytes32 indexed poolId,uint16 inputFeePips,uint16 outputFeePips)",
         "event ProtocolPoolFeeRateCleared(bytes32 indexed poolId)",
         "event BasketFeeAllocationSet(uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
         "event GeneralFeeAllocationSet(uint16 polShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
@@ -1130,11 +1131,11 @@ export const staticsMorphoErrorAbi = parseAbi([
 export const staticsSwapFeeHookAbi = parseAbi([
     "function staticsDiamond() view returns (address)",
     "function poolManager() view returns (address)",
-    "function defaultFeeRate() view returns (uint16 inputFeeBps,uint16 outputFeeBps)",
-    "function setDefaultFeeRate(uint16 inputFeeBps,uint16 outputFeeBps)",
-    "function setPoolFeeRate(bytes32 poolId,uint16 inputFeeBps,uint16 outputFeeBps)",
+    "function defaultFeeRate() view returns (uint16 inputFeePips,uint16 outputFeePips)",
+    "function setDefaultFeeRate(uint16 inputFeePips,uint16 outputFeePips)",
+    "function setPoolFeeRate(bytes32 poolId,uint16 inputFeePips,uint16 outputFeePips)",
     "function clearPoolFeeRate(bytes32 poolId)",
-    "function poolFeeRate(bytes32 poolId) view returns ((uint16 inputFeeBps,uint16 outputFeeBps,bool overridden) rate)",
+    "function poolFeeRate(bytes32 poolId) view returns ((uint16 inputFeePips,uint16 outputFeePips,bool overridden) rate)",
     "function basketFeeAllocation() view returns ((uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
     "function generalFeeAllocation() view returns ((uint16 polShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
     "function setBasketFeeAllocation((uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps) allocation)",
@@ -1153,8 +1154,8 @@ export const staticsSwapFeeHookAbi = parseAbi([
     "event PendingFeeDistributionReallocated(bytes32 indexed poolId,address indexed currency,uint256 basketStakerToPol,uint256 staticsStakerToTreasury)",
     "event ProtocolPolSettled(bytes32 indexed poolId,address indexed currency,address indexed receiver,uint256 amount)",
     "event PoolDecommissioned(bytes32 indexed poolId)",
-    "event PoolFeeRateSet(bytes32 indexed poolId,uint16 inputFeeBps,uint16 outputFeeBps,bool overridden)",
-    "event DefaultFeeRateSet(uint16 inputFeeBps,uint16 outputFeeBps)",
+    "event PoolFeeRateSet(bytes32 indexed poolId,uint16 inputFeePips,uint16 outputFeePips,bool overridden)",
+    "event DefaultFeeRateSet(uint16 inputFeePips,uint16 outputFeePips)",
     "event BasketFeeAllocationSet(uint16 polShareBps,uint16 basketStakerShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
     "event GeneralFeeAllocationSet(uint16 polShareBps,uint16 staticsStakerShareBps,uint16 treasuryShareBps)",
 ]);
@@ -1352,7 +1353,7 @@ export const staticsProtocolPoolErrorAbi = parseAbi([
     "error DeadlineExpired(uint256 deadline)",
     "error InvalidTickSpacing(int24 tickSpacing)",
     "error InvalidPoolPrice(uint160 sqrtPriceBPerAX96)",
-    "error InvalidFeeRate(uint16 inputFeeBps,uint16 outputFeeBps)",
+    "error InvalidFeeRate(uint16 inputFeePips,uint16 outputFeePips)",
     "error PoolAlreadyInitialized(bytes32 poolId)",
     "error PoolAlreadyRegisteredInHook(bytes32 poolId)",
     "error ActionPaused(uint256 action)",
@@ -2316,13 +2317,13 @@ export const MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342n
 export const MAX_STATIC_LP_FEE_PIPS = 999_999;
 export const MIN_TICK_SPACING = 1;
 export const MAX_TICK_SPACING = 32_767;
-export const MAX_COMBINED_FEE_BPS = 200n;
+export const MAX_COMBINED_FEE_PIPS = 20000n;
 export const CONFIGURABLE_SHARE_BPS = 9500n;
 export const CREATOR_SHARE_BPS = 500n;
 export const MAX_REVENUE_MAINTENANCE_TIP_BPS = 2000n;
 /// @dev Statics Protocol Pools EIP-712 domain name and version, matching `ProtocolPoolCreationFacet`.
 export const PROTOCOL_POOLS_DOMAIN_NAME = "Statics Protocol Pools";
-export const PROTOCOL_POOLS_DOMAIN_VERSION = "4";
+export const PROTOCOL_POOLS_DOMAIN_VERSION = "5";
 export const PERMISSIONED_POOLS_DOMAIN_NAME = "Statics Permissioned Pools";
 export const PERMISSIONED_POOLS_DOMAIN_VERSION = "1";
 export const DEFAULT_PERMISSIONED_CREATOR_SHARE_BPS = 8000n;
@@ -2378,12 +2379,19 @@ export function computePoolId(key) {
     return keccak256(encodeAbiParameters(parseAbiParameters("address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks"), [key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks]));
 }
 function validatedPoolSwapFeeRate(feeRate) {
-    const inputFeeBps = toUint16(feeRate.inputFeeBps, "inputFeeBps");
-    const outputFeeBps = toUint16(feeRate.outputFeeBps, "outputFeeBps");
-    if (BigInt(inputFeeBps) + BigInt(outputFeeBps) > MAX_COMBINED_FEE_BPS) {
-        throw new Error("combined pool fee rate exceeds 200 BPS");
+    const inputFeePips = toUint16(feeRate.inputFeePips, "inputFeePips");
+    const outputFeePips = toUint16(feeRate.outputFeePips, "outputFeePips");
+    if (BigInt(inputFeePips) + BigInt(outputFeePips) > MAX_COMBINED_FEE_PIPS) {
+        throw new Error("combined pool fee rate exceeds 20000 pips");
     }
-    return { inputFeeBps, outputFeeBps };
+    return { inputFeePips, outputFeePips };
+}
+function validatedCreatorInitialFeeRate(feeRate) {
+    const validated = validatedPoolSwapFeeRate(feeRate);
+    if (validated.inputFeePips < 10 || validated.outputFeePips < 10) {
+        throw new Error("creator hook fee must be at least 10 pips per leg");
+    }
+    return validated;
 }
 function validatedBasketFeeAllocation(allocation) {
     const polShareBps = toUint16(allocation.polShareBps, "polShareBps");
@@ -2420,7 +2428,7 @@ function coerceCreatePoolParams(params) {
         lpFee: _validateStaticLpFee(params.lpFee),
         tickSpacing: _validateTickSpacing(params.tickSpacing),
         sqrtPriceBPerAX96: params.sqrtPriceBPerAX96,
-        initialFeeRate: validatedPoolSwapFeeRate(params.initialFeeRate),
+        initialFeeRate: validatedCreatorInitialFeeRate(params.initialFeeRate),
         creator: params.creator,
         activateManagedPol: params.activateManagedPol,
         nonce: _validateUint256(params.nonce, "nonce"),
@@ -2645,8 +2653,8 @@ export function computePermissionedControllerReplacementDigest(chainId, diamond,
 /// are the normalized, sorted values the Diamond derives during quoting.
 export function buildCreatePoolAuthorizationTypedData(chainId, diamond, message) {
     const feeRate = validatedPoolSwapFeeRate({
-        inputFeeBps: message.inputFeeBps,
-        outputFeeBps: message.outputFeeBps,
+        inputFeePips: message.inputFeePips,
+        outputFeePips: message.outputFeePips,
     });
     return {
         domain: {
@@ -2659,8 +2667,8 @@ export function buildCreatePoolAuthorizationTypedData(chainId, diamond, message)
             CreatePool: [
                 { name: "poolId", type: "bytes32" },
                 { name: "sqrtPriceX96", type: "uint160" },
-                { name: "inputFeeBps", type: "uint16" },
-                { name: "outputFeeBps", type: "uint16" },
+                { name: "inputFeePips", type: "uint16" },
+                { name: "outputFeePips", type: "uint16" },
                 { name: "creator", type: "address" },
                 { name: "activateManagedPol", type: "bool" },
                 { name: "nonce", type: "uint256" },
@@ -2671,8 +2679,8 @@ export function buildCreatePoolAuthorizationTypedData(chainId, diamond, message)
         message: {
             poolId: message.poolId,
             sqrtPriceX96: message.sqrtPriceX96,
-            inputFeeBps: feeRate.inputFeeBps,
-            outputFeeBps: feeRate.outputFeeBps,
+            inputFeePips: feeRate.inputFeePips,
+            outputFeePips: feeRate.outputFeePips,
             creator: message.creator,
             activateManagedPol: message.activateManagedPol,
             nonce: _validateUint256(message.nonce, "nonce"),
@@ -2691,17 +2699,17 @@ export function computeCreatePoolAuthorizationDigest(chainId, diamond, message) 
         BigInt(chainId),
         diamond,
     ]));
-    const createPoolTypeHash = keccak256(toHex("CreatePool(bytes32 poolId,uint160 sqrtPriceX96,uint16 inputFeeBps,uint16 outputFeeBps,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline)"));
+    const createPoolTypeHash = keccak256(toHex("CreatePool(bytes32 poolId,uint160 sqrtPriceX96,uint16 inputFeePips,uint16 outputFeePips,address creator,bool activateManagedPol,uint256 nonce,uint256 deadline)"));
     const feeRate = validatedPoolSwapFeeRate({
-        inputFeeBps: message.inputFeeBps,
-        outputFeeBps: message.outputFeeBps,
+        inputFeePips: message.inputFeePips,
+        outputFeePips: message.outputFeePips,
     });
     const structHash = keccak256(encodeAbiParameters(parseAbiParameters("bytes32,bytes32,uint160,uint16,uint16,address,bool,uint256,uint256"), [
         createPoolTypeHash,
         message.poolId,
         message.sqrtPriceX96,
-        feeRate.inputFeeBps,
-        feeRate.outputFeeBps,
+        feeRate.inputFeePips,
+        feeRate.outputFeePips,
         message.creator,
         message.activateManagedPol,
         _validateUint256(message.nonce, "nonce"),
@@ -2716,11 +2724,12 @@ export function quoteProtocolPool(chainId, diamond, hook, params, creationFee = 
     const sqrtPriceX96 = normalizeSqrtPriceBPerAX96(params.tokenA, params.tokenB, params.sqrtPriceBPerAX96);
     const key = buildProtocolPoolKey(params.tokenA, params.tokenB, params.tickSpacing, hook, params.lpFee);
     const poolId = computePoolId(key);
+    const initialFeeRate = validatedCreatorInitialFeeRate(params.initialFeeRate);
     const authorizationDigest = computeCreatePoolAuthorizationDigest(chainId, diamond, {
         poolId,
         sqrtPriceX96,
-        inputFeeBps: params.initialFeeRate.inputFeeBps,
-        outputFeeBps: params.initialFeeRate.outputFeeBps,
+        inputFeePips: BigInt(initialFeeRate.inputFeePips),
+        outputFeePips: BigInt(initialFeeRate.outputFeePips),
         creator: params.creator,
         activateManagedPol: params.activateManagedPol,
         nonce: params.nonce,

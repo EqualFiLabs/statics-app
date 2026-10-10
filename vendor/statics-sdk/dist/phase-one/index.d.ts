@@ -6,6 +6,7 @@ export * from "./position-market.js";
 export * from "./range-gauges.js";
 export * from "./batch-rewards.js";
 export declare const BPS = 10000n;
+export declare const PIPS = 1000000n;
 export declare const SHARE_SCALE: bigint;
 export declare const MAX_LTV_BPS = 9500n;
 export declare const LOAN_RECOVERY_GRACE_PERIOD = 3600n;
@@ -2583,8 +2584,8 @@ export type FeeTier = {
     feeShares: bigint;
 };
 export type SwapFeeConfiguration = {
-    inputFeeBps: bigint;
-    outputFeeBps: bigint;
+    inputFeePips: bigint;
+    outputFeePips: bigint;
     polShareBps: bigint;
     basketStakerShareBps: bigint;
     staticsStakerShareBps: bigint;
@@ -2651,8 +2652,8 @@ export type PoolLaunchParams = {
     pairedAssetAmount: bigint;
 };
 export type PoolSwapFeeRate = {
-    inputFeeBps: bigint;
-    outputFeeBps: bigint;
+    inputFeePips: bigint;
+    outputFeePips: bigint;
 };
 export type PoolFeeRateView = PoolSwapFeeRate & {
     overridden: boolean;
@@ -2930,8 +2931,8 @@ export type RecoveryQuote = {
 };
 export type EffectiveCanonicalFees = {
     lpFeePips: bigint;
-    inputFeeBps: bigint;
-    outputFeeBps: bigint;
+    inputFeePips: bigint;
+    outputFeePips: bigint;
 };
 export type LiquidityParams = {
     asset: Address;
@@ -2996,10 +2997,10 @@ export declare function quoteMorphoHealth(input: {
 }): MorphoHealth;
 export declare function encodeSqrtPriceAssetPerBasketX96(assetAmountRaw: bigint, basketAmountRaw: bigint): bigint;
 export declare function encodeSqrtPriceBPerAX96(tokenBAmountRaw: bigint, tokenAAmountRaw: bigint): bigint;
-export declare function quoteExactInputHookFee(realizedAmount: bigint, hookFeeBps: bigint): bigint;
-export declare function quoteExactOutputHookFee(netAmount: bigint, hookFeeBps: bigint): bigint;
+export declare function quoteExactInputHookFee(realizedAmount: bigint, hookFeePips: bigint): bigint;
+export declare function quoteExactOutputHookFee(netAmount: bigint, hookFeePips: bigint): bigint;
 export declare function splitSwapFee(chargedAmount: bigint, configuration: SwapFeeConfiguration, basketStakersEligible: boolean, staticsStakersEligible: boolean): SwapFeeSplit;
-export declare function effectiveCanonicalFees(lpFeePips: bigint, inputFeeBps: bigint, outputFeeBps: bigint): EffectiveCanonicalFees;
+export declare function effectiveCanonicalFees(lpFeePips: bigint, inputFeePips: bigint, outputFeePips: bigint): EffectiveCanonicalFees;
 export declare function getSqrtPriceAtTick(tick: number): bigint;
 export declare function quoteRangeAmounts(sqrtPriceX96: bigint, tickLower: number, tickUpper: number, liquidity: bigint): {
     amount0: bigint;
@@ -6698,10 +6699,10 @@ export declare const staticsAbi: readonly [{
             readonly type: "tuple";
             readonly components: readonly [{
                 readonly type: "uint16";
-                readonly name: "inputFeeBps";
+                readonly name: "inputFeePips";
             }, {
                 readonly type: "uint16";
-                readonly name: "outputFeeBps";
+                readonly name: "outputFeePips";
             }];
             readonly name: "initialFeeRate";
         }, {
@@ -6786,10 +6787,10 @@ export declare const staticsAbi: readonly [{
             readonly type: "tuple";
             readonly components: readonly [{
                 readonly type: "uint16";
-                readonly name: "inputFeeBps";
+                readonly name: "inputFeePips";
             }, {
                 readonly type: "uint16";
-                readonly name: "outputFeeBps";
+                readonly name: "outputFeePips";
             }];
             readonly name: "initialFeeRate";
         }, {
@@ -6840,10 +6841,10 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint16";
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
         }, {
             readonly type: "uint16";
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
         }];
         readonly name: "feeRate";
     }];
@@ -6859,10 +6860,10 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint16";
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
         }, {
             readonly type: "uint16";
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
         }];
         readonly name: "feeRate";
     }];
@@ -7318,10 +7319,10 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint16";
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
         }, {
             readonly type: "uint16";
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
         }];
         readonly name: "feeRate";
     }];
@@ -7337,10 +7338,10 @@ export declare const staticsAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint16";
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
         }, {
             readonly type: "uint16";
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
         }, {
             readonly type: "bool";
             readonly name: "overridden";
@@ -9283,10 +9284,10 @@ export declare const staticsAbi: readonly [{
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
 }, {
     readonly name: "ProtocolPoolFeeRateSet";
@@ -9297,10 +9298,10 @@ export declare const staticsAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
 }, {
     readonly name: "ProtocolPoolFeeRateCleared";
@@ -13396,10 +13397,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     readonly inputs: readonly [];
     readonly outputs: readonly [{
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
 }, {
     readonly name: "setDefaultFeeRate";
@@ -13407,10 +13408,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
     readonly outputs: readonly [];
 }, {
@@ -13422,10 +13423,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly name: "poolId";
     }, {
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
     readonly outputs: readonly [];
 }, {
@@ -13449,10 +13450,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly type: "tuple";
         readonly components: readonly [{
             readonly type: "uint16";
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
         }, {
             readonly type: "uint16";
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
         }, {
             readonly type: "bool";
             readonly name: "overridden";
@@ -13892,10 +13893,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
         readonly indexed: true;
     }, {
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }, {
         readonly type: "bool";
         readonly name: "overridden";
@@ -13905,10 +13906,10 @@ export declare const staticsSwapFeeHookAbi: readonly [{
     readonly type: "event";
     readonly inputs: readonly [{
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
 }, {
     readonly name: "BasketFeeAllocationSet";
@@ -16615,10 +16616,10 @@ export declare const staticsProtocolPoolErrorAbi: readonly [{
     readonly type: "error";
     readonly inputs: readonly [{
         readonly type: "uint16";
-        readonly name: "inputFeeBps";
+        readonly name: "inputFeePips";
     }, {
         readonly type: "uint16";
-        readonly name: "outputFeeBps";
+        readonly name: "outputFeePips";
     }];
 }, {
     readonly name: "PoolAlreadyInitialized";
@@ -20254,12 +20255,12 @@ export declare const MAX_SQRT_PRICE = 146144670348521010328727305220398882237872
 export declare const MAX_STATIC_LP_FEE_PIPS = 999999;
 export declare const MIN_TICK_SPACING = 1;
 export declare const MAX_TICK_SPACING = 32767;
-export declare const MAX_COMBINED_FEE_BPS = 200n;
+export declare const MAX_COMBINED_FEE_PIPS = 20000n;
 export declare const CONFIGURABLE_SHARE_BPS = 9500n;
 export declare const CREATOR_SHARE_BPS = 500n;
 export declare const MAX_REVENUE_MAINTENANCE_TIP_BPS = 2000n;
 export declare const PROTOCOL_POOLS_DOMAIN_NAME = "Statics Protocol Pools";
-export declare const PROTOCOL_POOLS_DOMAIN_VERSION = "4";
+export declare const PROTOCOL_POOLS_DOMAIN_VERSION = "5";
 export declare const PERMISSIONED_POOLS_DOMAIN_NAME = "Statics Permissioned Pools";
 export declare const PERMISSIONED_POOLS_DOMAIN_VERSION = "1";
 export declare const DEFAULT_PERMISSIONED_CREATOR_SHARE_BPS = 8000n;
@@ -20430,8 +20431,8 @@ export declare function computePermissionedControllerReplacementDigest(chainId: 
 export declare function buildCreatePoolAuthorizationTypedData(chainId: number, diamond: Address, message: {
     poolId: Hex;
     sqrtPriceX96: bigint;
-    inputFeeBps: bigint;
-    outputFeeBps: bigint;
+    inputFeePips: bigint;
+    outputFeePips: bigint;
     creator: Address;
     activateManagedPol: boolean;
     nonce: bigint;
@@ -20439,7 +20440,7 @@ export declare function buildCreatePoolAuthorizationTypedData(chainId: number, d
 }): {
     readonly domain: {
         readonly name: "Statics Protocol Pools";
-        readonly version: "4";
+        readonly version: "5";
         readonly chainId: number;
         readonly verifyingContract: `0x${string}`;
     };
@@ -20451,10 +20452,10 @@ export declare function buildCreatePoolAuthorizationTypedData(chainId: number, d
             readonly name: "sqrtPriceX96";
             readonly type: "uint160";
         }, {
-            readonly name: "inputFeeBps";
+            readonly name: "inputFeePips";
             readonly type: "uint16";
         }, {
-            readonly name: "outputFeeBps";
+            readonly name: "outputFeePips";
             readonly type: "uint16";
         }, {
             readonly name: "creator";
@@ -20474,8 +20475,8 @@ export declare function buildCreatePoolAuthorizationTypedData(chainId: number, d
     readonly message: {
         readonly poolId: `0x${string}`;
         readonly sqrtPriceX96: bigint;
-        readonly inputFeeBps: number;
-        readonly outputFeeBps: number;
+        readonly inputFeePips: number;
+        readonly outputFeePips: number;
         readonly creator: `0x${string}`;
         readonly activateManagedPol: boolean;
         readonly nonce: bigint;
@@ -20485,8 +20486,8 @@ export declare function buildCreatePoolAuthorizationTypedData(chainId: number, d
 export declare function computeCreatePoolAuthorizationDigest(chainId: number, diamond: Address, message: {
     poolId: Hex;
     sqrtPriceX96: bigint;
-    inputFeeBps: bigint;
-    outputFeeBps: bigint;
+    inputFeePips: bigint;
+    outputFeePips: bigint;
     creator: Address;
     activateManagedPol: boolean;
     nonce: bigint;

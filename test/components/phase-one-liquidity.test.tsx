@@ -157,7 +157,7 @@ const fiveZero = [0n, 0n, 0n, 0n, 0n];
 beforeEach(() => {
   discoveredPools.value = [];
   mocks.fees.mockReset().mockResolvedValue({
-    items: [{ poolId, inputFeeBps: 5, outputFeeBps: 5 }],
+    items: [{ poolId, inputFeePips: 500, outputFeePips: 500 }],
   });
   mocks.native = 10n ** 19n;
   mocks.position.mockReset().mockImplementation(async (id: bigint) => indexed(id));

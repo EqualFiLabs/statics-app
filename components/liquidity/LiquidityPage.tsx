@@ -1230,8 +1230,8 @@ function LiquidityRuntime() {
                   source="phase-one"
                   lpFee={Number(item.lpFee)}
                   hook={{
-                    inputBps: Number(item.hookFees.inputFeeBps),
-                    outputBps: Number(item.hookFees.outputFeeBps),
+                    inputPips: Number(item.hookFees.inputFeeBps) * 100,
+                    outputPips: Number(item.hookFees.outputFeeBps) * 100,
                   }}
                 />
               </button>

@@ -9,10 +9,19 @@ describe("pool swap fee presentation", () => {
     expect(screen.queryByText(/0.30% fee/)).not.toBeInTheDocument();
   });
   it("labels the sum as approximate and exposes each rate", () => {
-    render(<PoolSwapFee lpFee={3000} source="phase-one" hook={{ inputBps: 5, outputBps: 10 }} />);
+    render(
+      <PoolSwapFee lpFee={3000} source="phase-one" hook={{ inputPips: 500, outputPips: 1000 }} />
+    );
     expect(screen.getByText("≈ 0.45% fee", { exact: false })).toHaveAttribute(
       "title",
       "0.30% LP fee; 0.05% input fee; 0.10% output fee. Combined rate is approximate."
+    );
+  });
+  it("shows the launch pool's 50/25/25 pip schedule as approximately 0.01%", () => {
+    render(<PoolSwapFee lpFee={50} source="phase-one" hook={{ inputPips: 25, outputPips: 25 }} />);
+    expect(screen.getByText("≈ 0.01% fee", { exact: false })).toHaveAttribute(
+      "title",
+      "0.005% LP fee; 0.0025% input fee; 0.0025% output fee. Combined rate is approximate."
     );
   });
   it("shows the native LP rate for Genesis independently of hook discovery", () => {

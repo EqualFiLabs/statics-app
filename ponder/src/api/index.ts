@@ -590,8 +590,8 @@ app.get("/phase-one/pools", async (context) => {
       },
       initialSqrtPriceX96: row.initialSqrtPriceX96.toString(),
       initialTick: row.initialTick,
-      inputFeeBps: row.inputFeeBps,
-      outputFeeBps: row.outputFeeBps,
+      inputFeePips: row.inputFeePips,
+      outputFeePips: row.outputFeePips,
       feeRateOverridden: row.feeRateOverridden,
       quarantined: row.quarantined,
       rewardRestrictions: {

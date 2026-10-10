@@ -15,7 +15,7 @@ export function usePoolFeeRates(deploymentId: string, enabled = true) {
       new Map<string, HookFeeRate>(
         (await loadIndexedPublicPools(deploymentId)).items.map((pool) => [
           pool.poolId.toLowerCase(),
-          { inputBps: pool.inputFeeBps, outputBps: pool.outputFeeBps },
+          { inputPips: pool.inputFeePips, outputPips: pool.outputFeePips },
         ])
       ),
   });

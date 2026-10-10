@@ -13,8 +13,8 @@ describe("indexed pool fees", () => {
   it("shares one request across labels and matches pool IDs case-insensitively", async () => {
     load.mockResolvedValue({
       items: [
-        { poolId: "0xAB", inputFeeBps: 5, outputFeeBps: 5 },
-        { poolId: "0xcd", inputFeeBps: 10, outputFeeBps: 20 },
+        { poolId: "0xAB", inputFeePips: 500, outputFeePips: 500 },
+        { poolId: "0xcd", inputFeePips: 1000, outputFeePips: 2000 },
       ],
     });
     render(
@@ -30,7 +30,7 @@ describe("indexed pool fees", () => {
   });
   it("does not reuse another deployment's rates", async () => {
     load.mockImplementation(async (id: string) => ({
-      items: id === "first" ? [{ poolId: "0xab", inputFeeBps: 5, outputFeeBps: 5 }] : [],
+      items: id === "first" ? [{ poolId: "0xab", inputFeePips: 500, outputFeePips: 500 }] : [],
     }));
     const view = render(<IndexedPoolSwapFee deploymentId="first" poolId="0xab" lpFee={3000} />);
     await screen.findByText("≈ 0.40% fee", { exact: false });

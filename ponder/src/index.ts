@@ -499,8 +499,8 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => 
       tickSpacing: event.args.tickSpacing,
       initialSqrtPriceX96: event.args.sqrtPriceX96,
       initialTick: event.args.tick,
-      inputFeeBps: feeRate.inputFeeBps,
-      outputFeeBps: feeRate.outputFeeBps,
+      inputFeePips: feeRate.inputFeePips,
+      outputFeePips: feeRate.outputFeePips,
       feeRateOverridden: feeRate.overridden,
       quarantined: false,
       decommissioned: false,
@@ -521,8 +521,8 @@ onPhaseOne("PhaseOneStatics:ProtocolPoolCreated", async ({ event, context }) => 
       tickSpacing: event.args.tickSpacing,
       initialSqrtPriceX96: event.args.sqrtPriceX96,
       initialTick: event.args.tick,
-      inputFeeBps: feeRate.inputFeeBps,
-      outputFeeBps: feeRate.outputFeeBps,
+      inputFeePips: feeRate.inputFeePips,
+      outputFeePips: feeRate.outputFeePips,
       feeRateOverridden: feeRate.overridden,
       updatedAtBlock: event.block.number,
     });
@@ -545,8 +545,8 @@ onPublicHook("PublicHook:DefaultFeeRateSet", async ({ event, context }) => {
   for (const pool of pools) {
     if (pool.deploymentId !== phaseOneDeploymentId || pool.feeRateOverridden) continue;
     await context.db.update(publicPool, { key: pool.key }).set({
-      inputFeeBps: event.args.inputFeeBps,
-      outputFeeBps: event.args.outputFeeBps,
+      inputFeePips: event.args.inputFeePips,
+      outputFeePips: event.args.outputFeePips,
       updatedAtBlock: event.block.number,
     });
   }
@@ -577,8 +577,8 @@ onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
       tickSpacing: pool.key.tickSpacing,
       initialSqrtPriceX96: 0n,
       initialTick: 0,
-      inputFeeBps: event.args.inputFeeBps,
-      outputFeeBps: event.args.outputFeeBps,
+      inputFeePips: event.args.inputFeePips,
+      outputFeePips: event.args.outputFeePips,
       feeRateOverridden: event.args.overridden,
       quarantined: false,
       decommissioned: pool.decommissioned,
@@ -591,8 +591,8 @@ onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
       updatedAtBlock: event.block.number,
     })
     .onConflictDoUpdate({
-      inputFeeBps: event.args.inputFeeBps,
-      outputFeeBps: event.args.outputFeeBps,
+      inputFeePips: event.args.inputFeePips,
+      outputFeePips: event.args.outputFeePips,
       feeRateOverridden: event.args.overridden,
       updatedAtBlock: event.block.number,
     });
