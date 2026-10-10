@@ -21,6 +21,7 @@ export function pool(n = 1, a = 1, b = 2): MarketPool {
     initialized: true,
     liquidityComplete: true,
     historyStart: "0",
+    priceHistoryStart: "0",
     sqrtPriceX96: String(Q96),
     tick: 0,
     cumulative: "0",

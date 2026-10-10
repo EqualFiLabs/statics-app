@@ -36,6 +36,7 @@ export type MarketPool = {
   initialized: boolean;
   liquidityComplete: boolean;
   historyStart: string;
+  priceHistoryStart: string;
   sqrtPriceX96: string;
   tick: number;
   cumulative: string;

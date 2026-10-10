@@ -1,6 +1,7 @@
 import type { ponder } from "ponder:registry";
 import { dexPool, dexRange, dexHistory, dexState } from "ponder:schema";
 import { getAddress, zeroAddress, type Hex } from "viem";
+import { v4StateViewReadAbi } from "@statics-protocol/sdk/phase-one";
 import { readTokenMetadata } from "./allocation-snapshots";
 import { configuredCanonicalPool, configuredAddress } from "./source-config";
 import {
@@ -98,9 +99,32 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
     };
     const startBlock =
       source === "genesis" ? process.env.PONDER_POOL_MANAGER_START_BLOCK : undefined;
-    const startTime = startBlock
+    const configuredTime = startBlock
       ? (await context.client.getBlock({ blockNumber: BigInt(startBlock) })).timestamp
       : event.block.timestamp;
+    const startTime =
+      configuredTime > event.block.timestamp ? configuredTime : event.block.timestamp;
+    // Inherited liquidity starts at initialization; price/swap coverage starts at the configured fork boundary.
+    let sqrtPriceX96 = String(a.sqrtPriceX96),
+      tick = Number(a.tick);
+    if (source === "genesis" && startTime > event.block.timestamp) {
+      const stateView = configuredAddress("PONDER_STATE_VIEW_ADDRESS");
+      if (stateView && startBlock) {
+        const state = await context.client.readContract({
+          address: stateView,
+          abi: v4StateViewReadAbi,
+          functionName: "getSlot0",
+          args: [poolId],
+          blockNumber: BigInt(startBlock),
+        });
+        sqrtPriceX96 = String(state[0]);
+        tick = state[1];
+      } else {
+        // Without a snapshot reader, wait for the first indexed swap rather than reuse an obsolete launch price.
+        sqrtPriceX96 = "0";
+        tick = 0;
+      }
+    }
     const pool: PoolState = {
       poolId,
       source,
@@ -116,10 +140,11 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
       initialized: true,
       liquidityComplete: true,
       historyStart: String(startTime),
-      sqrtPriceX96: String(a.sqrtPriceX96),
-      tick: Number(a.tick),
+      priceHistoryStart: String(startTime),
+      sqrtPriceX96,
+      tick,
       cumulative: "0",
-      priceTime: String(event.block.timestamp),
+      priceTime: String(startTime),
       decommissioned: false,
       stopped: false,
       quarantined: false,
@@ -168,7 +193,7 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
     });
     await save(context, event, pool);
   }
-  async function swap(context: Context, event: DexEvent, priceOnly = false) {
+  async function swap(context: Context, event: DexEvent) {
     const a = event.args,
       poolId = String(a.id) as Hex,
       pool = await read(context, poolId);
@@ -176,8 +201,16 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
     await advance(context, event, pool);
     const amount0 = BigInt(String(a.amount0)),
       amount1 = BigInt(String(a.amount1));
-    if (!((amount0 < 0n && amount1 > 0n) || (amount1 < 0n && amount0 > 0n))) return;
+    if (pool.sqrtPriceX96 === "0") {
+      pool.priceTime = String(event.block.timestamp);
+      pool.priceHistoryStart = String(event.block.timestamp);
+    }
     updatePrice(pool, Number(a.tick), BigInt(String(a.sqrtPriceX96)), event.block.timestamp);
+    if (!((amount0 < 0n && amount1 >= 0n) || (amount1 < 0n && amount0 >= 0n))) {
+      await history(context, event, poolId, "price", pool);
+      await save(context, event, pool);
+      return;
+    }
     const trade: MarketTrade = {
       poolId,
       sender: String(a.sender),
@@ -197,7 +230,7 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
       tick: Number(a.tick),
       lpFee: pool.lpFee,
     };
-    await history(context, event, poolId, priceOnly ? "price" : "swap", {
+    await history(context, event, poolId, "swap", {
       ...trade,
       cumulative: pool.cumulative,
       priceTime: pool.priceTime,

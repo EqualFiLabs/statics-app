@@ -1203,14 +1203,6 @@ for (const eventName of Object.keys(statementCategories) as (keyof typeof statem
 }
 
 if (dexEnabled) {
-  ponder.on("DexCanonicalPoolManager:Swap", async ({ event, context }) => {
-    const start = BigInt(
-      process.env.PONDER_POOL_MANAGER_START_BLOCK ||
-        process.env.PONDER_DEPLOYMENT_START_BLOCK ||
-        "0"
-    );
-    if (event.block.number < start) await dex.swap(context, event as unknown as DexEvent, true);
-  });
   ponder.on("DexCanonicalPoolManager:Initialize", async ({ event, context }) => {
     await dex.initialize(context, event as unknown as DexEvent, "genesis");
   });

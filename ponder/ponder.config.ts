@@ -188,11 +188,9 @@ export default createConfig({
       filter: [
         { event: "Initialize", args: { id: canonicalPoolId ?? zeroHash } },
         { event: "ModifyLiquidity", args: { id: canonicalPoolId ?? zeroHash } },
-        { event: "Swap", args: { id: canonicalPoolId ?? zeroHash } },
       ] as (
         | { event: "Initialize"; args: { id: `0x${string}` } }
         | { event: "ModifyLiquidity"; args: { id: `0x${string}` } }
-        | { event: "Swap"; args: { id: `0x${string}` } }
       )[],
     },
     PoolManager: {

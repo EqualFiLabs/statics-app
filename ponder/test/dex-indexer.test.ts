@@ -70,8 +70,48 @@ const pool = () => JSON.parse(String(rows.get(`pools:selected:${id}`)?.details))
 beforeEach(() => {
   rows.clear();
   index = 0;
+  vi.unstubAllEnvs();
 });
 describe("DEX event indexing", () => {
+  it("anchors inherited prices at the fork snapshot without reading historical swaps", async () => {
+    vi.stubEnv("PONDER_POOL_MANAGER_START_BLOCK", "1000");
+    vi.stubEnv("PONDER_STATE_VIEW_ADDRESS", address);
+    const client = {
+      getBlock: vi.fn(async () => ({ timestamp: 2000n })),
+      readContract: vi.fn(async () => [1n << 97n, 10, 0, 15000]),
+    };
+    const c = { ...context, client } as unknown as typeof context;
+    await domain().initialize(c, init(), "genesis");
+    expect(client.readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "getSlot0", blockNumber: 1000n, args: [id] })
+    );
+    expect(pool()).toMatchObject({
+      historyStart: "2000",
+      priceHistoryStart: "2000",
+      priceTime: "2000",
+      tick: 10,
+    });
+    expect([...rows.values()].filter((r) => r.kind === "swap")).toHaveLength(0);
+  });
+  it("waits for the first fork swap when no snapshot reader is configured", async () => {
+    vi.stubEnv("PONDER_POOL_MANAGER_START_BLOCK", "1000");
+    const c = {
+      ...context,
+      client: { getBlock: async () => ({ timestamp: 2000n }) },
+    } as unknown as typeof context;
+    const d = domain();
+    await d.initialize(c, init(), "genesis");
+    expect(pool().sqrtPriceX96).toBe("0");
+    await d.swap(
+      c,
+      event(
+        { id, sender: address, amount0: -1n, amount1: 0n, sqrtPriceX96: 1n << 96n, tick: 0 },
+        2050n
+      )
+    );
+    expect(pool()).toMatchObject({ priceHistoryStart: "2050", priceTime: "2050", cumulative: "0" });
+    expect([...rows.values()].filter((r) => r.kind === "swap")).toHaveLength(1);
+  });
   it("ignores unrelated pools and retains direct/POL range identities", async () => {
     const d = domain();
     await d.modify(context, event({ id, liquidityDelta: 1n }));

@@ -11,6 +11,13 @@ const config = {
   wrappedNative: null,
 };
 describe("indexed rational pricing", () => {
+  it("does not imply inherited price coverage before the fork boundary", () => {
+    const p = { ...pool(), source: "genesis" as const, priceHistoryStart: "2000" };
+    const ps = [{ ...points(p)[0]!, timestamp: "2000" }];
+    expect(poolPrice(p, ps, 1999n)).toBeNull();
+    expect(poolPrice(p, ps, 2001n)?.fallback).toBe(true);
+    expect(poolPrice(p, ps, 3800n)?.fallback).toBe(false);
+  });
   it("interpolates/extrapolates TWAP and floors negative ticks", () => {
     const p = pool();
     const ps = [

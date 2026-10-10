@@ -37,7 +37,7 @@ export function poolPrice(
   points: readonly PricePoint[],
   at: bigint
 ): PoolPrice | null {
-  if (at < BigInt(pool.createdAtTimestamp)) return null;
+  if (at < BigInt(pool.priceHistoryStart ?? pool.createdAtTimestamp)) return null;
   const before = (time: bigint) =>
     points
       .filter((p) => p.poolId === pool.poolId && BigInt(p.timestamp) <= time)
@@ -50,7 +50,7 @@ export function poolPrice(
       )[0];
   const end = before(at),
     start = before(at - 1800n);
-  if (!end) return null;
+  if (!end || BigInt(end.sqrtPriceX96) === 0n) return null;
   const extrapolate = (p: PricePoint, time: bigint) =>
     BigInt(p.cumulative) + BigInt(p.tick) * (time - BigInt(p.timestamp));
   const tick = start

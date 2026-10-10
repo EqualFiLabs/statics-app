@@ -99,7 +99,7 @@ export function marketSnapshotSql(deployment: string) {
     UNION SELECT floor(now/86400)*86400 - i*86400-1801 FROM clock,generate_series(0,89) AS i),
   price_points AS (SELECT DISTINCT h.key, h.pool_id,h.time,h.d FROM ${dexPool} p CROSS JOIN boundaries b
     CROSS JOIN LATERAL (SELECT key,pool_id,time,d FROM history WHERE pool_id = p.pool_id AND kind IN ('pool','swap','price')
-      AND time <= b.time AND d ? 'tick' ORDER BY block DESC,log DESC LIMIT 1) h WHERE p.deployment_id = ${deployment}),
+      AND time <= b.time AND (d->>'priceTime')::numeric <= b.time AND d ? 'tick' ORDER BY block DESC,log DESC LIMIT 1) h WHERE p.deployment_id = ${deployment}),
   recent AS (SELECT * FROM trades ORDER BY block DESC, log DESC LIMIT 50),
   topology AS ((SELECT * FROM history WHERE kind NOT IN ('swap','price') AND time >= (SELECT now - 90*86400 FROM clock))
     UNION (SELECT DISTINCT ON (pool_id) * FROM history WHERE kind = 'pool' AND time < (SELECT now - 90*86400 FROM clock) ORDER BY pool_id,block DESC,log DESC))
