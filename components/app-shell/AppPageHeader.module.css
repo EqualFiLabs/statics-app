@@ -127,7 +127,13 @@
 
   .header::before {
     background-image:
-      linear-gradient(90deg, var(--app-bg), var(--visual-shade) 75%), var(--header-art);
+      linear-gradient(
+        90deg,
+        var(--app-bg) 10%,
+        color-mix(in srgb, var(--app-bg) 70%, transparent) 55%,
+        color-mix(in srgb, var(--app-bg) 25%, transparent)
+      ),
+      var(--header-art);
     background-size:
       auto,
       220px auto;
