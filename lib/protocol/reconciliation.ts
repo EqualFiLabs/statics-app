@@ -86,6 +86,8 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-allocation-directory": "phase-one-reward",
   // Account statements are public history, keyed by deployment and Position NFT.
   "phase-one-statement": "phase-one-reward",
+  // DEX overview market data, shared by every wallet on the deployment.
+  "phase-one-dex": "phase-one-market",
 };
 
 const walletScopedRoots = new Set([
@@ -143,6 +145,7 @@ const deploymentScopedRoots = new Set([
   "phase-one-gauges",
   "phase-one-allocation-directory",
   "phase-one-statement",
+  "phase-one-dex",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {

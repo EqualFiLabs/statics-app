@@ -1,0 +1,473 @@
+/* The Phase 1 overview: the DEX and its stats. */
+.page {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  max-width: 1200px;
+}
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.header h1 {
+  margin: 0 0 6px;
+  font-size: var(--text-4xl);
+  letter-spacing: -0.03em;
+}
+.eyebrow,
+.label {
+  margin: 0 0 6px;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lead {
+  margin: 0;
+  color: var(--app-text-secondary);
+}
+.headerTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.sample {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-pill);
+}
+.segmented button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--app-text-muted);
+  font: 600 var(--text-xs) var(--font-sans);
+  cursor: pointer;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--app-raised);
+  color: var(--app-text);
+}
+.notice {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.yours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.yours:hover {
+  border-color: var(--accent);
+}
+.yoursFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+}
+.yoursFacts strong {
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.up {
+  color: var(--positive);
+  font-weight: 600;
+}
+.warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.tile {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+.tile .label {
+  margin: 0;
+}
+.tile strong {
+  font-size: var(--text-2xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.tile strong small {
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.tile > span:last-child {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+.tile > span[data-tone="up"],
+.table [data-tone="up"] {
+  color: var(--positive);
+}
+.tile > span[data-tone="down"],
+.table [data-tone="down"] {
+  color: var(--negative);
+}
+.card,
+.section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.card {
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+.card h2,
+.section h2 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.section h2 {
+  font-size: var(--text-xl);
+}
+.cardHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 180px;
+}
+.bars span {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.bars span[data-latest] {
+  background: var(--accent);
+}
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.search input {
+  width: 220px;
+  max-width: 100%;
+  min-height: var(--control-height-sm);
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-sans);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.tableFrame {
+  overflow-x: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.poolsSection {
+  container: pools / inline-size;
+}
+/* Headers and pair prices may wrap so the full table fits without scrolling. */
+.poolsTable thead th,
+.poolsTable td.pairPrice {
+  white-space: normal;
+}
+.poolsTable td.pairPrice {
+  min-width: 96px;
+}
+.table th,
+.table td {
+  padding: 12px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 18px;
+  text-align: left;
+}
+.table td:last-child {
+  padding-right: 18px;
+}
+.table thead th {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.table tbody tr {
+  border-top: 1px solid var(--app-border);
+}
+.card .table th:first-child,
+.card .table td:first-child {
+  padding-left: 0;
+}
+.card .table td:last-child {
+  padding-right: 0;
+}
+.pool {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+.pill {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.yield {
+  color: var(--positive);
+  font-weight: 600;
+}
+/* Swap and Add liquidity stack when the row is tight, so neither is cut off. */
+.table td.rowActions {
+  width: 1%;
+  white-space: normal;
+}
+/* Swap and Add liquidity always share one width. */
+.actions {
+  display: grid;
+  gap: 6px;
+  min-width: 112px;
+}
+.actions > * {
+  justify-content: center;
+  white-space: nowrap;
+}
+.empty {
+  margin: 0;
+  padding: 18px;
+  color: var(--app-text-muted);
+  text-align: center;
+}
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.trades {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.trades li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--app-border);
+}
+.hash {
+  align-self: center;
+  color: var(--app-text-muted);
+  font: var(--text-caption) var(--font-mono);
+}
+.share {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+.share span,
+.legend i {
+  background: var(--app-overlay);
+}
+.share [data-index="0"],
+.legend [data-index="0"] {
+  background: var(--accent);
+}
+.share [data-index="1"],
+.legend [data-index="1"] {
+  background: color-mix(in srgb, var(--accent) 65%, var(--app-overlay));
+}
+.share [data-index="2"],
+.legend [data-index="2"] {
+  background: var(--warning);
+}
+.share [data-index="3"],
+.legend [data-index="3"] {
+  background: color-mix(in srgb, var(--warning) 60%, var(--app-overlay));
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+.legend a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.footnote {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+@media (width < 1000px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Phones: tighter tiles and chart. */
+@media (width < 700px) {
+  .tiles {
+    gap: 10px;
+  }
+  .tile {
+    padding: 14px;
+  }
+  .tile strong {
+    font-size: var(--text-lg);
+  }
+  .bars {
+    height: 120px;
+    gap: 2px;
+  }
+  .search,
+  .search input {
+    width: 100%;
+  }
+}
+
+/* Whenever the pools section is too narrow for every column (a phone, or a laptop with the
+   sidebar open), each pool becomes a card with labelled figures instead of scrolling. */
+@container pools (width < 1040px) {
+  .tableFrame {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .poolsTable thead {
+    display: none;
+  }
+  .poolsTable tbody {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 10px;
+  }
+  .poolsTable tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    padding: 14px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--radius-lg);
+    background: var(--app-surface);
+  }
+  .poolsTable th,
+  .poolsTable td,
+  .poolsTable th:first-child,
+  .poolsTable td:first-child,
+  .poolsTable td:last-child {
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+  }
+  .poolsTable tbody th {
+    grid-column: 1 / -1;
+  }
+  .poolsTable td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--app-text-muted);
+    font-size: var(--text-caption);
+  }
+  .poolsTable td.rowActions {
+    grid-column: 1 / -1;
+    width: auto;
+  }
+  .poolsTable .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .poolsTable .actions > * {
+    min-height: var(--control-height);
+  }
+}

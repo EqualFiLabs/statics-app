@@ -77,3 +77,13 @@ Alert on sustained provider `429` or proxy `502` responses, an unhealthy `/ready
 checkpoint that remains outside the 50,000-block recent-reconciliation window or whose lag keeps
 growing. Logs and alerts may include status, chain ID, method names, batch size, and duration, but
 must not include RPC URLs, credentials, calldata, wallet addresses, or complete request bodies.
+
+## Integrated market overview
+
+The additive `/phase-one/market/{summary,pools,tokens,volume,emissions,trades}` routes combine
+registered Phase 1 markets with the inherited canonical Genesis/Doppler market. Configure quote
+addresses, independent USDG/WETH liquidity floors and the explicit native-wrapper relationship in
+`.env.example`. A schema replay into a separate database is required for complete liquidity and
+LP bribe accrual history; do not reset a running indexer automatically. See
+[`docs/dex-overview-indexer.md`](../docs/dex-overview-indexer.md) for source starts, accounting,
+coverage, estimation and five-minute cursor behavior.

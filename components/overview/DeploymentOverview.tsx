@@ -11,6 +11,7 @@ import { GENESIS_MAX_CREDIT_PRINCIPAL } from "@statics-protocol/sdk/genesis-cred
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { DollarOverview } from "@/components/dollar/DollarPage";
+import { DexOverview } from "@/components/overview/DexOverview";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
 import type { LaunchDeployment } from "@/lib/deployments/types";
@@ -235,6 +236,11 @@ export function formatCanonicalMarketPrice(
 export function DeploymentOverview() {
   const t = useTranslations("launchOverview");
   const { active } = useDeployment();
+  // Phase 1 deployments open on the DEX; the launch dashboard remains for launch-only networks.
+  if (active.phaseOne)
+    return (
+      <DexOverview key={active.phaseOne.descriptor.deploymentId} deployment={active.phaseOne} />
+    );
   if (active.protocol) return <DollarOverview deployment={active.protocol.protocol} />;
   if (!active.launch) {
     return (

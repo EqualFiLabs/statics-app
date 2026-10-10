@@ -32,6 +32,8 @@ const staticsBatchRewardsAbi = [
 import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
 import { PositionListPage } from "@/components/positions/PositionListPage";
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
+import { DeploymentOverview } from "@/components/overview/DeploymentOverview";
+import { dexFixture } from "@/lib/indexer/dex-market-fixture";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
 import type { DeploymentOption, PhaseOneDeployment } from "@/lib/deployments/types";
 import {
@@ -53,6 +55,7 @@ const mocks = vi.hoisted(() => ({
   directory: vi.fn(),
   managed: vi.fn(),
   statement: vi.fn(),
+  dex: vi.fn(),
   block: vi.fn(),
   params: new URLSearchParams(),
   push: vi.fn(),
@@ -73,6 +76,22 @@ vi.mock("wagmi", () => ({
   }),
 }));
 vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
+vi.mock("@/lib/indexer/dex-market", async (original) => {
+  const real = await original<typeof import("@/lib/indexer/dex-market")>();
+  const call =
+    (endpoint: string, parse: (value: unknown, id: string) => unknown) =>
+    async (deploymentId: string, quote: string) =>
+      parse(await mocks.dex(endpoint, quote), deploymentId);
+  return {
+    ...real,
+    loadDexSummary: call("summary", real.parseDexSummary),
+    loadDexPools: call("pools", real.parseDexPools),
+    loadDexTokens: call("tokens", real.parseDexTokens),
+    loadDexVolume: call("volume", real.parseDexVolume),
+    loadDexEmissions: call("emissions", real.parseDexEmissions),
+    loadDexTrades: call("trades", real.parseDexTrades),
+  };
+});
 vi.mock("@/lib/indexer/phase-one", async (original) => ({
   ...(await original<typeof import("@/lib/indexer/phase-one")>()),
   loadIndexedPhaseOnePositions: mocks.page,
@@ -290,6 +309,12 @@ beforeEach(() => {
   mocks.directory.mockReset().mockResolvedValue(directoryPage([]));
   mocks.managed.mockReset().mockResolvedValue([]);
   mocks.statement.mockReset().mockResolvedValue(statementPage([]));
+  mocks.dex
+    .mockReset()
+    .mockImplementation(
+      async (endpoint: string, quote: "usdg" | "weth") =>
+        dexFixture(phaseOne, quote)[endpoint as keyof ReturnType<typeof dexFixture>]
+    );
   window.localStorage.clear();
   mocks.allocations.mockReset().mockResolvedValue({
     totalAllocated: parseEther("30"),
@@ -394,6 +419,67 @@ beforeEach(() => {
       return { result: rewards.map((reward: { amount: bigint }) => reward.amount) };
     }
     throw new Error(`Unexpected simulation ${functionName}`);
+  });
+});
+
+describe("DEX overview", () => {
+  it("opens Phase 1 on the DEX with totals, pools, tokens, trades and emissions", async () => {
+    withPhaseOne(<DeploymentOverview />);
+    expect(await screen.findByRole("heading", { name: "Markets" })).toBeInTheDocument();
+    const totals = await screen.findByRole("region", { name: "Market totals" });
+    expect(await within(totals).findByText("≈ $1.07M")).toBeInTheDocument();
+    expect(within(totals).getByText("▲ 18.4%")).toBeInTheDocument();
+    expect(within(totals).getByText("612 wallets")).toBeInTheDocument();
+    const pools = screen.getByRole("region", { name: "Pools" });
+    const row = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
+    expect(
+      within(row).getByRole("link", { name: "Add liquidity to STATICS / WETH" })
+    ).toHaveAttribute("href", `/app/liquidity?poolId=${hash("1")}`);
+    expect(screen.getByRole("region", { name: "Tokens" })).toHaveTextContent("STATICS");
+    expect(screen.getByRole("region", { name: "Recent trades" })).toHaveTextContent(" for ");
+    expect(
+      screen.getByRole("region", { name: "Where emissions go this period" })
+    ).toBeInTheDocument();
+    // Operators and Genesis are not part of the Phase 1 home.
+    expect(screen.queryByText("Acquire Operators")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => expect(mocks.dex).toHaveBeenCalledWith("summary", "weth"));
+    await waitFor(() => expect(within(totals).getAllByText(/ WETH$/).length).toBeGreaterThan(0));
+    expect(within(totals).queryByText("≈ $1.07M")).not.toBeInTheDocument();
+  });
+  it("shows an unpriced pool with its pair price and says the totals exclude it", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "pools")
+        return {
+          ...sample.pools,
+          items: sample.pools.items.map((pool, index) =>
+            index === 1
+              ? {
+                  ...pool,
+                  priced: false,
+                  valueLocked: null,
+                  volume24h: null,
+                  lpFees24h: null,
+                  estimatedYieldBps: null,
+                }
+              : pool
+          ),
+        };
+      if (endpoint === "summary") return { ...sample.summary, unpricedPools: 1 };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const pools = await screen.findByRole("region", { name: "Pools" });
+    const row = (await within(pools).findByText("STATICS / TOKEN")).closest("tr")!;
+    expect(within(row).getByText("Unpriced: pair price only")).toBeInTheDocument();
+    expect(within(row).getByText(/^1 STATICS = /)).toBeInTheDocument();
+    expect(screen.getAllByText("1 unpriced pool excluded").length).toBeGreaterThan(0);
+  });
+  it("says when market data is not available yet", async () => {
+    mocks.dex.mockRejectedValue(new Error("404"));
+    withPhaseOne(<DeploymentOverview />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Market data is not available yet");
   });
 });
 
