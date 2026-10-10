@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
+import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { AccountDialog } from "@/components/app-shell/AccountDialog";
 import { LocaleSwitcher } from "@/components/common/LocaleSwitcher";
 import { getDappRouteId } from "@/lib/dapp-navigation";
@@ -273,6 +274,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const firstNavigationLinkRef = useRef<HTMLAnchorElement>(null);
   const navigationOpen = openNavigationPath === currentPath;
   const routeId = getDappRouteId(currentPath);
+  const detailParent = currentPath.startsWith("/app/positions/")
+    ? "positions"
+    : currentPath.startsWith("/app/baskets/")
+      ? "baskets"
+      : routeId === "genesisRecoveries"
+        ? "genesis"
+        : null;
   const useLaunchRouteCopy =
     active.descriptor.stage === "launch" &&
     (routeId === "overview" || routeId === "swap" || routeId === "genesis");
@@ -418,11 +426,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             active.phaseOne &&
             (currentPath.startsWith("/app/rewards") || routeId === "overview")
           ) && (
-            <section className="dapp-intro">
-              <p className="dapp-eyebrow">{routeCopy.status}</p>
-              <h1>{routeCopy.title}</h1>
-              <p>{routeCopy.description}</p>
-            </section>
+            <div className="dapp-page-intro">
+              {detailParent && (
+                <Link className="dapp-header-breadcrumb" href={`/app/${detailParent}`}>
+                  ← {tRoutes(`${detailParent}.label`)}
+                </Link>
+              )}
+              <AppPageHeader
+                feature={routeId}
+                eyebrow={routeCopy.status}
+                title={routeCopy.title}
+                description={routeCopy.description}
+                compact={detailParent !== null}
+              />
+            </div>
           )}
 
           {wallet.error && (

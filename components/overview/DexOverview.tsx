@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { useDeferredValue, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatUnits } from "viem";
@@ -186,28 +187,29 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>{t("eyebrow")}</p>
-          <h1>{t("title")}</h1>
-          <p className={styles.lead}>{t("lead")}</p>
-        </div>
-        <div className={styles.headerTools}>
-          {dex.fixtures && <span className={styles.sample}>{t("sample")}</span>}
-          <div className={styles.segmented} role="group" aria-label={t("quoteLabel")}>
-            {(["usdg", "weth"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={quote === value}
-                onClick={() => setQuote(value)}
-              >
-                {t(`quote.${value}`)}
-              </button>
-            ))}
+      <AppPageHeader
+        feature="overview"
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lead")}
+        actions={
+          <div className={styles.headerTools}>
+            {dex.fixtures && <span className={styles.sample}>{t("sample")}</span>}
+            <div className={styles.segmented} role="group" aria-label={t("quoteLabel")}>
+              {(["usdg", "weth"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={quote === value}
+                  onClick={() => setQuote(value)}
+                >
+                  {t(`quote.${value}`)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {summary &&
         Object.values(summary.current.coverage).some(

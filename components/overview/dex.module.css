@@ -5,19 +5,6 @@
   min-width: 0;
   max-width: 1200px;
 }
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-.header h1 {
-  margin: 0 0 6px;
-  font-size: var(--text-4xl);
-  letter-spacing: -0.03em;
-}
-.eyebrow,
 .label {
   margin: 0 0 6px;
   color: var(--app-text-muted);
@@ -25,10 +12,6 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-.lead {
-  margin: 0;
-  color: var(--app-text-secondary);
 }
 .headerTools {
   display: flex;
@@ -482,33 +465,6 @@
   }
 }
 
-/* A market masthead; the illustration stays outside the reading surface. */
-.header {
-  min-height: 200px;
-  padding: 28px;
-  border: 1px solid var(--app-border-strong);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(90deg, var(--app-bg) 28%, var(--visual-shade) 55%, transparent),
-    url("/assets/visual-direction/planet.webp") right 28% / 420px auto no-repeat,
-    var(--app-bg);
-}
-
-.header > div:first-child {
-  max-width: 62%;
-}
-
-.header h1 {
-  font-size: var(--text-display);
-  font-weight: 500;
-  line-height: var(--leading-tight);
-}
-
-.eyebrow {
-  color: var(--visual-brand);
-  font-family: var(--font-mono);
-}
-
 .headerTools {
   padding: 6px;
   border-radius: var(--radius-pill);
@@ -556,27 +512,6 @@
 }
 
 @media (width <= 700px) {
-  .header {
-    min-height: 190px;
-    padding: 22px;
-    background-size:
-      auto,
-      300px auto,
-      auto;
-  }
-
-  .header > div:first-child {
-    max-width: 100%;
-  }
-
-  .headerTools {
-    margin-top: 8px;
-  }
-
-  .lead {
-    max-width: 28ch;
-  }
-
   .tile {
     padding: 16px;
   }

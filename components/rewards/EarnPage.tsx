@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -146,12 +147,12 @@ export function EarnPage({
           ← {t("title")}
         </Link>
       )}
-      <header className={styles.header}>
-        <div>
-          <h1>{heading}</h1>
-          <p>{t(`${view}Help`)}</p>
-        </div>
-      </header>
+      <AppPageHeader
+        feature="rewards"
+        title={heading}
+        description={t(`${view}Help`)}
+        compact={view !== "overview"}
+      />
       <nav className={styles.nav} aria-label={t("featureNavigation")}>
         <Link href={earnHref("overview")} aria-current={view === "overview" ? "page" : undefined}>
           {t("positions")}
