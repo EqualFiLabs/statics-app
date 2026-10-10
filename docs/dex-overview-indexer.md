@@ -82,3 +82,15 @@ windows use the indexed clock, including on time-warped forks, and do not extend
 before the first available candle. Pool statistics retain the response's USDG or WETH quote;
 WETH values are never formatted as dollars. Empty or failed market responses leave onchain
 liquidity management available.
+
+## Pool fee labels
+
+Overview shows the LP fee separately from the input/output hook rates in the fee tooltip.
+Their displayed sum is a nominal approximation, not an exact execution quote. Unknown hook
+rates display as unavailable rather than as zero. Genesis uses its native LP rate.
+
+`PublicHook:DefaultFeeRateSet` updates indexed public pools that inherit the defaults;
+explicit pool overrides remain unchanged. This handler uses database state without RPC reads.
+Existing indexer databases need replay from the configured hook deployment start to recover
+previously unhandled default changes. No schema migration is required. Restarting alone does
+not recover past events; the active local database is not reset by this change.

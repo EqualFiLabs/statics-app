@@ -45,6 +45,7 @@ vi.mock("ponder:schema", () =>
 );
 process.env.PONDER_DEPLOYMENT_ID = "genesis";
 process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID = "phase-one";
+process.env.PONDER_PUBLIC_HOOK_ADDRESS = `0x${"9".repeat(40)}`;
 process.env.PONDER_STATICS_DIAMOND_ADDRESS = `0x${"1".repeat(40)}`;
 await import("../src/index");
 type Row = Record<string, unknown> & { key: string };
@@ -616,5 +617,55 @@ describe("Position NFT statement handlers", () => {
     expect(entries()).toHaveLength(2);
     expect(movements()).toHaveLength(1);
     expect(movements()[0]).toMatchObject({ purpose: "trading-fees", amount: 1n, actor: second });
+  });
+});
+
+it("updates default hook rates without overwriting overrides or another deployment", async () => {
+  for (const [id, deploymentId, overridden] of [
+    ["default", "phase-one", false],
+    ["override", "phase-one", true],
+    ["other", "other-deployment", false],
+  ] as const)
+    rows.set(`publicPool:${id}`, {
+      key: id,
+      deploymentId,
+      feeRateOverridden: overridden,
+      inputFeeBps: 5,
+      outputFeeBps: 5,
+      updatedAtBlock: 99n,
+    });
+  const handler = handlers.get("PublicHook:DefaultFeeRateSet")!;
+  await handler({
+    event: { ...base, args: { inputFeeBps: 10, outputFeeBps: 15 } },
+    context: { db, client: { readContract }, chain: { id: 4663 } },
+  });
+  expect(rows.get("publicPool:default")).toMatchObject({
+    inputFeeBps: 10,
+    outputFeeBps: 15,
+    updatedAtBlock: 100n,
+  });
+  expect(rows.get("publicPool:override")).toMatchObject({
+    inputFeeBps: 5,
+    outputFeeBps: 5,
+    updatedAtBlock: 99n,
+  });
+  expect(rows.get("publicPool:other")).toMatchObject({
+    inputFeeBps: 5,
+    outputFeeBps: 5,
+    updatedAtBlock: 99n,
+  });
+  expect(readContract).not.toHaveBeenCalled();
+  await handler({
+    event: {
+      ...base,
+      args: { inputFeeBps: 0, outputFeeBps: 0 },
+      block: { ...base.block, number: 101n },
+    },
+    context: { db, client: { readContract }, chain: { id: 4663 } },
+  });
+  expect(rows.get("publicPool:default")).toMatchObject({
+    inputFeeBps: 0,
+    outputFeeBps: 0,
+    updatedAtBlock: 101n,
   });
 });

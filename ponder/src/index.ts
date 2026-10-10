@@ -1,4 +1,5 @@
 import { ponder } from "ponder:registry";
+import { eq } from "ponder";
 import {
   genesisActivationRegistryAbi,
   staticsAbi as legacyStaticsAbi,
@@ -533,6 +534,22 @@ onPhaseOne("PhaseOneStatics:ProtocolPolActivated", async ({ event, context }) =>
     polActivated: true,
     updatedAtBlock: event.block.number,
   });
+});
+
+onPublicHook("PublicHook:DefaultFeeRateSet", async ({ event, context }) => {
+  const pools = await context.db.sql
+    .select()
+    .from(publicPool)
+    .where(eq(publicPool.deploymentId, phaseOneDeploymentId!));
+  // Default changes affect only inherited rates. No contract or metadata reads are needed.
+  for (const pool of pools) {
+    if (pool.deploymentId !== phaseOneDeploymentId || pool.feeRateOverridden) continue;
+    await context.db.update(publicPool, { key: pool.key }).set({
+      inputFeeBps: event.args.inputFeeBps,
+      outputFeeBps: event.args.outputFeeBps,
+      updatedAtBlock: event.block.number,
+    });
+  }
 });
 
 onPublicHook("PublicHook:PoolFeeRateSet", async ({ event, context }) => {
