@@ -18,7 +18,7 @@ export function PoolSummary({
   children,
 }: {
   pair: string;
-  fee: string;
+  fee: React.ReactNode;
   current: number | null;
   unit: string;
   series: readonly PricePoint[] | null;

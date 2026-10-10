@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, parseEventLogs, encodeFunctionData, type Hex } from "viem";
 import Link from "next/link";
+import { IndexedPoolSwapFee } from "@/components/common/IndexedPoolSwapFee";
 import { PoolSummary } from "@/components/liquidity/PoolSummary";
 import { RangeChart } from "@/components/liquidity/RangeChart";
 import chart from "@/components/liquidity/range-chart.module.css";
@@ -389,7 +390,11 @@ export function PhaseOneLiquidity({
                   <strong>
                     {pool.token0.symbol} / {pool.token1.symbol}
                   </strong>
-                  <span>{ux("feeTier", { fee: pool.poolKey.fee / 10000 })}</span>
+                  <IndexedPoolSwapFee
+                    deploymentId={deployment.descriptor.deploymentId}
+                    poolId={pool.poolId}
+                    lpFee={pool.poolKey.fee}
+                  />
                   {hasUnreviewedToken(pool) && (
                     <span className="liquidity-unreviewed-pill">{ux("unreviewedPool")}</span>
                   )}
@@ -564,7 +569,11 @@ function LiquidityPositionCard({
         </strong>
         <span>
           {t("positionNumber", { id: String(leg.positionId) })} ·{" "}
-          {ux("feeTier", { fee: pool.poolKey.fee / 10000 })}
+          <IndexedPoolSwapFee
+            deploymentId={deployment.descriptor.deploymentId}
+            poolId={pool.poolId}
+            lpFee={pool.poolKey.fee}
+          />
         </span>
       </div>
       <div>
@@ -1387,7 +1396,13 @@ function ManagedLiquidity({
         <h3>
           {pool.token0.symbol} / {pool.token1.symbol}
         </h3>
-        <span className="liquidity-fee">{ux("feeTier", { fee: pool.poolKey.fee / 10000 })}</span>
+        <span className="liquidity-fee">
+          <IndexedPoolSwapFee
+            deploymentId={deployment.descriptor.deploymentId}
+            poolId={pool.poolId}
+            lpFee={pool.poolKey.fee}
+          />
+        </span>
         <span className="liquidity-muted">{t("positionNumber", { id: String(positionId) })}</span>
       </div>
       {managed.isError && <p role="alert">{managed.error.message}</p>}
@@ -1469,7 +1484,13 @@ function ManagedLiquidity({
           )}
           <PoolSummary
             pair={`${pool.token0.symbol} / ${pool.token1.symbol}`}
-            fee={ux("feeTier", { fee: pool.poolKey.fee / 10000 })}
+            fee={
+              <IndexedPoolSwapFee
+                deploymentId={deployment.descriptor.deploymentId}
+                poolId={pool.poolId}
+                lpFee={pool.poolKey.fee}
+              />
+            }
             current={state.data ? displayPrice : null}
             unit={pricePair}
             series={series}

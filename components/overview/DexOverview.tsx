@@ -1,5 +1,5 @@
 "use client";
-import { PoolSwapFee } from "./PoolSwapFee";
+import { PoolSwapFee } from "@/components/common/PoolSwapFee";
 import Link from "next/link";
 import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { useDeferredValue, useState } from "react";
@@ -379,6 +379,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                       <span className={styles.pool}>
                         <strong>{pairOf(pool)}</strong>
                         <PoolSwapFee
+                          className={styles.muted}
                           lpFee={pool.lpFee}
                           source={pool.source}
                           hook={dex.hookFees?.get(pool.poolId.toLowerCase()) ?? null}

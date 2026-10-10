@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   lpIds: vi.fn(),
   legs: vi.fn(),
   position: vi.fn(),
+  fees: vi.fn(),
   native: 10n ** 19n,
   reward: 0n,
   liquidity: 0n,
@@ -70,6 +71,7 @@ vi.mock("@/lib/indexer/phase-one", () => ({
   loadIndexedPhaseOnePositions: mocks.positions,
   loadIndexedManagedLiquidity: mocks.legs,
   loadIndexedPhaseOnePosition: mocks.position,
+  loadIndexedPublicPools: mocks.fees,
 }));
 vi.mock("@/lib/indexer/statics", () => ({
   loadWalletV4PositionIds: mocks.lpIds,
@@ -154,6 +156,9 @@ function tree(
 const fiveZero = [0n, 0n, 0n, 0n, 0n];
 beforeEach(() => {
   discoveredPools.value = [];
+  mocks.fees.mockReset().mockResolvedValue({
+    items: [{ poolId, inputFeeBps: 5, outputFeeBps: 5 }],
+  });
   mocks.native = 10n ** 19n;
   mocks.position.mockReset().mockImplementation(async (id: bigint) => indexed(id));
   mocks.legs.mockReset().mockImplementation(async () => [
@@ -229,6 +234,21 @@ async function provideReview() {
   return screen.findByRole("button", { name: "Confirm transaction" });
 }
 describe("Phase 1 liquidity in the existing screen", () => {
+  it("shows combined swap fees on cards, pool choices, details and summaries", async () => {
+    mocks.liquidity = 100n;
+    render(tree());
+    expect(await screen.findByText("≈ 0.40% fee", { exact: false })).toHaveAttribute(
+      "title",
+      "0.30% LP fee; 0.05% input fee; 0.05% output fee. Combined rate is approximate."
+    );
+    await openDetail();
+    expect(screen.getAllByText("≈ 0.40% fee", { exact: false })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: /Your liquidity/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
+    expect(await screen.findByText("≈ 0.40% fee", { exact: false })).toBeInTheDocument();
+    expect(mocks.fees).toHaveBeenCalledTimes(1);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
   it("reviews fresh collection amounts without slippage and freezes exact payout checks", async () => {
     mocks.liquidity = 10n ** 18n;
     let growth = 1n << 128n;

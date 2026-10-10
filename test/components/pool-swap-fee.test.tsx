@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@/test/render";
-import { PoolSwapFee } from "@/components/overview/PoolSwapFee";
+import { PoolSwapFee } from "@/components/common/PoolSwapFee";
 
 describe("pool swap fee presentation", () => {
   it("does not show an incomplete total while hook rates are loading or unavailable", () => {
@@ -18,5 +18,9 @@ describe("pool swap fee presentation", () => {
   it("shows the native LP rate for Genesis independently of hook discovery", () => {
     render(<PoolSwapFee lpFee={15000} source="genesis" hook={null} />);
     expect(screen.getByText("1.50% fee")).toBeInTheDocument();
+  });
+  it("does not round a positive low fee tier to zero", () => {
+    render(<PoolSwapFee lpFee={1} source="genesis" hook={null} />);
+    expect(screen.getByText("0.0001% fee")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PoolSwapFee } from "@/components/common/PoolSwapFee";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -1225,10 +1226,14 @@ function LiquidityRuntime() {
                 <h4>
                   {item.basketSymbol} / {item.asset.symbol}
                 </h4>
-                <span>
-                  {Number(item.lpFee) / 10_000}% LP fee · {Number(item.hookFees.inputFeeBps) / 100}%
-                  hook in
-                </span>
+                <PoolSwapFee
+                  source="phase-one"
+                  lpFee={Number(item.lpFee)}
+                  hook={{
+                    inputBps: Number(item.hookFees.inputFeeBps),
+                    outputBps: Number(item.hookFees.outputFeeBps),
+                  }}
+                />
               </button>
               <details>
                 <summary>Technical details</summary>
