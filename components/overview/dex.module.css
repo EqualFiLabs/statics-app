@@ -481,3 +481,103 @@
     min-height: var(--control-height);
   }
 }
+
+/* A market masthead; the illustration stays outside the reading surface. */
+.header {
+  min-height: 200px;
+  padding: 28px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(90deg, var(--app-bg) 28%, var(--visual-shade) 55%, transparent),
+    url("/assets/visual-direction/planet.webp") right 28% / 420px auto no-repeat,
+    var(--app-bg);
+}
+
+.header > div:first-child {
+  max-width: 62%;
+}
+
+.header h1 {
+  font-size: var(--text-display);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+}
+
+.eyebrow {
+  color: var(--visual-brand);
+  font-family: var(--font-mono);
+}
+
+.headerTools {
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--visual-shade);
+}
+
+.tile {
+  padding: 22px;
+  border-color: var(--app-border-strong);
+  background: linear-gradient(135deg, var(--app-raised), var(--app-surface) 70%);
+}
+
+.tile:nth-child(3) {
+  background:
+    linear-gradient(90deg, var(--app-surface) 45%, var(--visual-shade)),
+    url("/assets/visual-direction/glass.webp") right center / 160px no-repeat,
+    var(--app-surface);
+}
+
+.card {
+  border-color: var(--app-border-strong);
+}
+
+.card:has(.bars) {
+  background:
+    linear-gradient(var(--app-surface) 65%, var(--visual-shade)),
+    url("/assets/visual-direction/terrain.webp") bottom / 100% auto no-repeat,
+    var(--app-surface);
+}
+
+.bars span {
+  background: color-mix(in srgb, var(--accent) 48%, var(--app-raised));
+}
+
+.tableFrame {
+  border-color: var(--app-border-strong);
+}
+
+.table thead {
+  background: var(--app-sunken);
+}
+
+.table tbody tr:hover {
+  background: var(--app-raised);
+}
+
+@media (width <= 700px) {
+  .header {
+    min-height: 190px;
+    padding: 22px;
+    background-size:
+      auto,
+      300px auto,
+      auto;
+  }
+
+  .header > div:first-child {
+    max-width: 100%;
+  }
+
+  .headerTools {
+    margin-top: 8px;
+  }
+
+  .lead {
+    max-width: 28ch;
+  }
+
+  .tile {
+    padding: 16px;
+  }
+}

@@ -24,8 +24,8 @@
   "metadata": {
     "title": "Statics Protocol",
     "titleTemplate": "{page} | Statics Protocol",
-    "description": "Statics unifies static multi-asset baskets, position-owned finance, and protocol-owned liquidity with a native dollar.",
-    "socialDescription": "Static assets. Static rules. Dynamic markets. Own your position."
+    "description": "A Uniswap v4 DEX where pool creators earn fees, STATICS stakers direct incentives, and trading can build protocol-owned liquidity.",
+    "socialDescription": "Create markets. Direct rewards. Grow liquidity."
   },
   "pageMetadata": {
     "overview": {
@@ -88,7 +88,9 @@
       "dollar": "Dollar",
       "liquidity": "Liquidity",
       "docs": "Docs",
-      "dev": "Dev"
+      "dev": "Dev",
+      "markets": "Markets",
+      "gauges": "Gauges"
     }
   },
   "launchRoutes": {
@@ -1281,11 +1283,11 @@
     "walletLink": "Wallet"
   },
   "landing": {
-    "eyebrow": "The anchor is fixed. The market is not.",
-    "heroLine1": "Static assets.",
-    "heroLine2": "Static rules.",
-    "heroLine3": "Dynamic markets.",
-    "heroDescription": "Every basket is a fixed bundle, always redeemable for exactly what is inside it. No manager, no rebalancing, no liquidations. Markets move around that anchor — Statics pays the people who hold it steady.",
+    "eyebrow": "Markets should reward participation.",
+    "heroLine1": "Create markets.",
+    "heroLine2": "Direct rewards.",
+    "heroLine3": "Grow liquidity.",
+    "heroDescription": "A Uniswap v4 DEX where pool creators earn fees, STATICS stakers direct incentives, and trading can build protocol-owned liquidity.",
     "whatsFixed": "What's fixed",
     "heroVisual": "Digital marble statue of Robin Hood",
     "heroAlt": "A fragmented digital marble statue of Robin Hood wearing a feathered cap and goatee",
@@ -1329,13 +1331,13 @@
     "perPosition": "Per staked position",
     "features": "Protocol features",
     "ownPosition": "Own your position",
-    "ownPositionDescription": "Baskets, loans, and dollar series live in one position you can hold, transfer, or sell as a single asset.",
+    "ownPositionDescription": "Stake, allocate to gauges, manage enrolled liquidity, and claim rewards through a transferable PositionNFT.",
     "noLiquidations": "No liquidations",
     "noLiquidationsDescription": "Debt is denominated in the same assets as the collateral, so a price crash moves both sides together. There is nothing to liquidate.",
-    "deepLiquidity": "Liquidity that deepens",
-    "deepLiquidityDescription": "A share of every swap becomes permanent protocol-owned liquidity. Pools get deeper the more they trade, and that depth cannot be withdrawn.",
+    "deepLiquidity": "Liquidity that builds",
+    "deepLiquidityDescription": "Activate managed protocol-owned liquidity. A share of future swap fees funds pool-bound liquidity that remains in protocol custody.",
     "stakeEarn": "Stake and earn",
-    "stakeEarnDescription": "Stake and opt into up to 12 reward assets. Rewards are swap fees paid in kind — real revenue, not emissions.",
+    "stakeEarnDescription": "Select up to 12 fee assets and earn in kind. Allocate STATICS to direct reserve-backed liquidity incentives.",
     "tagline": "Markets that work for you.",
     "principles": "Protocol principles",
     "bundleNeverChanges": "The bundle never changes",
@@ -1356,7 +1358,41 @@
     "security": "Security",
     "status": {
       "system": "Mainnet"
-    }
+    },
+    "mechanics": "The mechanics",
+    "marketsTitle": "Create a market. Earn 5% of its fees.",
+    "marketsDescription": "Launch Uniswap v4 pools with configurable LP fees, built-in revenue sharing, and no mandatory liquidity seed. Pool creators receive 5% of hook fees.",
+    "marketsHow": "How Statics markets work",
+    "marketCapabilities": "Market capabilities",
+    "creatorFees": "Creator fees",
+    "nativeEth": "Native ETH",
+    "erc20": "ERC-20",
+    "uniswapV4": "Uniswap v4",
+    "gaugesTitle": "Make liquidity compete for rewards.",
+    "gaugesDescription": "Stake STATICS to direct protocol incentives. Fund up to four additional reward assets per pool, with configurable splits between in-range LPs and gauge allocators.",
+    "gaugesHow": "How Statics gauges work",
+    "gaugeCapabilities": "Gauge reward sources",
+    "protocolRewards": "Protocol rewards",
+    "fourAssets": "4 Assets",
+    "communityRewards": "Community rewards",
+    "lps": "LPs",
+    "inRangeIncentives": "In-range incentives",
+    "allocators": "Allocators",
+    "stakeDirectedRewards": "Stake-directed rewards",
+    "creatorShare": "Creator share",
+    "publicPoolHookFees": "Of public-pool hook fees",
+    "rewardSlots": "Reward slots",
+    "perPublicPool": "Per public pool",
+    "gaugeAllocations": "Gauge allocations",
+    "poolsPerPosition": "Pools per position",
+    "allocationCooldown": "Allocation cooldown",
+    "configurableDefault": "Configurable default",
+    "activeLiquidity": "Reward active liquidity",
+    "activeLiquidityDescription": "In-range LPs earn streamed incentives. Anyone can fund rewards, with creator-configured splits for LPs and allocators.",
+    "creatorPrinciple": "Pool creators earn 5% of hook fees.",
+    "staticsPrinciple": "STATICS directs liquidity incentives.",
+    "lpPrinciple": "LPs earn in-range rewards.",
+    "marketPrinciple": "Open markets. Permissioned venues. Shared infrastructure."
   },
   "glossary": {
     "position": {

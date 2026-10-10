@@ -47,14 +47,14 @@
   /* ---- Surfaces ---------------------------------------------------
    * A real elevation ramp. Depth comes from surface steps and shadow,
    * not from hairline borders drawn on a flat black field. */
-  --app-bg: #060806;
-  --app-sunken: #0a0d0a;
-  --app-surface: #0f130f;
-  --app-raised: #161c16;
-  --app-overlay: #1d241d;
+  --app-bg: #050705;
+  --app-sunken: #090d0a;
+  --app-surface: #0c110d;
+  --app-raised: #151d16;
+  --app-overlay: #202b21;
 
-  --app-border: rgba(232, 238, 232, 0.09);
-  --app-border-strong: rgba(232, 238, 232, 0.18);
+  --app-border: rgba(232, 238, 232, 0.14);
+  --app-border-strong: rgba(232, 238, 232, 0.28);
 
   /* ---- Text ramp (all AA or better on --app-surface) -------------- */
   --app-text: #eef2ee; /* primary        ~16.5:1 */
@@ -91,6 +91,10 @@
   /* ---- Controls ---------------------------------------------------
    * 44px is the WCAG 2.2 AA target size. Nothing tappable goes below
    * --control-height-sm, and that is desktop-only affordances. */
+  --visual-grid: rgba(151, 185, 142, 0.055);
+  --visual-brand: #a9ce91;
+  --visual-shade: rgba(5, 7, 5, 0.94);
+  --text-display: clamp(2rem, 4vw, 3.5rem);
   --control-height: 44px;
   --control-height-sm: 36px;
 }

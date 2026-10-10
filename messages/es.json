@@ -24,8 +24,8 @@
   "metadata": {
     "title": "Statics Protocol",
     "titleTemplate": "{page} | Statics Protocol",
-    "description": "Statics reúne cestas estáticas de múltiples activos, finanzas propiedad de la posición y liquidez propiedad del protocolo con un dólar nativo.",
-    "socialDescription": "Activos estáticos. Reglas estáticas. Mercados dinámicos. Sé dueño de tu posición."
+    "description": "Un DEX de Uniswap v4 donde los creadores de pools ganan comisiones, quienes hacen staking de STATICS dirigen incentivos y el trading puede crear liquidez propiedad del protocolo.",
+    "socialDescription": "Crea mercados. Dirige recompensas. Aumenta la liquidez."
   },
   "pageMetadata": {
     "overview": {
@@ -88,7 +88,9 @@
       "dollar": "Dólar",
       "liquidity": "Liquidez",
       "docs": "Documentación",
-      "dev": "Desarrollo"
+      "dev": "Desarrollo",
+      "markets": "Mercados",
+      "gauges": "Gauges"
     }
   },
   "launchRoutes": {
@@ -1281,11 +1283,11 @@
     "walletLink": "Billetera"
   },
   "landing": {
-    "eyebrow": "El ancla es fija. El mercado no.",
-    "heroLine1": "Activos estáticos.",
-    "heroLine2": "Reglas estáticas.",
-    "heroLine3": "Mercados dinámicos.",
-    "heroDescription": "Cada cesta es un conjunto fijo, siempre canjeable por exactamente lo que contiene. Sin gestor, sin rebalanceos y sin liquidaciones. Los mercados se mueven alrededor de ese ancla; Statics recompensa a quienes la mantienen firme.",
+    "eyebrow": "Los mercados deben recompensar la participación.",
+    "heroLine1": "Crea mercados.",
+    "heroLine2": "Dirige recompensas.",
+    "heroLine3": "Aumenta la liquidez.",
+    "heroDescription": "Un DEX de Uniswap v4 donde los creadores de pools ganan comisiones, quienes hacen staking de STATICS dirigen incentivos y el trading puede crear liquidez propiedad del protocolo.",
     "whatsFixed": "Qué permanece fijo",
     "heroVisual": "Estatua digital de mármol de Robin Hood",
     "heroAlt": "Una estatua digital fragmentada de mármol de Robin Hood con gorro de plumas y perilla",
@@ -1328,14 +1330,14 @@
     "upTo12": "Hasta 12",
     "perPosition": "Por posición en staking",
     "features": "Funciones del protocolo",
-    "ownPosition": "Sé dueño de tu posición",
-    "ownPositionDescription": "Las cestas, los préstamos y las series de dólares viven en una posición que puedes mantener, transferir o vender como un solo activo.",
+    "ownPosition": "Tu posición te pertenece",
+    "ownPositionDescription": "Haz staking, asigna a gauges, gestiona la liquidez inscrita y reclama recompensas mediante un PositionNFT transferible.",
     "noLiquidations": "Sin liquidaciones",
     "noLiquidationsDescription": "La deuda está denominada en los mismos activos que la garantía, por lo que una caída de precio mueve ambos lados a la vez. No hay nada que liquidar.",
-    "deepLiquidity": "Liquidez que aumenta",
-    "deepLiquidityDescription": "Una parte de cada intercambio se convierte en liquidez permanente del protocolo. Los pools se profundizan cuanto más operan y esa liquidez no puede retirarse.",
+    "deepLiquidity": "Liquidez que se construye",
+    "deepLiquidityDescription": "Activa liquidez gestionada propiedad del protocolo. Una parte de las futuras comisiones de swap financia liquidez vinculada al pool que permanece bajo custodia del protocolo.",
     "stakeEarn": "Haz staking y gana",
-    "stakeEarnDescription": "Haz staking y elige hasta 12 activos de recompensa. Las recompensas son comisiones pagadas en especie: ingresos reales, no emisiones.",
+    "stakeEarnDescription": "Selecciona hasta 12 activos de comisiones y gana en especie. Asigna STATICS para dirigir incentivos de liquidez respaldados por la reserva.",
     "tagline": "Mercados que trabajan para ti.",
     "principles": "Principios del protocolo",
     "bundleNeverChanges": "El conjunto nunca cambia",
@@ -1356,7 +1358,41 @@
     "security": "Seguridad",
     "status": {
       "system": "Mainnet"
-    }
+    },
+    "mechanics": "La mecánica",
+    "marketsTitle": "Crea un mercado. Gana el 5% de sus comisiones.",
+    "marketsDescription": "Lanza pools de Uniswap v4 con comisiones de LP configurables, reparto de ingresos integrado y sin aporte inicial obligatorio de liquidez. Los creadores reciben el 5% de las comisiones del hook.",
+    "marketsHow": "Cómo funcionan los mercados de Statics",
+    "marketCapabilities": "Funciones del mercado",
+    "creatorFees": "Comisiones del creador",
+    "nativeEth": "ETH nativo",
+    "erc20": "ERC-20",
+    "uniswapV4": "Uniswap v4",
+    "gaugesTitle": "Haz que la liquidez compita por recompensas.",
+    "gaugesDescription": "Haz staking de STATICS para dirigir los incentivos del protocolo. Financia hasta cuatro activos de recompensa adicionales por pool, con repartos configurables entre LPs dentro del rango y asignadores de gauges.",
+    "gaugesHow": "Cómo funcionan los gauges de Statics",
+    "gaugeCapabilities": "Fuentes de recompensas de gauges",
+    "protocolRewards": "Recompensas del protocolo",
+    "fourAssets": "4 activos",
+    "communityRewards": "Recompensas comunitarias",
+    "lps": "LPs",
+    "inRangeIncentives": "Incentivos dentro del rango",
+    "allocators": "Asignadores",
+    "stakeDirectedRewards": "Recompensas dirigidas por stake",
+    "creatorShare": "Parte del creador",
+    "publicPoolHookFees": "De las comisiones del hook de pools públicos",
+    "rewardSlots": "Slots de recompensa",
+    "perPublicPool": "Por pool público",
+    "gaugeAllocations": "Asignaciones de gauges",
+    "poolsPerPosition": "Pools por posición",
+    "allocationCooldown": "Espera entre asignaciones",
+    "configurableDefault": "Valor predeterminado configurable",
+    "activeLiquidity": "Recompensa la liquidez activa",
+    "activeLiquidityDescription": "Los LPs dentro del rango ganan incentivos continuos. Cualquiera puede financiar recompensas, con repartos entre LPs y asignadores configurados por el creador.",
+    "creatorPrinciple": "Los creadores de pools ganan el 5% de las comisiones del hook.",
+    "staticsPrinciple": "STATICS dirige los incentivos de liquidez.",
+    "lpPrinciple": "Los LPs ganan recompensas dentro del rango.",
+    "marketPrinciple": "Mercados abiertos. Espacios con permisos. Infraestructura compartida."
   },
   "glossary": {
     "position": {

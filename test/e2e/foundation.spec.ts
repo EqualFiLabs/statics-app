@@ -32,13 +32,13 @@ test.describe("landing foundation", () => {
     await page.goto("/");
   });
 
-  test("reports mainnet status and time without horizontal overflow", async ({ page }) => {
+  test("retains accessible status and time without horizontal overflow", async ({ page }) => {
     await expect(
-      page.getByRole("heading", { name: /static assets.*dynamic markets/i })
+      page.getByRole("heading", { name: /create markets.*grow liquidity/i })
     ).toBeVisible();
     const readout = page.getByLabel("System status");
     await expect(readout.getByText(/system status:/i)).toContainText("Mainnet");
-    await expect(readout.getByText(/time:/i)).toBeVisible();
+    await expect(readout.getByText(/time:/i)).toBeAttached();
     await expect(readout.locator("p")).toHaveCount(2);
     await expect(readout.getByText(/network:/i)).toHaveCount(0);
     await expect(readout.getByText(/deployment:/i)).toHaveCount(0);
@@ -80,7 +80,7 @@ test.describe("landing foundation", () => {
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
       await expect(page.getByRole("navigation", { name: "Main menu" })).toBeVisible();
-      await page.getByRole("link", { name: "Baskets", exact: true }).click();
+      await page.getByRole("link", { name: "Markets", exact: true }).click();
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
     }
 

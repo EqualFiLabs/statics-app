@@ -24,8 +24,8 @@
   "metadata": {
     "title": "Statics Protocol",
     "titleTemplate": "{page} | Statics Protocol",
-    "description": "Statics 将静态多资产篮子、头寸自有金融和协议自有流动性与原生美元整合在一起。",
-    "socialDescription": "静态资产，静态规则，动态市场。拥有你的头寸。"
+    "description": "基于 Uniswap v4 的 DEX：池创建者赚取费用，STATICS 质押者引导激励，交易可积累协议自有流动性。",
+    "socialDescription": "创建市场。 引导奖励。 壮大流动性。"
   },
   "pageMetadata": {
     "overview": {
@@ -88,7 +88,9 @@
       "dollar": "美元",
       "liquidity": "流动性",
       "docs": "文档",
-      "dev": "开发"
+      "dev": "开发",
+      "markets": "市场",
+      "gauges": "Gauges"
     }
   },
   "launchRoutes": {
@@ -1281,11 +1283,11 @@
     "walletLink": "钱包"
   },
   "landing": {
-    "eyebrow": "锚点固定，市场不固定。",
-    "heroLine1": "静态资产。",
-    "heroLine2": "静态规则。",
-    "heroLine3": "动态市场。",
-    "heroDescription": "每个篮子都是固定组合，始终可以赎回其中完全相同的资产。没有管理人、没有再平衡、没有清算。市场围绕这个锚点波动，Statics 奖励维护锚点的人。",
+    "eyebrow": "市场应奖励参与。",
+    "heroLine1": "创建市场。",
+    "heroLine2": "引导奖励。",
+    "heroLine3": "壮大流动性。",
+    "heroDescription": "基于 Uniswap v4 的 DEX：池创建者赚取费用，STATICS 质押者引导激励，交易可积累协议自有流动性。",
     "whatsFixed": "哪些保持固定",
     "heroVisual": "Robin Hood 数字大理石雕像",
     "heroAlt": "一尊戴羽毛帽、留山羊胡的 Robin Hood 碎片化数字大理石雕像",
@@ -1326,16 +1328,16 @@
     "debtMatches": "债务与抵押品一致",
     "rewardAssets": "奖励资产",
     "upTo12": "最多 12 种",
-    "perPosition": "每个质押头寸",
+    "perPosition": "每个质押仓位",
     "features": "协议功能",
-    "ownPosition": "拥有你的头寸",
-    "ownPositionDescription": "篮子、贷款和美元系列存放在一个头寸中，你可以将其作为单一资产持有、转移或出售。",
+    "ownPosition": "拥有你的仓位",
+    "ownPositionDescription": "通过可转让的 PositionNFT 质押、分配至 gauges、管理已加入的流动性并领取奖励。",
     "noLiquidations": "无清算",
     "noLiquidationsDescription": "债务与抵押品以相同资产计价，因此价格下跌会同时影响两边，无需清算。",
-    "deepLiquidity": "不断加深的流动性",
-    "deepLiquidityDescription": "每次兑换的一部分成为协议永久持有的流动性。交易越多，池子越深，且这部分流动性无法撤回。",
-    "stakeEarn": "质押并赚取",
-    "stakeEarnDescription": "质押并选择最多 12 种奖励资产。奖励是以实物支付的兑换费用，属于真实收入，而非代币增发。",
+    "deepLiquidity": "积累流动性",
+    "deepLiquidityDescription": "激活托管的协议自有流动性。未来部分 swap 费用用于资助绑定到池的流动性，并始终由协议托管。",
+    "stakeEarn": "质押并赚取收益",
+    "stakeEarnDescription": "选择最多 12 种费用资产并获得原币收益。分配 STATICS，引导由储备支持的流动性激励。",
     "tagline": "为你服务的市场。",
     "principles": "协议原则",
     "bundleNeverChanges": "组合永不改变",
@@ -1356,7 +1358,41 @@
     "security": "安全",
     "status": {
       "system": "Mainnet"
-    }
+    },
+    "mechanics": "运作机制",
+    "marketsTitle": "创建市场，赚取其 5% 的费用。",
+    "marketsDescription": "创建 Uniswap v4 池，配置 LP 费率、使用内置收益分成，无需强制提供初始流动性。池创建者获得 5% 的 hook 费用。",
+    "marketsHow": "Statics 市场如何运作",
+    "marketCapabilities": "市场功能",
+    "creatorFees": "创建者费用",
+    "nativeEth": "原生 ETH",
+    "erc20": "ERC-20",
+    "uniswapV4": "Uniswap v4",
+    "gaugesTitle": "让流动性竞争奖励。",
+    "gaugesDescription": "质押 STATICS 引导协议激励。每个池最多可资助四种额外奖励资产，并配置区间内 LP 与 gauge 分配者的分成。",
+    "gaugesHow": "Statics gauges 如何运作",
+    "gaugeCapabilities": "Gauge 奖励来源",
+    "protocolRewards": "协议奖励",
+    "fourAssets": "4 种资产",
+    "communityRewards": "社区奖励",
+    "lps": "LPs",
+    "inRangeIncentives": "区间内激励",
+    "allocators": "分配者",
+    "stakeDirectedRewards": "质押引导奖励",
+    "creatorShare": "创建者分成",
+    "publicPoolHookFees": "公共池 hook 费用的分成",
+    "rewardSlots": "奖励槽位",
+    "perPublicPool": "每个公共池",
+    "gaugeAllocations": "Gauge 分配",
+    "poolsPerPosition": "每个仓位的池数量",
+    "allocationCooldown": "分配冷却期",
+    "configurableDefault": "可配置的默认值",
+    "activeLiquidity": "奖励活跃流动性",
+    "activeLiquidityDescription": "区间内 LP 获得持续释放的激励。任何人都可资助奖励，创建者可配置 LP 与分配者的分成。",
+    "creatorPrinciple": "池创建者获得 5% 的 hook 费用。",
+    "staticsPrinciple": "STATICS 引导流动性激励。",
+    "lpPrinciple": "LP 获得区间内奖励。",
+    "marketPrinciple": "开放市场。权限场所。共享基础设施。"
   },
   "glossary": {
     "position": {

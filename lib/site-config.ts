@@ -53,8 +53,8 @@ export function readPublicEnvironment(
 
 export const primaryNavigation: readonly SiteNavigationItem[] = [
   { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
-  { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
-  { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
+  { label: "Markets", messageKey: "markets", kind: "anchor", href: "#markets" },
+  { label: "Gauges", messageKey: "gauges", kind: "anchor", href: "#gauges" },
   { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
   {
     label: "Docs",

@@ -1,5 +1,21 @@
 "use client";
 
+import {
+  Activity,
+  ArrowLeftRight,
+  CircleDollarSign,
+  Coins,
+  Droplets,
+  Gift,
+  LayoutGrid,
+  Layers,
+  Plus,
+  Settings2,
+  ShieldCheck,
+  Wallet,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,6 +31,28 @@ import {
 } from "@/lib/site-config";
 import { useDeployment } from "@/providers/deployment-context";
 import { useWalletState } from "@/providers/wallet-context";
+
+const navigationIcons: Record<string, LucideIcon> = {
+  overview: LayoutGrid,
+  swap: ArrowLeftRight,
+  earn: Gift,
+  liquidity: Droplets,
+  baskets: Layers,
+  create: Plus,
+  dollar: CircleDollarSign,
+  positions: Wallet,
+  genesis: ShieldCheck,
+  loans: Coins,
+  wallet: Wallet,
+  faucet: Droplets,
+  activity: Activity,
+  tools: Wrench,
+};
+
+function NavigationIcon({ name }: { name: string }) {
+  const Icon = navigationIcons[name] ?? Settings2;
+  return <Icon className="dapp-nav-icon" size={18} strokeWidth={1.6} aria-hidden="true" />;
+}
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -346,12 +384,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       aria-current={currentActive ? "page" : undefined}
                       onClick={() => closeNavigation()}
                     >
+                      <NavigationIcon name={item.messageKey} />
                       {active.descriptor.stage === "launch" && item.capability !== "wallet"
                         ? tLaunchRoutes(`${item.messageKey}.label`)
                         : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
+                      <NavigationIcon name={item.messageKey} />
                       {tItems(item.messageKey)}
                       <small>{tCommon("planned")}</small>
                     </span>
