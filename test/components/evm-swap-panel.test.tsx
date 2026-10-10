@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@/test/render";
 import {
   decodeFunctionData,
+  decodeAbiParameters,
+  parseAbiParameters,
   encodeFunctionResult,
   getAddress,
   maxUint256,
@@ -17,7 +19,19 @@ const mocks = vi.hoisted(() => ({
   getBalance: vi.fn(),
   getBlock: vi.fn(),
   execute: vi.fn(),
+  discovered: [] as import("@/lib/phase-one/pool-discovery").PhaseOnePool[],
 }));
+vi.mock("@/hooks/usePhaseOnePools", async () => {
+  const { mergePhaseOnePools } = await vi.importActual<
+    typeof import("@/lib/phase-one/pool-discovery")
+  >("@/lib/phase-one/pool-discovery");
+  return {
+    usePhaseOnePools: (deployment: PhaseOneDeployment | null) => ({
+      pools: deployment ? mergePhaseOnePools(deployment.supportedPools, mocks.discovered) : [],
+      discovering: false,
+    }),
+  };
+});
 vi.mock("viem", async (original) => ({
   ...(await original<typeof import("viem")>()),
   createPublicClient: () => ({
@@ -454,4 +468,271 @@ describe("route precedence", () => {
       chainId: 8453,
     });
   });
+  it("routes through verified discovered pools and skips ones closed to trading", () => {
+    const third = getAddress("0x9999999999999999999999999999999999999999");
+    const discovered = {
+      poolId: `0x${"3".repeat(64)}` as const,
+      poolKey: { ...pool.poolKey, currency0: other.address, currency1: third },
+      swappable: true,
+    };
+    const active = { ...option, phaseOne };
+    const out = { ...other, address: third, symbol: "NEW" };
+    expect(
+      selectSwapRoute(active, descriptor.chainId, other, out, true, [discovered])
+    ).toMatchObject({ kind: "direct", phaseOne: true, id: `phase-one:${discovered.poolId}` });
+    expect(
+      selectSwapRoute(active, descriptor.chainId, other, out, true, [
+        { ...discovered, swappable: false },
+      ])
+    ).toMatchObject({ kind: "uniswap" });
+    // With no single pool for the pair, the route goes through two pools.
+    const viaOther = selectSwapRoute(active, descriptor.chainId, statics, out, true, [
+      { ...discovered, poolKey: { ...discovered.poolKey } },
+      {
+        poolId: `0x${"4".repeat(64)}`,
+        poolKey: { ...pool.poolKey, currency0: statics.address, currency1: other.address },
+        swappable: true,
+      },
+    ]);
+    expect(viaOther).toMatchObject({ kind: "direct", phaseOne: true });
+    expect(
+      viaOther.kind === "direct" && viaOther.paths?.[0]?.map((hop) => hop.intermediateCurrency)
+    ).toEqual([other.address, third]);
+    // The canonical STATICS pair keeps its launch pool even when a Phase 1 pool exists.
+    expect(
+      selectSwapRoute({ ...option, phaseOne }, descriptor.chainId, native, statics, true, [
+        { poolId: pool.poolId, poolKey: pool.poolKey, swappable: true },
+      ])
+    ).toMatchObject({ kind: "direct", phaseOne: false });
+  });
+});
+
+describe("discovered pools in the swap card", () => {
+  afterEach(() => {
+    mocks.discovered = [];
+  });
+  it("opens on a linked pair, labels an unreviewed token and asks for its address to be checked", async () => {
+    const fresh = getAddress("0x9999999999999999999999999999999999999999");
+    const weth = deployment.contracts.weth;
+    mocks.discovered = [
+      {
+        poolId: `0x${"3".repeat(64)}`,
+        poolKey: {
+          currency0: weth,
+          currency1: fresh,
+          fee: 3000,
+          tickSpacing: 60,
+          hooks: zeroAddress,
+        },
+        token0: {
+          address: weth,
+          symbol: "WETH",
+          name: "Wrapped Ether",
+          decimals: 18,
+          metadataSource: "onchain-import",
+        },
+        token1: {
+          address: fresh,
+          symbol: "USDG",
+          name: "Lookalike",
+          decimals: 18,
+          metadataSource: "onchain-import",
+        },
+        reviewed: false,
+        swappable: true,
+      },
+    ];
+    const phaseOne = {
+      descriptor: { ...descriptor, deploymentId: "phase-one" },
+      contracts: { ...deployment.contracts, publicHook: zeroAddress },
+      supportedPools: [],
+    } as unknown as PhaseOneDeployment;
+    const active = { ...option, phaseOne };
+    render(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <WalletContext.Provider
+          value={{
+            ...defaultWalletState,
+            status: "ready",
+            authenticated: true,
+            address: walletAddress,
+            chainId: descriptor.chainId,
+            targetChainId: descriptor.chainId,
+            isTargetChain: true,
+            getEthereumProvider: async () => ({
+              request: vi.fn(),
+              on: vi.fn(),
+              removeListener: vi.fn(),
+            }),
+          }}
+        >
+          <QueryClientProvider client={new QueryClient()}>
+            <EvmSwapPanel staticsNetwork initialIn={weth} initialOut={fresh} />
+          </QueryClientProvider>
+        </WalletContext.Provider>
+      </DeploymentContext.Provider>
+    );
+    const receive = await screen.findByRole("combobox", { name: "You receive asset" });
+    await waitFor(() => expect(receive).toHaveValue(fresh));
+    expect(screen.getByRole("combobox", { name: "You pay asset" })).toHaveValue(weth);
+    expect(
+      screen.getByRole("option", {
+        name: `USDG · unreviewed · ${fresh.slice(0, 6)}…${fresh.slice(-4)}`,
+      })
+    ).toBeInTheDocument();
+    const warning = screen.getByRole("note");
+    expect(warning).toHaveTextContent(fresh);
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "1" },
+    });
+    const review = screen.getByRole("button", { name: "Review swap" });
+    await waitFor(() => expect(mocks.call).toHaveBeenCalled());
+    expect(review).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "I have checked the address and want to trade this token.",
+      })
+    );
+    await waitFor(() => expect(review).toBeEnabled());
+  });
+});
+
+import { v4PathQuoterAbi } from "@/lib/trade/v4-path";
+describe("review regressions", () => {
+  const usd = getAddress("0x8888888888888888888888888888888888888888");
+  const middle = getAddress("0x5555555555555555555555555555555555555555");
+  const middle2 = getAddress("0x6666666666666666666666666666666666666666");
+  let client = new QueryClient();
+  beforeEach(() => {
+    client = new QueryClient();
+  });
+  const ui = (active: DeploymentOption, out: string) => (
+    <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+      <WalletContext.Provider
+        value={{
+          ...defaultWalletState,
+          status: "ready",
+          authenticated: true,
+          address: walletAddress,
+          chainId: descriptor.chainId,
+          targetChainId: descriptor.chainId,
+          isTargetChain: true,
+          getEthereumProvider: async () => ({
+            request: vi.fn(),
+            on: vi.fn(),
+            removeListener: vi.fn(),
+          }),
+        }}
+      >
+        <QueryClientProvider client={client}>
+          <EvmSwapPanel staticsNetwork initialIn="ETH" initialOut={out} />
+        </QueryClientProvider>
+      </WalletContext.Provider>
+    </DeploymentContext.Provider>
+  );
+  it("applies URL pair changes to an already mounted card", async () => {
+    mocks.tokens = [{ address: usd, decimals: 18, name: "Dollar", symbol: "USD" }];
+    const view = render(ui(option, deployment.contracts.statics));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "You receive asset" })).toHaveValue(
+        deployment.contracts.statics
+      )
+    );
+    view.rerender(ui(option, usd));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "You receive asset" })).toHaveValue(usd)
+    );
+  });
+  it("does not quote a different pair when a linked token is unavailable", async () => {
+    render(ui(option, usd));
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "1" },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("token pair is unavailable");
+    expect(screen.getByRole("button", { name: "Review swap" })).toBeDisabled();
+    expect(mocks.call).not.toHaveBeenCalled();
+  });
+  it.each([80n, 110n])(
+    "keeps the reviewed path when its refreshed output is %s",
+    async (refreshedOutput) => {
+      const token = (address: `0x${string}`, symbol: string) => ({
+        address,
+        symbol,
+        name: symbol,
+        decimals: 18,
+        metadataSource: "reviewed-manifest" as const,
+      });
+      const supportedPools = [
+        [deployment.contracts.weth, middle],
+        [middle, usd],
+        [deployment.contracts.weth, middle2],
+        [middle2, usd],
+      ].map(([x, y], i) => ({
+        poolId: `0x${String(i + 3).repeat(64)}` as `0x${string}`,
+        poolKey: { currency0: x!, currency1: y!, fee: 3000, tickSpacing: 60, hooks: zeroAddress },
+        enabled: true,
+        token0: token(x!, `T${i}a`),
+        token1: token(y!, `T${i}b`),
+      }));
+      const phaseOne = {
+        descriptor: { ...descriptor, deploymentId: "phase-one" },
+        contracts: { ...deployment.contracts, publicHook: zeroAddress },
+        supportedPools,
+      } as unknown as PhaseOneDeployment;
+      let refreshed = false,
+        calls = 0;
+      mocks.call.mockImplementation(async () => ({
+        data: encodeFunctionResult({
+          abi: v4PathQuoterAbi,
+          functionName: "quoteExactInput",
+          result: [
+            (refreshed
+              ? calls++ % 2 === 0
+                ? refreshedOutput
+                : 120n
+              : calls++ % 2 === 0
+                ? 100n
+                : 90n) *
+              10n ** 18n,
+            1n,
+          ],
+        }),
+      }));
+      render(ui({ ...option, phaseOne }, usd));
+      const amount = screen.getByRole("textbox", { name: "You pay amount" });
+      await waitFor(() => expect(amount).toHaveValue(""));
+      fireEvent.change(amount, { target: { value: "1" } });
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled()
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+      refreshed = true;
+      calls = 0;
+      fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+      if (refreshedOutput < 100n) {
+        expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
+        expect(mocks.execute).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+        const { args } = decodeFunctionData({
+          abi: universalRouterAbi,
+          data: mocks.execute.mock.calls[0][0].data,
+        });
+        const [, params] = decodeAbiParameters(
+          parseAbiParameters("bytes actions,bytes[] params"),
+          args![1]![1]!
+        );
+        const [swap] = decodeAbiParameters(
+          parseAbiParameters(
+            "(address currencyIn,(address intermediateCurrency,uint24 fee,int24 tickSpacing,address hooks,bytes hookData)[] path,uint256[] maxHopSlippage,uint128 amountIn,uint128 amountOutMinimum)"
+          ),
+          params[0]!
+        );
+        expect(swap.path[0].intermediateCurrency).toBe(middle);
+        expect(swap.amountOutMinimum).toBe(995n * 10n ** 17n);
+        expect(screen.queryByText("Route")).not.toBeInTheDocument();
+        expect(screen.queryByText("Pools")).not.toBeInTheDocument();
+      }
+    }
+  );
 });

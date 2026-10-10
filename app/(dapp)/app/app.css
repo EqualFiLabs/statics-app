@@ -2874,6 +2874,34 @@
   color: var(--app-text-muted);
 }
 
+/* A token from an unreviewed pool: its address must be checked before trading. */
+.portal-unreviewed {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--app-text);
+  font-size: var(--text-sm);
+}
+
+.portal-unreviewed strong {
+  color: var(--warning);
+}
+
+.portal-unreviewed p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.portal-unreviewed label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .portal-error {
   margin: 0;
   padding: 0.8rem 1rem;

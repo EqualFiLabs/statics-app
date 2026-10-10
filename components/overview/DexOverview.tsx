@@ -419,7 +419,8 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                       <div className={styles.actions}>
                         <Link
                           className="ui-button ui-button--secondary ui-button--sm"
-                          href="/app/swap"
+                          href={`/app/swap?in=${pool.token0.address}&out=${pool.token1.address}`}
+                          aria-label={t("swapIn", { pool: pairOf(pool) })}
                         >
                           {t("swap")}
                         </Link>

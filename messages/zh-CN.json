@@ -907,7 +907,12 @@
     "latestBridge": "最近跨链",
     "refresh": "刷新",
     "bridging": "正在跨链…",
-    "confirmBridge": "确认跨链"
+    "confirmBridge": "确认跨链",
+    "unreviewed": "未审核",
+    "unreviewedTitle": "未审核代币",
+    "unreviewedHelp": "{tokens} 来自尚未审核的池。任何人都可以用任意名称或符号创建代币，交易前请核对地址。",
+    "unreviewedAcknowledge": "我已核对地址，确认交易此代币。",
+    "linkedPairUnavailable": "此代币对不可用。请选择其他代币，或等待资金池发现完成。"
   },
   "positions": {
     "subject": "Position NFTs",
@@ -2566,6 +2571,7 @@
     "loadMore": "加载更多池",
     "restartPools": "重新加载池列表",
     "incompleteHistory": "历史数据覆盖不完整",
-    "unavailableHistory": "历史数据不可用"
+    "unavailableHistory": "历史数据不可用",
+    "swapIn": "在 {pool} 中兑换"
   }
 }

@@ -907,7 +907,12 @@
     "latestBridge": "Latest bridge",
     "refresh": "Refresh",
     "bridging": "Bridging…",
-    "confirmBridge": "Confirm bridge"
+    "confirmBridge": "Confirm bridge",
+    "unreviewed": "unreviewed",
+    "unreviewedTitle": "Unreviewed token",
+    "unreviewedHelp": "{tokens} comes from a pool that has not been reviewed. Anyone can create a token with any name or symbol, so check the address before you trade.",
+    "unreviewedAcknowledge": "I have checked the address and want to trade this token.",
+    "linkedPairUnavailable": "This token pair is unavailable. Choose another token or wait for pool discovery to finish."
   },
   "positions": {
     "subject": "Position NFTs",
@@ -2566,6 +2571,7 @@
     "loadMore": "Load more pools",
     "restartPools": "Reload pool directory",
     "incompleteHistory": "Historical coverage is incomplete",
-    "unavailableHistory": "Historical values unavailable"
+    "unavailableHistory": "Historical values unavailable",
+    "swapIn": "Swap in {pool}"
   }
 }

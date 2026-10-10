@@ -50,7 +50,11 @@ export function SwapPage() {
         ))}
       </div>
       {mode === "token" ? (
-        <EvmSwapPanel staticsNetwork />
+        <EvmSwapPanel
+          staticsNetwork
+          initialIn={searchParams?.get("in") ?? undefined}
+          initialOut={searchParams?.get("out") ?? undefined}
+        />
       ) : active.launch ? (
         <GenesisVaultSwapPanel deployment={active.launch} />
       ) : null}

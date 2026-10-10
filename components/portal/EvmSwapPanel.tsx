@@ -9,6 +9,7 @@ import {
   encodeFunctionData,
   formatUnits,
   getAddress,
+  isAddress,
   zeroAddress,
   type Address,
   type Hex,
@@ -26,6 +27,8 @@ import {
   type EvmSwapToken,
 } from "@/lib/portal/uniswap";
 import { useWalletTokens } from "@/hooks/useWalletTokens";
+import { usePhaseOnePools } from "@/hooks/usePhaseOnePools";
+import { isReviewedToken } from "@/lib/phase-one/pool-discovery";
 import { useDeployment } from "@/providers/deployment-context";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
@@ -47,7 +50,8 @@ import {
 } from "@/lib/protocol/approvals";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { isUniswapSwapChainId } from "@/lib/portal/uniswap";
-import { quoteDirectSwap, selectSwapRoute } from "@/lib/trade/swap-routing";
+import { quoteSwapRoute, selectSwapRoute } from "@/lib/trade/swap-routing";
+import { buildV4ExactInputPathSwap, type PathHop } from "@/lib/trade/v4-path";
 
 const PERMIT_TTL = 20n * 60n;
 
@@ -63,6 +67,8 @@ const erc20BalanceAbi = [
 
 type QuotePayload = {
   routeId?: string;
+  /** The Statics pools a multi-pool quote goes through, in order. */
+  path?: readonly PathHop[];
   routing?: string;
   quote?: {
     input: { amount: string; token: string };
@@ -97,7 +103,16 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
     : whole;
 }
 
-export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: boolean }) {
+export function EvmSwapPanel({
+  staticsNetwork = false,
+  initialIn,
+  initialOut,
+}: {
+  staticsNetwork?: boolean;
+  /** Token addresses (or "ETH") to open with, e.g. from a pool's Swap link. */
+  initialIn?: string;
+  initialOut?: string;
+}) {
   const queryClient = useQueryClient();
   const t = useTranslations("portal");
   const locale = useAppLocale();
@@ -117,6 +132,8 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
       ? active.phaseOne
       : null;
   const walletTokens = useWalletTokens(selectedChainId, active.protocol ?? active.launch);
+  // Reviewed manifest pools plus indexed public pools registered since.
+  const discovery = usePhaseOnePools(phaseOne);
   const tokens = useMemo(() => {
     const native = getDefaultEvmSwapTokens(selectedChainId).filter(
       (token) => token.kind === "native"
@@ -139,12 +156,19 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
           },
         ]
       : [];
-    const registered: EvmSwapToken[] = phaseOne
-      ? phaseOne.supportedPools
-          .filter((pool) => pool.enabled)
-          .flatMap((pool) => [pool.token0, pool.token1])
-          .map((token) => ({ ...token, kind: "erc20" as const }))
-      : [];
+    const registered: EvmSwapToken[] = discovery.pools
+      .filter((pool) => pool.swappable)
+      .flatMap((pool) => [pool.token0, pool.token1])
+      .map((token) => ({
+        address: token.address,
+        decimals: token.decimals,
+        name: token.name,
+        symbol: token.symbol,
+        kind: "erc20" as const,
+        reviewed: isReviewedToken(token),
+      }))
+      // Reviewed tokens list first; a token reviewed anywhere counts as reviewed.
+      .sort((a, b) => Number(b.reviewed) - Number(a.reviewed));
     const discovered = walletTokens.tokens.map((token): EvmSwapToken => ({
       address: token.address,
       decimals: token.decimals,
@@ -158,11 +182,19 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
           (candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()
         ) === index
     );
-  }, [phaseOne, launch, selectedChainId, walletTokens.tokens]);
-  const [sourceAddress, setSourceAddress] = useState<string>(zeroAddress);
+  }, [discovery.pools, launch, selectedChainId, walletTokens.tokens]);
+  const requested = (value: string | undefined) =>
+    value && /^(eth|native)$/i.test(value)
+      ? zeroAddress
+      : value && isAddress(value)
+        ? getAddress(value)
+        : undefined;
+  const [sourceAddress, setSourceAddress] = useState<string>(requested(initialIn) ?? zeroAddress);
   const [destinationAddress, setDestinationAddress] = useState<string>(
-    launch?.contracts.statics ?? ""
+    requested(initialOut) ?? launch?.contracts.statics ?? ""
   );
+  /** The unreviewed pair the user has acknowledged, so the warning is answered once per pair. */
+  const [acknowledged, setAcknowledged] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState<bigint | null>(null);
   const [balanceVersion, setBalanceVersion] = useState(0);
@@ -172,11 +204,14 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
   const [reviewing, setReviewing] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const { address: walletAddress, getEthereumProvider } = wallet;
-  const source = tokens.find((token) => token.address === sourceAddress) ?? tokens[0];
-  const destination =
-    tokens.find(
-      (token) => token.address === destinationAddress && token.address !== source?.address
-    ) ?? tokens.find((token) => token.address !== source?.address);
+  const source = tokens.find(
+    (token) => token.address.toLowerCase() === sourceAddress.toLowerCase()
+  );
+  const destination = tokens.find(
+    (token) =>
+      token.address.toLowerCase() === destinationAddress.toLowerCase() &&
+      token.address !== source?.address
+  );
   const parsedAmount = (() => {
     try {
       return source ? parseLocalizedUnits(amount, source.decimals, locale) : 0n;
@@ -193,8 +228,20 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     outputRaw;
   const route =
     source && destination
-      ? selectSwapRoute(active, selectedChainId, source, destination, staticsNetwork)
+      ? selectSwapRoute(
+          active,
+          selectedChainId,
+          source,
+          destination,
+          staticsNetwork,
+          phaseOne ? discovery.pools : undefined
+        )
       : null;
+  const unreviewed = [source, destination].filter(
+    (token): token is EvmSwapToken => token?.reviewed === false
+  );
+  const pairKey = `${source?.address}:${destination?.address}`;
+  const needsAcknowledgement = unreviewed.length > 0 && acknowledged !== pairKey;
   const identity = [
     wallet.address,
     wallet.chainId,
@@ -202,13 +249,22 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     wallet.walletKind,
     selectedChainId,
     route?.id,
+    route?.kind === "direct" ? `${route.router}:${route.quoter}:${route.permit2}` : "",
+    active.descriptor.deploymentId,
+    initialIn,
+    initialOut,
+    acknowledged,
     source?.address,
     destination?.address,
     parsedAmount.toString(),
     slippage,
   ].join(":");
   const identityRef = useRef(identity);
-  const [review, setReview] = useState<{ identity: string; minimum: bigint } | null>(null);
+  const [review, setReview] = useState<{
+    identity: string;
+    minimum: bigint;
+    path?: readonly PathHop[];
+  } | null>(null);
   useEffect(() => {
     identityRef.current = identity;
     const timer = window.setTimeout(() => {
@@ -220,9 +276,14 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      setSourceAddress(tokens.find((token) => token.kind === "native")?.address ?? "");
+      setSourceAddress(
+        requested(initialIn) ?? tokens.find((token) => token.kind === "native")?.address ?? ""
+      );
       setDestinationAddress(
-        tokens.find((token) => token.symbol === "STATICS")?.address ?? tokens[1]?.address ?? ""
+        requested(initialOut) ??
+          tokens.find((token) => token.symbol === "STATICS")?.address ??
+          tokens[1]?.address ??
+          ""
       );
       setAmount("");
       setQuote(null);
@@ -231,9 +292,15 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     }, 0);
     return () => window.clearTimeout(timeout);
     // Discovery can refresh balances/metadata while the user types. Reset only
-    // when the selected network or canonical deployment changes.
+    // when the network, deployment or requested pair changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChainId, launch?.contracts.statics]);
+  }, [
+    selectedChainId,
+    launch?.contracts.statics,
+    active.descriptor.deploymentId,
+    initialIn,
+    initialOut,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -277,7 +344,10 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     balanceVersion,
   ]);
 
-  const requestQuote = async (signal?: AbortSignal): Promise<QuotePayload> => {
+  const requestQuote = async (
+    signal?: AbortSignal,
+    pinnedPath?: readonly PathHop[]
+  ): Promise<QuotePayload> => {
     if (!wallet.address || !source || !destination || !route || parsedAmount <= 0n) {
       throw new Error("Enter an amount and choose two assets.");
     }
@@ -289,9 +359,9 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
         chain: network.chain,
         transport: custom(provider),
       });
-      const amountOut = await quoteDirectSwap(
+      const { amountOut, path } = await quoteSwapRoute(
         publicClient,
-        route,
+        pinnedPath ? { ...route, paths: [pinnedPath] } : route,
         parsedAmount,
         getAddress(wallet.address)
       );
@@ -299,6 +369,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
       if (bps === null) throw new Error("Choose a valid slippage tolerance.");
       return {
         routeId: route.id,
+        path,
         quote: {
           input: { amount: parsedAmount.toString(), token: source.address },
           output: { amount: amountOut.toString(), token: destination.address },
@@ -441,7 +512,7 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     };
     const refreshQuote = async () => {
       assertCurrent();
-      const fresh = await requestQuote();
+      const fresh = await requestQuote(undefined, accepted.path);
       assertCurrent();
       const freshMinimum = fresh.quote?.aggregatedOutputs?.[0]?.minAmount;
       const executableMinimum = route.kind === "direct" ? fresh.quote?.output.amount : freshMinimum;
@@ -579,15 +650,26 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
             pendingBlock?.timestamp ?? null,
             BigInt(Math.floor(Date.now() / 1000))
           ) + PERMIT_TTL;
-        const execution = buildV4ExactInputSingleSwap({
-          router: route.router,
-          poolKey: route.poolKey,
-          zeroForOne: route.zeroForOne,
-          amountIn: parsedAmount,
-          amountOutMinimum: accepted.minimum,
-          deadline,
-          settlement: route.settlement,
-        });
+        // Execution keeps the exact path accepted in review, including after approvals.
+        const execution = accepted.path
+          ? buildV4ExactInputPathSwap({
+              router: route.router,
+              currencyIn: route.inputToken,
+              path: accepted.path,
+              amountIn: parsedAmount,
+              amountOutMinimum: accepted.minimum,
+              deadline,
+              settlement: route.settlement,
+            })
+          : buildV4ExactInputSingleSwap({
+              router: route.router,
+              poolKey: route.poolKey,
+              zeroForOne: route.zeroForOne,
+              amountIn: parsedAmount,
+              amountOutMinimum: accepted.minimum,
+              deadline,
+              settlement: route.settlement,
+            });
         setSubmitState("swapping");
         await send({
           to: execution.target,
@@ -686,7 +768,11 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
         : void wallet.selectFundingNetwork(selectedChainId);
     }
     if (quote?.quote && route && minimumRaw) {
-      setReview({ identity, minimum: BigInt(minimumRaw) });
+      setReview({
+        identity,
+        minimum: BigInt(minimumRaw),
+        path: quote.path?.map((hop) => Object.freeze({ ...hop })),
+      });
       setReviewing(true);
     }
   };
@@ -708,7 +794,9 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
     wallet.status === "loading" ||
     submitting ||
     quoteLoading ||
-    (wallet.status === "ready" && walletOnSelectedChain && (!quote?.quote || insufficient));
+    (wallet.status === "ready" &&
+      walletOnSelectedChain &&
+      (!quote?.quote || insufficient || needsAcknowledgement));
 
   return (
     <div className="portal-panel" role="tabpanel">
@@ -828,6 +916,29 @@ export function EvmSwapPanel({ staticsNetwork = false }: { staticsNetwork?: bool
           />
         </dl>
       )}
+      {unreviewed.length > 0 && (
+        <div className="portal-unreviewed" role="note">
+          <strong>{t("unreviewedTitle")}</strong>
+          <p>
+            {t("unreviewedHelp", {
+              tokens: unreviewed.map((token) => `${token.symbol} (${token.address})`).join(", "),
+            })}
+          </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={acknowledged === pairKey}
+              onChange={(event) => setAcknowledged(event.target.checked ? pairKey : null)}
+            />
+            {t("unreviewedAcknowledge")}
+          </label>
+        </div>
+      )}
+      {(!source || !destination) && !discovery.discovering && (
+        <p className="portal-error" role="alert">
+          {t("linkedPairUnavailable")}
+        </p>
+      )}
       {error && (
         <p className="portal-error" role="alert">
           {error}
@@ -899,6 +1010,7 @@ function SwapAssetField({
   onEditSlippage?: () => void;
 }) {
   const t = useTranslations("portal");
+  const unreviewedLabel = t("unreviewed");
   return (
     // A div rather than a label, because the slippage control lives in this
     // card and a button inside a label would also activate the amount input.
@@ -928,7 +1040,9 @@ function SwapAssetField({
             .filter((token) => token.address !== excluded)
             .map((token) => (
               <option key={token.address} value={token.address}>
-                {token.symbol}
+                {token.reviewed === false
+                  ? `${token.symbol} · ${unreviewedLabel} · ${token.address.slice(0, 6)}…${token.address.slice(-4)}`
+                  : token.symbol}
               </option>
             ))}
         </select>
