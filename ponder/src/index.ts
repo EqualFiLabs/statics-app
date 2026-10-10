@@ -20,6 +20,7 @@ import {
   genesisWeightChangedMutation,
 } from "./genesis";
 import { configuredAddress } from "./source-config";
+import { dexIndexer, type DexEvent } from "./dex-indexer";
 
 import {
   activeGenesisCredit,
@@ -78,11 +79,14 @@ const onPositionManager = sourceHandler(
 const onPoolManager = sourceHandler(Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS")));
 const registerPhaseOne = sourceHandler(Boolean(phaseOneDeploymentId && phaseOneDiamondAddress));
 const statementHandlers = new Set<string>();
+const dex = dexIndexer(phaseOneDeploymentId || deploymentId, deploymentId);
+const dexEnabled = Boolean(configuredAddress("PONDER_POOL_MANAGER_ADDRESS"));
 const onPhaseOne: typeof ponder.on = (name, handler) => {
   const eventName = name.slice("PhaseOneStatics:".length);
   statementHandlers.add(eventName);
   registerPhaseOne(name, async (input) => {
     await handler(input);
+    if (dexEnabled) await dex.diamond(eventName, input.context, input.event as unknown as DexEvent);
     await recordPositionStatement(
       phaseOneDeploymentId!,
       eventName,
@@ -407,6 +411,7 @@ ponder.on("StaticsFeeReceiver:FeesHarvested", async ({ event, context }) => {
 });
 
 onPoolManager("PoolManager:Swap", async ({ event, context }) => {
+  await dex.swap(context, event as unknown as DexEvent);
   const metrics = marketSwapMetrics(event.args.amount0, event.args.amount1);
   await context.db.insert(marketSwap).values({
     key: eventKey(event.transaction.hash, event.log.logIndex),
@@ -1195,4 +1200,27 @@ for (const eventName of [
 
 for (const eventName of Object.keys(statementCategories) as (keyof typeof statementCategories)[]) {
   if (!statementHandlers.has(eventName)) onPhaseOne(`PhaseOneStatics:${eventName}`, async () => {});
+}
+
+if (dexEnabled) {
+  ponder.on("DexCanonicalPoolManager:Swap", async ({ event, context }) => {
+    const start = BigInt(
+      process.env.PONDER_POOL_MANAGER_START_BLOCK ||
+        process.env.PONDER_DEPLOYMENT_START_BLOCK ||
+        "0"
+    );
+    if (event.block.number < start) await dex.swap(context, event as unknown as DexEvent, true);
+  });
+  ponder.on("DexCanonicalPoolManager:Initialize", async ({ event, context }) => {
+    await dex.initialize(context, event as unknown as DexEvent, "genesis");
+  });
+  ponder.on("DexCanonicalPoolManager:ModifyLiquidity", async ({ event, context }) => {
+    await dex.modify(context, event as unknown as DexEvent);
+  });
+  ponder.on("DexPublicPoolManager:ModifyLiquidity", async ({ event, context }) => {
+    if (event.args.id !== dex.canonical) await dex.modify(context, event as unknown as DexEvent);
+  });
+  ponder.on("DexPublicPoolManager:Swap", async ({ event, context }) => {
+    if (event.args.id !== dex.canonical) await dex.swap(context, event as unknown as DexEvent);
+  });
 }

@@ -52,6 +52,8 @@ if (!Number.isSafeInteger(chainId) || chainId <= 0) {
 const logBlockRange = configuredLogBlockRange();
 const deploymentStartBlock = optionalStartBlock("PONDER_DEPLOYMENT_START_BLOCK", 0);
 const poolManagerEventsAbi = parseAbi([
+  "event Initialize(bytes32 indexed id,address indexed currency0,address indexed currency1,uint24 fee,int24 tickSpacing,address hooks,uint160 sqrtPriceX96,int24 tick)",
+  "event ModifyLiquidity(bytes32 indexed id,address indexed sender,int24 tickLower,int24 tickUpper,int256 liquidityDelta,bytes32 salt)",
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
 ]);
 const phaseOnePolicyEventsAbi = parseAbi([
@@ -71,6 +73,8 @@ function activeContracts<T extends Record<string, unknown>>(contracts: T): T {
   if (!publicHookAddress) delete contracts.PublicHook;
   if (!positionManagerAddress) delete contracts.PositionManager;
   if (!poolManagerAddress) delete contracts.PoolManager;
+  if (!poolManagerAddress) delete contracts.DexPublicPoolManager;
+  if (!poolManagerAddress) delete contracts.DexCanonicalPoolManager;
   return contracts;
 }
 
@@ -166,6 +170,30 @@ export default createConfig({
         "PONDER_STATICS_FEE_RECEIVER_START_BLOCK",
         deploymentStartBlock
       ),
+    },
+    DexPublicPoolManager: {
+      chain: "active",
+      abi: poolManagerEventsAbi,
+      address: poolManagerAddress ?? zeroAddress,
+      startBlock: optionalStartBlock("PONDER_PHASE_ONE_START_BLOCK", deploymentStartBlock),
+    },
+    DexCanonicalPoolManager: {
+      chain: "active",
+      abi: poolManagerEventsAbi,
+      address: poolManagerAddress ?? zeroAddress,
+      startBlock: optionalStartBlock(
+        "PONDER_CANONICAL_LIQUIDITY_START_BLOCK",
+        optionalStartBlock("PONDER_GENESIS_START_BLOCK", 0)
+      ),
+      filter: [
+        { event: "Initialize", args: { id: canonicalPoolId ?? zeroHash } },
+        { event: "ModifyLiquidity", args: { id: canonicalPoolId ?? zeroHash } },
+        { event: "Swap", args: { id: canonicalPoolId ?? zeroHash } },
+      ] as (
+        | { event: "Initialize"; args: { id: `0x${string}` } }
+        | { event: "ModifyLiquidity"; args: { id: `0x${string}` } }
+        | { event: "Swap"; args: { id: `0x${string}` } }
+      )[],
     },
     PoolManager: {
       chain: "active",

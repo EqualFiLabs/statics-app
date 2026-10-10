@@ -541,3 +541,53 @@ export const positionStatementRevision = onchainTable("position_statement_revisi
   key: t.text().primaryKey(),
   digest: t.hex().notNull(),
 }));
+
+/** Unified DEX sources; payloads retain exact integer strings and source provenance. */
+export const dexPool = onchainTable(
+  "dex_pool",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    details: t.text().notNull(),
+    updatedAtBlock: t.bigint().notNull(),
+  }),
+  (t) => ({ scope: index().on(t.deploymentId, t.poolId) })
+);
+export const dexRange = onchainTable(
+  "dex_range",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    details: t.text().notNull(),
+    updatedAtBlock: t.bigint().notNull(),
+  }),
+  (t) => ({ scope: index().on(t.deploymentId, t.poolId) })
+);
+export const dexHistory = onchainTable(
+  "dex_history",
+  (t) => ({
+    key: t.text().primaryKey(),
+    deploymentId: t.text().notNull(),
+    poolId: t.hex().notNull(),
+    kind: t.text().notNull(),
+    details: t.text().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockHash: t.hex().notNull(),
+    timestamp: t.bigint().notNull(),
+    logIndex: t.integer().notNull(),
+  }),
+  (t) => ({
+    scope: index().on(t.deploymentId, t.poolId, t.timestamp, t.blockNumber, t.logIndex),
+    time: index().on(t.deploymentId, t.timestamp),
+  })
+);
+export const dexState = onchainTable("dex_state", (t) => ({
+  key: t.text().primaryKey(),
+  deploymentId: t.text().notNull(),
+  revision: t.bigint().notNull(),
+  blockHash: t.hex().notNull(),
+  blockNumber: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+}));
