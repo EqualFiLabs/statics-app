@@ -39,7 +39,6 @@ const deploymentId = process.env.PONDER_DEPLOYMENT_ID?.trim() || "unconfigured";
 const phaseOneDeploymentId =
   process.env.PONDER_PHASE_ONE_DEPLOYMENT_ID?.trim() || "unconfigured-phase-one";
 
-app.route("/", dexMarketRoutes(phaseOneDeploymentId));
 app.route("/", allocationPoolRoutes(phaseOneDeploymentId));
 app.route("/", positionStatementRoutes(phaseOneDeploymentId));
 
@@ -959,5 +958,8 @@ app.get("/phase-one/activity", async (context) => {
     })),
   });
 });
+
+// Literal market routes (including candles) take precedence over the new section route.
+app.route("/", dexMarketRoutes(phaseOneDeploymentId));
 
 export default app;
