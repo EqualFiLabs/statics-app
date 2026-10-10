@@ -7,7 +7,6 @@ import { useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
-import { TradeMarketStats } from "@/components/swap/TradeMarketStats";
 import { useDeployment } from "@/providers/deployment-context";
 
 type SwapMode = "token" | "nft";
@@ -35,7 +34,6 @@ export function SwapPage() {
 
   return (
     <div className="swap-page">
-      {active.launch && <TradeMarketStats deploymentId={active.launch.descriptor.deploymentId} />}
       <div className="portal-direction-tabs" role="tablist" aria-label={t("swapType")}>
         {(["token", ...(active.launch ? (["nft"] as const) : [])] as const).map((item) => (
           <button

@@ -23,9 +23,6 @@ vi.mock("@/components/portal/EvmSwapPanel", () => ({
 vi.mock("@/components/genesis/GenesisVaultSwapPanel", () => ({
   GenesisVaultSwapPanel: () => <div>Next available Operator NFT</div>,
 }));
-vi.mock("@/components/swap/TradeMarketStats", () => ({
-  TradeMarketStats: () => <div>Market statistics</div>,
-}));
 vi.mock("@/components/phase-one/PhaseOneSwapPanel", () => ({
   PhaseOneSwapPanel: () => <div>Phase 1 direct public swap</div>,
 }));
