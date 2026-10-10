@@ -188,6 +188,10 @@
   border-radius: 4px 4px 0 0;
   background: color-mix(in srgb, var(--accent) 38%, transparent);
 }
+.bars span[data-incomplete] {
+  opacity: 0.45;
+  outline: 1px dashed var(--text-muted);
+}
 .bars span[data-latest] {
   background: var(--accent);
 }

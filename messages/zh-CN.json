@@ -2565,6 +2565,7 @@
     "spotFallback": "最新价格",
     "loadMore": "加载更多池",
     "restartPools": "重新加载池列表",
+    "incompleteHistory": "历史数据覆盖不完整",
     "unavailableHistory": "历史数据不可用"
   }
 }

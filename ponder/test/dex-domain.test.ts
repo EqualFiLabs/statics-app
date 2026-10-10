@@ -26,6 +26,7 @@ const pool = (): MarketPool => ({
   initialized: true,
   liquidityComplete: true,
   historyStart: "1",
+  priceHistoryStart: "0",
   sqrtPriceX96: String(1n << 96n),
   tick: 0,
   cumulative: "0",

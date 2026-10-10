@@ -50,6 +50,12 @@ describe("indexed rational pricing", () => {
     const g = priceGraph([a, b], [range(a), range(b)], [...points(a), ...points(b)], 2000n, config);
     expect(g.prices.get(token(1).address)?.route).toEqual([b.poolId]);
   });
+  it("chooses fewer hops after a downstream bottleneck equalizes intermediate routes", () => {
+    const ps = [pool(1, 2, 3), pool(2, 3, 4), pool(3, 4, 5), pool(4, 2, 5), pool(5, 5, 6)];
+    const rs = ps.map((p, i) => range(p, String(BigInt([100, 100, 100, 90, 50][i]!) * 10n ** 18n)));
+    const g = priceGraph(ps, rs, ps.flatMap(points), 2000n, config);
+    expect(g.prices.get(token(6).address)?.route).toEqual([ps[3]!.poolId, ps[4]!.poolId]);
+  });
   it("preserves tiny positive prices and adjusts mixed decimals at the whole-token boundary", () => {
     expect(value(10n ** 18n, ratio(1n, 10n ** 12n))).toBe(10n ** 6n);
     expect(decimal(ratio(1n, 10n ** 20n))).toBe("0.00000000000000000001");

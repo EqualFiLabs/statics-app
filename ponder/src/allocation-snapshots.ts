@@ -129,7 +129,11 @@ export async function readTokenMetadata(context: Context, event: Observation, as
   return row;
 }
 
-export function allocationSnapshots(deploymentId: string, diamond: Address) {
+export function allocationSnapshots(
+  deploymentId: string,
+  diamond: Address,
+  onDirectoryChange?: (context: Context, event: Observation) => Promise<void>
+) {
   const key = (poolId: Hex) => `${deploymentId}:${poolId.toLowerCase()}`;
   async function reserve(context: Context, event: Observation) {
     const state = await context.client.readContract({
@@ -340,6 +344,7 @@ export function allocationSnapshots(deploymentId: string, diamond: Address) {
         indexedAtBlock: event.block.number,
         indexedAtTimestamp: event.block.timestamp,
       }));
+    await onDirectoryChange?.(context, event);
   }
   async function pool(context: Context, event: Observation, poolId: Hex) {
     await weight(context, event, poolId);

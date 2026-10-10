@@ -196,7 +196,7 @@ export function settleTrade(
   const a = BigInt(trade.coreAmount0),
     b = BigInt(trade.coreAmount1);
   const input0 = a < 0n;
-  if (!((a < 0n && b > 0n) || (b < 0n && a > 0n))) throw new Error("Invalid DEX swap signs");
+  if (!((a < 0n && b >= 0n) || (b < 0n && a >= 0n))) throw new Error("Invalid DEX swap signs");
   const input = abs(input0 ? a : b),
     output = input0 ? b : a,
     outputFee = input0 ? fee1 : fee0;

@@ -197,7 +197,34 @@ export function priceGraph(
       if (!selected.has(to) || better(candidate, selected.get(to)!)) selected.set(to, candidate);
     }
   }
-  return { prices: selected, quoteUnits: unit };
+  // A later bottleneck can equalize routes whose intermediate depths differ.
+  // Resolve hop/tie preferences per destination after its widest depth is known.
+  const resolved = new Map<string, TokenPrice>();
+  for (const [target, widest] of selected) {
+    const queue = [{ asset: quote, price: ratio(1n), route: [] as string[], fallback: false }];
+    const seen = new Set([quote]);
+    for (let i = 0; i < queue.length; i++) {
+      const current = queue[i]!;
+      if (current.asset === target) {
+        resolved.set(target, { ...current, depth: widest.depth });
+        break;
+      }
+      for (const e of admitted
+        .filter((e) => e.depth >= widest.depth)
+        .sort((a, b) => a.id.localeCompare(b.id))) {
+        const to = e.a === current.asset ? e.b : e.b === current.asset ? e.a : null;
+        if (!to || seen.has(to)) continue;
+        seen.add(to);
+        queue.push({
+          asset: to,
+          price: multiply(current.price, e.a === current.asset ? invert(e.ratio) : e.ratio),
+          route: [...current.route, e.id],
+          fallback: current.fallback || e.fallback,
+        });
+      }
+    }
+  }
+  return { prices: resolved, quoteUnits: unit };
 }
 export function routePrice(
   asset: string,

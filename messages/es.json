@@ -2565,6 +2565,7 @@
     "spotFallback": "Último precio",
     "loadMore": "Cargar más pools",
     "restartPools": "Recargar directorio",
+    "incompleteHistory": "La cobertura histórica está incompleta",
     "unavailableHistory": "Valores históricos no disponibles"
   }
 }

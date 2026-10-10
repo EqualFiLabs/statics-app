@@ -33,7 +33,7 @@ beforeAll(async () => {
     );
   }
   await client.exec(
-    'CREATE TABLE _ponder_checkpoint ("chainName" text,"latestCheckpoint" text); CREATE TABLE _ponder_meta (key text,value jsonb);'
+    "CREATE TABLE _ponder_checkpoint (chain_name text,latest_checkpoint text); CREATE TABLE _ponder_meta (key text,value jsonb);"
   );
   execute.mockImplementation((q) => database.execute(q));
   process.env.PONDER_PRICING_QUOTE_WETH = pool().token1.address;
@@ -81,6 +81,27 @@ beforeEach(async () => {
   }
 });
 describe("DEX endpoints with real SQL and bounded snapshots", () => {
+  it("invalidates pages when a reserve/directory-only event is reorganized", async () => {
+    await database
+      .insert(schema.dexHistory)
+      .values({
+        key: "directory-event",
+        deploymentId: "selected",
+        poolId: `0x${"00".repeat(32)}`,
+        kind: "observation",
+        details: "{}",
+        blockNumber: 2n,
+        blockHash: `0x${"02".repeat(32)}`,
+        timestamp: 1n,
+        logIndex: 1,
+      });
+    const first = await (await app.request("/phase-one/market/pools?limit=1")).json();
+    await client.query("DELETE FROM dex_history WHERE key=$1", ["directory-event"]);
+    const response = await app.request(
+      `/phase-one/market/pools?limit=1&cursor=${first.nextCursor}`
+    );
+    expect(response.status).toBe(409);
+  });
   it("serves all six endpoints without RPC calls and honors quote fallback and day ranges", async () => {
     for (const section of ["summary", "pools", "tokens", "volume", "emissions", "trades"]) {
       const response = await app.request(`/phase-one/market/${section}?days=3`);
@@ -95,7 +116,7 @@ describe("DEX endpoints with real SQL and bounded snapshots", () => {
     const first = await (await app.request("/phase-one/market/pools?limit=1")).json();
     expect(first.total).toBe(3);
     expect(first.nextCursor).not.toBeNull();
-    await client.query('UPDATE _ponder_checkpoint SET "latestCheckpoint"=$1', [checkpoint(200010)]);
+    await client.query("UPDATE _ponder_checkpoint SET latest_checkpoint=$1", [checkpoint(200010)]);
     const response = await app.request(
       `/phase-one/market/pools?limit=1&cursor=${first.nextCursor}`
     );

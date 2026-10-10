@@ -338,6 +338,23 @@ export function dexIndexer(deploymentId: string, genesisDeploymentId: string) {
     await history(context, event, poolId, "pool", pool);
     await save(context, event, pool);
   }
+  async function observe(context: Context, event: DexEvent) {
+    await context.db
+      .insert(dexHistory)
+      .values({
+        key: eventKey(event, ":directory"),
+        deploymentId,
+        poolId: `0x${"0".repeat(64)}` as Hex,
+        kind: "observation",
+        details: "{}",
+        blockNumber: event.block.number,
+        blockHash: event.block.hash,
+        timestamp: event.block.timestamp,
+        logIndex: event.log.logIndex,
+      })
+      .onConflictDoUpdate({ blockHash: event.block.hash });
+    await touch(context, event);
+  }
   const canonical = configuredCanonicalPool(configuredAddress("PONDER_POOL_MANAGER_ADDRESS"));
-  return { diamond, modify, swap, initialize, canonical };
+  return { diamond, modify, swap, initialize, observe, canonical };
 }

@@ -93,6 +93,7 @@ export type DexVolume = Observed &
       volume: bigint | null;
       swaps: bigint;
       provisional: boolean;
+      coverage: Readonly<{ includedPools: number; omittedPools: number; historyComplete: boolean }>;
     }>[];
   }>;
 export type DexEmissions = Observed &
@@ -334,11 +335,17 @@ export function parseDexVolume(value: unknown, deploymentId: string): DexVolume 
         new Date(d.day).toISOString().slice(0, 10) === d.day
           ? d.day
           : fail("day");
+      const coverage = object(d.coverage, "day coverage");
       return {
         day,
         volume: optionalUint(d.volume, "day volume"),
         swaps: uint(d.swaps, "day swaps"),
         provisional: boolean(d.provisional, "provisional day"),
+        coverage: {
+          includedPools: int(coverage.includedPools, "included pools", 0),
+          omittedPools: int(coverage.omittedPools, "omitted pools", 0),
+          historyComplete: boolean(coverage.historyComplete, "history complete"),
+        },
       };
     }),
   };

@@ -210,6 +210,7 @@ export function dexFixture(
         volume: usd(value * 2601),
         swaps: String(value * 8),
         provisional: index === (options.days ?? 30) - 1,
+        coverage: { includedPools: pools.length, omittedPools: 0, historyComplete: true },
       })),
     },
     emissions: {

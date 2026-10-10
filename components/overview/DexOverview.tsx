@@ -173,10 +173,9 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
     0n
   );
   const emissions = dex.emissions.data;
-  const remaining =
-    emissions?.period && summary
-      ? Number(emissions.period.finish) - Number(summary.indexedAtTimestamp)
-      : null;
+  const remaining = emissions?.period
+    ? Number(emissions.period.finish) - Number(emissions.indexedAtTimestamp)
+    : null;
   const unavailable =
     dex.summary.isError ||
     dex.pools.isError ||
@@ -265,7 +264,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
               {number(Number(formatUnits(emissions.period.budget, 18)))} <small>STATICS</small>
             </strong>
             <span data-tone="neutral">
-              {remaining !== null && remaining > 0
+              {!emissions.period.expired && remaining !== null && remaining > 0
                 ? t("endsIn", {
                     days: Math.floor(remaining / 86_400),
                     hours: Math.floor((remaining % 86_400) / 3600),
@@ -305,13 +304,19 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
             <span
               key={day.day}
               data-latest={index === shown.length - 1 || undefined}
+              data-incomplete={
+                !day.coverage.historyComplete || day.coverage.omittedPools > 0 || undefined
+              }
               style={{
                 height: `${day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
               }}
-              title={`${day.day}: ${money(day.volume, false, dex.volume.data?.quote)}`}
+              title={`${day.day}: ${money(day.volume, false, dex.volume.data?.quote)}${!day.coverage.historyComplete || day.coverage.omittedPools > 0 ? ` · ${t("incompleteHistory")}` : ""}`}
             />
           ))}
         </div>
+        {bars.some((day) => !day.coverage.historyComplete || day.coverage.omittedPools > 0) && (
+          <span className={styles.muted}>{t("incompleteHistory")}</span>
+        )}
         {summary && summary.unpricedPools > 0 && (
           <span className={styles.muted}>
             {t("excludesUnpriced", { count: summary.unpricedPools })}

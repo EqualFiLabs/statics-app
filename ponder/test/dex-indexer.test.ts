@@ -187,6 +187,34 @@ describe("DEX event indexing", () => {
     });
     expect(trades[1].internal).toBe(true);
   });
+  it("settles valid public swaps with a zero output", async () => {
+    const d = domain();
+    await d.diamond("ProtocolPoolCreated", context, init());
+    await d.swap(
+      context,
+      event({ id, sender: address, amount0: -1n, amount1: 0n, sqrtPriceX96: 1n << 96n, tick: 0 })
+    );
+    await d.diamond(
+      "MarketSwapRecorded",
+      context,
+      event({
+        poolId: id,
+        poolDelta: -1n << 128n,
+        staticsFeesPacked: 0n,
+        nativeLpFee: 3000,
+        flags: 0,
+      })
+    );
+    const trade = JSON.parse(String([...rows.values()].find((r) => r.kind === "swap")?.details));
+    expect(trade).toMatchObject({ amountIn: "1", amountOut: "0", complete: true });
+  });
+  it("records reserve/directory observations for reorg validation without duplicate keys", async () => {
+    const d = domain(),
+      e = event({});
+    await d.observe(context, e);
+    await d.observe(context, e);
+    expect([...rows.values()].filter((r) => r.kind === "observation")).toHaveLength(1);
+  });
   it("fails closed on inconsistent source association", async () => {
     const d = domain();
     await d.diamond("ProtocolPoolCreated", context, init());

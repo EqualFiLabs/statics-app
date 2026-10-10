@@ -104,7 +104,8 @@ const phaseOneEventKey = (transactionHash: string, logIndex: number) =>
 
 const allocationIndex = allocationSnapshots(
   phaseOneDeploymentId || "unconfigured-phase-one",
-  phaseOneDiamondAddress || zeroAddress
+  phaseOneDiamondAddress || zeroAddress,
+  dexEnabled ? (context, event) => dex.observe(context, event as DexEvent) : undefined
 );
 const rewardRestrictionReadAbi = parseAbi([
   "function rewardRestricted(address) view returns (bool)",

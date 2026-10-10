@@ -75,7 +75,7 @@ export type DexSnapshot = {
 };
 export function marketSnapshotSql(deployment: string) {
   // All six endpoints share this MVCC snapshot. Swap history is aggregated in SQL rather than shipped to Node.
-  return sql`WITH cp AS (SELECT "latestCheckpoint" AS checkpoint FROM _ponder_checkpoint WHERE "chainName" = 'active'),
+  return sql`WITH cp AS (SELECT latest_checkpoint AS checkpoint FROM _ponder_checkpoint WHERE chain_name = 'active'),
   clock AS (SELECT substring(checkpoint,1,10)::numeric AS now FROM cp),
   history AS NOT MATERIALIZED (SELECT ${dexHistory.key} AS key, ${dexHistory.poolId} AS pool_id, ${dexHistory.kind} AS kind,
     ${dexHistory.timestamp} AS time, ${dexHistory.blockNumber} AS block, ${dexHistory.blockHash} AS hash, ${dexHistory.logIndex} AS log,
@@ -101,7 +101,7 @@ export function marketSnapshotSql(deployment: string) {
     CROSS JOIN LATERAL (SELECT key,pool_id,time,d FROM history WHERE pool_id = p.pool_id AND kind IN ('pool','swap','price')
       AND time <= b.time AND (d->>'priceTime')::numeric <= b.time AND d ? 'tick' ORDER BY block DESC,log DESC LIMIT 1) h WHERE p.deployment_id = ${deployment}),
   recent AS (SELECT * FROM trades ORDER BY block DESC, log DESC LIMIT 50),
-  topology AS ((SELECT * FROM history WHERE kind NOT IN ('swap','price') AND time >= (SELECT now - 90*86400 FROM clock))
+  topology AS ((SELECT * FROM history WHERE kind NOT IN ('swap','price','observation') AND time >= (SELECT now - 90*86400 FROM clock))
     UNION (SELECT DISTINCT ON (pool_id) * FROM history WHERE kind = 'pool' AND time < (SELECT now - 90*86400 FROM clock) ORDER BY pool_id,block DESC,log DESC))
   SELECT json_build_object(
     'checkpoint',(SELECT checkpoint FROM cp),

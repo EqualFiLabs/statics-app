@@ -423,6 +423,25 @@ beforeEach(() => {
 });
 
 describe("DEX overview", () => {
+  it("keeps emission expiry independent from a failed summary and marks incomplete volume", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "summary") throw new Error("summary unavailable");
+      if (endpoint === "volume")
+        return {
+          ...sample.volume,
+          days: sample.volume.days.map((d) => ({
+            ...d,
+            coverage: { ...d.coverage, historyComplete: false },
+          })),
+        };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    expect(await screen.findByText(/Ends in/)).toBeInTheDocument();
+    expect(screen.queryByText("Period ended")).not.toBeInTheDocument();
+    expect(await screen.findByText("Historical coverage is incomplete")).toBeInTheDocument();
+  });
   it("opens Phase 1 on the DEX with totals, pools, tokens, trades and emissions", async () => {
     withPhaseOne(<DeploymentOverview />);
     expect(await screen.findByRole("heading", { name: "Markets" })).toBeInTheDocument();

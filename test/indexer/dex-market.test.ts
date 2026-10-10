@@ -78,6 +78,23 @@ describe("DEX market responses", () => {
     const volume = structuredClone(sample.volume);
     volume.days[0]!.day = "2026-02-30";
     expect(() => parseDexVolume(volume, "dex-fixture")).toThrow();
+    const partial = structuredClone(sample.volume);
+    partial.days[0]!.coverage.historyComplete = false;
+    expect(parseDexVolume(partial, "dex-fixture").days[0]!.coverage.historyComplete).toBe(false);
+    expect(() =>
+      parseDexVolume(
+        {
+          ...partial,
+          days: [
+            {
+              ...partial.days[0],
+              coverage: { includedPools: 0, omittedPools: 0, historyComplete: "false" },
+            },
+          ],
+        },
+        "dex-fixture"
+      )
+    ).toThrow();
     expect(new DexMarketRestartError().name).toBe("DexMarketRestartError");
   });
   it("supports empty deployments, literal filters, sorting, pages and exact requested fixture ranges", () => {
