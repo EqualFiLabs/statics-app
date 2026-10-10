@@ -643,6 +643,72 @@ describe("review regressions", () => {
       expect(screen.getByRole("combobox", { name: "You receive asset" })).toHaveValue(usd)
     );
   });
+  it("warns in review when the route passes through an unreviewed pool", async () => {
+    const reviewedToken = (address: `0x${string}`, symbol: string) => ({
+      address,
+      symbol,
+      name: symbol,
+      decimals: 18,
+      metadataSource: "reviewed-manifest" as const,
+    });
+    const weth = deployment.contracts.weth;
+    // USD is reviewed through its own pool; the only route to it uses discovered pools.
+    const phaseOne = {
+      descriptor: { ...descriptor, deploymentId: "phase-one" },
+      contracts: { ...deployment.contracts, publicHook: zeroAddress },
+      supportedPools: [
+        {
+          poolId: `0x${"7".repeat(64)}`,
+          poolKey: {
+            currency0: middle2,
+            currency1: usd,
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: zeroAddress,
+          },
+          enabled: true,
+          token0: reviewedToken(middle2, "OTHER"),
+          token1: reviewedToken(usd, "USD"),
+        },
+      ],
+    } as unknown as PhaseOneDeployment;
+    const unreviewed = (address: `0x${string}`, symbol: string) => ({
+      address,
+      symbol,
+      name: symbol,
+      decimals: 18,
+      metadataSource: "onchain-import" as const,
+    });
+    mocks.discovered = [
+      [weth, middle],
+      [middle, usd],
+    ].map(([x, y], i) => ({
+      poolId: `0x${String(i + 8).repeat(64)}` as `0x${string}`,
+      poolKey: { currency0: x!, currency1: y!, fee: 3000, tickSpacing: 60, hooks: zeroAddress },
+      token0: x === weth ? reviewedToken(weth, "WETH") : unreviewed(x!, "MID"),
+      token1: y === usd ? reviewedToken(usd, "USD") : unreviewed(y!, "MID"),
+      reviewed: false,
+      swappable: true,
+    }));
+    mocks.call.mockResolvedValue({
+      data: encodeFunctionResult({
+        abi: v4PathQuoterAbi,
+        functionName: "quoteExactInput",
+        result: [100n * 10n ** 18n, 1n],
+      }),
+    });
+    render(ui({ ...option, phaseOne }, usd));
+    const amount = screen.getByRole("textbox", { name: "You pay amount" });
+    await waitFor(() => expect(amount).toHaveValue(""));
+    fireEvent.change(amount, { target: { value: "1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    expect(
+      screen.getByText(`Route: ETH → MID (${middle.slice(0, 6)}…${middle.slice(-4)}) → USD`)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("has not been reviewed");
+    mocks.discovered = [];
+  });
   it("does not quote a different pair when a linked token is unavailable", async () => {
     render(ui(option, usd));
     fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
@@ -706,6 +772,10 @@ describe("review regressions", () => {
         expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled()
       );
       fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+      // Review names the exact pools the swap will use.
+      expect(screen.getByText(/^Route: ETH → T0b → /)).toBeInTheDocument();
+      expect(screen.getByText("2 Statics pools on this route")).toBeInTheDocument();
+      expect(screen.queryByText(/has not been reviewed/)).not.toBeInTheDocument();
       refreshed = true;
       calls = 0;
       fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
@@ -730,8 +800,6 @@ describe("review regressions", () => {
         );
         expect(swap.path[0].intermediateCurrency).toBe(middle);
         expect(swap.amountOutMinimum).toBe(995n * 10n ** 17n);
-        expect(screen.queryByText("Route")).not.toBeInTheDocument();
-        expect(screen.queryByText("Pools")).not.toBeInTheDocument();
       }
     }
   );

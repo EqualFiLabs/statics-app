@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { getAddress, type Address } from "viem";
 import { v4PoolId } from "@statics-protocol/sdk/phase-one";
 import type { SupportedPublicPool } from "@/lib/deployments/types";
-import type { IndexedPublicPool } from "@/lib/indexer/phase-one";
 import {
   type IndexedSwapPool,
   mergePhaseOnePools,
@@ -13,10 +12,12 @@ import {
 const a = (n: string) => getAddress(`0x${n.repeat(40)}`) as Address;
 const hook = a("4");
 const key = { currency0: a("1"), currency1: a("2"), fee: 3000, tickSpacing: 60, hooks: hook };
-const indexed = (overrides: Partial<IndexedPublicPool> = {}) =>
+const indexed = (overrides: Partial<IndexedSwapPool> = {}) =>
   ({
     poolId: v4PoolId(key),
     poolKey: key,
+    gaugeInitialized: true,
+    gaugeStopped: false,
     quarantined: false,
     decommissioned: false,
     ...overrides,
@@ -113,4 +114,66 @@ describe("pool discovery", () => {
       mergePhaseOnePools([reviewed], [{ ...discovered, poolId: reviewed.poolId }])
     ).toHaveLength(1);
   });
+});
+
+describe("discovered pools on liquidity screens", () => {
+  it("adds unreviewed discovered pools to the deployment and keeps reviewed entries untouched", async () => {
+    const { withDiscoveredPools, hasUnreviewedToken } =
+      await import("@/lib/phase-one/pool-discovery");
+    const reviewedToken = {
+      address: getAddress(`0x${"1".repeat(40)}`),
+      symbol: "WETH",
+      name: "Wrapped Ether",
+      decimals: 18,
+      metadataSource: "reviewed-manifest" as const,
+    };
+    const reviewedPool = {
+      poolId: `0x${"a".repeat(64)}`,
+      poolKey: {} as never,
+      token0: reviewedToken,
+      token1: reviewedToken,
+      enabled: true,
+      provenance: { deploymentId: "d", protocolCommit: "c", registrationBlock: 1n },
+    } as const;
+    const deployment = { descriptor: { deploymentId: "d" }, supportedPools: [reviewedPool] };
+    const discovered = {
+      poolId: `0x${"b".repeat(64)}`,
+      poolKey: {} as never,
+      token0: reviewedToken,
+      token1: { ...reviewedToken, symbol: "NEW", metadataSource: "onchain-import" as const },
+      reviewed: false,
+      swappable: false,
+    } as const;
+    expect(withDiscoveredPools(deployment, [])).toBe(deployment);
+    const merged = withDiscoveredPools(deployment, [
+      { ...reviewedPool, reviewed: true, swappable: false },
+      discovered,
+    ] as never);
+    expect(merged.supportedPools).toHaveLength(2);
+    expect(merged.supportedPools[0]).toBe(reviewedPool);
+    expect(merged.supportedPools[1]).toMatchObject({
+      enabled: true,
+      provenance: { protocolCommit: "indexed-discovery" },
+    });
+    expect(hasUnreviewedToken(merged.supportedPools[1]!)).toBe(true);
+    expect(hasUnreviewedToken(reviewedPool)).toBe(false);
+  });
+});
+
+it("keeps paused pools manageable without making them deposit eligible", async () => {
+  const { liquidityDepositsAllowed } = await import("@/lib/phase-one/pool-discovery");
+  const id = `0x${"1".repeat(64)}` as const;
+  const pools = [{ poolId: id, swappable: false }] as never;
+  expect(liquidityDepositsAllowed(id, pools)).toBe(false);
+  expect(liquidityDepositsAllowed(id, [{ poolId: id, swappable: true }] as never)).toBe(true);
+});
+
+it("distinguishes swap quarantine from new-liquidity gauge eligibility", async () => {
+  const { liquidityDepositsAllowed } = await import("@/lib/phase-one/pool-discovery");
+  const stopped = discoverPhaseOnePool(indexed({ gaugeStopped: true }), hook);
+  const quarantined = discoverPhaseOnePool(indexed({ quarantined: true }), hook);
+  expect(stopped).toMatchObject({ swappable: true, liquidityEnabled: false });
+  expect(quarantined).toMatchObject({ swappable: false, liquidityEnabled: true });
+  expect(liquidityDepositsAllowed(v4PoolId(key), [stopped] as never)).toBe(false);
+  expect(liquidityDepositsAllowed(v4PoolId(key), [quarantined] as never)).toBe(true);
 });

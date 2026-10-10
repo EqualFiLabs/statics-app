@@ -414,6 +414,17 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                     </td>
                     <td className={styles.yield} data-label={t("column.yield")}>
                       {yieldText(pool)}
+                      {/* Less than a week of history: say how much the figure is based on. */}
+                      {pool.estimatedYieldBps !== null && !pool.yieldComponents.complete && (
+                        <span className={styles.yieldWindow}>
+                          {t("yieldWindow", {
+                            days: Math.max(
+                              1,
+                              Math.floor(Number(pool.yieldComponents.windowSeconds) / 86_400)
+                            ),
+                          })}
+                        </span>
+                      )}
                     </td>
                     <td className={styles.rowActions}>
                       <div className={styles.actions}>

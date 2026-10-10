@@ -88,6 +88,7 @@ export function dexFixture(
         gaugeCredits: unpriced ? null : usd(10),
         lpBribeAccrual: unpriced ? null : usd(10),
         complete: true,
+        windowSeconds: "604800",
         estimated: true,
       },
     };

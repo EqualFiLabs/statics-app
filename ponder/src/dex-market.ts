@@ -77,6 +77,8 @@ const zeroMetric = (id: string, bucket: string): Metric => ({
   swaps: "0",
   wallets: "0",
 });
+/** 52 weeks, matching the seven-day window annualised as × 52. */
+const YEAR_SECONDS = 52n * 604800n;
 export function buildMarket(
   s: DexSnapshot,
   deploymentId: string,
@@ -206,6 +208,10 @@ export function buildMarket(
     const gaugeValue =
       credits === 0n ? 0n : staticsAsset ? pricedValue(staticsAsset, credits) : null;
     const complete = BigInt(p.historyStart) <= now - 604800n;
+    // Yield annualises over the history that exists, up to seven days; under a day of history
+    // is too little to annualise. Every component above is summed over the same window.
+    const observed = now > BigInt(p.historyStart) ? now - BigInt(p.historyStart) : 0n;
+    const windowSeconds = observed < 604800n ? observed : 604800n;
     const earnings =
       weekly.lpFees !== null && gaugeValue !== null && bribeValue !== null
         ? weekly.lpFees + gaugeValue + bribeValue
@@ -228,8 +234,8 @@ export function buildMarket(
       incentiveStreams: allocation?.incentiveStreamCount ?? 0,
       emissionShareBps: Math.min(10000, emissionShare),
       estimatedYieldBps:
-        complete && earnings !== null && locked !== null && locked > 0n
-          ? numberBps((earnings * 52n * 10000n) / locked)
+        windowSeconds >= 86400n && earnings !== null && locked !== null && locked > 0n
+          ? numberBps((earnings * YEAR_SECONDS * 10000n) / (windowSeconds * locked))
           : null,
       priced: !!price(p.token0.address) && !!price(p.token1.address),
       source: p.source,
@@ -245,8 +251,9 @@ export function buildMarket(
         gaugeCreditedAmount: credits,
         gaugeRecycledAmount: recycled,
         complete,
+        windowSeconds,
         estimated: true,
-        basis: "seven-day-settlement-credits-and-modeled-lp-accrual",
+        basis: "trailing-window-settlement-credits-and-modeled-lp-accrual",
       },
       bribeAccrual: [...bribes].map(([asset, amount]) => ({ asset: metadata(asset), amount })),
       active: p.initialized && !p.decommissioned,

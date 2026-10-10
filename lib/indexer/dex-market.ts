@@ -70,6 +70,8 @@ export type DexPool = Readonly<{
     gaugeCredits: bigint | null;
     lpBribeAccrual: bigint | null;
     complete: boolean;
+    /** Seconds of history the yield is annualised over: one day to seven. */
+    windowSeconds: bigint;
     estimated: true;
   }>;
 }>;
@@ -239,7 +241,20 @@ export function parseDexPools(value: unknown, deploymentId: string): DexPoolPage
     if (!priced && valueLocked !== null) fail("unpriced pool value");
     const yieldComponents = object(p.yieldComponents, "yield components");
     const complete = boolean(yieldComponents.complete, "yield coverage");
-    if (yieldComponents.estimated !== true || (!complete && p.estimatedYieldBps !== null))
+    // Indexers before trailing-window yields send no window: a yield then implies a full week.
+    const windowSeconds =
+      yieldComponents.windowSeconds === undefined
+        ? complete
+          ? 604_800n
+          : 0n
+        : uint(yieldComponents.windowSeconds, "yield window");
+    // A yield needs at least a day of history; a full week is the complete window.
+    if (
+      yieldComponents.estimated !== true ||
+      windowSeconds > 604_800n ||
+      (complete && windowSeconds !== 604_800n) ||
+      (p.estimatedYieldBps !== null && windowSeconds < 86_400n)
+    )
       fail("estimated yield");
     return {
       poolId: hash(p.poolId, "pool ID"),
@@ -273,6 +288,7 @@ export function parseDexPools(value: unknown, deploymentId: string): DexPoolPage
         gaugeCredits: optionalUint(yieldComponents.gaugeCredits, "gauge credits"),
         lpBribeAccrual: optionalUint(yieldComponents.lpBribeAccrual, "LP bribe accrual"),
         complete,
+        windowSeconds,
         estimated: true,
       },
     };

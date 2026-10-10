@@ -912,7 +912,9 @@
     "unreviewedTitle": "未审核代币",
     "unreviewedHelp": "{tokens} 来自尚未审核的池。任何人都可以用任意名称或符号创建代币，交易前请核对地址。",
     "unreviewedAcknowledge": "我已核对地址，确认交易此代币。",
-    "linkedPairUnavailable": "此代币对不可用。请选择其他代币，或等待资金池发现完成。"
+    "linkedPairUnavailable": "此代币对不可用。请选择其他代币，或等待资金池发现完成。",
+    "routePools": "此路径经过 {count, plural, other {# 个 Statics 池}}",
+    "routeUnreviewedPool": "此路径经过尚未审核的池。确认前请核对路径上的每个代币。"
   },
   "positions": {
     "subject": "Position NFTs",
@@ -1650,7 +1652,12 @@
     "confirmed": "交易已确认。",
     "viewActivity": "查看活动",
     "poolUnavailable": "此池不可用。请选择已启用的池以继续。",
-    "positionUnavailable": "无法加载此仓位，或它不属于你的钱包。请选择池和你拥有的仓位以继续。"
+    "positionUnavailable": "无法加载此仓位，或它不属于你的钱包。请选择池和你拥有的仓位以继续。",
+    "depositsPaused": "此池暂不可添加流动性。你仍可管理已有仓位。",
+    "unreviewedPool": "未审核",
+    "unreviewedTitle": "未审核代币",
+    "unreviewedHelp": "此池包含尚未审核的 {tokens}。任何人都可以用任意名称或符号创建代币，添加流动性前请核对地址。",
+    "unreviewedAcknowledge": "我已核对地址，确认向此池添加流动性。"
   },
   "earnPortfolio": {
     "title": "所有仓位奖励",
@@ -2550,7 +2557,7 @@
     "addLiquidityTo": "为 {pool} 添加流动性",
     "noMatch": "没有匹配的池。",
     "noPools": "暂无池。",
-    "yieldNote": "估算年化收益基于七天的估算LP手续费、已记账Gauge奖励和建模LP贿赂累积。历史不足时显示—。",
+    "yieldNote": "预计收益 = 支付给流动性的手续费、STATICS 排放和激励，按过去 7 天年化；较新的池按已有历史（至少一天）年化。仅为估算，不作保证。",
     "tokensTitle": "代币",
     "via": "经由 {route}",
     "tradesTitle": "最近成交",
@@ -2572,6 +2579,7 @@
     "restartPools": "重新加载池列表",
     "incompleteHistory": "历史数据覆盖不完整",
     "unavailableHistory": "历史数据不可用",
-    "swapIn": "在 {pool} 中兑换"
+    "swapIn": "在 {pool} 中兑换",
+    "yieldWindow": "{days, plural, other {# 天}}历史"
   }
 }

@@ -912,7 +912,9 @@
     "unreviewedTitle": "Token sin revisar",
     "unreviewedHelp": "{tokens} proviene de un pool que no se ha revisado. Cualquiera puede crear un token con cualquier nombre o símbolo, así que comprueba la dirección antes de operar.",
     "unreviewedAcknowledge": "He comprobado la dirección y quiero operar este token.",
-    "linkedPairUnavailable": "Este par de tokens no está disponible. Elige otro token o espera a que termine la búsqueda de pools."
+    "linkedPairUnavailable": "Este par de tokens no está disponible. Elige otro token o espera a que termine la búsqueda de pools.",
+    "routePools": "{count, plural, one {# pool de Statics} other {# pools de Statics}} en esta ruta",
+    "routeUnreviewedPool": "Esta ruta pasa por un pool que no se ha revisado. Comprueba cada token de la ruta antes de confirmar."
   },
   "positions": {
     "subject": "Position NFTs",
@@ -1650,7 +1652,12 @@
     "confirmed": "Transacción confirmada.",
     "viewActivity": "Ver actividad",
     "poolUnavailable": "Este pool no está disponible. Elige un pool habilitado para continuar.",
-    "positionUnavailable": "No se pudo cargar esta posición o no pertenece a tu cartera. Elige un pool y una posición propia para continuar."
+    "positionUnavailable": "No se pudo cargar esta posición o no pertenece a tu cartera. Elige un pool y una posición propia para continuar.",
+    "depositsPaused": "No se puede añadir liquidez a este pool. Puedes seguir gestionando tu posición existente.",
+    "unreviewedPool": "Sin revisar",
+    "unreviewedTitle": "Token sin revisar",
+    "unreviewedHelp": "Este pool contiene {tokens}, que no se ha revisado. Cualquiera puede crear un token con cualquier nombre o símbolo, así que comprueba la dirección antes de añadir liquidez.",
+    "unreviewedAcknowledge": "He comprobado la dirección y quiero añadir liquidez a este pool."
   },
   "earnPortfolio": {
     "title": "Todas las recompensas de posiciones",
@@ -2550,7 +2557,7 @@
     "addLiquidityTo": "Añadir liquidez a {pool}",
     "noMatch": "Ningún pool coincide.",
     "noPools": "Aún no hay pools.",
-    "yieldNote": "El rendimiento anual estimado usa siete días de comisiones LP estimadas, recompensas gauge acreditadas e incentivos LP devengados. Sin historial se muestra —.",
+    "yieldNote": "Rend. est. = comisiones más emisiones de STATICS e incentivos pagados a la liquidez, anualizados a partir de los últimos 7 días, o del historial disponible si el pool es más reciente (al menos un día). Una estimación, no una promesa.",
     "tokensTitle": "Tokens",
     "via": "vía {route}",
     "tradesTitle": "Operaciones recientes",
@@ -2572,6 +2579,7 @@
     "restartPools": "Recargar directorio",
     "incompleteHistory": "La cobertura histórica está incompleta",
     "unavailableHistory": "Valores históricos no disponibles",
-    "swapIn": "Hacer swap en {pool}"
+    "swapIn": "Hacer swap en {pool}",
+    "yieldWindow": "{days, plural, one {# día} other {# días}} de historial"
   }
 }

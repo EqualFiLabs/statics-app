@@ -17,6 +17,8 @@ export type PhaseOnePool = Readonly<{
   reviewed: boolean;
   /** Trading is open: not decommissioned and not quarantined. */
   swappable: boolean;
+  /** New liquidity requires an initialized, running, non-decommissioned gauge. */
+  liquidityEnabled?: boolean;
 }>;
 
 /** Registered pool and cached currency metadata supplied by the typed indexer loader. */
@@ -30,6 +32,8 @@ export type IndexedSwapPool = Pick<
   | "decommissionStarted"
   | "decommissionFinalized"
   | "quarantined"
+  | "gaugeInitialized"
+  | "gaugeStopped"
 >;
 
 export type DiscoveryRejection = "pool-id" | "token-order" | "hook" | "key-mismatch" | "decimals";
@@ -83,12 +87,23 @@ export function discoverPhaseOnePool(
     token0: token(pool.token0),
     token1: token(pool.token1),
     reviewed: false,
+    liquidityEnabled: liquidityGaugeOpen(pool),
     swappable:
       !pool.decommissioned &&
       !pool.decommissionStarted &&
       !pool.decommissionFinalized &&
       !pool.quarantined,
   };
+}
+
+function liquidityGaugeOpen(pool: IndexedSwapPool): boolean {
+  return (
+    pool.gaugeInitialized &&
+    !pool.gaugeStopped &&
+    !pool.decommissioned &&
+    !pool.decommissionStarted &&
+    !pool.decommissionFinalized
+  );
 }
 
 /**
@@ -108,6 +123,17 @@ export function mergePhaseOnePools(
       token0: pool.token0,
       token1: pool.token1,
       reviewed: true,
+      liquidityEnabled: (() => {
+        const status = statuses.find(
+          (candidate) => candidate.poolId.toLowerCase() === pool.poolId.toLowerCase()
+        );
+        const indexedPool = discovered.find(
+          (candidate) => candidate.poolId.toLowerCase() === pool.poolId.toLowerCase()
+        );
+        return status
+          ? liquidityGaugeOpen(status)
+          : (indexedPool?.liquidityEnabled ?? indexedPool?.swappable ?? true);
+      })(),
       swappable: (() => {
         const status = statuses.find(
           (candidate) => candidate.poolId.toLowerCase() === pool.poolId.toLowerCase()
@@ -138,4 +164,55 @@ export function mergePhaseOnePools(
 /** True when a token's identity comes from the reviewed manifest. */
 export function isReviewedToken(token: Pick<PublicPoolToken, "metadataSource">) {
   return token.metadataSource === "reviewed-manifest";
+}
+
+/**
+ * The deployment with discovered pools added to its pool list, for surfaces built on
+ * `supportedPools` (liquidity). Reviewed pools keep their manifest entries unchanged;
+ * discovered pools remain available for owned-position management, and their tokens stay marked
+ * `onchain-import` so screens can warn before money goes in.
+ */
+export function withDiscoveredPools<
+  T extends Readonly<{
+    descriptor: Readonly<{ deploymentId: string }>;
+    supportedPools: readonly SupportedPublicPool[];
+  }>,
+>(deployment: T, pools: readonly PhaseOnePool[]): T {
+  const reviewed = new Set(deployment.supportedPools.map((pool) => pool.poolId.toLowerCase()));
+  const discovered = pools
+    .filter((pool) => !pool.reviewed && !reviewed.has(pool.poolId.toLowerCase()))
+    .map((pool): SupportedPublicPool => ({
+      poolId: pool.poolId,
+      poolKey: pool.poolKey,
+      token0: pool.token0,
+      token1: pool.token1,
+      enabled: true,
+      provenance: {
+        deploymentId: deployment.descriptor.deploymentId,
+        protocolCommit: "indexed-discovery",
+        registrationBlock: 0n,
+      },
+    }));
+  return discovered.length
+    ? { ...deployment, supportedPools: [...deployment.supportedPools, ...discovered] }
+    : deployment;
+}
+
+/** True when a pool's token comes from discovery rather than the reviewed manifest. */
+export function hasUnreviewedToken(
+  pool: Readonly<{
+    token0: Pick<PublicPoolToken, "metadataSource">;
+    token1: Pick<PublicPoolToken, "metadataSource">;
+  }>
+) {
+  return !isReviewedToken(pool.token0) || !isReviewedToken(pool.token1);
+}
+
+/** Deposit eligibility is independent of trading and access to an existing liquidity leg. */
+export function liquidityDepositsAllowed(poolId: Hex, pools: readonly PhaseOnePool[]): boolean {
+  return pools.some(
+    (pool) =>
+      pool.poolId.toLowerCase() === poolId.toLowerCase() &&
+      (pool.liquidityEnabled ?? pool.swappable)
+  );
 }

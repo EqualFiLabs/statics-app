@@ -2912,6 +2912,37 @@
   border-radius: var(--radius-lg);
 }
 
+/* A pool in the liquidity picker whose token has not been reviewed. */
+.liquidity-unreviewed-pill {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* The exact pools a reviewed multi-pool swap will use. */
+.portal-review-route {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.portal-review-route small {
+  color: var(--app-text-muted);
+}
+
+.portal-review-route p {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
 .portal-review {
   display: grid;
   gap: 1rem;

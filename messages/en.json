@@ -912,7 +912,9 @@
     "unreviewedTitle": "Unreviewed token",
     "unreviewedHelp": "{tokens} comes from a pool that has not been reviewed. Anyone can create a token with any name or symbol, so check the address before you trade.",
     "unreviewedAcknowledge": "I have checked the address and want to trade this token.",
-    "linkedPairUnavailable": "This token pair is unavailable. Choose another token or wait for pool discovery to finish."
+    "linkedPairUnavailable": "This token pair is unavailable. Choose another token or wait for pool discovery to finish.",
+    "routePools": "{count, plural, one {# Statics pool} other {# Statics pools}} on this route",
+    "routeUnreviewedPool": "This route passes through a pool that has not been reviewed. Check each token on the route before confirming."
   },
   "positions": {
     "subject": "Position NFTs",
@@ -1650,7 +1652,12 @@
     "confirmed": "Transaction confirmed.",
     "viewActivity": "View activity",
     "poolUnavailable": "This pool is unavailable. Choose an enabled pool to continue.",
-    "positionUnavailable": "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue."
+    "positionUnavailable": "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue.",
+    "depositsPaused": "New liquidity is unavailable for this pool. You can still manage your existing position.",
+    "unreviewedPool": "Unreviewed",
+    "unreviewedTitle": "Unreviewed token",
+    "unreviewedHelp": "This pool holds {tokens}, which has not been reviewed. Anyone can create a token with any name or symbol, so check the address before you add liquidity.",
+    "unreviewedAcknowledge": "I have checked the address and want to add liquidity to this pool."
   },
   "earnPortfolio": {
     "title": "All position rewards",
@@ -2550,7 +2557,7 @@
     "addLiquidityTo": "Add liquidity to {pool}",
     "noMatch": "No pools match.",
     "noPools": "No pools yet.",
-    "yieldNote": "Estimated annualized yield uses seven days of estimated LP fees, credited gauge rewards and modeled LP bribe accrual. Unavailable history is shown as —.",
+    "yieldNote": "Est. yield = trading fees plus STATICS emissions and incentives paid to liquidity, annualised from the last 7 days, or from the history available when a pool is newer (at least a day). An estimate, not a promise.",
     "tokensTitle": "Tokens",
     "via": "via {route}",
     "tradesTitle": "Recent trades",
@@ -2572,6 +2579,7 @@
     "restartPools": "Reload pool directory",
     "incompleteHistory": "Historical coverage is incomplete",
     "unavailableHistory": "Historical values unavailable",
-    "swapIn": "Swap in {pool}"
+    "swapIn": "Swap in {pool}",
+    "yieldWindow": "{days, plural, one {# day} other {# days}} of history"
   }
 }

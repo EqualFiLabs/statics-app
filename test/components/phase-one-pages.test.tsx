@@ -506,6 +506,30 @@ describe("DEX overview", () => {
     expect(within(row).getByText(/^1 STATICS = /)).toBeInTheDocument();
     expect(screen.getAllByText("1 unpriced pool excluded").length).toBeGreaterThan(0);
   });
+  it("labels a yield annualised from less than a week of history", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) =>
+          index === 0
+            ? {
+                ...pool,
+                yieldComponents: {
+                  ...pool.yieldComponents,
+                  complete: false,
+                  windowSeconds: "259200",
+                },
+              }
+            : pool
+        ),
+      };
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const pools = await screen.findByRole("region", { name: "Pools" });
+    expect(await within(pools).findByText("3 days of history")).toBeInTheDocument();
+  });
   it("says when market data is not available yet", async () => {
     mocks.dex.mockRejectedValue(new Error("404"));
     withPhaseOne(<DeploymentOverview />);

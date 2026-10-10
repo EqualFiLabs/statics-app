@@ -109,3 +109,26 @@ describe("DEX market responses", () => {
     expect(dexFixture(deployment, "usdg", { search: "missing" }).pools.total).toBe(0);
   });
 });
+
+describe("yield windows", () => {
+  it("accepts yields over at least a day of history and rejects shorter or inconsistent windows", () => {
+    const sample = dexFixture(deployment, "usdg");
+    const withWindow = (windowSeconds: string, complete: boolean, yieldBps: number | null) => {
+      const pools = structuredClone(sample.pools);
+      const pool = pools.items.find((item) => item.priced)!;
+      pool.yieldComponents = { ...pool.yieldComponents, windowSeconds, complete };
+      (pool as { estimatedYieldBps: number | null }).estimatedYieldBps = yieldBps;
+      return () => parseDexPools(pools, "dex-fixture");
+    };
+    expect(withWindow("259200", false, 1200)).not.toThrow();
+    expect(withWindow("86399", false, 1200)).toThrow();
+    expect(withWindow("86399", false, null)).not.toThrow();
+    expect(withWindow("259200", true, 1200)).toThrow();
+    expect(withWindow("700000", false, null)).toThrow();
+    // An older indexer without the field: yields only with a complete week, as before.
+    const legacy = structuredClone(sample.pools);
+    for (const pool of legacy.items)
+      delete (pool.yieldComponents as { windowSeconds?: string }).windowSeconds;
+    expect(() => parseDexPools(legacy, "dex-fixture")).not.toThrow();
+  });
+});

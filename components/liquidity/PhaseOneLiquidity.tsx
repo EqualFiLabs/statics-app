@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, parseEventLogs, encodeFunctionData, type Hex } from "viem";
 import Link from "next/link";
@@ -42,6 +42,13 @@ import { buildGaugeRewardResolution } from "@/lib/phase-one/gauges";
 import { gaugePrerequisites } from "@/lib/phase-one/reward-actions";
 import { earnHref } from "@/lib/rewards/earn";
 import { listedPublicPool, readPublicPoolState } from "@/lib/phase-one/pools";
+import { usePhaseOnePools } from "@/hooks/usePhaseOnePools";
+import {
+  hasUnreviewedToken,
+  isReviewedToken,
+  liquidityDepositsAllowed,
+  withDiscoveredPools,
+} from "@/lib/phase-one/pool-discovery";
 import { priceToAlignedTick, tickPrice, fractionalRewardAmount } from "@/lib/phase-one/prices";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
@@ -51,7 +58,7 @@ import { useAppLocale } from "@/i18n/client";
 type Mode = "provide" | "attach" | "increase" | "decrease" | "collect" | "rebalance" | "exit";
 
 export function PhaseOneLiquidity({
-  deployment,
+  deployment: reviewedDeployment,
   initialPositionId = null,
   initialPoolId = null,
 }: {
@@ -61,6 +68,13 @@ export function PhaseOneLiquidity({
 }) {
   const t = useTranslations("phaseOne");
   const ux = useTranslations("liquidityUx");
+  // Pools registered after the manifest was reviewed join the list, marked unreviewed.
+  const discovery = usePhaseOnePools(reviewedDeployment);
+  const deployment = useMemo(
+    () => withDiscoveredPools(reviewedDeployment, discovery.pools),
+    [reviewedDeployment, discovery.pools]
+  );
+  const canDeposit = (id: Hex) => liquidityDepositsAllowed(id, discovery.pools);
   const [screen, setView] = useState<"list" | "pool" | "deposit" | "detail" | "focus">(
     initialPositionId !== null ? "focus" : "list"
   );
@@ -69,7 +83,7 @@ export function PhaseOneLiquidity({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<bigint | null>(null);
   const [poolId, setPoolId] = useState(
-    initialPoolId ?? deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? ""
+    initialPoolId ?? deployment.supportedPools.find((pool) => canDeposit(pool.poolId))?.poolId ?? ""
   );
   const initial = useQuery({
     queryKey: [
@@ -190,14 +204,16 @@ export function PhaseOneLiquidity({
             leg.positionId === initialPositionId &&
             (!initialPoolId || leg.poolId.toLowerCase() === initialPoolId.toLowerCase()) &&
             deployment.supportedPools.some(
-              (pool) => pool.enabled && pool.poolId.toLowerCase() === leg.poolId.toLowerCase()
+              (pool) => pool.poolId.toLowerCase() === leg.poolId.toLowerCase()
             )
         )
       : null;
   const view = screen === "focus" ? (focusedLeg ? "detail" : "deposit") : screen;
   const activePoolId = focusedLeg?.poolId ?? poolId;
   const activePoolAvailable = deployment.supportedPools.some(
-    (pool) => pool.enabled && pool.poolId.toLowerCase() === activePoolId.toLowerCase()
+    (pool) =>
+      pool.poolId.toLowerCase() === activePoolId.toLowerCase() &&
+      (view === "detail" || canDeposit(pool.poolId))
   );
   const focusError =
     screen === "focus" &&
@@ -342,7 +358,7 @@ export function PhaseOneLiquidity({
           <h3>{ux("choosePool")}</h3>
           <div className="liquidity-pool-options">
             {deployment.supportedPools
-              .filter((pool) => pool.enabled)
+              .filter((pool) => canDeposit(pool.poolId))
               .map((pool) => (
                 <button
                   className={`liquidity-pool-option${poolId === pool.poolId ? " is-selected" : ""}`}
@@ -359,6 +375,9 @@ export function PhaseOneLiquidity({
                     {pool.token0.symbol} / {pool.token1.symbol}
                   </strong>
                   <span>{ux("feeTier", { fee: pool.poolKey.fee / 10000 })}</span>
+                  {hasUnreviewedToken(pool) && (
+                    <span className="liquidity-unreviewed-pill">{ux("unreviewedPool")}</span>
+                  )}
                 </button>
               ))}
           </div>
@@ -367,7 +386,8 @@ export function PhaseOneLiquidity({
             className="ui-button ui-button--primary"
             disabled={
               !deployment.supportedPools.some(
-                (pool) => pool.enabled && pool.poolId.toLowerCase() === poolId.toLowerCase()
+                (pool) =>
+                  canDeposit(pool.poolId) && pool.poolId.toLowerCase() === poolId.toLowerCase()
               )
             }
             type="button"
@@ -384,7 +404,9 @@ export function PhaseOneLiquidity({
             type="button"
             onClick={() => {
               action.cancel();
-              setPoolId(deployment.supportedPools.find((pool) => pool.enabled)?.poolId ?? "");
+              setPoolId(
+                deployment.supportedPools.find((pool) => canDeposit(pool.poolId))?.poolId ?? ""
+              );
               setView("pool");
             }}
           >
@@ -449,6 +471,7 @@ export function PhaseOneLiquidity({
               positionId={BigInt(resolved)}
               poolId={activePoolId as Hex}
               detail={view === "detail"}
+              depositsAllowed={canDeposit(activePoolId as Hex)}
             />
           ) : (
             <p className="liquidity-muted">{ux("chooseDestination")}</p>
@@ -476,7 +499,7 @@ function LiquidityPositionCard({
   const configured = deployment.supportedPools.find(
     (pool) => pool.poolId.toLowerCase() === leg.poolId.toLowerCase()
   );
-  const pool = configured?.enabled ? listedPublicPool(configured) : null;
+  const pool = configured ? listedPublicPool({ ...configured, enabled: true }) : null;
   const state = useQuery({
     queryKey: protocolQueryKeys.phaseOnePool(deployment.descriptor.deploymentId, leg.poolId),
     enabled: action.ready && Boolean(pool),
@@ -581,11 +604,13 @@ function ManagedLiquidity({
   positionId,
   poolId,
   detail,
+  depositsAllowed,
 }: {
   deployment: PhaseOneDeployment;
   positionId: bigint;
   poolId: Hex;
   detail: boolean;
+  depositsAllowed: boolean;
 }) {
   const t = useTranslations("phaseOne");
   const ux = useTranslations("liquidityUx");
@@ -595,11 +620,14 @@ function ManagedLiquidity({
   const [fundWithEth, setFundWithEth] = useState(false);
   const [inverted, setInverted] = useState(false);
   const [exact, setExact] = useState<0 | 1>(0);
-  const action = usePhaseOneAction(deployment, `${positionId}:${poolId}`);
+  const action = usePhaseOneAction(deployment, `${positionId}:${poolId}:${depositsAllowed}`);
   const queryClient = useQueryClient();
-  const pool = listedPublicPool(
-    deployment.supportedPools.find((entry) => entry.poolId.toLowerCase() === poolId.toLowerCase())!
-  );
+  const pool = listedPublicPool({
+    ...deployment.supportedPools.find(
+      (entry) => entry.poolId.toLowerCase() === poolId.toLowerCase()
+    )!,
+    enabled: true,
+  });
   const [mode, setMode] = useState<Mode>("provide");
   const [fullRange, setFullRange] = useState(true);
   const [lower, setLower] = useState("");
@@ -651,6 +679,11 @@ function ManagedLiquidity({
         : mode;
   const deposits =
     selectedMode === "provide" || selectedMode === "increase" || selectedMode === "rebalance";
+  // Money going into a pool with an unreviewed token needs its addresses checked first.
+  const unreviewedTokens = [pool.token0, pool.token1].filter((token) => !isReviewedToken(token));
+  const [acknowledgedPool, setAcknowledgedPool] = useState<string | null>(null);
+  const needsAcknowledgement =
+    deposits && unreviewedTokens.length > 0 && acknowledgedPool !== pool.poolId;
   const withdrawals =
     selectedMode === "decrease" ||
     selectedMode === "exit" ||
@@ -933,6 +966,9 @@ function ManagedLiquidity({
   };
   const prepare = () =>
     action.prepare(async () => {
+      if (!depositsAllowed && (deposits || selectedMode === "attach"))
+        throw new Error(ux("depositsPaused"));
+      if (needsAcknowledgement) throw new Error(ux("unreviewedAcknowledge"));
       setCompleted(false);
       if (!action.publicClient || !action.wallet) throw new Error(t("connect"));
       if (selectedMode === "attach") {
@@ -1343,7 +1379,7 @@ function ManagedLiquidity({
                 <button
                   className="ui-button ui-button--primary"
                   type="button"
-                  disabled={action.busy}
+                  disabled={action.busy || !depositsAllowed}
                   onClick={() => selectMode("increase")}
                 >
                   {ux("addLiquidity")}
@@ -1368,7 +1404,7 @@ function ManagedLiquidity({
                   <summary>{ux("more")}</summary>
                   <button
                     type="button"
-                    disabled={action.busy}
+                    disabled={action.busy || !depositsAllowed}
                     onClick={() => selectMode("rebalance")}
                   >
                     {t("rebalance")}
@@ -1377,13 +1413,19 @@ function ManagedLiquidity({
               </>
             )}
             {managed.data && !active && !managed.data.claimOnly && (
-              <button className="ui-button" type="button" onClick={() => selectMode("provide")}>
+              <button
+                className="ui-button"
+                type="button"
+                disabled={!depositsAllowed}
+                onClick={() => selectMode("provide")}
+              >
                 {ux("addLiquidity")}
               </button>
             )}
           </div>
         </>
       )}
+      {!depositsAllowed && <p role="note">{ux("depositsPaused")}</p>}
       <div className={`liquidity-editor${!editing ? " is-summary" : ""}`}>
         <section className="ui-card liquidity-price-card">
           <div className="liquidity-card-heading">
@@ -1532,6 +1574,29 @@ function ManagedLiquidity({
                 {fundWithEth && <span className="liquidity-muted">{ux("nativeHelp")}</span>}
               </label>
             )}
+            {deposits && unreviewedTokens.length > 0 && (
+              <div className="portal-unreviewed" role="note">
+                <strong>{ux("unreviewedTitle")}</strong>
+                <p>
+                  {ux("unreviewedHelp", {
+                    tokens: unreviewedTokens
+                      .map((token) => `${token.symbol} (${token.address})`)
+                      .join(", "),
+                  })}
+                </p>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={acknowledgedPool === pool.poolId}
+                    onChange={(event) => {
+                      action.cancel();
+                      setAcknowledgedPool(event.target.checked ? pool.poolId : null);
+                    }}
+                  />
+                  {ux("unreviewedAcknowledge")}
+                </label>
+              </div>
+            )}
             <fieldset disabled={!action.ready || action.busy}>
               {selectedMode === "attach" ? (
                 <label className="basket-field">
@@ -1667,6 +1732,8 @@ function ManagedLiquidity({
                   disabled={
                     !state.data ||
                     !managed.data ||
+                    needsAcknowledgement ||
+                    (!depositsAllowed && (deposits || selectedMode === "attach")) ||
                     Boolean(inputError) ||
                     (deposits &&
                       selectedMode !== "rebalance" &&

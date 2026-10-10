@@ -116,6 +116,66 @@ describe("market accounting and history coverage", () => {
     b = buildMarket(s, "selected", config, "0x0000000000000000000000000000000000000099");
     expect(b.pools[0]!.estimatedYieldBps).toBeNull();
   });
+  it("annualises yield over the history available, from one day to seven", () => {
+    const s = snapshot(),
+      p = s.pools[0]!;
+    s.metrics = [metric({ bucket: "week" })];
+    s.history = [
+      {
+        key: "a",
+        poolId: p.poolId,
+        kind: "accrual",
+        timestamp: "999999",
+        blockNumber: "10",
+        blockHash: "0x00",
+        logIndex: 1,
+        details: [
+          {
+            asset: p.token1.address,
+            slot: 1,
+            start: "900000",
+            finish: "1000000",
+            from: "900000",
+            to: "1000000",
+            budget: "1000000000000000000",
+          },
+        ],
+      },
+      {
+        key: "b",
+        poolId: p.poolId,
+        kind: "credit",
+        timestamp: "999999",
+        blockNumber: "10",
+        blockHash: "0x00",
+        logIndex: 2,
+        details: { amount: "1000000000000000000" },
+      },
+      {
+        key: "c",
+        poolId: p.poolId,
+        kind: "recycle",
+        timestamp: "999999",
+        blockNumber: "10",
+        blockHash: "0x00",
+        logIndex: 3,
+        details: { amount: "5000000000000000000" },
+      },
+    ];
+    s.pools[0]!.historyStart = "0";
+    const week = buildMarket(s, "selected", config, p.token0.address).pools[0]!;
+    // Three days of history: the same earnings annualised over a shorter window.
+    s.pools[0]!.historyStart = String(1_000_000 - 3 * 86_400);
+    const partial = buildMarket(s, "selected", config, p.token0.address).pools[0]!;
+    expect(week.yieldComponents).toMatchObject({ complete: true, windowSeconds: 604_800n });
+    expect(partial.yieldComponents).toMatchObject({ complete: false, windowSeconds: 259_200n });
+    expect(partial.estimatedYieldBps! / week.estimatedYieldBps!).toBeCloseTo(7 / 3, 2);
+    // Under a day of history is too little to annualise.
+    s.pools[0]!.historyStart = String(1_000_000 - 23 * 3600);
+    expect(
+      buildMarket(s, "selected", config, p.token0.address).pools[0]!.estimatedYieldBps
+    ).toBeNull();
+  });
   it("never invents TVL or seven-day history when liquidity or swap history is incomplete", () => {
     const s = snapshot();
     s.pools[0]!.liquidityComplete = false;

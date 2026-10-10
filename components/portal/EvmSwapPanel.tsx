@@ -777,6 +777,22 @@ export function EvmSwapPanel({
     }
   };
 
+  /** The tokens a multi-pool path passes through, by symbol, starting with what is paid. */
+  const routeText = (path: readonly PathHop[]) =>
+    [
+      source?.symbol ?? "",
+      ...path.map((hop) => {
+        const token = tokens.find(
+          (candidate) => candidate.address.toLowerCase() === hop.intermediateCurrency.toLowerCase()
+        );
+        return token
+          ? token.reviewed === false
+            ? `${token.symbol} (${token.address.slice(0, 6)}…${token.address.slice(-4)})`
+            : token.symbol
+          : `${hop.intermediateCurrency.slice(0, 6)}…${hop.intermediateCurrency.slice(-4)}`;
+      }),
+    ].join(" → ");
+
   const actionLabel =
     walletRecovery === "login"
       ? t("connectWallet")
@@ -893,6 +909,7 @@ export function EvmSwapPanel({
       </fieldset>
       {quote?.quote && (
         <dl className="portal-quote-grid">
+          {quote.path && <QuoteDatum label={t("route")} value={routeText(quote.path)} />}
           <QuoteDatum
             label={t("minimumReceived")}
             value={
@@ -955,6 +972,17 @@ export function EvmSwapPanel({
               {displayAmount(outputRaw, destination)} {destination?.symbol}
             </span>
           </div>
+          {review?.path && (
+            <div className="portal-review-route">
+              <span>
+                {t("route")}: {routeText(review.path)}
+              </span>
+              <small>{t("routePools", { count: review.path.length })}</small>
+              {review.path.some((hop) => !hop.reviewed) && (
+                <p role="note">{t("routeUnreviewedPool")}</p>
+              )}
+            </div>
+          )}
           <button
             className="portal-primary-action"
             type="button"

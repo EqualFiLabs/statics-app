@@ -43,6 +43,20 @@ vi.mock("wagmi", () => ({
   }),
 }));
 vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
+vi.mock("@/hooks/usePhaseOnePools", async () => {
+  const { mergePhaseOnePools } = await vi.importActual<
+    typeof import("@/lib/phase-one/pool-discovery")
+  >("@/lib/phase-one/pool-discovery");
+  return {
+    usePhaseOnePools: (deployment: PhaseOneDeployment) => ({
+      pools: mergePhaseOnePools(deployment.supportedPools, discoveredPools.value),
+      discovering: false,
+    }),
+  };
+});
+const discoveredPools = vi.hoisted(() => ({
+  value: [] as import("@/lib/phase-one/pool-discovery").PhaseOnePool[],
+}));
 vi.mock("@/lib/indexer/phase-one", () => ({
   loadIndexedPhaseOnePositions: mocks.positions,
   loadIndexedManagedLiquidity: mocks.legs,
@@ -130,6 +144,7 @@ function tree(
 }
 const fiveZero = [0n, 0n, 0n, 0n, 0n];
 beforeEach(() => {
+  discoveredPools.value = [];
   mocks.native = 10n ** 19n;
   mocks.position.mockReset().mockImplementation(async (id: bigint) => indexed(id));
   mocks.legs.mockReset().mockImplementation(async () => [
@@ -530,7 +545,7 @@ it("shows unavailable indexed pools without crashing or hiding retained rewards"
     ...option,
     phaseOne: {
       ...deployment,
-      supportedPools: deployment.supportedPools.map((pool) => ({ ...pool, enabled: false })),
+      supportedPools: [],
     },
   };
   render(tree(null, null, disabled));
@@ -714,5 +729,79 @@ it("accepts a mixed-case bytes32 pool deep link", async () => {
   expect(
     screen.queryByText("This pool is unavailable. Choose an enabled pool to continue.")
   ).not.toBeInTheDocument();
+  expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+it("lists a discovered pool as unreviewed and asks for its token to be checked before depositing", async () => {
+  const fresh = address("7");
+  const { v4PoolId } = await import("@statics-protocol/sdk/phase-one");
+  const freshKey = { ...key, currency1: fresh };
+  discoveredPools.value = [
+    {
+      poolId: v4PoolId(freshKey),
+      poolKey: freshKey,
+      token0: token("2", "STATICS"),
+      token1: { ...token("7", "NEWX"), metadataSource: "onchain-import" },
+      reviewed: false,
+      swappable: true,
+    },
+  ] as never;
+  render(tree());
+  fireEvent.click((await screen.findAllByRole("button", { name: /Add liquidity$/ }))[0]!);
+  const option = screen.getByRole("button", { name: /STATICS \/ NEWX/ });
+  expect(option).toHaveTextContent("Unreviewed");
+  fireEvent.click(option);
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Deposit STATICS" }), {
+    target: { value: "1" },
+  });
+  const warning = screen.getByRole("note");
+  expect(warning).toHaveTextContent(fresh);
+  const review = screen.getByRole("button", { name: "Review Add liquidity" });
+  expect(review).toBeDisabled();
+  fireEvent.click(
+    screen.getByRole("checkbox", {
+      name: "I have checked the address and want to add liquidity to this pool.",
+    })
+  );
+  await waitFor(() => expect(review).toBeEnabled());
+  fireEvent.click(review);
+  await screen.findByRole("button", { name: "Confirm transaction" });
+  fireEvent.click(
+    screen.getByRole("checkbox", {
+      name: "I have checked the address and want to add liquidity to this pool.",
+    })
+  );
+  expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument();
+  expect(review).toBeDisabled();
+  discoveredPools.value = [];
+});
+
+it.each([true, false])("keeps a paused pool manageable (reviewed: %s)", async (reviewed) => {
+  mocks.liquidity = 10n ** 18n;
+  discoveredPools.value = [
+    {
+      poolId,
+      poolKey: key,
+      token0: token("2", "STATICS"),
+      token1: token("3", "WETH"),
+      reviewed,
+      swappable: true,
+      liquidityEnabled: false,
+    },
+  ] as never;
+  const active = reviewed ? option : { ...option, phaseOne: { ...deployment, supportedPools: [] } };
+  render(tree(1n, poolId, active));
+  expect(await screen.findByRole("button", { name: "Remove liquidity" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Add liquidity" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Collect fees" })).toBeEnabled();
+  expect(
+    screen.queryByText("This pool is unavailable. Choose an enabled pool to continue.")
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Collect fees" }));
+  const review = screen.getByRole("button", { name: "Review Collect fees" });
+  await waitFor(() => expect(review).toBeEnabled());
+  fireEvent.click(review);
+  expect(await screen.findByRole("button", { name: "Confirm transaction" })).toBeEnabled();
   expect(mocks.execute).not.toHaveBeenCalled();
 });
