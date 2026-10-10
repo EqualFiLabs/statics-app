@@ -85,15 +85,6 @@
   overflow-wrap: anywhere;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: var(--visual-brand);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .description {
   max-width: 620px;
   margin: 0;

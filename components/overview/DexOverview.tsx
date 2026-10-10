@@ -189,7 +189,6 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
     <div className={styles.page}>
       <AppPageHeader
         feature="overview"
-        eyebrow={t("eyebrow")}
         title={t("title")}
         description={t("lead")}
         actions={

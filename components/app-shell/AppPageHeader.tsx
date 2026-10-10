@@ -7,7 +7,6 @@ export function AppPageHeader({
   feature,
   title,
   description,
-  eyebrow,
   compact = false,
   actions,
   className = "",
@@ -15,7 +14,6 @@ export function AppPageHeader({
   feature: DappRouteId;
   title: string;
   description: string;
-  eyebrow?: string;
   compact?: boolean;
   actions?: ReactNode;
   className?: string;
@@ -26,7 +24,6 @@ export function AppPageHeader({
       data-feature={feature}
     >
       <div className={styles.copy}>
-        {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
         <h1>{title}</h1>
         <p className={styles.description}>{description}</p>
       </div>

@@ -287,7 +287,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const tLaunchRoutes = useTranslations("launchRoutes");
   const routeCopy = {
     label: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.label`) : tRoutes(`${routeId}.label`),
-    status: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.status`) : tRoutes(`${routeId}.status`),
     title: useLaunchRouteCopy ? tLaunchRoutes(`${routeId}.title`) : tRoutes(`${routeId}.title`),
     description: useLaunchRouteCopy
       ? tLaunchRoutes(`${routeId}.description`)
@@ -434,7 +433,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
               <AppPageHeader
                 feature={routeId}
-                eyebrow={routeCopy.status}
                 title={routeCopy.title}
                 description={routeCopy.description}
                 compact={detailParent !== null}
