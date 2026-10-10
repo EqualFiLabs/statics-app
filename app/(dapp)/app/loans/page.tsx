@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { LoansPage } from "@/components/loans/LoansPage";
 import { readBorrowDestination } from "@/lib/loans/loans";
 
-export const metadata: Metadata = {
-  title: "Loans | Statics",
-  description: "Review PositionNFT loan tranches, maturities, and recovery state.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.loans");
+  return { title: t("title"), description: t("description") };
+}
 
 export default async function LoansRoute({
   searchParams,

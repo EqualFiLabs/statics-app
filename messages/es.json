@@ -43,6 +43,59 @@
     "wallet": {
       "title": "Billetera",
       "description": "Consulta saldos, añade fondos, envía activos y gestiona NFT en Statics."
+    },
+    "activity": {
+      "title": "Actividad",
+      "description": "Tus transacciones de Statics y su estado."
+    },
+    "basket": {
+      "title": "Detalles de la cesta",
+      "description": "Consulta, acuña y canjea una cesta actual de Statics."
+    },
+    "baskets": {
+      "title": "Cestas",
+      "description": "Descubre y consulta las cestas actuales de Statics."
+    },
+    "createBasket": {
+      "title": "Crear cesta",
+      "description": "Revisa la configuración de una cesta de Statics sin permisos antes de crearla."
+    },
+    "dollar": {
+      "title": "Dólar",
+      "description": "Deposita garantía en WETH o recombina Statics Dollar y participaciones de riesgo."
+    },
+    "faucet": {
+      "title": "Faucet",
+      "description": "Reclama y añade activos de la testnet de Robinhood Chain."
+    },
+    "operatorRecoveries": {
+      "title": "Recuperaciones de Operators",
+      "description": "Encuentra NFT de Operators cuyo crédito garantizado ha vencido y recupéralos por el incentivo para quien lo ejecuta."
+    },
+    "liquidity": {
+      "title": "Liquidez",
+      "description": "Aporta liquidez a los pools de Statics y gestiona tus posiciones y recompensas."
+    },
+    "loans": {
+      "title": "Préstamos",
+      "description": "Revisa los préstamos de tus cuentas, sus vencimientos y su estado de recuperación."
+    },
+    "account": {
+      "title": "Detalles de la cuenta",
+      "description": "Saldos, historial y controles de una de tus cuentas de Statics."
+    },
+    "accounts": {
+      "title": "Cuentas",
+      "description": "Tus cuentas de Statics: saldos, historial y controles."
+    },
+    "earn": {
+      "title": "Ganar",
+      "description": "Haz staking de STATICS, asigna a pools y cobra recompensas en todas tus cuentas.",
+      "viewTitle": "{view} · Ganar"
+    },
+    "tools": {
+      "title": "Herramientas de aprobación",
+      "description": "Revisa, habilita y revoca las aprobaciones de la aplicación Statics."
     }
   },
   "navigation": {
@@ -1161,7 +1214,7 @@
     "operatorTransferConsequence": "Consecuencia de transferir el Operator",
     "removeCollection": "Eliminar {name}",
     "noNfts": "Aún no hay NFT",
-    "noNftsDescription": "Las cuentas (Position NFT) y las posiciones de liquidez aparecen aquí. Crea una cesta o aporta liquidez y el NFT que la representa aparecerá en tu billetera.",
+    "noNftsDescription": "Las cuentas (Position NFT) y las posiciones de liquidez aparecen aquí. Abre una cuenta o aporta liquidez y el NFT que la representa aparecerá en tu billetera.",
     "operatorNftsSyncing": "Tus NFT de Operator se están sincronizando",
     "operatorNftsSyncingDescription": "El indexador se está poniendo al día. Los Operators adquiridos recientemente pueden aparecer en breve.",
     "browseBaskets": "Explorar cestas",
@@ -1175,7 +1228,8 @@
     "invalidRecipient": "Introduce una dirección de destino válida que no sea la tuya.",
     "transferIncomplete": "La transferencia no se completó.",
     "clientUnavailable": "No hay ningún cliente disponible para esta red.",
-    "collectionAddFailed": "No se pudo añadir esa colección."
+    "collectionAddFailed": "No se pudo añadir esa colección.",
+    "addLiquidity": "Aportar liquidez"
   },
   "dollar": {
     "collateralProfile": "Perfil de colateral",

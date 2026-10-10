@@ -43,6 +43,59 @@
     "wallet": {
       "title": "Wallet",
       "description": "View balances, fund your account, send assets, and manage NFTs in Statics."
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Your Statics transactions and their status."
+    },
+    "basket": {
+      "title": "Basket details",
+      "description": "Inspect, mint, and redeem a current Statics basket."
+    },
+    "baskets": {
+      "title": "Baskets",
+      "description": "Discover and inspect current Statics baskets."
+    },
+    "createBasket": {
+      "title": "Create basket",
+      "description": "Review a permissionless Statics basket configuration before creation."
+    },
+    "dollar": {
+      "title": "Dollar",
+      "description": "Deposit WETH collateral or recombine Statics Dollar and risk shares."
+    },
+    "faucet": {
+      "title": "Faucet",
+      "description": "Claim and add Robinhood Chain testnet assets."
+    },
+    "operatorRecoveries": {
+      "title": "Operator recoveries",
+      "description": "Find Operators NFTs whose secured credit has matured and recover them for the caller incentive."
+    },
+    "liquidity": {
+      "title": "Liquidity",
+      "description": "Add liquidity to Statics pools and manage your positions and rewards."
+    },
+    "loans": {
+      "title": "Loans",
+      "description": "Review account loans, maturities, and recovery state."
+    },
+    "account": {
+      "title": "Account details",
+      "description": "Balances, history and controls for one of your Statics accounts."
+    },
+    "accounts": {
+      "title": "Accounts",
+      "description": "Your Statics accounts: balances, history and controls."
+    },
+    "earn": {
+      "title": "Earn",
+      "description": "Stake STATICS, allocate to pools and collect rewards across your accounts.",
+      "viewTitle": "{view} · Earn"
+    },
+    "tools": {
+      "title": "Approval tools",
+      "description": "Review, enable, and revoke Statics application approvals."
     }
   },
   "navigation": {
@@ -1161,7 +1214,7 @@
     "operatorTransferConsequence": "Operator transfer consequence",
     "removeCollection": "Remove {name}",
     "noNfts": "No NFTs yet",
-    "noNftsDescription": "Accounts (Position NFTs) and liquidity positions appear here. Mint a basket or supply liquidity and the NFT that represents it shows up in your wallet.",
+    "noNftsDescription": "Accounts (Position NFTs) and liquidity positions appear here. Open an account or add liquidity and the NFT that represents it shows up in your wallet.",
     "operatorNftsSyncing": "Your Operator NFTs are syncing",
     "operatorNftsSyncingDescription": "The indexer is catching up. Recently acquired Operators may appear shortly.",
     "browseBaskets": "Browse baskets",
@@ -1175,7 +1228,8 @@
     "invalidRecipient": "Enter a valid recipient address that is not your own.",
     "transferIncomplete": "The transfer did not complete.",
     "clientUnavailable": "No client is available for this network.",
-    "collectionAddFailed": "That collection could not be added."
+    "collectionAddFailed": "That collection could not be added.",
+    "addLiquidity": "Add liquidity"
   },
   "dollar": {
     "collateralProfile": "Collateral profile",

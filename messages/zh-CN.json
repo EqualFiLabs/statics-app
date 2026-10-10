@@ -43,6 +43,59 @@
     "wallet": {
       "title": "钱包",
       "description": "在 Statics 中查看余额、为账户充值、发送资产并管理 NFT。"
+    },
+    "activity": {
+      "title": "活动",
+      "description": "你的 Statics 交易及其状态。"
+    },
+    "basket": {
+      "title": "篮子详情",
+      "description": "查看、铸造和赎回当前的 Statics 篮子。"
+    },
+    "baskets": {
+      "title": "篮子",
+      "description": "发现并查看当前的 Statics 篮子。"
+    },
+    "createBasket": {
+      "title": "创建篮子",
+      "description": "在创建前审核无需许可的 Statics 篮子配置。"
+    },
+    "dollar": {
+      "title": "美元",
+      "description": "存入 WETH 抵押品，或将 Statics Dollar 与风险份额重新组合。"
+    },
+    "faucet": {
+      "title": "水龙头",
+      "description": "领取并添加 Robinhood Chain 测试网资产。"
+    },
+    "operatorRecoveries": {
+      "title": "Operator 回收",
+      "description": "查找担保信贷已到期的 Operators NFT，并回收以获得调用者激励。"
+    },
+    "liquidity": {
+      "title": "流动性",
+      "description": "向 Statics 池提供流动性，并管理你的头寸和奖励。"
+    },
+    "loans": {
+      "title": "贷款",
+      "description": "查看账户贷款、到期时间和回收状态。"
+    },
+    "account": {
+      "title": "账户详情",
+      "description": "你的某个 Statics 账户的余额、历史和操作。"
+    },
+    "accounts": {
+      "title": "账户",
+      "description": "你的 Statics 账户：余额、历史和操作。"
+    },
+    "earn": {
+      "title": "赚取",
+      "description": "质押 STATICS、分配到池，并领取所有账户的奖励。",
+      "viewTitle": "{view} · 赚取"
+    },
+    "tools": {
+      "title": "授权工具",
+      "description": "查看、启用和撤销 Statics 应用授权。"
     }
   },
   "navigation": {
@@ -1161,7 +1214,7 @@
     "operatorTransferConsequence": "转移 Operator 的影响",
     "removeCollection": "移除 {name}",
     "noNfts": "暂无 NFT",
-    "noNftsDescription": "账户（Position NFT）和流动性头寸会显示在这里。铸造篮子或提供流动性后，代表它的 NFT 将出现在你的钱包中。",
+    "noNftsDescription": "账户（Position NFT）和流动性头寸会显示在这里。开设账户或提供流动性后，代表它的 NFT 将出现在你的钱包中。",
     "operatorNftsSyncing": "你的 Operator NFT 正在同步",
     "operatorNftsSyncingDescription": "索引器正在追赶链上进度。最近获得的 Operator 可能很快就会显示。",
     "browseBaskets": "浏览篮子",
@@ -1175,7 +1228,8 @@
     "invalidRecipient": "请输入一个有效且不是你自己的收款地址。",
     "transferIncomplete": "转账未完成。",
     "clientUnavailable": "此网络没有可用的客户端。",
-    "collectionAddFailed": "无法添加该收藏系列。"
+    "collectionAddFailed": "无法添加该收藏系列。",
+    "addLiquidity": "提供流动性"
   },
   "dollar": {
     "collateralProfile": "抵押品配置",

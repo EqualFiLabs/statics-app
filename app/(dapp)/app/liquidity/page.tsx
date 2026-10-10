@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { isHash } from "viem";
 
 import { readRewardPositionFocus } from "@/lib/rewards/navigation";
 import { LiquidityPage } from "@/components/liquidity/LiquidityPage";
 
-export const metadata: Metadata = {
-  title: "Liquidity | Statics",
-  description: "Review canonical pools, permanent liquidity, and user-owned v4 LP NFTs.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.liquidity");
+  return { title: t("title"), description: t("description") };
+}
 
 export default async function LiquidityRoute({
   searchParams,

@@ -217,7 +217,13 @@ export function WalletNftPanel({
           empty={{
             title: t("noNfts"),
             description: t("noNftsDescription"),
-            action: { label: t("browseBaskets"), href: "/app/baskets" },
+            // Offer an empty-state action only when its destination is supported.
+            action: active.descriptor.capabilities.includes("baskets")
+              ? { label: t("browseBaskets"), href: "/app/baskets" }
+              : active.descriptor.capabilities.includes("public-lp-positions") ||
+                  active.descriptor.capabilities.includes("protocol-liquidity")
+                ? { label: t("addLiquidity"), href: "/app/liquidity" }
+                : undefined,
           }}
         />
       </>

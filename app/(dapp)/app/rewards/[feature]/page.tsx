@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
 import { earnViews } from "@/lib/rewards/earn";
@@ -16,6 +18,19 @@ function retiredBribesTarget(search: Record<string, string | string[] | undefine
   // Allocations has no asset filter.
   if (target === "allocations") params.delete("asset");
   return `/app/rewards/${target}${params.size ? `?${params}` : ""}`;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ feature: string }>;
+}): Promise<Metadata> {
+  const { feature } = await params;
+  const view = earnViews.find((view) => view === feature);
+  const page = await getTranslations("pageMetadata.earn");
+  if (!view) return { title: page("title"), description: page("description") };
+  const t = await getTranslations("earnUx");
+  return { title: page("viewTitle", { view: t(view) }), description: page("description") };
 }
 
 export default async function EarnFeatureRoute({
