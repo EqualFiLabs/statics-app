@@ -24,7 +24,7 @@ describe("position collateral summary", () => {
     expect(screen.getByText("200 TPA1")).toBeInTheDocument();
     expect(screen.getByText("175 TPA1")).toBeInTheDocument();
     expect(screen.getByText("25 TPA1")).toBeInTheDocument();
-    expect(screen.getByText(/belong to this PositionNFT/i)).toBeInTheDocument();
+    expect(screen.getByText(/belong to this account/i)).toBeInTheDocument();
   });
 
   it("shows the next-block withdrawal gate without hiding ownership", () => {

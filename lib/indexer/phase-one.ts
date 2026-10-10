@@ -761,7 +761,7 @@ export async function loadPositionStatement(input: {
     const error = record(await response.json(), "statement error");
     if (error.code === "STATEMENT_HISTORY_CHANGED") throw new StatementHistoryChangedError();
   }
-  if (!response.ok) throw new Error(`Position statement request failed (${response.status}).`);
+  if (!response.ok) throw new Error(`Account statement request failed (${response.status}).`);
   return parsePositionStatement(
     await response.json(),
     input.deploymentId,

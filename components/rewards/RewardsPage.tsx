@@ -242,7 +242,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     setActionError(null);
     try {
       const refreshed = await catalog.refetch();
-      if (!refreshed.data) throw new Error("The current Position state is unavailable.");
+      if (!refreshed.data) throw new Error("The current account state is unavailable.");
       const token = refreshed.data.stakingToken;
       const diamond = deploymentState.deployment.contracts.diamond;
       const targetPosition =
@@ -369,7 +369,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         wallet,
         chainId: deploymentState.deployment.chainId,
         kind: "claim-rewards",
-        label: `Claim rewards from Position #${key}`,
+        label: `Claim rewards from Account #${key}`,
         amount: rewards
           .map(
             (reward) =>

@@ -1673,8 +1673,10 @@ function ManagedLiquidity({
                 })}
               </div>
               {state.data && previewTicks && (
-                <p className={inRange ? "liquidity-status" : "liquidity-status is-out"}>
-                  {ux(inRange ? "inRange" : "outOfRange")} ·{" "}
+                <p className="liquidity-muted">
+                  <span className={inRange ? "liquidity-status" : "liquidity-status is-out"}>
+                    {ux(inRange ? "inRange" : "outOfRange")}
+                  </span>{" "}
                   {ux(
                     effectiveFullRange
                       ? "fullRangeHelp"

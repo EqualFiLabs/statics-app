@@ -98,7 +98,7 @@ function PositionListRuntime() {
     setActionError(null);
     try {
       const refreshed = await catalog.refetch();
-      if (!refreshed.data) throw new Error("The current Position fee is unavailable.");
+      if (!refreshed.data) throw new Error("The current account opening fee is unavailable.");
       const creationFee = refreshed.data.positionCreationFee;
       const data = buildCreatePositionCall(wallet);
       await executeProtocolTransaction({

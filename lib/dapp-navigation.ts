@@ -67,7 +67,7 @@ const routePresentations = {
     status: "Portfolio",
     title: "Your portfolio",
     description:
-      "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
+      "Everything you hold in one place: your Dollar balance, accounts, collateral, and rewards waiting to be claimed.",
   },
   swap: {
     label: "Swap",
@@ -112,11 +112,11 @@ const routePresentations = {
       "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
-    label: "Position NFT",
-    status: "Position NFT",
-    title: "Your Position NFTs",
+    label: "Accounts",
+    status: "Accounts",
+    title: "Your accounts",
     description:
-      "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
+      "Each account is a Position NFT holding your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
   },
   loans: {
     label: "Loans",
@@ -136,7 +136,7 @@ const routePresentations = {
     status: "Operator NFT",
     title: "Manage your Operators NFTs",
     description:
-      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to an account for additional reward weight.",
   },
   genesisRecoveries: {
     label: "Recoveries",

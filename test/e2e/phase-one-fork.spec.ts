@@ -50,7 +50,7 @@ test("preserves Operator management and adds Positions Rewards Liquidity and Act
     {
       path: "/app/rewards",
       heading: "Earn",
-      copy: "Your stake and rewards, across every position.",
+      copy: "Your stake and rewards, across every account.",
     },
     {
       path: "/app/rewards/staking",

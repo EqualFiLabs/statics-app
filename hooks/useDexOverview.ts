@@ -18,6 +18,8 @@ import {
   type DexPoolPage,
 } from "@/lib/indexer/dex-market";
 import { dexFixture, dexOverviewFixturesEnabled } from "@/lib/indexer/dex-market-fixture";
+import { loadIndexedPublicPools } from "@/lib/indexer/phase-one";
+import type { HookFeeRate } from "@/lib/phase-one/swap-fees";
 
 export const dexRoot = "phase-one-dex";
 const LIVE_MS = 30_000;
@@ -73,6 +75,21 @@ export function useDexOverview(
     queryKey: [dexRoot, id, "trades", quote],
     queryFn: () => (fixtures ? parseDexTrades(sample().trades, id) : loadDexTrades(id, quote)),
   });
+  // Statics-hooked pools charge input and output fees on top of the LP fee; each pool has its own.
+  const hookFees = useQuery({
+    ...common,
+    refetchInterval: false,
+    staleTime: 60_000,
+    enabled: !fixtures,
+    queryKey: [dexRoot, id, "hook-fees"],
+    queryFn: async () =>
+      new Map<string, HookFeeRate>(
+        (await loadIndexedPublicPools(id)).items.map((pool) => [
+          pool.poolId.toLowerCase(),
+          { inputBps: pool.inputFeeBps, outputBps: pool.outputFeeBps },
+        ])
+      ),
+  });
   return {
     summary,
     pools: {
@@ -85,6 +102,7 @@ export function useDexOverview(
     volume,
     emissions,
     trades,
+    hookFees: hookFees.data ?? null,
     fixtures,
   };
 }

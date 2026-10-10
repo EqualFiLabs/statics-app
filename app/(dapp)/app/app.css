@@ -7454,7 +7454,9 @@
 }
 
 .genesis-timeline-segment.is-grace {
-  background: var(--warning-wash);
+  /* One hour of a 30-day term: keep it visible as a sliver. */
+  min-width: 4px;
+  background: var(--warning);
   color: var(--warning);
 }
 
@@ -7469,6 +7471,34 @@
   bottom: 0;
   width: 2px;
   background: var(--app-text);
+}
+
+.genesis-timeline-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+}
+.genesis-timeline-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.genesis-timeline-key li::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--radius-sm);
+  background: currentcolor;
+}
+.genesis-timeline-key .is-grace {
+  color: var(--warning);
+}
+.genesis-timeline-key .is-danger {
+  color: var(--negative);
 }
 
 .genesis-timeline-marks {
@@ -8306,6 +8336,7 @@
 }
 .liquidity-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 999 1 560px;
   gap: 1rem;
   min-width: 0;
@@ -8320,6 +8351,7 @@
 }
 .liquidity-editor {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 .liquidity-token-input[data-unused] {
@@ -8333,6 +8365,8 @@
 .liquidity-price-card,
 .liquidity-deposit-card {
   display: grid;
+  /* One column at the card's width; content never widens the card on a phone. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   min-width: 0;
   padding: 1.75rem;

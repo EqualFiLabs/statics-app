@@ -216,7 +216,7 @@ async function openDeposit() {
   return screen.findByRole("textbox", { name: "Deposit STATICS" });
 }
 async function openDetail() {
-  fireEvent.click(await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /STATICS \/ WETH Account #1/ }));
 }
 async function provideReview() {
   await openDeposit();
@@ -340,7 +340,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     });
     render(tree());
     await openDeposit();
-    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("1");
+    expect(screen.getByRole("combobox", { name: "Save to account" })).toHaveValue("1");
     expect(screen.getByRole("button", { name: /^Full range/ })).toHaveAttribute(
       "aria-pressed",
       "true"
@@ -378,7 +378,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     const rendered = render(tree());
     fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create position" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open account" }));
     mocks.execute.mockImplementation(async (request) => {
       if (request.kind === "phase-one-create-position") {
         await request.verifyConfirmation({
@@ -401,7 +401,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     });
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("99")
+      expect(screen.getByRole("combobox", { name: "Save to account" })).toHaveValue("99")
     );
     fireEvent.click(await provideReview());
     await screen.findByText("Approval interrupted");
@@ -419,7 +419,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.execute.mockResolvedValue(hash("b"));
     render(tree());
     await openDeposit();
-    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("99");
+    expect(screen.getByRole("combobox", { name: "Save to account" })).toHaveValue("99");
     fireEvent.click(await provideReview());
     await waitFor(() =>
       expect(
@@ -617,7 +617,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
   it("opens a deposit for an owned Position NFT that has no liquidity", async () => {
     render(tree(1n));
     expect(await screen.findByRole("textbox", { name: "Deposit STATICS" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("1");
+    expect(screen.getByRole("combobox", { name: "Save to account" })).toHaveValue("1");
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 });
@@ -633,7 +633,7 @@ it("shows unavailable indexed pools without crashing or hiding retained rewards"
   };
   render(tree(null, null, disabled));
   expect(
-    await screen.findByText("Position #1 belongs to a pool that is currently unavailable.")
+    await screen.findByText("Account #1 has liquidity in a pool that is currently unavailable.")
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Manage rewards" })).toHaveAttribute(
     "href",
@@ -656,7 +656,7 @@ it("does not substitute another NFT when a requested position belongs to a diffe
   render(tree(99n));
   expect(
     await screen.findByText(
-      "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue."
+      "This account could not be loaded or does not belong to your wallet. Choose a pool and one of your accounts to continue."
     )
   ).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: "Deposit STATICS" })).not.toBeInTheDocument();
@@ -668,7 +668,7 @@ it("does not open a deposit when focused liquidity discovery fails", async () =>
   render(tree(1n));
   expect(
     await screen.findByText(
-      "This position could not be loaded or does not belong to your wallet. Choose a pool and an owned position to continue."
+      "This account could not be loaded or does not belong to your wallet. Choose a pool and one of your accounts to continue."
     )
   ).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: "Deposit STATICS" })).not.toBeInTheDocument();
@@ -681,7 +681,7 @@ it("does not show a definitive empty state while ownership discovery has another
     nextCursor: "1",
   });
   render(tree());
-  await screen.findByRole("button", { name: "Load more positions" });
+  await screen.findByRole("button", { name: "Load more accounts" });
   expect(screen.queryByText("Your liquidity positions will appear here.")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("heading", { name: "No liquidity positions yet" })
@@ -709,10 +709,10 @@ it("retains only the inactive pool with actual exit obligations", async () => {
   );
   render(tree());
   expect(
-    await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ })
+    await screen.findByRole("button", { name: /STATICS \/ WETH Account #1/ })
   ).toBeInTheDocument();
   expect(
-    screen.queryByText("Position #1 belongs to a pool that is currently unavailable.")
+    screen.queryByText("Account #1 has liquidity in a pool that is currently unavailable.")
   ).not.toBeInTheDocument();
 });
 it("drops a resolved exited leg after a claim confirms, even before the indexer catches up", async () => {
@@ -744,7 +744,7 @@ it("drops a resolved exited leg after a claim confirms, even before the indexer 
     </>
   );
   expect(
-    await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ })
+    await screen.findByRole("button", { name: /STATICS \/ WETH Account #1/ })
   ).toBeInTheDocument();
   claimed = true;
   act(() =>
@@ -759,7 +759,7 @@ it("drops a resolved exited leg after a claim confirms, even before the indexer 
   );
   await waitFor(() =>
     expect(
-      screen.queryByRole("button", { name: /STATICS \/ WETH Position #1/ })
+      screen.queryByRole("button", { name: /STATICS \/ WETH Account #1/ })
     ).not.toBeInTheDocument()
   );
 });
@@ -784,9 +784,9 @@ it("reuses earlier position discovery when loading another ownership page", asyn
     },
   ]);
   render(tree());
-  await screen.findByRole("button", { name: /STATICS \/ WETH Position #1/ });
-  fireEvent.click(screen.getByRole("button", { name: "Load more positions" }));
-  await screen.findByRole("button", { name: /STATICS \/ WETH Position #2/ });
+  await screen.findByRole("button", { name: /STATICS \/ WETH Account #1/ });
+  fireEvent.click(screen.getByRole("button", { name: "Load more accounts" }));
+  await screen.findByRole("button", { name: /STATICS \/ WETH Account #2/ });
   expect(mocks.legs).toHaveBeenCalledTimes(2);
 });
 it("waits for live price before enabling custom range defaults", async () => {

@@ -18,7 +18,7 @@ export type OverviewTile = Readonly<{
 }>;
 
 export const overviewTiles: readonly OverviewTile[] = [
-  { id: "positions", label: "Positions", href: "/app/positions", action: "Review positions" },
+  { id: "positions", label: "Accounts", href: "/app/positions", action: "Review accounts" },
   { id: "baskets", label: "Deposited baskets", href: "/app/baskets", action: "Browse baskets" },
   { id: "loans", label: "Loans", href: "/app/loans", action: "Review loans" },
   { id: "rewards", label: "Rewards to claim", href: "/app/rewards", action: "Review rewards" },

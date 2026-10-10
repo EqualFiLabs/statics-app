@@ -718,7 +718,7 @@ function LiquidityRuntime() {
       await send(
         "stake-lp-nft",
         `Stake Liquidity position #${position.tokenId}`,
-        `Position #${positionNft}`,
+        `Account #${positionNft}`,
         diamond,
         buildStakeLiquidityPositionCall(positionNft, position.tokenId),
         {

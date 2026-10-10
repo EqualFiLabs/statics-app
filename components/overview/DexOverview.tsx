@@ -1,4 +1,5 @@
 "use client";
+import { PoolSwapFee } from "./PoolSwapFee";
 import Link from "next/link";
 import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { useDeferredValue, useState } from "react";
@@ -377,9 +378,11 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                     <th scope="row">
                       <span className={styles.pool}>
                         <strong>{pairOf(pool)}</strong>
-                        <span className={styles.muted}>
-                          {t("fee", { fee: (pool.lpFee / 10_000).toFixed(2) })}
-                        </span>
+                        <PoolSwapFee
+                          lpFee={pool.lpFee}
+                          source={pool.source}
+                          hook={dex.hookFees?.get(pool.poolId.toLowerCase()) ?? null}
+                        />
                         {pool.priceFallback && (
                           <span className={styles.pill}>{t("spotFallback")}</span>
                         )}
@@ -480,52 +483,60 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
       <div className={styles.split}>
         <section className={styles.card} aria-labelledby="dex-tokens">
           <h2 id="dex-tokens">{t("tokensTitle")}</h2>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th scope="col">{t("column.token")}</th>
-                <th scope="col">{t("column.price")}</th>
-                <th scope="col">{t("column.change")}</th>
-                <th scope="col">{t("column.volume")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(dex.tokens.data?.items ?? []).map((item) => {
-                const moved = change(item.change24hBps);
-                return (
-                  <tr key={item.token.address}>
-                    <th scope="row">
-                      <span className={styles.pool}>
-                        <strong>{symbolOf(item.token)}</strong>
-                        {item.route.length > 0 && (
-                          <span className={styles.muted}>
-                            {item.priceFallback && `${t("spotFallback")} · `}
-                            {t("via", {
-                              route: item.route
-                                .map((poolId) => {
-                                  const known = deployment.supportedPools.find(
-                                    (pool) => pool.poolId.toLowerCase() === poolId.toLowerCase()
-                                  );
-                                  return known ? pairOf(known) : short(poolId);
-                                })
-                                .join(" · "),
-                            })}
-                          </span>
-                        )}
-                      </span>
-                    </th>
-                    <td>
-                      {item.price === 0n && item.priceNumerator !== null && item.priceNumerator > 0n
-                        ? `<${money(1n, true, dex.tokens.data?.quote)}`
-                        : money(item.price, true, dex.tokens.data?.quote)}
-                    </td>
-                    <td data-tone={moved.tone}>{moved.text}</td>
-                    <td>{money(item.volume24h, false, dex.tokens.data?.quote)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className={styles.cardTable}>
+            <table className={`${styles.table} ${styles.tokensTable}`}>
+              <thead>
+                <tr>
+                  <th scope="col">{t("column.token")}</th>
+                  <th scope="col">{t("column.price")}</th>
+                  <th scope="col">{t("column.change")}</th>
+                  <th scope="col">{t("column.volume")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(dex.tokens.data?.items ?? []).map((item) => {
+                  const moved = change(item.change24hBps);
+                  return (
+                    <tr key={item.token.address}>
+                      <th scope="row">
+                        <span className={styles.pool}>
+                          <strong>{symbolOf(item.token)}</strong>
+                          {item.route.length > 0 && (
+                            <span className={styles.muted}>
+                              {item.priceFallback && `${t("spotFallback")} · `}
+                              {t("via", {
+                                route: item.route
+                                  .map((poolId) => {
+                                    const known = deployment.supportedPools.find(
+                                      (pool) => pool.poolId.toLowerCase() === poolId.toLowerCase()
+                                    );
+                                    // Lines may break between pools, never inside a pair.
+                                    return (known ? pairOf(known) : short(poolId)).replaceAll(
+                                      " ",
+                                      "\u00a0"
+                                    );
+                                  })
+                                  .join(" · "),
+                              })}
+                            </span>
+                          )}
+                        </span>
+                      </th>
+                      <td>
+                        {item.price === 0n &&
+                        item.priceNumerator !== null &&
+                        item.priceNumerator > 0n
+                          ? `<${money(1n, true, dex.tokens.data?.quote)}`
+                          : money(item.price, true, dex.tokens.data?.quote)}
+                      </td>
+                      <td data-tone={moved.tone}>{moved.text}</td>
+                      <td>{money(item.volume24h, false, dex.tokens.data?.quote)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className={styles.card} aria-labelledby="dex-trades">

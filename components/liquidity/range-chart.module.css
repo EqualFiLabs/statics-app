@@ -1,6 +1,7 @@
 /* Liquidity range chart: price history, depth and the selected range on one price axis. */
 .chart {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
 }
@@ -238,11 +239,13 @@
 /* Range strategies and the min/max price cards. */
 .presets {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* Two strategies per row even on a narrow phone. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
   gap: 8px;
 }
 .presets button {
   display: grid;
+  align-content: start;
   gap: 4px;
   justify-items: start;
   padding: 12px 14px;

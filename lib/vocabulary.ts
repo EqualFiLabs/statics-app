@@ -35,7 +35,7 @@ export type GlossaryEntry = {
 
 export const glossary = {
   position: {
-    label: "Position",
+    label: "Account",
     plain: "Everything you hold in Statics, bundled into one transferable item.",
     protocol: "PositionNFT",
   },

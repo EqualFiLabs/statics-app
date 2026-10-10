@@ -1030,7 +1030,7 @@ describe("focused Phase 1 Earn", () => {
     withPhaseOne(<RewardsPage />);
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Earn" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Positions" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Accounts" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review stake" })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
@@ -1044,17 +1044,17 @@ describe("focused Phase 1 Earn", () => {
       nextCursor: null,
     });
     withPhaseOne(<RewardsPage />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Select Position #2" }));
-    const bulk = screen.getByRole("region", { name: "Actions for selected positions" });
-    expect(within(bulk).getByText("1 position selected")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select Account #2" }));
+    const bulk = screen.getByRole("region", { name: "Actions for selected accounts" });
+    expect(within(bulk).getByText("1 account selected")).toBeInTheDocument();
     expect(within(bulk).getByRole("button", { name: "Collect selected" })).toBeInTheDocument();
     fireEvent.click(within(bulk).getByRole("button", { name: "Hide" }));
     await waitFor(() =>
-      expect(screen.queryByRole("checkbox", { name: "Select Position #2" })).not.toBeInTheDocument()
+      expect(screen.queryByRole("checkbox", { name: "Select Account #2" })).not.toBeInTheDocument()
     );
-    expect(screen.getByRole("checkbox", { name: "Select Position #1" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Account #1" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show hidden · 1" }));
-    expect(await screen.findByRole("checkbox", { name: "Select Position #2" })).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: "Select Account #2" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Collect" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
     const reviewed = decodeFunctionData({
@@ -1074,18 +1074,18 @@ describe("focused Phase 1 Earn", () => {
       nextCursor: null,
     });
     withPhaseOne(<RewardsPage />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Select Position #2" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select Account #2" }));
     expect(
-      screen.getByRole("region", { name: "Actions for selected positions" })
+      screen.getByRole("region", { name: "Actions for selected accounts" })
     ).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "#1" } });
     expect(
-      screen.queryByRole("region", { name: "Actions for selected positions" })
+      screen.queryByRole("region", { name: "Actions for selected accounts" })
     ).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
-    expect(screen.getByRole("checkbox", { name: "Select Position #2" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Select Account #2" })).not.toBeChecked();
     expect(
-      screen.queryByRole("region", { name: "Actions for selected positions" })
+      screen.queryByRole("region", { name: "Actions for selected accounts" })
     ).not.toBeInTheDocument();
   });
   it("loads ownership beyond 100 and pages the stake picker to an explicitly requested NFT", async () => {
@@ -1099,9 +1099,9 @@ describe("focused Phase 1 Earn", () => {
       nextCursor: cursor ? null : "100",
     }));
     withPhaseOne(<RewardsPage earnView="staking" />);
-    expect(await screen.findByRole("radio", { name: /Position #101/ })).toBeChecked();
+    expect(await screen.findByRole("radio", { name: /Account #101/ })).toBeChecked();
     expect(screen.getByText("101–101 of 101")).toBeInTheDocument();
-    expect(screen.getAllByRole("radio", { name: /^Position #/ })).toHaveLength(1);
+    expect(screen.getAllByRole("radio", { name: /^Account #/ })).toHaveLength(1);
     expect(mocks.page.mock.calls.at(-1)?.[3]).toBe("100");
     await waitFor(() =>
       expect(
@@ -1116,14 +1116,14 @@ describe("focused Phase 1 Earn", () => {
         ([input]) => input.functionName === "stakePosition" && input.args[0] === 50n
       )
     ).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Previous positions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous accounts" }));
     expect(await screen.findByText("96–100 of 101")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Position #101/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Account #101/ })).toBeChecked();
   });
   it("rejects a missing or foreign position without falling back to another NFT", async () => {
     mocks.params = new URLSearchParams("positionId=999");
     withPhaseOne(<RewardsPage earnView="staking" />);
-    await screen.findByText("This position is missing or belongs to another wallet.");
+    await screen.findByText("This account is missing or belongs to another wallet.");
     expect(screen.getByRole("link", { name: "Reset filters" })).toHaveAttribute(
       "href",
       "/app/rewards/staking"
@@ -1207,11 +1207,11 @@ describe("focused Phase 1 Earn", () => {
     );
     withPhaseOne(<RewardsPage earnView="gauge" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
-    const [first] = screen.getAllByRole("checkbox", { name: /^Select all positions in/ });
+    const [first] = screen.getAllByRole("checkbox", { name: /^Select all accounts in/ });
     fireEvent.click(first);
     expect(screen.getByText("1 leg selected")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in/ })[0]);
-    expect(screen.getByRole("checkbox", { name: /^Select Position #1 in/ })).toBeChecked();
+    fireEvent.click(screen.getAllByRole("button", { name: /^Show accounts in/ })[0]);
+    expect(screen.getByRole("checkbox", { name: /^Select Account #1 in/ })).toBeChecked();
     expect(first).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
@@ -1262,25 +1262,25 @@ describe("focused Phase 1 Earn", () => {
     withPhaseOne(<RewardsPage earnView="staking" />);
     await screen.findByText(/Some data could not be loaded/);
     // Known positions stay usable for staking while the rest of ownership is unavailable.
-    expect(await screen.findByRole("radio", { name: /Position #1/ })).toBeChecked();
+    expect(await screen.findByRole("radio", { name: /Account #1/ })).toBeChecked();
   });
   it("clearing one allocation preserves other pools, with no reward-source reads", async () => {
     withPhaseOne(<RewardsPage earnView="allocations" />);
     await screen.findAllByRole("button", { name: /^Adjust allocation to / });
-    fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in / })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /^Show accounts in / })[0]);
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Remove Position #1 allocation to STATICS / WETH",
+        name: "Remove Account #1 allocation to STATICS / WETH",
       })
     );
     // Remove opens the editor on that allocation, ready for the amount to take off it.
     const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
     const amount = within(editor).getByRole("textbox", {
-      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+      name: "Amount to add to or remove from STATICS / WETH, Account #1",
     });
     expect(amount).toHaveFocus();
     const remove = within(editor).getByRole("button", {
-      name: "Remove from STATICS / WETH on Position #1",
+      name: "Remove from STATICS / WETH on Account #1",
     });
     // A partial removal takes exactly the amount entered.
     fireEvent.change(amount, { target: { value: "4" } });
@@ -1300,11 +1300,11 @@ describe("focused Phase 1 Earn", () => {
     // Removal is staged, not sent: the row shows it pending and the change set summarises it.
     expect(await screen.findByText("Pending → 0")).toBeInTheDocument();
     const changes = screen.getByRole("region", { name: "Actions for selected allocations" });
-    expect(within(changes).getByText("1 position · 1 transaction")).toBeInTheDocument();
+    expect(within(changes).getByText("1 account · 1 transaction")).toBeInTheDocument();
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(within(changes).getByRole("button", { name: "Review changes" }));
     const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
-    expect(within(review).getByText("Position #1: STATICS / WETH 10 → 0")).toBeInTheDocument();
+    expect(within(review).getByText("Account #1: STATICS / WETH 10 → 0")).toBeInTheDocument();
     expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
     await waitFor(() => expect(mocks.execute).toHaveBeenCalled());
@@ -1350,7 +1350,7 @@ describe("focused Phase 1 Earn", () => {
       target: { value: "71" },
     });
     expect(
-      screen.getByText("Amount exceeds the stake you can unstake from this position.")
+      screen.getByText("Amount exceeds the stake you can unstake from this account.")
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage allocations" })).toHaveAttribute(
       "href",
@@ -1365,13 +1365,13 @@ describe("focused Phase 1 Earn", () => {
     });
     const preview = await screen.findByRole("status", { name: "" });
     expect(
-      within(preview).getByText("Position #1 will have 110 STATICS staked.")
+      within(preview).getByText("Account #1 will have 110 STATICS staked.")
     ).toBeInTheDocument();
     expect(
       within(preview).getByText(/STATICS: added stake is estimated to start earning from/)
     ).toBeInTheDocument();
     expect(
-      within(preview).getByText(/Restarts Position #1's allocation cooldown/)
+      within(preview).getByText(/Restarts Account #1's allocation cooldown/)
     ).toBeInTheDocument();
   });
   it("creates a position and stakes with the chosen reward assets in one transaction", async () => {
@@ -1404,24 +1404,24 @@ describe("focused Phase 1 Earn", () => {
       return hash("f");
     });
     withPhaseOne(<RewardsPage earnView="staking" />);
-    fireEvent.click(await screen.findByRole("radio", { name: /New position/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /New account/ }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
     fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
       target: { value: "25" },
     });
     // The modal defaults to the reward assets of the largest existing position.
-    fireEvent.click(screen.getByRole("button", { name: "Reward assets for New position" }));
-    const modal = await screen.findByRole("dialog", { name: "Reward assets · new position" });
+    fireEvent.click(screen.getByRole("button", { name: "Reward assets for New account" }));
+    const modal = await screen.findByRole("dialog", { name: "Reward assets · new account" });
     expect(within(modal).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
     expect(within(modal).getByText("1 of 10 selected")).toBeInTheDocument();
     fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
     fireEvent.click(within(modal).getByRole("button", { name: "OK" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Reward assets for New position" })
-    ).toHaveTextContent("Assets 2/10");
+    expect(screen.getByRole("button", { name: "Reward assets for New account" })).toHaveTextContent(
+      "Assets 2/10"
+    );
     fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
-    const review = await screen.findByRole("dialog", { name: "Create position and stake" });
+    const review = await screen.findByRole("dialog", { name: "Open account and stake" });
     expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(review).getByRole("button", { name: "Close" })).toBeEnabled();
     fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
@@ -1438,21 +1438,21 @@ describe("focused Phase 1 Earn", () => {
     ]);
     // No reload needed: the new position appears and is selected once indexed.
     expect(
-      await screen.findByRole("radio", { name: /Position #2/ }, { timeout: 5_000 })
+      await screen.findByRole("radio", { name: /Account #2/ }, { timeout: 5_000 })
     ).toBeChecked();
-    expect(screen.getByText("Create position and stake confirmed.")).toBeInTheDocument();
+    expect(screen.getByText("Open account and stake confirmed.")).toBeInTheDocument();
   });
   it("updates an existing position's reward assets from the Assets modal", async () => {
     withPhaseOne(<RewardsPage earnView="staking" />);
-    const open = await screen.findByRole("button", { name: "Reward assets for Position #1" });
+    const open = await screen.findByRole("button", { name: "Reward assets for Account #1" });
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
-    const modal = await screen.findByRole("dialog", { name: "Reward assets · Position #1" });
+    const modal = await screen.findByRole("dialog", { name: "Reward assets · Account #1" });
     fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
     fireEvent.click(within(modal).getByRole("button", { name: "Cancel" }));
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(open);
-    const reopened = await screen.findByRole("dialog", { name: "Reward assets · Position #1" });
+    const reopened = await screen.findByRole("dialog", { name: "Reward assets · Account #1" });
     // Cancel discarded the draft.
     expect(within(reopened).getByRole("checkbox", { name: /^WETH/ })).not.toBeChecked();
     const search = within(reopened).getByRole("searchbox", { name: "Search reward assets" });
@@ -1466,7 +1466,7 @@ describe("focused Phase 1 Earn", () => {
     expect(within(reopened).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
     fireEvent.click(within(reopened).getByRole("button", { name: "OK" }));
     const review = await screen.findByRole("dialog", {
-      name: "Update reward assets for Position #1",
+      name: "Update reward assets for Account #1",
     });
     expect(within(review).getByText("+ WETH")).toBeInTheDocument();
     expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
@@ -1516,7 +1516,7 @@ describe("Earn review remediation", () => {
     await screen.findByText(/Some data could not be loaded/);
     expect(screen.getByRole("button", { name: "Collect" })).toBeDisabled();
     fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      await screen.findByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
     );
     expect(screen.getByRole("button", { name: "Collect selected" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
@@ -1639,7 +1639,7 @@ describe("Earn review remediation", () => {
     // Pool 1 is already in this position's set, so it beats the more incentivised pool 4.
     expect(
       within(stale).getByText(
-        "Gauge stopped · Suggested: STATICS / WETH (already in this position's pools)"
+        "Gauge stopped · Suggested: STATICS / WETH (already in this account's pools)"
       )
     ).toBeInTheDocument();
     // Move stages the suggested pool with this position's stake there plus its stale stake.
@@ -1700,14 +1700,14 @@ describe("Earn review remediation", () => {
     await screen.findByTitle(/This allocation no longer counts/);
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Remove Position #1 allocation to STATICS / WETH",
+        name: "Remove Account #1 allocation to STATICS / WETH",
       })
     );
     const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
     expect(within(editor).getByRole("button", { name: "Clear all" })).toBeEnabled();
     fireEvent.click(
       within(editor).getByRole("button", {
-        name: "Remove from STATICS / WETH on Position #1",
+        name: "Remove from STATICS / WETH on Account #1",
       })
     );
     expect(within(editor).getByRole("button", { name: "Add to changes" })).toBeEnabled();
@@ -1770,7 +1770,7 @@ describe("Earn review remediation", () => {
     fireEvent.click(open);
     const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
     const input = within(panel).getByRole("textbox", {
-      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+      name: "Amount to add to or remove from STATICS / WETH, Account #1",
     });
     expect(within(panel).getByText("10 STATICS allocated")).toBeInTheDocument();
     // The allocation dialog stacks over the directory: Escape closes only the top dialog and
@@ -1787,15 +1787,15 @@ describe("Earn review remediation", () => {
     const again = await screen.findByRole("dialog", { name: "Manage allocations" });
     fireEvent.change(
       within(again).getByRole("textbox", {
-        name: "Amount to add to or remove from STATICS / WETH, Position #1",
+        name: "Amount to add to or remove from STATICS / WETH, Account #1",
       }),
       { target: { value: "5" } }
     );
     fireEvent.click(
-      within(again).getByRole("button", { name: "Remove from STATICS / WETH on Position #1" })
+      within(again).getByRole("button", { name: "Remove from STATICS / WETH on Account #1" })
     );
     fireEvent.click(within(again).getByRole("button", { name: "Add to changes" }));
-    expect(within(directory()).getByText("1 position · 1 transaction")).toBeInTheDocument();
+    expect(within(directory()).getByText("1 account · 1 transaction")).toBeInTheDocument();
     expect(
       within(directory()).getByRole("button", { name: "Show incentive streams in STATICS / WETH" })
     ).toBeInTheDocument();
@@ -1805,7 +1805,7 @@ describe("Earn review remediation", () => {
     );
     expect(
       within(screen.getByRole("region", { name: "Actions for selected allocations" })).getByText(
-        "1 position · 1 transaction"
+        "1 account · 1 transaction"
       )
     ).toBeInTheDocument();
   });
@@ -1888,11 +1888,11 @@ describe("Earn review remediation", () => {
     fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
     const panel = await screen.findByRole("dialog", { name: "Manage allocations" });
     const input = within(panel).getByRole("textbox", {
-      name: "Amount to add to or remove from STATICS / WETH, Position #1",
+      name: "Amount to add to or remove from STATICS / WETH, Account #1",
     });
-    const add = within(panel).getByRole("button", { name: "Add to STATICS / WETH on Position #1" }),
+    const add = within(panel).getByRole("button", { name: "Add to STATICS / WETH on Account #1" }),
       remove = within(panel).getByRole("button", {
-        name: "Remove from STATICS / WETH on Position #1",
+        name: "Remove from STATICS / WETH on Account #1",
       });
     expect(within(panel).getByText(/^Reduce-only until/)).toBeInTheDocument();
     expect(within(panel).getByRole("searchbox", { name: "Add a pool" })).toBeDisabled();
@@ -1913,7 +1913,7 @@ describe("Earn review remediation", () => {
     expect(add).toBeEnabled();
     // A reduction during cooldown leaves the cooldown where it is.
     expect(
-      within(panel).getByText(/^Reductions don't extend this position's cooldown/)
+      within(panel).getByText(/^Reductions don't extend this account's cooldown/)
     ).toBeInTheDocument();
   });
   it("sends one transaction per position and keeps confirmed ones when stopped", async () => {
@@ -1940,44 +1940,42 @@ describe("Earn review remediation", () => {
     // One position at a time: pick each from the dropdown and clear its allocation.
     for (const id of ["1", "2"]) {
       // Positions are chosen on their own full-screen list.
-      fireEvent.click(within(panel).getByRole("button", { name: /^Position #\d+ selected\./ }));
-      const picker = await screen.findByRole("dialog", { name: "Choose a position" });
-      fireEvent.click(
-        within(picker).getByRole("button", { name: new RegExp(`^Position #${id},`) })
-      );
+      fireEvent.click(within(panel).getByRole("button", { name: /^Account #\d+ selected\./ }));
+      const picker = await screen.findByRole("dialog", { name: "Choose an account" });
+      fireEvent.click(within(picker).getByRole("button", { name: new RegExp(`^Account #${id},`) }));
       await waitFor(() =>
-        expect(screen.queryByRole("dialog", { name: "Choose a position" })).not.toBeInTheDocument()
+        expect(screen.queryByRole("dialog", { name: "Choose an account" })).not.toBeInTheDocument()
       );
       fireEvent.change(
         within(panel).getByRole("textbox", {
-          name: `Amount to add to or remove from STATICS / WETH, Position #${id}`,
+          name: `Amount to add to or remove from STATICS / WETH, Account #${id}`,
         }),
         { target: { value: "10" } }
       );
       fireEvent.click(
         within(panel).getByRole("button", {
-          name: `Remove from STATICS / WETH on Position #${id}`,
+          name: `Remove from STATICS / WETH on Account #${id}`,
         })
       );
     }
     fireEvent.click(
-      within(panel).getByRole("button", { name: "Position #2 selected. Choose another position" })
+      within(panel).getByRole("button", { name: "Account #2 selected. Choose another account" })
     );
-    const picker = await screen.findByRole("dialog", { name: "Choose a position" });
-    const first = within(picker).getByRole("button", { name: /^Position #1, 1 change, / });
+    const picker = await screen.findByRole("dialog", { name: "Choose an account" });
+    const first = within(picker).getByRole("button", { name: /^Account #1, 1 change, / });
     expect(first).toHaveAttribute("aria-pressed", "false");
-    expect(within(picker).getByRole("button", { name: /^Position #2,/ })).toHaveAttribute(
+    expect(within(picker).getByRole("button", { name: /^Account #2,/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
     fireEvent.keyDown(picker, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Choose a position" })).not.toBeInTheDocument()
+      expect(screen.queryByRole("dialog", { name: "Choose an account" })).not.toBeInTheDocument()
     );
-    expect(within(panel).getByText("2 positions changed")).toBeInTheDocument();
+    expect(within(panel).getByText("2 accounts changed")).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button", { name: "Add to changes" }));
     const changes = () => screen.getByRole("region", { name: "Actions for selected allocations" });
-    expect(within(changes()).getByText("2 positions · 2 transactions")).toBeInTheDocument();
+    expect(within(changes()).getByText("2 accounts · 2 transactions")).toBeInTheDocument();
     // Ask to stop while the first transaction is being sent.
     mocks.execute.mockImplementationOnce(async () => {
       // A real wallet prompt takes time; let the progress and Stop control render first.
@@ -1988,13 +1986,13 @@ describe("Earn review remediation", () => {
     const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
     fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
     expect(
-      await screen.findByText(/^Stopped\. Confirmed positions stay confirmed/)
+      await screen.findByText(/^Stopped\. Confirmed accounts stay confirmed/)
     ).toBeInTheDocument();
     expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-set-allocations");
     // The confirmed position leaves the change set; the other is still staged.
     await waitFor(() =>
-      expect(within(changes()).getByText("1 position · 1 transaction")).toBeInTheDocument()
+      expect(within(changes()).getByText("1 account · 1 transaction")).toBeInTheDocument()
     );
   });
   it("stops between gauge checkpoint prerequisites", async () => {
@@ -2026,7 +2024,7 @@ describe("Earn review remediation", () => {
     const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
     fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
     expect(
-      await screen.findByText(/^Stopped\. Confirmed positions stay confirmed/)
+      await screen.findByText(/^Stopped\. Confirmed accounts stay confirmed/)
     ).toBeInTheDocument();
     expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(mocks.execute.mock.calls[0][0].kind).toBe("phase-one-checkpoint-schedule");
@@ -2047,7 +2045,7 @@ describe("Earn review remediation", () => {
     );
     fireEvent.click(within(editor).getByRole("button", { name: "Add & review" }));
     const review = await screen.findByRole("dialog", { name: "Review allocation changes" });
-    expect(within(review).getByText(/^Position #1: .* 20 → 5$/)).toBeInTheDocument();
+    expect(within(review).getByText(/^Account #1: .* 20 → 5$/)).toBeInTheDocument();
   });
   it("adds a pool from the editor's search and shows it in the stake split", async () => {
     const extra = directoryPool(hash("4"), {
@@ -2067,9 +2065,9 @@ describe("Earn review remediation", () => {
     const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
     fireEvent.click(await within(editor).findByRole("button", { name: "+ TOKEN / WETH" }));
     const input = within(editor).getByRole("textbox", {
-      name: "Amount to add to or remove from TOKEN / WETH, Position #1",
+      name: "Amount to add to or remove from TOKEN / WETH, Account #1",
     });
-    const add = within(editor).getByRole("button", { name: "Add to TOKEN / WETH on Position #1" });
+    const add = within(editor).getByRole("button", { name: "Add to TOKEN / WETH on Account #1" });
     expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: "5" } });
     fireEvent.click(add);
@@ -2101,7 +2099,7 @@ describe("Earn review remediation", () => {
     fireEvent.click(within(editor).getByRole("button", { name: "Add to changes" }));
     expect(
       within(screen.getByRole("region", { name: "Actions for selected allocations" })).getByText(
-        "1 position · 1 transaction"
+        "1 account · 1 transaction"
       )
     ).toBeInTheDocument();
   });
@@ -2122,17 +2120,17 @@ describe("Earn review remediation", () => {
     fireEvent.click((await screen.findAllByRole("button", { name: /^Adjust allocation to / }))[0]);
     const editor = await screen.findByRole("dialog", { name: "Manage allocations" });
     fireEvent.click(within(editor).getByRole("button", { name: "+ Add pool" }));
-    const picker = await screen.findByRole("dialog", { name: "Add a pool to Position #1" });
+    const picker = await screen.findByRole("dialog", { name: "Add a pool to Account #1" });
     expect(within(picker).getByRole("searchbox", { name: "Add a pool" })).toHaveFocus();
     fireEvent.click(await within(picker).findByRole("button", { name: "+ TOKEN / WETH" }));
     await waitFor(() =>
       expect(
-        screen.queryByRole("dialog", { name: "Add a pool to Position #1" })
+        screen.queryByRole("dialog", { name: "Add a pool to Account #1" })
       ).not.toBeInTheDocument()
     );
     expect(
       within(editor).getByRole("textbox", {
-        name: "Amount to add to or remove from TOKEN / WETH, Position #1",
+        name: "Amount to add to or remove from TOKEN / WETH, Account #1",
       })
     ).toHaveFocus();
   });
@@ -2186,7 +2184,7 @@ it("does not report an unowned position before the wallet and ownership load", (
     </DeploymentContext.Provider>
   );
   expect(
-    screen.queryByText("This position is missing or belongs to another wallet.")
+    screen.queryByText("This account is missing or belongs to another wallet.")
   ).not.toBeInTheDocument();
   expect(mocks.page).not.toHaveBeenCalled();
 });
@@ -2199,7 +2197,7 @@ it("shows position creation for an empty wallet without perpetual reward loading
   });
   withPhaseOne(<RewardsPage earnView="staking" />);
   // An empty wallet can create a position and stake in one step.
-  expect(await screen.findByRole("radio", { name: /New position/ })).toBeChecked();
+  expect(await screen.findByRole("radio", { name: /New account/ })).toBeChecked();
   expect(screen.queryByText("Loading your positions and rewards…")).not.toBeInTheDocument();
 });
 
@@ -2243,7 +2241,7 @@ describe("additional review regressions", () => {
     });
     await waitFor(() => expect(screen.getByRole("button", { name: "Review stake" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
-    const dialog = await screen.findByRole("dialog", { name: "Stake into Position #1" });
+    const dialog = await screen.findByRole("dialog", { name: "Stake into Account #1" });
     expect(within(dialog).getByText(/weighted maturity is estimated/).textContent).not.toContain(
       " – "
     );
@@ -2308,16 +2306,16 @@ describe("additional review regressions", () => {
     });
     const view = render(reviewTree());
     await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("radio", { name: /Position #2/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Account #2/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
       target: { value: "1" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
-    await screen.findByRole("dialog", { name: "Stake into Position #2" });
+    await screen.findByRole("dialog", { name: "Stake into Account #2" });
     mocks.params = new URLSearchParams("positionId=1");
     view.rerender(reviewTree());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Position #1/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Account #1/ })).toBeChecked();
   });
   it("clears a stake review when the URL switches to the Unstake tab", async () => {
     mocks.params = new URLSearchParams("positionId=1");
@@ -2327,7 +2325,7 @@ describe("additional review regressions", () => {
       target: { value: "1" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
-    await screen.findByRole("dialog", { name: "Stake into Position #1" });
+    await screen.findByRole("dialog", { name: "Stake into Account #1" });
     mocks.params = new URLSearchParams("positionId=1&mode=unstake");
     view.rerender(reviewTree());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -2352,19 +2350,19 @@ describe("additional review regressions", () => {
   it("does not silently change the reviewed creation fee", async () => {
     withPhaseOne(<RewardsPage earnView="staking" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Max" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("radio", { name: /New position/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /New account/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "STATICS amount" }), {
       target: { value: "1" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Review stake" }));
-    const dialog = await screen.findByRole("dialog", { name: "Create position and stake" });
+    const dialog = await screen.findByRole("dialog", { name: "Open account and stake" });
     const base = mocks.read.getMockImplementation()!;
     mocks.read.mockImplementation((input) =>
       input.functionName === "positionCreationFee" ? Promise.resolve(2n) : base(input)
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm transaction" }));
     expect(
-      await screen.findByText("The position creation fee changed. Review the action again.")
+      await screen.findByText("The account opening fee changed. Review the action again.")
     ).toBeInTheDocument();
     expect(mocks.execute).not.toHaveBeenCalled();
   });
@@ -2380,7 +2378,7 @@ describe("additional review regressions", () => {
 it("keeps legacy unlisted reward-asset links usable on the management-only staking screen", async () => {
   mocks.params = new URLSearchParams(`positionId=1&asset=${address("a")}&poolId=${hash("c")}`);
   withPhaseOne(<RewardsPage earnView="staking" />);
-  expect(await screen.findByRole("radio", { name: /Position #1/ })).toBeChecked();
+  expect(await screen.findByRole("radio", { name: /Account #1/ })).toBeChecked();
   expect(screen.queryByRole("link", { name: "Reset filters" })).not.toBeInTheDocument();
 });
 
@@ -2393,7 +2391,7 @@ describe("liquidity claim scope regressions", () => {
       await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
       if (label === "Collect selected")
         fireEvent.click(
-          screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+          screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
         );
       fireEvent.click(screen.getByRole("button", { name: label }));
       await screen.findByRole("button", { name: "Confirm transaction" });
@@ -2408,7 +2406,7 @@ describe("liquidity claim scope regressions", () => {
     withPhaseOne(<RewardsPage earnView="gauge" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
     );
     expect(
       screen.getByRole("region", { name: "Actions for selected liquidity" })
@@ -2423,7 +2421,7 @@ describe("liquidity claim scope regressions", () => {
       target: { value: "" },
     });
     expect(
-      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
     ).not.toBeChecked();
   });
 });
@@ -2556,7 +2554,7 @@ it.each(["0", "700"])(
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     expect(screen.queryByText("350")).not.toBeInTheDocument();
     expect(screen.queryByText("87.5")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show accounts in STATICS / WETH" }));
     expect(screen.queryByText("87.5")).not.toBeInTheDocument();
   }
 );
@@ -2662,7 +2660,7 @@ it("shows no claimable rewards after Collect confirms, without a reload", async 
       <RewardsPage />
     </>
   );
-  const collect = await screen.findByRole("button", { name: "Collect Position #1 rewards" });
+  const collect = await screen.findByRole("button", { name: "Collect Account #1 rewards" });
   await waitFor(() => expect(collect).toBeEnabled());
   fireEvent.click(collect);
   fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
@@ -2678,12 +2676,12 @@ it("shows no claimable rewards after Collect confirms, without a reload", async 
       scopes: protocolQueryScopes("phase-one-claim-batch-rewards"),
     })
   );
-  const row = screen.getByText("Position #1").closest("tr")!;
+  const row = screen.getByText("Account #1").closest("tr")!;
   expect(await within(row).findByText("No claimable rewards")).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "Collect Position #1 rewards" })
+    screen.queryByRole("button", { name: "Collect Account #1 rewards" })
   ).not.toBeInTheDocument();
-  const completed = screen.getByRole("dialog", { name: "Collect Position #1 rewards" });
+  const completed = screen.getByRole("dialog", { name: "Collect Account #1 rewards" });
   expect(within(completed).getByText("All 1 transactions confirmed.")).toBeInTheDocument();
   expect(
     within(completed).getByRole("link", { name: /Transaction 1 confirmed/ })
@@ -2698,19 +2696,19 @@ it("collects one position from its row and hides positions from the overview tab
     nextCursor: null,
   });
   withPhaseOne(<RewardsPage />);
-  const collectTwo = await screen.findByRole("button", { name: "Collect Position #2 rewards" });
+  const collectTwo = await screen.findByRole("button", { name: "Collect Account #2 rewards" });
   await waitFor(() => expect(collectTwo).toBeEnabled());
   fireEvent.click(collectTwo);
   await screen.findByRole("button", { name: "Confirm transaction" });
-  // Only Position #2 is claimed.
+  // Only Account #2 is claimed.
   expect(claimedPositions(mocks.call.mock.calls[0][0].data)).toEqual([2n]);
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
-  const rowTwo = screen.getByText("Position #2").closest("tr")!;
+  const rowTwo = screen.getByText("Account #2").closest("tr")!;
   fireEvent.click(within(rowTwo).getByRole("button", { name: "Hide" }));
-  await waitFor(() => expect(screen.queryByText("Position #2")).not.toBeInTheDocument());
-  expect(screen.getByText("Position #1")).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText("Account #2")).not.toBeInTheDocument());
+  expect(screen.getByText("Account #1")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Show hidden · 1" }));
-  expect(await screen.findByText("Position #2")).toBeInTheDocument();
+  expect(await screen.findByText("Account #2")).toBeInTheDocument();
   window.localStorage.clear();
 });
 it("collects every pool from the summary, or one pool or position from its row", async () => {
@@ -2741,9 +2739,9 @@ it("collects every pool from the summary, or one pool or position from its row",
   });
   expect(one.args?.[1]).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
-  fireEvent.click(screen.getAllByRole("button", { name: /^Show positions in/ })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: /^Show accounts in/ })[0]);
   expect(
-    screen.getAllByRole("button", { name: /^Collect Position #1 rewards in / })[0]
+    screen.getAllByRole("button", { name: /^Collect Account #1 rewards in / })[0]
   ).toBeInTheDocument();
 });
 it("a healthy pool stays claimable from its row when another pool fails", async () => {
@@ -2800,7 +2798,7 @@ it.each(["row", "selected"])(
     const label = source === "row" ? "Collect STATICS / WETH rewards" : "Collect selected";
     if (source === "selected")
       fireEvent.click(
-        screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+        screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
       );
     fireEvent.click(screen.getByRole("button", { name: label }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
@@ -2818,7 +2816,7 @@ it.each(["row", "selected"])(
     );
     await waitFor(() =>
       expect(
-        screen.queryByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+        screen.queryByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
       ).not.toBeInTheDocument()
     );
     const dialog = screen.getByRole("dialog", { name: label });
@@ -2904,18 +2902,19 @@ describe("compact liquidity rewards", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Your estimate")).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" })
+      screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
-    expect(
-      screen.getByRole("button", { name: "Hide positions in STATICS / WETH" })
-    ).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Show accounts in STATICS / WETH" }));
+    expect(screen.getByRole("button", { name: "Hide accounts in STATICS / WETH" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
     expect(screen.getAllByText("Your estimate")).toHaveLength(3);
     expect(
-      screen.getByRole("button", { name: "Collect Position #1 rewards in STATICS / WETH" })
+      screen.getByRole("button", { name: "Collect Account #1 rewards in STATICS / WETH" })
     ).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "Collect Position #2 rewards in STATICS / WETH" })
+      screen.getByRole("button", { name: "Collect Account #2 rewards in STATICS / WETH" })
     ).toBeEnabled();
     expect(screen.getAllByRole("checkbox", { name: /^Select/ })).toHaveLength(4);
     const poolCollect = screen.getByRole("button", {
@@ -2924,7 +2923,7 @@ describe("compact liquidity rewards", () => {
     expect(poolCollect).toHaveTextContent("Collect all");
     expect(screen.getAllByRole("link", { name: "Manage" })).toHaveLength(2);
     resize(false);
-    const poolRow = screen.getByRole("row", { name: /Select all positions in STATICS/ });
+    const poolRow = screen.getByRole("row", { name: /Select all accounts in STATICS/ });
     expect(within(poolRow).queryByRole("link", { name: "Manage" })).not.toBeInTheDocument();
     fireEvent.click(
       within(poolRow).getByRole("button", {
@@ -2943,7 +2942,7 @@ describe("compact liquidity rewards", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Collect Position #2 rewards in STATICS / WETH",
+        name: "Collect Account #2 rewards in STATICS / WETH",
       })
     );
     await screen.findByRole("button", { name: "Confirm transaction" });
@@ -2990,12 +2989,12 @@ describe("compact liquidity rewards", () => {
       withPhaseOne(<RewardsPage earnView="gauge" />);
       await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
       resize(isCompact);
-      const header = screen.getByRole("checkbox", { name: /^Select all positions$/ });
-      fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
-      const child = screen.getByRole("checkbox", { name: "Select Position #2 in STATICS / WETH" });
-      const pool = screen.getByRole("checkbox", { name: "Select all positions in STATICS / WETH" });
+      const header = screen.getByRole("checkbox", { name: /^Select all accounts$/ });
+      fireEvent.click(screen.getByRole("button", { name: "Show accounts in STATICS / WETH" }));
+      const child = screen.getByRole("checkbox", { name: "Select Account #2 in STATICS / WETH" });
+      const pool = screen.getByRole("checkbox", { name: "Select all accounts in STATICS / WETH" });
       const otherPool = screen.getByRole("checkbox", {
-        name: "Select all positions in STATICS / TOKEN",
+        name: "Select all accounts in STATICS / TOKEN",
       });
       expect(header).not.toBeChecked();
       fireEvent.click(child);
@@ -3051,7 +3050,7 @@ describe("compact liquidity rewards", () => {
   it("preserves the frozen claim and expanded pool when switching to desktop", async () => {
     withPhaseOne(<RewardsPage earnView="gauge" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show accounts in STATICS / WETH" }));
     expect(
       screen.getByRole("button", { name: "Collect STATICS / WETH rewards" })
     ).toHaveTextContent("Collect");
@@ -3060,16 +3059,17 @@ describe("compact liquidity rewards", () => {
     ).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Manage" })).toHaveLength(1);
     fireEvent.click(
-      screen.getByRole("button", { name: "Collect Position #1 rewards in STATICS / WETH" })
+      screen.getByRole("button", { name: "Collect Account #1 rewards in STATICS / WETH" })
     );
     await screen.findByRole("button", { name: "Confirm transaction" });
     resize(false);
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide accounts in STATICS / WETH" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
     expect(
-      screen.getByRole("button", { name: "Hide positions in STATICS / WETH" })
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(
-      screen.getByRole("dialog", { name: "Collect Position #1 rewards in STATICS / WETH" })
+      screen.getByRole("dialog", { name: "Collect Account #1 rewards in STATICS / WETH" })
     ).toBeInTheDocument();
     expect(mocks.call).toHaveBeenCalledTimes(1);
     expect(mocks.execute).not.toHaveBeenCalled();
@@ -3086,15 +3086,15 @@ describe("compact liquidity rewards", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     await screen.findByText("Some range or emission data could not be loaded.");
     expect(
-      screen.getByRole("button", { name: "Show positions in STATICS / WETH" })
-    ).toHaveAccessibleDescription("1 position Unavailable");
-    fireEvent.click(screen.getByRole("button", { name: "Show positions in STATICS / WETH" }));
-    const positionDetail = screen.getByRole("region", { name: "Position #1" });
+      screen.getByRole("button", { name: "Show accounts in STATICS / WETH" })
+    ).toHaveAccessibleDescription("1 account Unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Show accounts in STATICS / WETH" }));
+    const positionDetail = screen.getByRole("region", { name: "Account #1" });
     expect(within(positionDetail).getByText("Unavailable")).toBeInTheDocument();
     expect(within(positionDetail).queryByText("Loading")).not.toBeInTheDocument();
     expect(
       within(positionDetail).getByRole("button", {
-        name: "Collect Position #1 rewards in STATICS / WETH",
+        name: "Collect Account #1 rewards in STATICS / WETH",
       })
     ).toBeEnabled();
   });
@@ -3174,8 +3174,8 @@ describe("compact Earn positions", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     expect(screen.queryByRole("link", { name: "Manage" })).not.toBeInTheDocument();
     const reads = mocks.read.mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #2" }));
-    const region = screen.getByRole("region", { name: "Your positions" });
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Account #2" }));
+    const region = screen.getByRole("region", { name: "Your accounts" });
     expect(within(region).getByText("Reward assets")).toBeInTheDocument();
     expect(within(region).getByText("Allocated / free")).toBeInTheDocument();
     expect(within(region).getByText("Liquidity")).toBeInTheDocument();
@@ -3184,9 +3184,9 @@ describe("compact Earn positions", () => {
       "/app/rewards/staking?positionId=2"
     );
     expect(mocks.read).toHaveBeenCalledTimes(reads);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select Position #2" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Account #2" }));
     expect(
-      screen.getByRole("checkbox", { name: "Select all shown positions" })
+      screen.getByRole("checkbox", { name: "Select all shown accounts" })
     ).toBePartiallyChecked();
     fireEvent.click(screen.getByRole("button", { name: "Collect selected" }));
     await screen.findByRole("button", { name: "Confirm transaction" });
@@ -3198,10 +3198,10 @@ describe("compact Earn positions", () => {
     expect(decoded.args?.[2]?.every((group) => group.positionId === 2n)).toBe(true);
     resize(false);
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Select Position #2" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Select Account #2" })).toBeChecked();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     resize(true);
-    expect(screen.getByRole("button", { name: "Hide details for Position #2" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Hide details for Account #2" })).toHaveAttribute(
       "aria-expanded",
       "true"
     );
@@ -3228,27 +3228,27 @@ describe("compact Earn positions", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Collect" })).toBeEnabled());
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: /^Show details/ })[0]).toHaveAccessibleName(
-        "Show details for Position #26"
+        "Show details for Account #26"
       )
     );
-    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(25);
-    fireEvent.change(screen.getByRole("combobox", { name: "Sort positions" }), {
+    expect(screen.getAllByRole("checkbox", { name: /^Select Account/ })).toHaveLength(25);
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort accounts" }), {
       target: { value: "staked:asc" },
     });
     expect(screen.getAllByRole("button", { name: /^Show details/ })[0]).toHaveAccessibleName(
-      "Show details for Position #1"
+      "Show details for Account #1"
     );
     fireEvent.click(screen.getByRole("button", { name: "Load more · 1" }));
-    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(26);
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search positions" }), {
+    expect(screen.getAllByRole("checkbox", { name: /^Select Account/ })).toHaveLength(26);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search accounts" }), {
       target: { value: "#26" },
     });
-    expect(screen.getAllByRole("checkbox", { name: /^Select Position/ })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #26" }));
+    expect(screen.getAllByRole("checkbox", { name: /^Select Account/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Account #26" }));
     fireEvent.click(screen.getByRole("button", { name: /^Hide$/ }));
-    expect(screen.queryByRole("checkbox", { name: "Select Position #26" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Select Account #26" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show hidden · 1" }));
-    expect(screen.getByRole("checkbox", { name: "Select Position #26" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Account #26" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unhide" }));
     expect(screen.queryByText("Hidden")).not.toBeInTheDocument();
   });
@@ -3264,7 +3264,7 @@ describe("compact Earn positions", () => {
     withPhaseOne(<RewardsPage />);
     await screen.findByText(/^Cooldown /);
     expect(
-      screen.getByRole("button", { name: "Show details for Position #1" })
+      screen.getByRole("button", { name: "Show details for Account #1" })
     ).toHaveAccessibleDescription(/100 STATICS Cooldown/);
   });
 
@@ -3278,9 +3278,9 @@ describe("compact Earn positions", () => {
     withPhaseOne(<RewardsPage />);
     await screen.findByText("Unavailable");
     expect(
-      screen.getByRole("button", { name: "Show details for Position #1" })
+      screen.getByRole("button", { name: "Show details for Account #1" })
     ).toHaveAccessibleDescription("100 STATICS Unavailable");
-    fireEvent.click(screen.getByRole("button", { name: "Show details for Position #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show details for Account #1" }));
     expect(screen.getAllByText("Unavailable")).toHaveLength(3);
     expect(screen.getByRole("link", { name: "Manage" })).toBeInTheDocument();
     cleanup();
@@ -3291,10 +3291,10 @@ describe("compact Earn positions", () => {
       nextCursor: null,
     });
     withPhaseOne(<RewardsPage />);
-    expect(await screen.findByRole("link", { name: "Create position" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Open account" })).toHaveAttribute(
       "href",
       "/app/positions"
     );
-    expect(screen.getByRole("checkbox", { name: "Select all shown positions" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Select all shown accounts" })).toBeDisabled();
   });
 });

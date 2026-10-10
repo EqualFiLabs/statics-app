@@ -139,6 +139,8 @@
   min-width: 0;
 }
 .card {
+  /* Cards in a row share a height; keep content at the top instead of spreading rows. */
+  align-content: start;
   padding: 18px;
   border: 1px solid var(--app-border);
   border-radius: var(--radius-lg);
@@ -256,6 +258,14 @@
 }
 .card .table td:last-child {
   padding-right: 0;
+}
+/* Price routes wrap inside the token column so the table fits its card. */
+.cardTable {
+  min-width: 0;
+  overflow-x: auto;
+}
+.tokensTable tbody th {
+  white-space: normal;
 }
 .pool {
   display: grid;
