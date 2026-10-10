@@ -59,8 +59,6 @@ export function EarnStakeForm({
   const [pageChoice, setPageChoice] = useState<number | null>(null);
   /** Position ID, or "new", whose reward-asset modal is open. */
   const [assetsFor, setAssetsFor] = useState<string | null>(null);
-  /** Which kind of review the shared drawer is showing. */
-  const [reviewKind, setReviewKind] = useState<"stake" | "create" | "assets">("stake");
   const [newAssets, setNewAssets] = useState<readonly Address[] | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -456,7 +454,6 @@ export function EarnStakeForm({
     const removals = current.filter((asset) => !has(next, asset));
     if (!additions.length && !removals.length) return;
     setSuccess(null);
-    setReviewKind("assets");
     void action.prepare(async () => {
       const label = t("label.assets", { id: String(positionId) });
       const transactions = [
@@ -773,8 +770,8 @@ export function EarnStakeForm({
             busy={action.busy}
             onClose={clearReview}
           >
-            {/* The drawer's × already cancels asset updates and position creation. */}
-            <ActionReview action={action} showCancel={reviewKind === "stake"} />
+            {/* The drawer's × cancels every review here. */}
+            <ActionReview action={action} inline />
             {action.busy && <p role="status">{progress ?? t("preparing")}</p>}
           </ReviewDrawer>
         ) : null}
@@ -784,7 +781,6 @@ export function EarnStakeForm({
           disabled={!canReview}
           onClick={() => {
             setSuccess(null);
-            setReviewKind(preview?.kind === "create" ? "create" : "stake");
             void review();
           }}
         >

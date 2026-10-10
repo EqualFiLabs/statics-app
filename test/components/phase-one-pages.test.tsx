@@ -1328,7 +1328,9 @@ describe("focused Phase 1 Earn", () => {
     const drawer = screen.getByRole("dialog");
     expect(within(drawer).getByText("500 STATICS")).toBeInTheDocument();
     expect(mocks.execute).not.toHaveBeenCalled();
-    fireEvent.click(within(drawer).getByRole("button", { name: "Cancel" }));
+    // The drawer's close icon is the only way out; there is no separate Cancel button.
+    expect(within(drawer).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
     expect(screen.getByRole("textbox", { name: "STATICS amount" })).toHaveValue("500");
   });
   it("opens the staking form on Unstake when linked with mode=unstake", async () => {

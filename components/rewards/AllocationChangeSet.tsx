@@ -232,7 +232,7 @@ export function AllocationChangeSet({
       </div>
       {open && (action.review || action.busy || action.error) && (
         <ReviewDrawer title={t("title")} busy={action.busy} onClose={close}>
-          <ActionReview action={action} showCancel={false} />
+          <ActionReview action={action} inline />
           {action.busy && progress && (
             <>
               <p role="status">{progress}</p>
