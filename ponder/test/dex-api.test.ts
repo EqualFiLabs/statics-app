@@ -82,19 +82,17 @@ beforeEach(async () => {
 });
 describe("DEX endpoints with real SQL and bounded snapshots", () => {
   it("invalidates pages when a reserve/directory-only event is reorganized", async () => {
-    await database
-      .insert(schema.dexHistory)
-      .values({
-        key: "directory-event",
-        deploymentId: "selected",
-        poolId: `0x${"00".repeat(32)}`,
-        kind: "observation",
-        details: "{}",
-        blockNumber: 2n,
-        blockHash: `0x${"02".repeat(32)}`,
-        timestamp: 1n,
-        logIndex: 1,
-      });
+    await database.insert(schema.dexHistory).values({
+      key: "directory-event",
+      deploymentId: "selected",
+      poolId: `0x${"00".repeat(32)}`,
+      kind: "observation",
+      details: "{}",
+      blockNumber: 2n,
+      blockHash: `0x${"02".repeat(32)}`,
+      timestamp: 1n,
+      logIndex: 1,
+    });
     const first = await (await app.request("/phase-one/market/pools?limit=1")).json();
     await client.query("DELETE FROM dex_history WHERE key=$1", ["directory-event"]);
     const response = await app.request(

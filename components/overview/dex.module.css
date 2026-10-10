@@ -190,7 +190,7 @@
 }
 .bars span[data-incomplete] {
   opacity: 0.45;
-  outline: 1px dashed var(--text-muted);
+  outline: 1px dashed var(--app-text-muted);
 }
 .bars span[data-latest] {
   background: var(--accent);
