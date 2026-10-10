@@ -1671,7 +1671,7 @@
   font-weight: 500;
 }
 
-.approval-tools-summary > button,
+.approval-tools-summary-action > button,
 .approval-tools-state button {
   min-height: var(--control-height-sm);
   padding: 0 1rem;
@@ -1685,23 +1685,26 @@
   cursor: pointer;
 }
 
-.approval-tools-summary > button:hover:not(:disabled),
+.approval-tools-summary-action > button:hover:not(:disabled),
 .approval-tools-state button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.approval-tools-summary > button:disabled,
+.approval-tools-summary-action > button:disabled,
 .approval-tools-state button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.approval-tools-summary > button {
+.approval-tools-summary-action {
+  align-content: center;
+}
+
+.approval-tools-summary-action > button {
   min-width: 220px;
   border-color: var(--negative);
   background: var(--negative-wash);
   color: var(--negative);
-  border-radius: 0;
 }
 
 .approval-tools-note {
@@ -6681,7 +6684,7 @@
     grid-template-columns: 1fr;
   }
 
-  .approval-tools-summary > button {
+  .approval-tools-summary-action > button {
     min-height: 52px;
   }
 
