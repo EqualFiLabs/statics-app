@@ -14,11 +14,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import {
-  buildV4ExactInputSingleSwap,
-  dopplerStaticsTokenAbi,
-  permit2AllowanceAbi,
-} from "@statics-protocol/sdk";
+import { dopplerStaticsTokenAbi, permit2AllowanceAbi } from "@statics-protocol/sdk";
 
 import {
   getDefaultEvmSwapTokens,
@@ -50,6 +46,7 @@ import {
 } from "@/lib/protocol/approvals";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { isUniswapSwapChainId } from "@/lib/portal/uniswap";
+import { buildV4ExactInputSingleSwap } from "@/lib/trade/v4-execution";
 import { quoteSwapRoute, selectSwapRoute } from "@/lib/trade/swap-routing";
 import { buildV4ExactInputPathSwap, type PathHop } from "@/lib/trade/v4-path";
 

@@ -49,3 +49,5 @@ Relevant contract sources:
 - `RewardPolicyFacet`: restriction nonce and schedule checkpoint behavior.
 
 See [Phase 1 replay](phase-one-indexer-replay.md) before running a changed schema against an existing deployment.
+
+Native pools use address zero for the native currency. The app resolves its identity from the selected chain configuration when indexed native metadata is absent; it never treats that address as an ERC-20 or guesses missing ERC-20 decimals. Configure the native metadata variables above for complete indexer responses.

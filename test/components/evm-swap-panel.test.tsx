@@ -4,6 +4,7 @@ import {
   decodeFunctionData,
   decodeAbiParameters,
   parseAbiParameters,
+  parseAbi,
   encodeFunctionResult,
   getAddress,
   maxUint256,
@@ -114,14 +115,16 @@ const option = {
   protocol: null,
 } satisfies DeploymentOption;
 
-function renderCanonicalTrade(chainId: number, connected = false) {
+function renderCanonicalTrade(
+  chainId: number,
+  connected = false,
+  active: DeploymentOption = option
+) {
   const switchNetwork = vi.fn().mockResolvedValue(undefined);
   const selectFundingNetwork = vi.fn().mockResolvedValue(undefined);
   const client = new QueryClient();
   const element = (chainId: number) => (
-    <DeploymentContext.Provider
-      value={{ active: option, options: [option], selectNetwork: vi.fn() }}
-    >
+    <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
       <WalletContext.Provider
         value={{
           ...defaultWalletState,
@@ -170,6 +173,92 @@ beforeEach(() => {
   mocks.execute.mockResolvedValue(`0x${"a".repeat(64)}`);
 });
 afterEach(() => vi.restoreAllMocks());
+
+it("reviews and executes a discovered native ETH pool without wrapping or approvals", async () => {
+  const usd = getAddress("0x8888888888888888888888888888888888888888");
+  const poolKey = {
+    currency0: zeroAddress,
+    currency1: usd,
+    fee: 3000,
+    tickSpacing: 60,
+    hooks: zeroAddress,
+  };
+  const phaseOne = {
+    descriptor: { ...descriptor, deploymentId: "native-pools" },
+    contracts: deployment.contracts,
+    supportedPools: [],
+  } as unknown as PhaseOneDeployment;
+  mocks.discovered = [
+    {
+      poolId: `0x${"9".repeat(64)}`,
+      poolKey,
+      swappable: true,
+      reviewed: false,
+      token0: {
+        address: zeroAddress,
+        symbol: "ETH",
+        name: "Ether",
+        decimals: 18,
+        metadataSource: "reviewed-manifest",
+      },
+      token1: {
+        address: usd,
+        symbol: "USD",
+        name: "Dollar",
+        decimals: 6,
+        metadataSource: "reviewed-manifest",
+      },
+    },
+  ];
+  mocks.call.mockResolvedValue({
+    data: encodeFunctionResult({
+      abi: v4QuoterAbi,
+      functionName: "quoteExactInputSingle",
+      result: [2300000n, 100000n],
+    }),
+  });
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  try {
+    renderCanonicalTrade(descriptor.chainId, true, { ...option, phaseOne });
+    fireEvent.change(await screen.findByRole("combobox", { name: "You receive asset" }), {
+      target: { value: usd },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "0.001" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+    const { buildV4ExactInputSingleSwap: buildNativeSwap } =
+      await import("@/lib/trade/v4-execution");
+    const execution = mocks.execute.mock.calls[0]![0];
+    const { args } = decodeFunctionData({
+      abi: parseAbi(["function execute(bytes commands,bytes[] inputs,uint256 deadline) payable"]),
+      data: execution.data,
+    });
+    const deadline = args![2];
+    expect(deadline).toBeGreaterThanOrEqual(
+      (await mocks.getBlock.mock.results[0]!.value).timestamp + 1200n
+    );
+    const expected = buildNativeSwap({
+      router: deployment.contracts.universalRouter,
+      poolKey,
+      zeroForOne: true,
+      amountIn: 10n ** 15n,
+      amountOutMinimum: 2288500n,
+      deadline,
+      settlement: { input: "native", output: "erc20" },
+    });
+    expect(mocks.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expected.calldata, value: 10n ** 15n })
+    );
+    expect(mocks.readContract).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  } finally {
+    mocks.discovered = [];
+  }
+});
 
 describe("canonical Trade network", () => {
   it("ignores a remembered Arbitrum funding selection on Robinhood", async () => {
@@ -393,7 +482,10 @@ describe("integrated swap execution", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
     await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
     const execution = mocks.execute.mock.calls[0]![0];
-    const decoded = decodeFunctionData({ abi: universalRouterAbi, data: execution.data });
+    const decoded = decodeFunctionData({
+      abi: parseAbi(["function execute(bytes commands,bytes[] inputs,uint256 deadline) payable"]),
+      data: execution.data,
+    });
     const deadline = decoded.args![2]!;
     expect(deadline).toBeGreaterThanOrEqual(
       (await mocks.getBlock.mock.results[0]!.value).timestamp + 1200n
@@ -467,6 +559,84 @@ describe("route precedence", () => {
       kind: "uniswap",
       chainId: 8453,
     });
+  });
+  it("prefers an actual native pool in either direction and keeps wrapped pools for WETH", () => {
+    const nativePool = {
+      ...pool,
+      poolId: `0x${"5".repeat(64)}` as const,
+      poolKey: { ...pool.poolKey, currency0: zeroAddress, currency1: other.address },
+      swappable: true,
+    };
+    const wrappedPool = {
+      ...pool,
+      poolId: `0x${"6".repeat(64)}` as const,
+      poolKey: { ...pool.poolKey, currency0: deployment.contracts.weth, currency1: other.address },
+      swappable: true,
+    };
+    const active = { ...option, launch: null, phaseOne };
+    expect(
+      selectSwapRoute(active, descriptor.chainId, native, other, true, [wrappedPool, nativePool])
+    ).toMatchObject({
+      id: `phase-one:${nativePool.poolId}`,
+      inputToken: zeroAddress,
+      zeroForOne: true,
+      settlement: { input: "native", output: "erc20" },
+    });
+    expect(
+      selectSwapRoute(active, descriptor.chainId, other, native, true, [wrappedPool, nativePool])
+    ).toMatchObject({
+      id: `phase-one:${nativePool.poolId}`,
+      zeroForOne: false,
+      settlement: { input: "erc20", output: "native" },
+    });
+    expect(
+      selectSwapRoute(
+        active,
+        descriptor.chainId,
+        { ...native, kind: "erc20", address: deployment.contracts.weth },
+        other,
+        true,
+        [nativePool, wrappedPool]
+      )
+    ).toMatchObject({
+      id: `phase-one:${wrappedPool.poolId}`,
+      settlement: { input: "erc20", output: "erc20" },
+    });
+    expect(
+      selectSwapRoute(active, descriptor.chainId, native, other, true, [
+        { ...nativePool, swappable: false },
+        wrappedPool,
+      ])
+    ).toMatchObject({
+      id: `phase-one:${wrappedPool.poolId}`,
+      settlement: { wrappedNative: deployment.contracts.weth },
+    });
+  });
+  it("supports native-endpoint paths without mixing their quotes with wrapped routes", () => {
+    const middle = getAddress("0x5555555555555555555555555555555555555555");
+    const active = { ...option, launch: null, phaseOne };
+    const nativePool = {
+      poolId: `0x${"7".repeat(64)}` as const,
+      poolKey: { ...pool.poolKey, currency0: zeroAddress, currency1: middle },
+      swappable: true,
+    };
+    const nextPool = {
+      poolId: `0x${"8".repeat(64)}` as const,
+      poolKey: { ...pool.poolKey, currency0: middle, currency1: other.address },
+      swappable: true,
+    };
+    const route = selectSwapRoute(active, descriptor.chainId, native, other, true, [
+      nativePool,
+      nextPool,
+    ]);
+    expect(route).toMatchObject({
+      kind: "direct",
+      inputToken: zeroAddress,
+      settlement: { input: "native", output: "erc20" },
+    });
+    expect(
+      route.kind === "direct" && route.paths?.[0]?.map((hop) => hop.intermediateCurrency)
+    ).toEqual([middle, other.address]);
   });
   it("routes through verified discovered pools and skips ones closed to trading", () => {
     const third = getAddress("0x9999999999999999999999999999999999999999");

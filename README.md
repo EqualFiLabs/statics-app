@@ -104,6 +104,13 @@ copied into browser configuration.
 Anvil can keep Robinhood's mainnet chain ID while serving the app entirely on localhost. Set
 `NEXT_PUBLIC_APP_ENV=development`, `NEXT_PUBLIC_APP_NETWORK=anvil`,
 `NEXT_PUBLIC_ANVIL_CHAIN_ID=4663`, and `NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8663`.
+Phase 1 swap routing supports native ETH PoolKeys (`currency0 = address(0)`) directly.
+For an ETH pair it prefers an enabled native pool, then an enabled WETH pool; WETH trades
+continue to use WETH. Native pools settle ETH directly through the Universal Router, while
+WETH pools retain wrapping/unwrapping. Genesis keeps precedence for its canonical pair.
+Discovery resolves native currency metadata from the selected chain configuration without
+ERC-20 RPC calls. A failed selected quote remains an error rather than switching pools.
+
 Both local Genesis and Phase 1 manifests must identify chain `4663`; point the local indexer
 at the same fork and use a dedicated database. Without the chain override, existing local
 deployments continue to use `31337`.

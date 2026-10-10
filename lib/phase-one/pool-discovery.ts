@@ -1,4 +1,4 @@
-import { getAddress, type Address, type Hex } from "viem";
+import { getAddress, type Address, type Hex, zeroAddress } from "viem";
 import { v4PoolId, type V4PoolKey } from "@statics-protocol/sdk/phase-one";
 import type { PublicPoolToken, SupportedPublicPool } from "@/lib/deployments/types";
 import type { IndexedAllocationPool, IndexedPublicPool } from "@/lib/indexer/phase-one";
@@ -54,7 +54,8 @@ export function precheckDiscoveredPool(
 /** Validate local identity and require known decimals; never infer token units. */
 export function discoverPhaseOnePool(
   pool: IndexedSwapPool,
-  publicHook: Address
+  publicHook: Address,
+  nativeCurrency?: Readonly<{ symbol: string; name: string; decimals: number }>
 ): PhaseOnePool | DiscoveryRejection {
   const precheck = precheckDiscoveredPool(pool, publicHook);
   if (precheck) return precheck;
@@ -63,8 +64,12 @@ export function discoverPhaseOnePool(
     !same(pool.token1.address, pool.poolKey.currency1)
   )
     return "key-mismatch";
+  // Native currency has no ERC-20 getters. Use the selected chain's configured identity.
+  const currencies = [pool.token0, pool.token1].map((meta) =>
+    same(meta.address, zeroAddress) && nativeCurrency ? { ...meta, ...nativeCurrency } : meta
+  );
   if (
-    [pool.token0, pool.token1].some(
+    currencies.some(
       (token) =>
         token.decimals === null ||
         !Number.isInteger(token.decimals) ||
@@ -79,13 +84,14 @@ export function discoverPhaseOnePool(
       meta.symbol?.trim().slice(0, 16) || `${meta.address.slice(0, 6)}…${meta.address.slice(-4)}`,
     name: meta.name?.trim().slice(0, 64) || "Unreviewed token",
     decimals: meta.decimals!,
-    metadataSource: "onchain-import",
+    metadataSource:
+      same(meta.address, zeroAddress) && nativeCurrency ? "reviewed-manifest" : "onchain-import",
   });
   return {
     poolId: pool.poolId,
     poolKey: pool.poolKey,
-    token0: token(pool.token0),
-    token1: token(pool.token1),
+    token0: token(currencies[0]!),
+    token1: token(currencies[1]!),
     reviewed: false,
     liquidityEnabled: liquidityGaugeOpen(pool),
     swappable:

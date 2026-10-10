@@ -1,8 +1,15 @@
-import { decodeFunctionResult, getAddress, type Address, type PublicClient } from "viem";
+import {
+  decodeFunctionResult,
+  getAddress,
+  type Address,
+  type PublicClient,
+  zeroAddress,
+} from "viem";
 import { buildQuoteV4ExactInputSingleCall, v4QuoterAbi } from "@statics-protocol/sdk";
 
 import type { DeploymentOption, LaunchPoolKey } from "@/lib/deployments/types";
 import type { EvmSwapToken } from "@/lib/portal/uniswap";
+import type { SwapSettlement } from "@/lib/trade/v4-execution";
 import {
   buildQuoteV4ExactInputCall,
   candidatePaths,
@@ -29,10 +36,7 @@ export type DirectSwapRoute = Readonly<{
   permit2: Address;
   inputToken: Address;
   zeroForOne: boolean;
-  settlement:
-    | Readonly<{ input: "erc20"; output: "erc20" }>
-    | Readonly<{ input: "native"; output: "erc20"; wrappedNative: Address }>
-    | Readonly<{ input: "erc20"; output: "native"; wrappedNative: Address }>;
+  settlement: SwapSettlement;
   /**
    * Multi-pool candidates when no single pool trades the pair. Each is quoted; the best one is
    * executed. `poolKey` and `zeroForOne` are unused for these routes.
@@ -80,65 +84,82 @@ export function selectSwapRoute(
   const phaseOne =
     includePhaseOne && active.phaseOne?.descriptor.chainId === chainId ? active.phaseOne : null;
   if (phaseOne) {
-    const input = getAddress(source.kind === "native" ? phaseOne.contracts.weth : source.address);
-    const output = getAddress(
-      destination.kind === "native" ? phaseOne.contracts.weth : destination.address
-    );
     const candidates =
       pools ?? phaseOne.supportedPools.map((pool) => ({ ...pool, swappable: pool.enabled }));
-    const pool = candidates.find(
-      (candidate) =>
-        candidate.swappable &&
-        ((getAddress(candidate.poolKey.currency0) === input &&
-          getAddress(candidate.poolKey.currency1) === output) ||
-          (getAddress(candidate.poolKey.currency1) === input &&
-            getAddress(candidate.poolKey.currency0) === output))
-    );
-    if (pool) {
-      return {
-        kind: "direct",
-        id: `${phaseOne.descriptor.deploymentId}:${pool.poolId}`,
-        chainId,
-        deploymentId: phaseOne.descriptor.deploymentId,
-        phaseOne: true,
-        poolKey: pool.poolKey,
-        quoter: phaseOne.contracts.quoter,
-        router: phaseOne.contracts.universalRouter,
-        permit2: phaseOne.contracts.permit2,
-        inputToken: input,
-        zeroForOne: getAddress(pool.poolKey.currency0) === input,
-        settlement:
-          source.kind === "native"
-            ? { input: "native", output: "erc20", wrappedNative: phaseOne.contracts.weth }
-            : destination.kind === "native"
-              ? { input: "erc20", output: "native", wrappedNative: phaseOne.contracts.weth }
-              : { input: "erc20", output: "erc20" },
-      };
+    const actual = {
+      input: getAddress(source.kind === "native" ? zeroAddress : source.address),
+      output: getAddress(destination.kind === "native" ? zeroAddress : destination.address),
+    };
+    const wrapped = {
+      input: getAddress(source.kind === "native" ? phaseOne.contracts.weth : source.address),
+      output: getAddress(
+        destination.kind === "native" ? phaseOne.contracts.weth : destination.address
+      ),
+    };
+    const pairs =
+      actual.input === wrapped.input && actual.output === wrapped.output
+        ? [actual]
+        : [actual, wrapped];
+    const settlement = (input: Address, output: Address): SwapSettlement =>
+      source.kind === "native"
+        ? {
+            input: "native",
+            output: "erc20",
+            ...(input === zeroAddress ? {} : { wrappedNative: phaseOne.contracts.weth }),
+          }
+        : destination.kind === "native"
+          ? {
+              input: "erc20",
+              output: "native",
+              ...(output === zeroAddress ? {} : { wrappedNative: phaseOne.contracts.weth }),
+            }
+          : { input: "erc20", output: "erc20" };
+    // Prefer an exact native pair, then its wrapped equivalent. Never switch on quote failure.
+    for (const { input, output } of pairs) {
+      const pool = candidates.find(
+        (candidate) =>
+          candidate.swappable &&
+          ((getAddress(candidate.poolKey.currency0) === input &&
+            getAddress(candidate.poolKey.currency1) === output) ||
+            (getAddress(candidate.poolKey.currency1) === input &&
+              getAddress(candidate.poolKey.currency0) === output))
+      );
+      if (pool)
+        return {
+          kind: "direct",
+          id: `${phaseOne.descriptor.deploymentId}:${pool.poolId}`,
+          chainId,
+          deploymentId: phaseOne.descriptor.deploymentId,
+          phaseOne: true,
+          poolKey: pool.poolKey,
+          quoter: phaseOne.contracts.quoter,
+          router: phaseOne.contracts.universalRouter,
+          permit2: phaseOne.contracts.permit2,
+          inputToken: input,
+          zeroForOne: getAddress(pool.poolKey.currency0) === input,
+          settlement: settlement(input, output),
+        };
     }
-    // No single pool trades the pair: route through two or three Statics pools.
-    const paths = candidatePaths(input, output, candidates);
-    if (paths.length && input !== output) {
-      const first = candidates.find((candidate) => candidate.poolId === paths[0]![0]!.poolId)!;
-      return {
-        kind: "direct",
-        id: `${phaseOne.descriptor.deploymentId}:path:${input}:${output}:${paths.map((path) => path.map((hop) => hop.poolId.toLowerCase()).join(",")).join(";")}`,
-        chainId,
-        deploymentId: phaseOne.descriptor.deploymentId,
-        phaseOne: true,
-        poolKey: first.poolKey,
-        quoter: phaseOne.contracts.quoter,
-        router: phaseOne.contracts.universalRouter,
-        permit2: phaseOne.contracts.permit2,
-        inputToken: input,
-        zeroForOne: false,
-        settlement:
-          source.kind === "native"
-            ? { input: "native", output: "erc20", wrappedNative: phaseOne.contracts.weth }
-            : destination.kind === "native"
-              ? { input: "erc20", output: "native", wrappedNative: phaseOne.contracts.weth }
-              : { input: "erc20", output: "erc20" },
-        paths,
-      };
+    for (const { input, output } of pairs) {
+      const paths = candidatePaths(input, output, candidates);
+      if (paths.length && input !== output) {
+        const first = candidates.find((candidate) => candidate.poolId === paths[0]![0]!.poolId)!;
+        return {
+          kind: "direct",
+          id: `${phaseOne.descriptor.deploymentId}:path:${input}:${output}:${paths.map((path) => path.map((hop) => hop.poolId.toLowerCase()).join(",")).join(";")}`,
+          chainId,
+          deploymentId: phaseOne.descriptor.deploymentId,
+          phaseOne: true,
+          poolKey: first.poolKey,
+          quoter: phaseOne.contracts.quoter,
+          router: phaseOne.contracts.universalRouter,
+          permit2: phaseOne.contracts.permit2,
+          inputToken: input,
+          zeroForOne: false,
+          settlement: settlement(input, output),
+          paths,
+        };
+      }
     }
   }
   return {

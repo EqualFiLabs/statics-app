@@ -1,3 +1,4 @@
+import { buildV4ExactInputSingleSwap } from "@/lib/trade/v4-execution";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, expect, it } from "vitest";
@@ -19,7 +20,6 @@ import {
 import { mnemonicToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import {
-  buildV4ExactInputSingleSwap,
   staticsGenesisAbi,
   staticsGenesisVaultAbi,
   genesisActivationRegistryAbi,

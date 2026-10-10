@@ -9,6 +9,7 @@ import {
   type AllocationDirectoryPage,
   type IndexedAllocationPool,
 } from "@/lib/indexer/phase-one";
+import { getFundingNetwork } from "@/lib/funding-networks";
 import { discoverPhaseOnePool, mergePhaseOnePools } from "@/lib/phase-one/pool-discovery";
 
 export const discoveryRoot = "phase-one-pools";
@@ -63,13 +64,16 @@ export function usePhaseOnePools(deployment: PhaseOneDeployment | null) {
   });
   const supported = deployment?.supportedPools;
   const hook = deployment?.contracts.publicHook;
+  const nativeCurrency = deployment
+    ? getFundingNetwork(deployment.descriptor.chainId)?.chain.nativeCurrency
+    : undefined;
   const pools = useMemo(() => {
     const discovered = (indexed.data ?? []).flatMap((pool) => {
       if (!hook) return [];
-      const result = discoverPhaseOnePool(pool, hook);
+      const result = discoverPhaseOnePool(pool, hook, nativeCurrency);
       return typeof result === "object" ? [result] : [];
     });
     return supported ? mergePhaseOnePools(supported, discovered, indexed.data) : [];
-  }, [supported, hook, indexed.data]);
+  }, [supported, hook, indexed.data, nativeCurrency]);
   return { pools, discovering: indexed.isLoading };
 }

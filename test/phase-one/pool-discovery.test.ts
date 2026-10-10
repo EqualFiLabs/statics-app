@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAddress, type Address } from "viem";
+import { getAddress, type Address, zeroAddress } from "viem";
 import { v4PoolId } from "@statics-protocol/sdk/phase-one";
 import type { SupportedPublicPool } from "@/lib/deployments/types";
 import {
@@ -48,6 +48,36 @@ describe("pool discovery", () => {
     ).toBe("key-mismatch");
     expect(
       discoverPhaseOnePool({ ...indexed(), token0: { ...indexed().token0, decimals: null } }, hook)
+    ).toBe("decimals");
+  });
+  it("uses configured chain metadata for native pools without guessing unknown ERC-20 decimals", () => {
+    const nativeKey = { ...key, currency0: zeroAddress };
+    const record = {
+      ...indexed(),
+      poolKey: nativeKey,
+      poolId: v4PoolId(nativeKey),
+      token0: { address: zeroAddress, symbol: null, name: null, decimals: null },
+    };
+    expect(discoverPhaseOnePool(record, hook)).toBe("decimals");
+    expect(
+      discoverPhaseOnePool(record, hook, { name: "Ether", symbol: "ETH", decimals: 18 })
+    ).toMatchObject({
+      token0: {
+        address: zeroAddress,
+        name: "Ether",
+        symbol: "ETH",
+        decimals: 18,
+        metadataSource: "reviewed-manifest",
+      },
+      reviewed: false,
+      swappable: true,
+    });
+    expect(
+      discoverPhaseOnePool({ ...record, token1: { ...record.token1, decimals: null } }, hook, {
+        name: "Ether",
+        symbol: "ETH",
+        decimals: 18,
+      })
     ).toBe("decimals");
   });
   it("keeps quarantined or decommissioned pools out of trading", () => {

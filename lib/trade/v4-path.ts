@@ -4,10 +4,11 @@ import {
   getAddress,
   parseAbi,
   parseAbiParameters,
-  toHex,
   type Address,
   type Hex,
 } from "viem";
+
+import { buildV4Execution, type SwapSettlement } from "@/lib/trade/v4-execution";
 
 /**
  * Multi-pool exact-input swaps use IV4Router.ExactInputParams, including its maxHopSlippage
@@ -176,17 +177,6 @@ export function buildQuoteV4ExactInputCall(
   });
 }
 
-type Settlement =
-  | Readonly<{ input: "erc20"; output: "erc20" }>
-  | Readonly<{ input: "native"; output: "erc20"; wrappedNative: Address }>
-  | Readonly<{ input: "erc20"; output: "native"; wrappedNative: Address }>;
-
-const MSG_SENDER = "0x0000000000000000000000000000000000000001";
-const ROUTER_SELF = "0x0000000000000000000000000000000000000002";
-const routerAbi = parseAbi([
-  "function execute(bytes commands, bytes[] inputs, uint256 deadline) payable",
-]);
-
 /** Universal Router calldata for a multi-pool exact-input swap, mirroring the SDK's single-pool builder. */
 export function buildV4ExactInputPathSwap(request: {
   router: Address;
@@ -195,24 +185,13 @@ export function buildV4ExactInputPathSwap(request: {
   amountIn: bigint;
   amountOutMinimum: bigint;
   deadline: bigint;
-  settlement: Settlement;
+  settlement: SwapSettlement;
 }) {
   const max128 = (1n << 128n) - 1n;
   if (request.amountIn <= 0n || request.amountIn > max128) throw new Error("Invalid swap input.");
   if (request.amountOutMinimum < 0n || request.amountOutMinimum > max128)
     throw new Error("Invalid minimum output.");
   if (request.path.length < 2) throw new Error("A path swap needs at least two pools.");
-  const settlement = request.settlement;
-  const nativeInput = settlement.input === "native",
-    nativeOutput = settlement.output === "native";
-  const outputCurrency = request.path.at(-1)!.intermediateCurrency;
-  if (
-    settlement.input === "native" &&
-    lower(settlement.wrappedNative) !== lower(request.currencyIn)
-  )
-    throw new Error("Native input must enter as the wrapped-native currency.");
-  if (settlement.output === "native" && lower(settlement.wrappedNative) !== lower(outputCurrency))
-    throw new Error("Native output must leave as the wrapped-native currency.");
   const swap = encodeAbiParameters(
     parseAbiParameters(
       "(address currencyIn,(address intermediateCurrency,uint24 fee,int24 tickSpacing,address hooks,bytes hookData)[] path,uint256[] maxHopSlippage,uint128 amountIn,uint128 amountOutMinimum)"
@@ -227,65 +206,10 @@ export function buildV4ExactInputPathSwap(request: {
       },
     ]
   );
-  // Actions: SWAP_EXACT_IN (0x07), then SETTLE (0x0b) / SETTLE_ALL (0x0c), TAKE (0x0e) / TAKE_ALL (0x0f).
-  const actions = toHex(
-    new Uint8Array(
-      nativeInput ? [0x07, 0x0b, 0x0f] : nativeOutput ? [0x07, 0x0c, 0x0e] : [0x07, 0x0c, 0x0f]
-    )
-  );
-  const params = [
+  return buildV4Execution({
+    ...request,
+    currencyOut: request.path.at(-1)!.intermediateCurrency,
     swap,
-    nativeInput
-      ? encodeAbiParameters(
-          parseAbiParameters("address currency,uint256 amount,bool payerIsUser"),
-          [request.currencyIn, request.amountIn, false]
-        )
-      : encodeAbiParameters(parseAbiParameters("address currency,uint256 amount"), [
-          request.currencyIn,
-          request.amountIn,
-        ]),
-    nativeOutput
-      ? encodeAbiParameters(
-          parseAbiParameters("address currency,address recipient,uint256 amount"),
-          [outputCurrency, ROUTER_SELF, 0n]
-        )
-      : encodeAbiParameters(parseAbiParameters("address currency,uint256 minimumAmount"), [
-          outputCurrency,
-          request.amountOutMinimum,
-        ]),
-  ];
-  const plan = encodeAbiParameters(parseAbiParameters("bytes actions,bytes[] params"), [
-    actions,
-    params,
-  ]);
-  // Commands: WRAP_ETH (0x0b), V4_SWAP (0x10), UNWRAP_WETH (0x0c).
-  const commands = toHex(
-    new Uint8Array(nativeInput ? [0x0b, 0x10] : nativeOutput ? [0x10, 0x0c] : [0x10])
-  );
-  const inputs = nativeInput
-    ? [
-        encodeAbiParameters(parseAbiParameters("address recipient,uint256 amount"), [
-          ROUTER_SELF,
-          request.amountIn,
-        ]),
-        plan,
-      ]
-    : nativeOutput
-      ? [
-          plan,
-          encodeAbiParameters(parseAbiParameters("address recipient,uint256 amountMinimum"), [
-            MSG_SENDER,
-            request.amountOutMinimum,
-          ]),
-        ]
-      : [plan];
-  return {
-    target: request.router,
-    calldata: encodeFunctionData({
-      abi: routerAbi,
-      functionName: "execute",
-      args: [commands, inputs, request.deadline],
-    }),
-    value: nativeInput ? request.amountIn : 0n,
-  };
+    action: 0x07,
+  });
 }
