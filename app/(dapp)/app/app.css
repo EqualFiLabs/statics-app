@@ -2607,6 +2607,7 @@
 }
 
 .portal-asset-field input {
+  flex: 1 1 0;
   width: 100%;
   min-width: 0;
   padding: 0;
@@ -2627,8 +2628,9 @@
 }
 
 .portal-asset-field select {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 6rem;
+  max-width: 60%;
   min-height: 2.375rem;
   padding: 0 0.75rem;
   border: 1px solid var(--app-border-strong);
@@ -5936,6 +5938,10 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--app-border);
+}
+
+.wallet-dialog.is-wide .portal-header {
+  padding-inline-end: 3.5rem;
 }
 
 .portal-header .portal-mode-tabs {
