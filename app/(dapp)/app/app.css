@@ -5933,8 +5933,7 @@
   border-radius: 0;
 }
 
-/* Mode tabs and the settings gear share a row, so the gear stays reachable
- * whichever panel is open rather than being repeated inside each one. */
+/* Keep the Portal mode tabs clear of the containing wallet dialog close button. */
 .portal-header {
   display: flex;
   gap: 0.5rem;
@@ -5951,35 +5950,6 @@
   flex: 1;
   min-width: 0;
   border-bottom: 0;
-}
-
-.portal-settings-button {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  margin-right: 0.35rem;
-  color: var(--app-text-muted);
-  border: 1px solid transparent;
-  background: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.portal-settings-button svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-}
-
-.portal-settings-button:hover {
-  color: var(--app-text);
-  border-color: var(--app-border-strong);
-  background: var(--app-raised);
 }
 
 .portal-slippage-dialog {

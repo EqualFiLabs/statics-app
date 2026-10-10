@@ -6,10 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { AcrossBridgePanel } from "@/components/portal/AcrossBridgePanel";
 import { EvmSwapPanel } from "@/components/portal/EvmSwapPanel";
-import { SlippageSettingsDialog } from "@/components/portal/SlippageSettingsDialog";
 import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
-import { usePortalSlippage } from "@/hooks/usePortalSlippage";
-import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
 import { useDeployment } from "@/providers/deployment-context";
 
@@ -29,8 +26,6 @@ export function PortalWorkspace({
   const { active } = useDeployment();
   const [mode, setMode] = useState<PortalMode>(initialMode);
   const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const slippage = usePortalSlippage();
 
   return (
     <section className={`portal-workspace${compact ? " is-compact" : ""}`}>
@@ -48,26 +43,7 @@ export function PortalWorkspace({
             </button>
           ))}
         </div>
-        <button
-          className="portal-settings-button"
-          type="button"
-          aria-label={t("settings", { slippage })}
-          onClick={() => setSettingsOpen(true)}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="3.2" />
-            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" />
-          </svg>
-        </button>
       </div>
-
-      {settingsOpen && (
-        <SlippageSettingsDialog
-          value={slippage}
-          onApply={writePortalSlippage}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
 
       {mode === "swap" && (
         <>
