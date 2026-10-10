@@ -1593,8 +1593,6 @@
     "emptyTitle": "Todavía no tienes posiciones de liquidez",
     "emptyHelp": "Añade tokens a un pool para empezar a ganar comisiones.",
     "stepPool": "1 · Elegir pool",
-    "stepRange": "2 · Definir rango",
-    "stepDeposit": "3 · Depositar",
     "feeTier": "Comisión del {fee}%",
     "poolHelp": "Elige un par disponible. Tu depósito utilizará este pool.",
     "continue": "Continuar",
@@ -1611,11 +1609,6 @@
     "unknownReward": "Metadatos de recompensa no disponibles",
     "manageRewards": "Gestionar recompensas",
     "removeLiquidity": "Retirar liquidez",
-    "more": "Más",
-    "priceRange": "Rango de precios",
-    "customRange": "Rango personalizado",
-    "currentPrice": "Precio actual",
-    "rangeDescription": "Precio actual {current} {symbol} en relación con el rango elegido.",
     "inRange": "Dentro del rango",
     "outOfRange": "Fuera del rango",
     "fullRangeHelp": "Gana comisiones a cualquier precio. Tu depósito utiliza ambos tokens.",
@@ -1623,7 +1616,6 @@
     "singleSidedHelp": "Este rango acepta un solo token. Las comisiones se reanudan cuando el precio entre en él.",
     "loadingRange": "Cargando precio y rango…",
     "rangeError": "Introduce un precio mínimo mayor que cero y un máximo superior.",
-    "insufficientBalance": "Saldo insuficiente para este depósito.",
     "settings": "Ajustes de transacción",
     "depositToken": "Depositar {symbol}",
     "balance": "Saldo:",
@@ -1657,7 +1649,59 @@
     "unreviewedPool": "Sin revisar",
     "unreviewedTitle": "Token sin revisar",
     "unreviewedHelp": "Este pool contiene {tokens}, que no se ha revisado. Cualquiera puede crear un token con cualquier nombre o símbolo, así que comprueba la dirección antes de añadir liquidez.",
-    "unreviewedAcknowledge": "He comprobado la dirección y quiero añadir liquidez a este pool."
+    "unreviewedAcknowledge": "He comprobado la dirección y quiero añadir liquidez a este pool.",
+    "setRange": "Elige el rango de precios",
+    "yourRange": "Tu rango",
+    "setRangeHelp": "Arrastra los controles, elige una estrategia o escribe un precio.",
+    "lockedRangeHelp": "Añadir mantiene este rango. Usa Rebalancear para cambiarlo.",
+    "rangeHelp": "Donde esta posición gana comisiones de trading.",
+    "strategy": "Estrategia de rango",
+    "preset": {
+      "full": {
+        "label": "Rango completo",
+        "range": "0 → ∞",
+        "help": "Siempre gana, con la menor parte de comisiones."
+      },
+      "narrow": {
+        "label": "Estrecho",
+        "range": "± 1%",
+        "help": "Mayor parte de comisiones. Sale del rango rápido."
+      },
+      "common": {
+        "label": "Común",
+        "range": "± 10%",
+        "help": "Buena opción para pares volátiles."
+      },
+      "wide": {
+        "label": "Amplio",
+        "range": "−50% → +100%",
+        "help": "Se mantiene en rango con movimientos grandes."
+      },
+      "below": {
+        "label": "Bajo el precio",
+        "range": "−50% → ahora",
+        "help": "Contiene un solo token."
+      },
+      "above": {
+        "label": "Sobre el precio",
+        "range": "ahora → +100%",
+        "help": "Contiene un solo token."
+      }
+    },
+    "presetOneToken": "Solo contiene {symbol}.",
+    "minPrice": "Precio mínimo",
+    "maxPrice": "Precio máximo",
+    "pricePer": "{pair}",
+    "raiseBound": "Subir {bound} un paso",
+    "lowerBound": "Bajar {bound} un paso",
+    "payWithWeth": "WETH",
+    "payWithEth": "ETH + WETH",
+    "notNeeded": "No se necesita para este rango",
+    "needMore": "Necesitas {amount} {symbol} más.",
+    "swapFor": "Intercambiar por {symbol}",
+    "notEnough": "No tienes suficiente {symbol} para este depósito.",
+    "depositTotal": "Total",
+    "feeShare": "≈ {multiple}× la parte de comisiones de un depósito de rango completo mientras esté en rango"
   },
   "earnPortfolio": {
     "title": "Todas las recompensas de posiciones",
@@ -2580,6 +2624,27 @@
     "incompleteHistory": "La cobertura histórica está incompleta",
     "unavailableHistory": "Valores históricos no disponibles",
     "swapIn": "Hacer swap en {pool}",
+    "yieldWindow": "{days, plural, one {# día} other {# días}} de historial"
+  },
+  "rangeChart": {
+    "description": "Precio actual {current} {unit}. Rango de {min} a {max}.",
+    "dragMin": "Precio mínimo {price} {unit}. Arrastra o usa las flechas.",
+    "dragMax": "Precio máximo {price} {unit}. Arrastra o usa las flechas.",
+    "period": "Periodo del gráfico",
+    "period1D": "1D",
+    "period1W": "1S",
+    "period1M": "1M",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "reset": "Restablecer",
+    "noHistory": "El historial de precios no está disponible ahora.",
+    "poolSummary": "Pool {pair}",
+    "currentPrice": "Precio actual",
+    "tvl": "TVL",
+    "volume24h": "Volumen 24 h",
+    "fees24h": "Comisiones 24 h",
+    "estimatedYield": "Rend. estimado",
+    "yieldBasis": "Comisiones e incentivos, 7 días",
     "yieldWindow": "{days, plural, one {# día} other {# días}} de historial"
   }
 }

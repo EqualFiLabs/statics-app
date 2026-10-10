@@ -1593,8 +1593,6 @@
     "emptyTitle": "暂无流动性仓位",
     "emptyHelp": "向池中添加代币，开始赚取交易手续费。",
     "stepPool": "1 · 选择池",
-    "stepRange": "2 · 设置区间",
-    "stepDeposit": "3 · 存入",
     "feeTier": "{fee}% 手续费",
     "poolHelp": "选择可用代币对，存款将使用该池。",
     "continue": "继续",
@@ -1611,11 +1609,6 @@
     "unknownReward": "奖励代币信息不可用",
     "manageRewards": "管理奖励",
     "removeLiquidity": "移除流动性",
-    "more": "更多",
-    "priceRange": "价格区间",
-    "customRange": "自定义区间",
-    "currentPrice": "当前价格",
-    "rangeDescription": "当前价格为 {current} {symbol}，相对于所选价格区间。",
     "inRange": "区间内",
     "outOfRange": "区间外",
     "fullRangeHelp": "在所有价格范围赚取手续费，存款使用两种代币。",
@@ -1623,7 +1616,6 @@
     "singleSidedHelp": "此区间只接受一种代币。价格进入区间后恢复赚取手续费。",
     "loadingRange": "正在加载池价格和区间…",
     "rangeError": "最低价格必须大于零，最高价格必须高于最低价格。",
-    "insufficientBalance": "代币余额不足。",
     "settings": "交易设置",
     "depositToken": "存入 {symbol}",
     "balance": "余额：",
@@ -1657,7 +1649,59 @@
     "unreviewedPool": "未审核",
     "unreviewedTitle": "未审核代币",
     "unreviewedHelp": "此池包含尚未审核的 {tokens}。任何人都可以用任意名称或符号创建代币，添加流动性前请核对地址。",
-    "unreviewedAcknowledge": "我已核对地址，确认向此池添加流动性。"
+    "unreviewedAcknowledge": "我已核对地址，确认向此池添加流动性。",
+    "setRange": "设置价格区间",
+    "yourRange": "你的区间",
+    "setRangeHelp": "拖动手柄、选择策略或输入价格。",
+    "lockedRangeHelp": "追加流动性会保持此区间。使用再平衡来更改。",
+    "rangeHelp": "此仓位赚取交易手续费的价格区间。",
+    "strategy": "区间策略",
+    "preset": {
+      "full": {
+        "label": "全区间",
+        "range": "0 → ∞",
+        "help": "始终赚取手续费，但份额最低。"
+      },
+      "narrow": {
+        "label": "窄区间",
+        "range": "± 1%",
+        "help": "手续费份额最高，但很快会超出区间。"
+      },
+      "common": {
+        "label": "常用",
+        "range": "± 10%",
+        "help": "适合波动较大的交易对。"
+      },
+      "wide": {
+        "label": "宽区间",
+        "range": "−50% → +100%",
+        "help": "大幅波动时仍保持在区间内。"
+      },
+      "below": {
+        "label": "低于现价",
+        "range": "−50% → 现价",
+        "help": "只持有一种代币。"
+      },
+      "above": {
+        "label": "高于现价",
+        "range": "现价 → +100%",
+        "help": "只持有一种代币。"
+      }
+    },
+    "presetOneToken": "只持有 {symbol}。",
+    "minPrice": "最低价格",
+    "maxPrice": "最高价格",
+    "pricePer": "{pair}",
+    "raiseBound": "将{bound}上调一档",
+    "lowerBound": "将{bound}下调一档",
+    "payWithWeth": "WETH",
+    "payWithEth": "ETH + WETH",
+    "notNeeded": "此区间不需要",
+    "needMore": "你还需要 {amount} {symbol}。",
+    "swapFor": "兑换 {symbol}",
+    "notEnough": "{symbol} 余额不足以完成此存入。",
+    "depositTotal": "合计",
+    "feeShare": "在区间内时，手续费份额约为全区间存入的 {multiple} 倍"
   },
   "earnPortfolio": {
     "title": "所有仓位奖励",
@@ -2580,6 +2624,27 @@
     "incompleteHistory": "历史数据覆盖不完整",
     "unavailableHistory": "历史数据不可用",
     "swapIn": "在 {pool} 中兑换",
+    "yieldWindow": "{days, plural, other {# 天}}历史"
+  },
+  "rangeChart": {
+    "description": "当前价格 {current} {unit}。区间 {min} 至 {max}。",
+    "dragMin": "最低价格 {price} {unit}。拖动或使用方向键。",
+    "dragMax": "最高价格 {price} {unit}。拖动或使用方向键。",
+    "period": "图表周期",
+    "period1D": "1天",
+    "period1W": "1周",
+    "period1M": "1月",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "reset": "重置",
+    "noHistory": "暂时无法获取价格历史。",
+    "poolSummary": "{pair} 池",
+    "currentPrice": "当前价格",
+    "tvl": "锁仓价值",
+    "volume24h": "24小时交易量",
+    "fees24h": "24小时手续费",
+    "estimatedYield": "预估收益",
+    "yieldBasis": "手续费和激励，7天",
     "yieldWindow": "{days, plural, other {# 天}}历史"
   }
 }

@@ -34,12 +34,6 @@ export function priceFromSqrt(sqrtPriceX96: bigint, decimals0: number, decimals1
   return (Number(sqrtPriceX96) / 2 ** 96) ** 2 * 10 ** (decimals0 - decimals1);
 }
 
-/** Return a display-only range marker; transaction amounts never use floating point. */
-export function rangeMarker(current: number, lower: number, upper: number) {
-  if (!(current > 0 && lower > 0 && upper > lower)) return 50;
-  return Math.max(0, Math.min(100, (Math.log(current / lower) / Math.log(upper / lower)) * 100));
-}
-
 /** Leave one base unit for rounding so the dependent amount fits both balances. */
 export function maximumPairedInput(input: {
   sqrtPriceX96: bigint;

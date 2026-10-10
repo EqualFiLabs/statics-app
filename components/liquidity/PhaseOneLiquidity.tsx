@@ -5,7 +5,22 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { erc20Abi, formatUnits, parseEventLogs, encodeFunctionData, type Hex } from "viem";
 import Link from "next/link";
-import { LiquidityRange } from "@/components/liquidity/LiquidityRange";
+import { PoolSummary } from "@/components/liquidity/PoolSummary";
+import { RangeChart } from "@/components/liquidity/RangeChart";
+import chart from "@/components/liquidity/range-chart.module.css";
+import { usePoolMarket, type ChartPeriod } from "@/hooks/usePoolMarket";
+import {
+  displayBounds,
+  feeShareMultiplier,
+  moveBound,
+  presetTicks,
+  priceSeries,
+  singleSidedToken,
+  stepBound,
+  type Bound,
+  type PresetId,
+  type Ticks,
+} from "@/lib/phase-one/range-chart";
 import {
   maximumPairedInput,
   pairedLiquidityAmounts,
@@ -49,7 +64,7 @@ import {
   liquidityDepositsAllowed,
   withDiscoveredPools,
 } from "@/lib/phase-one/pool-discovery";
-import { priceToAlignedTick, tickPrice, fractionalRewardAmount } from "@/lib/phase-one/prices";
+import { tickPrice, fractionalRewardAmount } from "@/lib/phase-one/prices";
 import { protocolQueryKeys } from "@/lib/protocol/query-keys";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { mapRewardReads } from "@/lib/phase-one/reward-portfolio";
@@ -629,9 +644,13 @@ function ManagedLiquidity({
     enabled: true,
   });
   const [mode, setMode] = useState<Mode>("provide");
-  const [fullRange, setFullRange] = useState(true);
-  const [lower, setLower] = useState("");
-  const [upper, setUpper] = useState("");
+  // The selected range is held as aligned ticks; presets, dragging, stepping and typed prices
+  // all snap to the pool's price increments before they are stored.
+  const [preset, setPreset] = useState<PresetId | null>("full");
+  const [customTicks, setCustomTicks] = useState<Ticks | null>(null);
+  const [drafts, setDrafts] = useState<Partial<Record<Bound, string>>>({});
+  const [period, setPeriod] = useState<ChartPeriod>("1W");
+  const fullRange = preset === "full";
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
   const [minimum0, setMinimum0] = useState("");
@@ -752,25 +771,8 @@ function ManagedLiquidity({
     if (selectedMode === "increase" || !deposits)
       return [managed.data!.leg.tickLower, managed.data!.leg.tickUpper];
     if (fullRange) return usableTickBounds(pool.poolKey.tickSpacing);
-    const prices = [parseLocalizedUnits(lower, 36, locale), parseLocalizedUnits(upper, 36, locale)];
-    if (prices[0] <= 0n || prices[1] <= prices[0]) throw new Error(ux("rangeError"));
-    const canonical = inverted ? [10n ** 72n / prices[1], 10n ** 72n / prices[0]] : prices;
-    return [
-      priceToAlignedTick(
-        canonical[0],
-        pool.token0.decimals,
-        pool.token1.decimals,
-        pool.poolKey.tickSpacing,
-        "lower"
-      ),
-      priceToAlignedTick(
-        canonical[1],
-        pool.token0.decimals,
-        pool.token1.decimals,
-        pool.poolKey.tickSpacing,
-        "upper"
-      ),
-    ];
+    if (!customTicks || customTicks[0] >= customTicks[1]) throw new Error(ux("rangeError"));
+    return customTicks;
   };
   let previewTicks: readonly [number, number] | null = null;
   let inputError = "";
@@ -796,8 +798,11 @@ function ManagedLiquidity({
                 locale
               ),
             });
-      if (balances.data && inputs.some((amount, index) => amount > spendable(index)))
-        inputError = ux("insufficientBalance");
+      const short = balances.data
+        ? inputs.findIndex((amount, index) => amount > spendable(index))
+        : -1;
+      if (short >= 0)
+        inputError = ux("notEnough", { symbol: (short === 0 ? pool.token0 : pool.token1).symbol });
     }
   } catch (failure) {
     inputError =
@@ -824,24 +829,6 @@ function ManagedLiquidity({
   const pricePair = inverted
     ? `${pool.token0.symbol}/${pool.token1.symbol}`
     : `${pool.token1.symbol}/${pool.token0.symbol}`;
-  const lowerPrice = previewTicks
-    ? Number(
-        tickPrice(
-          inverted ? previewTicks[1] : previewTicks[0],
-          pool.token0.decimals,
-          pool.token1.decimals
-        )
-      )
-    : 0;
-  const upperPrice = previewTicks
-    ? Number(
-        tickPrice(
-          inverted ? previewTicks[0] : previewTicks[1],
-          pool.token0.decimals,
-          pool.token1.decimals
-        )
-      )
-    : 0;
   const effectiveFullRange =
     previewTicks?.[0] === usableTickBounds(pool.poolKey.tickSpacing)[0] &&
     previewTicks?.[1] === usableTickBounds(pool.poolKey.tickSpacing)[1];
@@ -900,21 +887,110 @@ function ManagedLiquidity({
   const switchOrientation = () => {
     action.cancel();
     setCompleted(false);
-    if (lower && upper) {
-      try {
-        const lo = parseLocalizedUnits(lower, 36, locale);
-        const hi = parseLocalizedUnits(upper, 36, locale);
-        if (lo > 0n && hi > 0n) {
-          setLower(formatUnits(10n ** 72n / hi, 36));
-          setUpper(formatUnits(10n ** 72n / lo, 36));
-        }
-      } catch {
-        setLower("");
-        setUpper("");
-      }
-    }
+    setDrafts({});
     setInverted(!inverted);
   };
+  const decimals = [pool.token0.decimals, pool.token1.decimals] as const;
+  const spacing = pool.poolKey.tickSpacing;
+  const market = usePoolMarket(deployment.descriptor.deploymentId, poolId, decimals, period);
+  const rangeEditable = editing && deposits && selectedMode !== "increase";
+  const shownBounds = previewTicks
+    ? displayBounds(previewTicks, spacing, decimals, inverted)
+    : null;
+  const series =
+    market.candles && market.candles.items.length > 0 && state.data
+      ? priceSeries(
+          market.candles.items,
+          currentPrice,
+          market.candles.from,
+          market.candles.to,
+          inverted
+        )
+      : null;
+  const editRange = (next: Ticks, nextPreset: PresetId | null) => {
+    action.cancel();
+    setCompleted(false);
+    setCustomTicks(next);
+    setPreset(nextPreset);
+  };
+  const choosePreset = (id: PresetId) => {
+    if (id !== "full" && !state.data) return;
+    setDrafts({});
+    editRange(
+      id === "full"
+        ? usableTickBounds(spacing)
+        : presetTicks(id, state.data!.tick, spacing, inverted),
+      id
+    );
+  };
+  // Editing a bound of a full range starts from the common ±10% range.
+  const editableTicks = () =>
+    !fullRange && previewTicks
+      ? previewTicks
+      : state.data
+        ? presetTicks("common", state.data.tick, spacing, inverted)
+        : null;
+  const typeBound = (bound: Bound, text: string) => {
+    action.cancel();
+    setCompleted(false);
+    setDrafts((current) => ({ ...current, [bound]: text }));
+    const base = editableTicks();
+    if (!base) return;
+    try {
+      const value = Number(formatUnits(parseLocalizedUnits(text, 36, locale), 36));
+      if (value > 0) editRange(moveBound(base, bound, value, spacing, decimals, inverted), null);
+    } catch {
+      // Keep the draft; the range updates once the text is a valid price.
+    }
+  };
+  const formatPrice = (value: number) =>
+    value === 0
+      ? "0"
+      : value === Infinity
+        ? "∞"
+        : new Intl.NumberFormat(locale, { maximumSignificantDigits: 7 }).format(value);
+  const oneSided =
+    deposits && previewTicks && state.data ? singleSidedToken(previewTicks, state.data.tick) : null;
+  const feeShare =
+    previewTicks && state.data
+      ? feeShareMultiplier(previewTicks, state.data.sqrtPriceX96, spacing)
+      : null;
+  const money = (value: number | null) =>
+    value === null
+      ? null
+      : `≈ ${new Intl.NumberFormat(locale, {
+          style: "currency",
+          currency: "USD",
+          ...(value > 0 && value < 0.01
+            ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
+            : {}),
+        }).format(value)}`;
+  const depositUsd = inputs.map((amount, index) =>
+    index === 0
+      ? market.usd(pool.token0.address, amount, pool.token0.decimals)
+      : market.usd(pool.token1.address, amount, pool.token1.decimals)
+  );
+  // Summary cards round long token amounts; reviews and inputs keep exact values.
+  const tokenDisplay = (amount: bigint, tokenDecimals: number) =>
+    new Intl.NumberFormat(locale, { maximumSignificantDigits: 8 }).format(
+      Number(formatUnits(amount, tokenDecimals))
+    );
+  const sumUsd = (values: readonly (number | null)[]) =>
+    values.every((value) => value !== null)
+      ? values.reduce<number>((sum, value) => sum + value!, 0)
+      : null;
+  const depositTotal = sumUsd(depositUsd);
+  const holdingsUsd = holdings
+    ? sumUsd([
+        market.usd(pool.token0.address, holdings.amount0, pool.token0.decimals),
+        market.usd(pool.token1.address, holdings.amount1, pool.token1.decimals),
+      ])
+    : null;
+  const shortfalls = [0, 1].map((index) =>
+    deposits && balances.data && inputs[index]! > spendable(index)
+      ? inputs[index]! - spendable(index)
+      : 0n
+  );
   const tokenAmount = (value: bigint, index: 0 | 1) =>
     `${formatUnits(value, index === 0 ? pool.token0.decimals : pool.token1.decimals)} ${index === 0 ? pool.token0.symbol : pool.token1.symbol}`;
   const approve = async (maximum0: bigint, maximum1: bigint) => {
@@ -964,8 +1040,21 @@ function ManagedLiquidity({
     if (approvals.some((entry) => entry.needed))
       await queryClient.fetchQuery({ queryKey: key, staleTime: 0, queryFn: read });
   };
+  const invalidDraft =
+    rangeEditable &&
+    Object.values(drafts).some((text) => {
+      if (text === undefined) return false;
+      try {
+        const value = Number(formatUnits(parseLocalizedUnits(text, 36, locale), 36));
+        return !(value > 0) || !Number.isFinite(value);
+      } catch {
+        return true;
+      }
+    });
+  if (invalidDraft) inputError = ux("rangeError");
   const prepare = () =>
     action.prepare(async () => {
+      if (invalidDraft) throw new Error(ux("rangeError"));
       if (!depositsAllowed && (deposits || selectedMode === "attach"))
         throw new Error(ux("depositsPaused"));
       if (needsAcknowledgement) throw new Error(ux("unreviewedAcknowledge"));
@@ -1303,475 +1392,609 @@ function ManagedLiquidity({
       </div>
       {managed.isError && <p role="alert">{managed.error.message}</p>}
       {state.isError && <p role="alert">{state.error.message}</p>}
-      {detail && (
-        <>
-          <div className="liquidity-detail-summary">
-            <section className="ui-card">
-              <h4>{ux("tokenHoldings")}</h4>
-              <div className="liquidity-holdings">
-                {[pool.token0, pool.token1].map((token, index) => (
-                  <div key={token.address}>
-                    <span>{token.symbol}</span>
-                    <strong>
-                      {holdings
-                        ? formatUnits(
-                            index === 0 ? holdings.amount0 : holdings.amount1,
-                            token.decimals
-                          )
-                        : "—"}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-              <p className="liquidity-muted">{ux("principalHelp")}</p>
-            </section>
-            <section className="ui-card">
-              <h4>{ux("tradingFees")}</h4>
-              {fees.data ? (
+      <div className="liquidity-workspace">
+        <aside className="liquidity-side">
+          {detail && (
+            <div className="liquidity-detail-summary">
+              <section className="ui-card">
+                <h4>{ux("tokenHoldings")}</h4>
+                {holdingsUsd !== null && (
+                  <strong className="liquidity-total">{money(holdingsUsd)}</strong>
+                )}
                 <div className="liquidity-holdings">
-                  <div>
-                    <span>{pool.token0.symbol}</span>
-                    <strong>{formatUnits(fees.data.amount0, pool.token0.decimals)}</strong>
-                  </div>
-                  <div>
-                    <span>{pool.token1.symbol}</span>
-                    <strong>{formatUnits(fees.data.amount1, pool.token1.decimals)}</strong>
-                  </div>
+                  {[pool.token0, pool.token1].map((token, index) => (
+                    <div key={token.address}>
+                      <span>{token.symbol}</span>
+                      <strong>
+                        {holdings
+                          ? tokenDisplay(
+                              index === 0 ? holdings.amount0 : holdings.amount1,
+                              token.decimals
+                            )
+                          : "—"}
+                      </strong>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <p className="liquidity-muted">
-                  {ux(fees.isError ? "feesUnavailable" : "loading")}
-                </p>
-              )}
-              <p className="liquidity-muted">{ux("feesHelp")}</p>
-            </section>
-            <section className="ui-card">
-              <h4>{ux("incentiveRewards")}</h4>
-              {managed.data?.rewards.amounts
-                .slice(0, managed.data.rewards.slotCount)
-                .map((amount, slot) => {
-                  const token = deployment.supportedPools
-                    .flatMap((entry) => [entry.token0, entry.token1])
-                    .find(
-                      (token) =>
-                        token.address.toLowerCase() ===
-                        managed.data!.rewards.assets[slot].toLowerCase()
+                <p className="liquidity-muted">{ux("principalHelp")}</p>
+              </section>
+              <section className="ui-card">
+                <h4>{ux("tradingFees")}</h4>
+                {fees.data ? (
+                  <div className="liquidity-holdings">
+                    <div>
+                      <span>{pool.token0.symbol}</span>
+                      <strong>{tokenDisplay(fees.data.amount0, pool.token0.decimals)}</strong>
+                    </div>
+                    <div>
+                      <span>{pool.token1.symbol}</span>
+                      <strong>{tokenDisplay(fees.data.amount1, pool.token1.decimals)}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="liquidity-muted">
+                    {ux(fees.isError ? "feesUnavailable" : "loading")}
+                  </p>
+                )}
+                <p className="liquidity-muted">{ux("feesHelp")}</p>
+              </section>
+              <section className="ui-card">
+                <h4>{ux("incentiveRewards")}</h4>
+                {managed.data?.rewards.amounts
+                  .slice(0, managed.data.rewards.slotCount)
+                  .map((amount, slot) => {
+                    const token = deployment.supportedPools
+                      .flatMap((entry) => [entry.token0, entry.token1])
+                      .find(
+                        (token) =>
+                          token.address.toLowerCase() ===
+                          managed.data!.rewards.assets[slot].toLowerCase()
+                      );
+                    return (
+                      <strong className="liquidity-reward-value" key={slot}>
+                        {token
+                          ? `${tokenDisplay(amount, token.decimals)} ${token.symbol}`
+                          : ux("unknownReward")}
+                      </strong>
                     );
-                  return (
-                    <strong className="liquidity-reward-value" key={slot}>
-                      {token
-                        ? `${formatUnits(amount, token.decimals)} ${token.symbol}`
-                        : ux("unknownReward")}
-                    </strong>
-                  );
-                })}
-              <Link
-                className="liquidity-back"
-                href={`/app/rewards/gauge?positionId=${positionId}&poolId=${poolId}`}
-              >
-                {ux("manageRewards")} →
-              </Link>
-            </section>
-          </div>
-          <div className="liquidity-detail-actions">
-            {active && (
-              <>
-                <button
-                  className="ui-button ui-button--primary"
-                  type="button"
-                  disabled={action.busy || !depositsAllowed}
-                  onClick={() => selectMode("increase")}
+                  })}
+                <Link
+                  className="liquidity-back"
+                  href={`/app/rewards/gauge?positionId=${positionId}&poolId=${poolId}`}
                 >
-                  {ux("addLiquidity")}
-                </button>
-                <button
-                  className="ui-button"
-                  type="button"
-                  disabled={action.busy}
-                  onClick={() => selectMode("decrease")}
-                >
-                  {ux("removeLiquidity")}
-                </button>
-                <button
-                  className="ui-button"
-                  type="button"
-                  disabled={action.busy}
-                  onClick={() => selectMode("collect")}
-                >
-                  {t("collect")}
-                </button>
-                <details>
-                  <summary>{ux("more")}</summary>
+                  {ux("manageRewards")} →
+                </Link>
+              </section>
+            </div>
+          )}
+          <PoolSummary
+            pair={`${pool.token0.symbol} / ${pool.token1.symbol}`}
+            fee={ux("feeTier", { fee: pool.poolKey.fee / 10000 })}
+            current={state.data ? displayPrice : null}
+            unit={pricePair}
+            series={series}
+            stats={market.stats}
+            quote={market.statsQuote}
+          />
+        </aside>
+        <div className="liquidity-main">
+          {detail && (
+            <div className="liquidity-detail-actions">
+              {active && (
+                <>
                   <button
+                    className="ui-button ui-button--primary"
+                    type="button"
+                    disabled={action.busy || !depositsAllowed}
+                    onClick={() => selectMode("increase")}
+                  >
+                    {ux("addLiquidity")}
+                  </button>
+                  <button
+                    className="ui-button"
+                    type="button"
+                    disabled={action.busy}
+                    onClick={() => selectMode("decrease")}
+                  >
+                    {ux("removeLiquidity")}
+                  </button>
+                  <button
+                    className="ui-button"
+                    type="button"
+                    disabled={action.busy}
+                    onClick={() => selectMode("collect")}
+                  >
+                    {t("collect")}
+                  </button>
+                  <button
+                    className="ui-button"
                     type="button"
                     disabled={action.busy || !depositsAllowed}
                     onClick={() => selectMode("rebalance")}
                   >
                     {t("rebalance")}
                   </button>
-                </details>
-              </>
-            )}
-            {managed.data && !active && !managed.data.claimOnly && (
-              <button
-                className="ui-button"
-                type="button"
-                disabled={!depositsAllowed}
-                onClick={() => selectMode("provide")}
-              >
-                {ux("addLiquidity")}
-              </button>
-            )}
-          </div>
-        </>
-      )}
-      {!depositsAllowed && <p role="note">{ux("depositsPaused")}</p>}
-      <div className={`liquidity-editor${!editing ? " is-summary" : ""}`}>
-        <section className="ui-card liquidity-price-card">
-          <div className="liquidity-card-heading">
-            <div>
-              <p className="liquidity-step">{ux("stepRange")}</p>
-              <h4>{ux("priceRange")}</h4>
-            </div>
-            <button
-              className="ui-button liquidity-orientation"
-              type="button"
-              disabled={action.busy}
-              onClick={switchOrientation}
-            >
-              {pricePair} ⇄
-            </button>
-          </div>
-          {editing && deposits && selectedMode !== "increase" && (
-            <div className="liquidity-segmented">
-              <button
-                type="button"
-                aria-pressed={fullRange}
-                disabled={action.busy}
-                onClick={() => {
-                  action.cancel();
-                  setCompleted(false);
-                  setFullRange(true);
-                }}
-              >
-                {t("fullRange")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={!fullRange}
-                disabled={
-                  action.busy || !state.data || !Number.isFinite(displayPrice) || displayPrice <= 0
-                }
-                onClick={() => {
-                  action.cancel();
-                  setCompleted(false);
-                  setFullRange(false);
-                  if (!lower || !upper) {
-                    setLower(
-                      new Intl.NumberFormat(locale, {
-                        useGrouping: false,
-                        maximumSignificantDigits: 10,
-                      }).format(displayPrice * 0.8)
-                    );
-                    setUpper(
-                      new Intl.NumberFormat(locale, {
-                        useGrouping: false,
-                        maximumSignificantDigits: 10,
-                      }).format(displayPrice * 1.2)
-                    );
-                  }
-                }}
-              >
-                {ux("customRange")}
-              </button>
-            </div>
-          )}
-          {state.data && previewTicks ? (
-            <LiquidityRange
-              current={displayPrice}
-              lower={inverted ? 1 / lowerPrice : lowerPrice}
-              upper={inverted ? 1 / upperPrice : upperPrice}
-              fullRange={effectiveFullRange}
-              symbol={pricePair}
-              inRange={inRange}
-            />
-          ) : (
-            <p className="liquidity-muted">{ux("loadingRange")}</p>
-          )}
-          {editing && deposits && selectedMode !== "increase" && !fullRange && (
-            <div className="liquidity-bound-inputs">
-              {[
-                ["lower", lower, setLower],
-                ["upper", upper, setUpper],
-              ].map(([key, value, setter]) => (
-                <label key={String(key)}>
-                  {t(key === "lower" ? "lowerPrice" : "upperPrice", { pair: pricePair })}
-                  <input
-                    inputMode="decimal"
-                    value={String(value)}
-                    disabled={action.busy}
-                    onChange={(event) => {
-                      action.cancel();
-                      setCompleted(false);
-                      (setter as (value: string) => void)(event.target.value);
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          )}
-          {editing && !effectiveFullRange && deposits && (
-            <p className="liquidity-muted">{ux("alignHelp")}</p>
-          )}
-          {inputError && (
-            <p className="dapp-inline-error" role="alert">
-              {inputError}
-            </p>
-          )}
-        </section>
-        {editing && (
-          <section className="ui-card liquidity-deposit-card">
-            <div className="liquidity-card-heading">
-              <div>
-                <p className="liquidity-step">{ux("stepDeposit")}</p>
-                <h4>{selectedMode === "exit" ? ux("removeLiquidity") : t(selectedMode)}</h4>
-              </div>
-              {selectedMode !== "collect" && (
-                <details className="liquidity-settings">
-                  <summary aria-label={ux("settings")}>⚙</summary>
-                  <label>
-                    {t("slippage")} (%)
-                    <input
-                      value={slippage}
-                      disabled={action.busy}
-                      onChange={(event) => {
-                        action.cancel();
-                        setCompleted(false);
-                        setSlippage(event.target.value);
-                      }}
-                      inputMode="decimal"
-                    />
-                  </label>
-                </details>
+                </>
+              )}
+              {managed.data && !active && !managed.data.claimOnly && (
+                <button
+                  className="ui-button"
+                  type="button"
+                  disabled={!depositsAllowed}
+                  onClick={() => selectMode("provide")}
+                >
+                  {ux("addLiquidity")}
+                </button>
               )}
             </div>
-            {deposits && wrappedIndex >= 0 && (
-              <label className="liquidity-funding">
-                {ux("payWith")}
-                <select
-                  aria-label={ux("payWith")}
+          )}
+          {!depositsAllowed && <p role="note">{ux("depositsPaused")}</p>}
+          <div className={`liquidity-editor${!editing ? " is-summary" : ""}`}>
+            <section className="ui-card liquidity-price-card">
+              <div className="liquidity-card-heading">
+                <div>
+                  <h4>{ux(rangeEditable ? "setRange" : "yourRange")}</h4>
+                  <p className="liquidity-muted">
+                    {ux(
+                      rangeEditable
+                        ? "setRangeHelp"
+                        : selectedMode === "increase"
+                          ? "lockedRangeHelp"
+                          : "rangeHelp"
+                    )}
+                  </p>
+                </div>
+                <button
+                  className="ui-button liquidity-orientation"
+                  type="button"
                   disabled={action.busy}
-                  value={fundWithEth ? "ETH" : "WETH"}
-                  onChange={(event) => {
-                    action.cancel();
-                    setCompleted(false);
-                    setFundWithEth(event.target.value === "ETH");
-                  }}
+                  onClick={switchOrientation}
                 >
-                  <option value="WETH">WETH</option>
-                  <option value="ETH">ETH + WETH</option>
-                </select>
-                {fundWithEth && <span className="liquidity-muted">{ux("nativeHelp")}</span>}
-              </label>
-            )}
-            {deposits && unreviewedTokens.length > 0 && (
-              <div className="portal-unreviewed" role="note">
-                <strong>{ux("unreviewedTitle")}</strong>
-                <p>
-                  {ux("unreviewedHelp", {
-                    tokens: unreviewedTokens
-                      .map((token) => `${token.symbol} (${token.address})`)
-                      .join(", "),
-                  })}
-                </p>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={acknowledgedPool === pool.poolId}
-                    onChange={(event) => {
-                      action.cancel();
-                      setAcknowledgedPool(event.target.checked ? pool.poolId : null);
-                    }}
-                  />
-                  {ux("unreviewedAcknowledge")}
-                </label>
+                  {pricePair} ⇄
+                </button>
               </div>
-            )}
-            <fieldset disabled={!action.ready || action.busy}>
-              {selectedMode === "attach" ? (
-                <label className="basket-field">
-                  {t("chooseLp")}
-                  <select
-                    value={lpId || String(lpIds.data?.[0] ?? "")}
-                    onChange={(event) => {
-                      action.cancel();
-                      setCompleted(false);
-                      setLpId(event.target.value);
-                    }}
-                  >
-                    {lpIds.data?.map((id) => (
-                      <option key={String(id)} value={String(id)}>
-                        {t("lpNumber", { id: String(id) })}
-                      </option>
-                    ))}
-                  </select>
-                  {lpIds.isError && <span role="alert">{lpIds.error.message}</span>}
-                </label>
+              {state.data ? (
+                <RangeChart
+                  current={displayPrice}
+                  bounds={shownBounds}
+                  unit={pricePair}
+                  series={series}
+                  depth={market.depth?.liquidityComplete ? market.depth.ticks : null}
+                  decimals={decimals}
+                  inverted={inverted}
+                  period={period}
+                  onPeriod={setPeriod}
+                  editable={rangeEditable && !action.busy}
+                  onMove={(bound, price) => {
+                    setDrafts({});
+                    const base = editableTicks();
+                    if (base)
+                      editRange(moveBound(base, bound, price, spacing, decimals, inverted), null);
+                  }}
+                  onStep={(bound, direction) => {
+                    setDrafts({});
+                    const base = editableTicks();
+                    if (base) editRange(stepBound(base, bound, direction, spacing, inverted), null);
+                  }}
+                />
               ) : (
-                <>
-                  {deposits && (
-                    <div className="liquidity-deposits">
-                      {[pool.token0, pool.token1].map((token, index) => (
-                        <div className="liquidity-token-input" key={token.address}>
-                          <label htmlFor={`liquidity-amount-${index}`}>
-                            {ux("depositToken", { symbol: token.symbol })}
-                          </label>
-                          <div>
+                <p className="liquidity-muted">{ux("loadingRange")}</p>
+              )}
+              {rangeEditable && (
+                <div className={chart.presets} role="group" aria-label={ux("strategy")}>
+                  {(["full", "narrow", "common", "wide", "below", "above"] as const).map((id) => {
+                    const held =
+                      id === "below" || id === "above"
+                        ? state.data
+                          ? singleSidedToken(
+                              presetTicks(id, state.data.tick, spacing, inverted),
+                              state.data.tick
+                            )
+                          : null
+                        : null;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={preset === id}
+                        disabled={action.busy || (id !== "full" && !state.data)}
+                        onClick={() => choosePreset(id)}
+                      >
+                        <span>{ux(`preset.${id}.label`)}</span>
+                        <strong>{ux(`preset.${id}.range`)}</strong>
+                        <small>
+                          {held === null
+                            ? ux(`preset.${id}.help`)
+                            : ux("presetOneToken", {
+                                symbol: (held === 0 ? pool.token0 : pool.token1).symbol,
+                              })}
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className={chart.bounds}>
+                {(["min", "max"] as const).map((bound) => {
+                  const value = shownBounds ? shownBounds[bound === "min" ? 0 : 1] : null;
+                  const label = ux(bound === "min" ? "minPrice" : "maxPrice");
+                  const text = value === null ? "—" : formatPrice(value);
+                  return (
+                    <div className={chart.bound} key={bound}>
+                      <div>
+                        {rangeEditable ? (
+                          <>
+                            <label htmlFor={`range-${bound}`}>{label}</label>
                             <input
-                              id={`liquidity-amount-${index}`}
-                              value={displays[index]}
-                              placeholder="0"
-                              onChange={(event) => setInput(index as 0 | 1, event.target.value)}
+                              id={`range-${bound}`}
                               inputMode="decimal"
+                              value={drafts[bound] ?? text}
+                              disabled={action.busy || !state.data}
+                              onChange={(event) => typeBound(bound, event.target.value)}
+                              onBlur={() =>
+                                setDrafts((current) => ({ ...current, [bound]: undefined }))
+                              }
                             />
-                            <strong>{token.symbol}</strong>
-                          </div>
-                          <div className="liquidity-input-meta">
-                            <span>
-                              {ux("balance")}{" "}
-                              {balances.data
-                                ? new Intl.NumberFormat(locale, {
-                                    maximumFractionDigits: 6,
-                                  }).format(Number(formatUnits(spendable(index), token.decimals)))
-                                : "—"}
-                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{label}</span>
+                            <strong>{text}</strong>
+                          </>
+                        )}
+                        <span>{ux("pricePer", { pair: pricePair })}</span>
+                      </div>
+                      {rangeEditable && (
+                        <div className={chart.stepper}>
+                          {([1, -1] as const).map((direction) => (
                             <button
+                              key={direction}
                               type="button"
-                              disabled={!balances.data}
-                              onClick={() => fillMaximum(index as 0 | 1)}
+                              aria-label={ux(direction === 1 ? "raiseBound" : "lowerBound", {
+                                bound: label,
+                              })}
+                              disabled={action.busy || fullRange || !previewTicks}
+                              onClick={() => {
+                                setDrafts({});
+                                if (previewTicks)
+                                  editRange(
+                                    stepBound(previewTicks, bound, direction, spacing, inverted),
+                                    null
+                                  );
+                              }}
                             >
-                              {ux("max")}
+                              {direction === 1 ? "+" : "−"}
                             </button>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                      <p className="liquidity-muted">
-                        {ux(selectedMode === "rebalance" ? "rebalanceHelp" : "pairedAmounts")}
-                      </p>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
+              {state.data && previewTicks && (
+                <p className={inRange ? "liquidity-status" : "liquidity-status is-out"}>
+                  {ux(inRange ? "inRange" : "outOfRange")} ·{" "}
+                  {ux(
+                    effectiveFullRange
+                      ? "fullRangeHelp"
+                      : inRange
+                        ? "customRangeHelp"
+                        : "singleSidedHelp"
                   )}
-                  {mode === "decrease" && (
-                    <div className="liquidity-withdrawal">
-                      <strong>{percentage}%</strong>
+                </p>
+              )}
+              {editing && !effectiveFullRange && deposits && (
+                <p className="liquidity-muted">{ux("alignHelp")}</p>
+              )}
+              {inputError && (
+                <p className="dapp-inline-error" role="alert">
+                  {inputError}
+                </p>
+              )}
+            </section>
+            {editing && (
+              <section className="ui-card liquidity-deposit-card">
+                <div className="liquidity-card-heading">
+                  <div>
+                    <h4>{selectedMode === "exit" ? ux("removeLiquidity") : t(selectedMode)}</h4>
+                  </div>
+                  {selectedMode !== "collect" && (
+                    <details className="liquidity-settings">
+                      <summary aria-label={ux("settings")}>⚙</summary>
                       <label>
-                        {t("withdrawPercent")}
+                        {t("slippage")} (%)
                         <input
-                          type="range"
-                          min="1"
-                          max="100"
-                          value={percentage}
+                          value={slippage}
+                          disabled={action.busy}
                           onChange={(event) => {
                             action.cancel();
                             setCompleted(false);
-                            setPercentage(event.target.value);
+                            setSlippage(event.target.value);
                           }}
+                          inputMode="decimal"
                         />
                       </label>
-                      <div className="liquidity-presets">
-                        {[25, 50, 75, 100].map((value) => (
-                          <button
-                            type="button"
-                            key={value}
-                            aria-pressed={percentage === String(value)}
-                            onClick={() => {
-                              action.cancel();
-                              setCompleted(false);
-                              setPercentage(String(value));
-                            }}
-                          >
-                            {value}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {withdrawals && selectedMode !== "collect" && (
-                    <div className="liquidity-expected">
-                      <p>{ux("expectedReturns")}</p>
-                      <strong>{tokenAmount(expected[0], 0)}</strong>
-                      <strong>{tokenAmount(expected[1], 1)}</strong>
-                    </div>
-                  )}
-                  {withdrawals && selectedMode !== "collect" && (
-                    <details className="liquidity-minimums">
-                      <summary>{ux("minimumReturns")}</summary>
-                      {[pool.token0, pool.token1].map((token, index) => (
-                        <label className="basket-field" key={token.address}>
-                          {t("minimumToken", { symbol: token.symbol })}
-                          <input
-                            value={index === 0 ? minimum0 : minimum1}
-                            placeholder={t("automatic")}
-                            onChange={(event) => {
-                              action.cancel();
-                              setCompleted(false);
-                              (index === 0 ? setMinimum0 : setMinimum1)(event.target.value);
-                            }}
-                            inputMode="decimal"
-                          />
-                        </label>
-                      ))}
                     </details>
                   )}
-                </>
-              )}
-              {selectedMode === "exit" && <p className="liquidity-muted">{ux("exitReviewHelp")}</p>}
-              {!managed.data?.claimOnly && (
-                <button
-                  className="ui-button ui-button--primary liquidity-review-button"
-                  type="button"
-                  disabled={
-                    !state.data ||
-                    !managed.data ||
-                    needsAcknowledgement ||
-                    (!depositsAllowed && (deposits || selectedMode === "attach")) ||
-                    Boolean(inputError) ||
-                    (deposits &&
-                      selectedMode !== "rebalance" &&
-                      inputs[0] === 0n &&
-                      inputs[1] === 0n) ||
-                    (deposits && !balances.data)
-                  }
-                  onClick={() => void prepare()}
-                >
-                  {t("reviewAction", { action: t(selectedMode) })}
-                </button>
-              )}
-            </fieldset>
-            <div className="liquidity-inline-review">
-              <ActionReview action={action} />
-            </div>
-            {!active && !managed.data?.claimOnly && selectedMode !== "attach" && (
-              <button
-                className="liquidity-back"
-                type="button"
-                disabled={action.busy}
-                onClick={() => selectMode("attach")}
-              >
-                {ux("attachExisting")} →
-              </button>
+                </div>
+                {deposits && wrappedIndex >= 0 && (
+                  <div className="liquidity-funding">
+                    <div className="liquidity-segmented" role="group" aria-label={ux("payWith")}>
+                      {[false, true].map((native) => (
+                        <button
+                          key={String(native)}
+                          type="button"
+                          aria-pressed={fundWithEth === native}
+                          disabled={action.busy}
+                          onClick={() => {
+                            action.cancel();
+                            setCompleted(false);
+                            setFundWithEth(native);
+                          }}
+                        >
+                          {native ? ux("payWithEth") : ux("payWithWeth")}
+                        </button>
+                      ))}
+                    </div>
+                    {fundWithEth && <span className="liquidity-muted">{ux("nativeHelp")}</span>}
+                  </div>
+                )}
+                {deposits && unreviewedTokens.length > 0 && (
+                  <div className="portal-unreviewed" role="note">
+                    <strong>{ux("unreviewedTitle")}</strong>
+                    <p>
+                      {ux("unreviewedHelp", {
+                        tokens: unreviewedTokens
+                          .map((token) => `${token.symbol} (${token.address})`)
+                          .join(", "),
+                      })}
+                    </p>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={acknowledgedPool === pool.poolId}
+                        onChange={(event) => {
+                          action.cancel();
+                          setAcknowledgedPool(event.target.checked ? pool.poolId : null);
+                        }}
+                      />
+                      {ux("unreviewedAcknowledge")}
+                    </label>
+                  </div>
+                )}
+                <fieldset disabled={!action.ready || action.busy}>
+                  {selectedMode === "attach" ? (
+                    <label className="basket-field">
+                      {t("chooseLp")}
+                      <select
+                        value={lpId || String(lpIds.data?.[0] ?? "")}
+                        onChange={(event) => {
+                          action.cancel();
+                          setCompleted(false);
+                          setLpId(event.target.value);
+                        }}
+                      >
+                        {lpIds.data?.map((id) => (
+                          <option key={String(id)} value={String(id)}>
+                            {t("lpNumber", { id: String(id) })}
+                          </option>
+                        ))}
+                      </select>
+                      {lpIds.isError && <span role="alert">{lpIds.error.message}</span>}
+                    </label>
+                  ) : (
+                    <>
+                      {deposits && (
+                        <div className="liquidity-deposits">
+                          {[pool.token0, pool.token1].map((token, index) => {
+                            // A one-sided range takes only the token it holds.
+                            const unused =
+                              selectedMode !== "rebalance" &&
+                              oneSided !== null &&
+                              oneSided !== index;
+                            const other = index === 0 ? pool.token1 : pool.token0;
+                            return (
+                              <div
+                                className="liquidity-token-input"
+                                data-unused={unused || undefined}
+                                key={token.address}
+                              >
+                                <label htmlFor={`liquidity-amount-${index}`}>
+                                  {ux("depositToken", { symbol: token.symbol })}
+                                </label>
+                                <div>
+                                  <input
+                                    id={`liquidity-amount-${index}`}
+                                    value={unused ? "" : displays[index]}
+                                    placeholder="0"
+                                    disabled={unused}
+                                    onChange={(event) =>
+                                      setInput(index as 0 | 1, event.target.value)
+                                    }
+                                    inputMode="decimal"
+                                  />
+                                  <strong>{token.symbol}</strong>
+                                </div>
+                                <div className="liquidity-input-meta">
+                                  <span className={chart.usd}>
+                                    {unused ? ux("notNeeded") : (money(depositUsd[index]!) ?? "")}
+                                  </span>
+                                  <span>
+                                    <span>
+                                      {ux("balance")}{" "}
+                                      {balances.data
+                                        ? new Intl.NumberFormat(locale, {
+                                            maximumFractionDigits: 6,
+                                          }).format(
+                                            Number(formatUnits(spendable(index), token.decimals))
+                                          )
+                                        : "—"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={!balances.data}
+                                      onClick={() => fillMaximum(index as 0 | 1)}
+                                    >
+                                      {ux("max")}
+                                    </button>
+                                  </span>
+                                </div>
+                                {shortfalls[index]! > 0n && (
+                                  <p className={chart.shortfall}>
+                                    {ux("needMore", {
+                                      amount: displayAmount(shortfalls[index]!, token.decimals),
+                                      symbol: token.symbol,
+                                    })}{" "}
+                                    <Link
+                                      href={`/app/swap?in=${other.address}&out=${token.address}`}
+                                    >
+                                      {ux("swapFor", { symbol: token.symbol })}
+                                    </Link>
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <p className="liquidity-muted">
+                            {ux(selectedMode === "rebalance" ? "rebalanceHelp" : "pairedAmounts")}
+                          </p>
+                          {(depositTotal !== null || feeShare !== null) && (
+                            <div className={chart.totals}>
+                              {depositTotal !== null && depositTotal > 0 && (
+                                <span>
+                                  {ux("depositTotal")} <strong>{money(depositTotal)}</strong>
+                                </span>
+                              )}
+                              {feeShare !== null && !effectiveFullRange && (
+                                <span>
+                                  {ux("feeShare", {
+                                    multiple: new Intl.NumberFormat(locale, {
+                                      maximumSignificantDigits: 3,
+                                    }).format(feeShare),
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {mode === "decrease" && (
+                        <div className="liquidity-withdrawal">
+                          <strong>{percentage}%</strong>
+                          <label>
+                            {t("withdrawPercent")}
+                            <input
+                              type="range"
+                              min="1"
+                              max="100"
+                              value={percentage}
+                              onChange={(event) => {
+                                action.cancel();
+                                setCompleted(false);
+                                setPercentage(event.target.value);
+                              }}
+                            />
+                          </label>
+                          <div className="liquidity-presets">
+                            {[25, 50, 75, 100].map((value) => (
+                              <button
+                                type="button"
+                                key={value}
+                                aria-pressed={percentage === String(value)}
+                                onClick={() => {
+                                  action.cancel();
+                                  setCompleted(false);
+                                  setPercentage(String(value));
+                                }}
+                              >
+                                {value}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {withdrawals && selectedMode !== "collect" && (
+                        <div className="liquidity-expected">
+                          <p>{ux("expectedReturns")}</p>
+                          <strong>{tokenAmount(expected[0], 0)}</strong>
+                          <strong>{tokenAmount(expected[1], 1)}</strong>
+                        </div>
+                      )}
+                      {withdrawals && selectedMode !== "collect" && (
+                        <details className="liquidity-minimums">
+                          <summary>{ux("minimumReturns")}</summary>
+                          {[pool.token0, pool.token1].map((token, index) => (
+                            <label className="basket-field" key={token.address}>
+                              {t("minimumToken", { symbol: token.symbol })}
+                              <input
+                                value={index === 0 ? minimum0 : minimum1}
+                                placeholder={t("automatic")}
+                                onChange={(event) => {
+                                  action.cancel();
+                                  setCompleted(false);
+                                  (index === 0 ? setMinimum0 : setMinimum1)(event.target.value);
+                                }}
+                                inputMode="decimal"
+                              />
+                            </label>
+                          ))}
+                        </details>
+                      )}
+                    </>
+                  )}
+                  {selectedMode === "exit" && (
+                    <p className="liquidity-muted">{ux("exitReviewHelp")}</p>
+                  )}
+                  {!managed.data?.claimOnly && (
+                    <button
+                      className="ui-button ui-button--primary liquidity-review-button"
+                      type="button"
+                      disabled={
+                        !state.data ||
+                        !managed.data ||
+                        needsAcknowledgement ||
+                        (!depositsAllowed && (deposits || selectedMode === "attach")) ||
+                        Boolean(inputError) ||
+                        (deposits &&
+                          selectedMode !== "rebalance" &&
+                          inputs[0] === 0n &&
+                          inputs[1] === 0n) ||
+                        (deposits && !balances.data)
+                      }
+                      onClick={() => void prepare()}
+                    >
+                      {t("reviewAction", { action: t(selectedMode) })}
+                    </button>
+                  )}
+                </fieldset>
+                <div className="liquidity-inline-review">
+                  <ActionReview action={action} />
+                </div>
+                {!active && !managed.data?.claimOnly && selectedMode !== "attach" && (
+                  <button
+                    className="liquidity-back"
+                    type="button"
+                    disabled={action.busy}
+                    onClick={() => selectMode("attach")}
+                  >
+                    {ux("attachExisting")} →
+                  </button>
+                )}
+                {selectedMode === "attach" && (
+                  <button
+                    className="liquidity-back"
+                    type="button"
+                    disabled={action.busy}
+                    onClick={() => selectMode("provide")}
+                  >
+                    {ux("backToDeposit")}
+                  </button>
+                )}
+              </section>
             )}
-            {selectedMode === "attach" && (
-              <button
-                className="liquidity-back"
-                type="button"
-                disabled={action.busy}
-                onClick={() => selectMode("provide")}
-              >
-                {ux("backToDeposit")}
-              </button>
-            )}
-          </section>
-        )}
+          </div>
+        </div>
       </div>
       {(managed.data?.claimOnly || selectedMode === "exit") && (
         <section className="ui-card liquidity-obligations">

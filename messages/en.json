@@ -1593,8 +1593,6 @@
     "emptyTitle": "No liquidity positions yet",
     "emptyHelp": "Add tokens to a pool to start earning trading fees.",
     "stepPool": "1 · Select pool",
-    "stepRange": "2 · Set range",
-    "stepDeposit": "3 · Deposit",
     "feeTier": "{fee}% fee",
     "poolHelp": "Choose an available token pair. Your deposit will use this pool.",
     "continue": "Continue",
@@ -1611,11 +1609,6 @@
     "unknownReward": "Reward token metadata unavailable",
     "manageRewards": "Manage rewards",
     "removeLiquidity": "Remove liquidity",
-    "more": "More",
-    "priceRange": "Price range",
-    "customRange": "Custom range",
-    "currentPrice": "Current price",
-    "rangeDescription": "Current price {current} {symbol}, relative to your selected range.",
     "inRange": "In range",
     "outOfRange": "Out of range",
     "fullRangeHelp": "Earn trading fees across all prices. Your deposit uses both tokens.",
@@ -1623,7 +1616,6 @@
     "singleSidedHelp": "This range accepts one token. Fees resume when the pool price enters your range.",
     "loadingRange": "Loading pool price and range…",
     "rangeError": "Enter a minimum price greater than zero and a higher maximum price.",
-    "insufficientBalance": "Insufficient token balance for this deposit.",
     "settings": "Transaction settings",
     "depositToken": "Deposit {symbol}",
     "balance": "Balance:",
@@ -1657,7 +1649,59 @@
     "unreviewedPool": "Unreviewed",
     "unreviewedTitle": "Unreviewed token",
     "unreviewedHelp": "This pool holds {tokens}, which has not been reviewed. Anyone can create a token with any name or symbol, so check the address before you add liquidity.",
-    "unreviewedAcknowledge": "I have checked the address and want to add liquidity to this pool."
+    "unreviewedAcknowledge": "I have checked the address and want to add liquidity to this pool.",
+    "setRange": "Set price range",
+    "yourRange": "Your range",
+    "setRangeHelp": "Drag the handles, pick a strategy, or type a price.",
+    "lockedRangeHelp": "Adding keeps this range. Use Rebalance to change it.",
+    "rangeHelp": "Where this position earns trading fees.",
+    "strategy": "Range strategy",
+    "preset": {
+      "full": {
+        "label": "Full range",
+        "range": "0 → ∞",
+        "help": "Always earns, at the lowest fee share."
+      },
+      "narrow": {
+        "label": "Narrow",
+        "range": "± 1%",
+        "help": "Highest fee share. Leaves range quickly."
+      },
+      "common": {
+        "label": "Common",
+        "range": "± 10%",
+        "help": "A good default for volatile pairs."
+      },
+      "wide": {
+        "label": "Wide",
+        "range": "−50% → +100%",
+        "help": "Stays in range through big moves."
+      },
+      "below": {
+        "label": "Below price",
+        "range": "−50% → now",
+        "help": "Holds one token."
+      },
+      "above": {
+        "label": "Above price",
+        "range": "now → +100%",
+        "help": "Holds one token."
+      }
+    },
+    "presetOneToken": "Holds {symbol} only.",
+    "minPrice": "Min price",
+    "maxPrice": "Max price",
+    "pricePer": "{pair}",
+    "raiseBound": "Raise {bound} one step",
+    "lowerBound": "Lower {bound} one step",
+    "payWithWeth": "WETH",
+    "payWithEth": "ETH + WETH",
+    "notNeeded": "Not needed for this range",
+    "needMore": "You need {amount} more {symbol}.",
+    "swapFor": "Swap for {symbol}",
+    "notEnough": "Not enough {symbol} for this deposit.",
+    "depositTotal": "Total",
+    "feeShare": "≈ {multiple}× the fee share of a full-range deposit while in range"
   },
   "earnPortfolio": {
     "title": "All position rewards",
@@ -2580,6 +2624,27 @@
     "incompleteHistory": "Historical coverage is incomplete",
     "unavailableHistory": "Historical values unavailable",
     "swapIn": "Swap in {pool}",
+    "yieldWindow": "{days, plural, one {# day} other {# days}} of history"
+  },
+  "rangeChart": {
+    "description": "Current price {current} {unit}. Range {min} to {max}.",
+    "dragMin": "Minimum price {price} {unit}. Drag or use the arrow keys.",
+    "dragMax": "Maximum price {price} {unit}. Drag or use the arrow keys.",
+    "period": "Chart period",
+    "period1D": "1D",
+    "period1W": "1W",
+    "period1M": "1M",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "reset": "Reset",
+    "noHistory": "Price history is unavailable right now.",
+    "poolSummary": "{pair} pool",
+    "currentPrice": "Current price",
+    "tvl": "TVL",
+    "volume24h": "24h volume",
+    "fees24h": "24h fees",
+    "estimatedYield": "Est. yield",
+    "yieldBasis": "Fees and incentives, 7 days",
     "yieldWindow": "{days, plural, one {# day} other {# days}} of history"
   }
 }

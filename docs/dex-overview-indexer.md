@@ -71,3 +71,14 @@ Source reviewed at protocol `a50b3691c0f7d9fdb75ca6c831f7ea7ab6f522d7`:
 - `src/genesis/StaticsFeeReceiver.sol`: Genesis harvests existing LP fees; it is not additional swap revenue.
 
 No contract or SDK changes are required. Historical coverage is only as complete as configured source starts and relay availability. The local market-overview 503 on the old application route is separate from these additive endpoints.
+
+## Liquidity range chart
+
+`GET /phase-one/market/depth?pool=<PoolId>` returns ordered initialized-tick net liquidity,
+indexed active liquidity, the spot tick/price, tick spacing, observation block/time and
+`liquidityComplete`. It uses the same committed market snapshot and performs no RPC reads.
+The liquidity screen hides depth bars when inherited range coverage is incomplete. History
+windows use the indexed clock, including on time-warped forks, and do not extend chart history
+before the first available candle. Pool statistics retain the response's USDG or WETH quote;
+WETH values are never formatted as dollars. Empty or failed market responses leave onchain
+liquidity management available.

@@ -43,6 +43,15 @@ vi.mock("wagmi", () => ({
   }),
 }));
 vi.mock("@/lib/protocol/transactions", () => ({ executeProtocolTransaction: mocks.execute }));
+vi.mock("@/hooks/usePoolMarket", () => ({
+  usePoolMarket: () => ({
+    stats: null,
+    statsQuote: null,
+    depth: null,
+    candles: null,
+    usd: () => null,
+  }),
+}));
 vi.mock("@/hooks/usePhaseOnePools", async () => {
   const { mergePhaseOnePools } = await vi.importActual<
     typeof import("@/lib/phase-one/pool-discovery")
@@ -296,8 +305,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.liquidity = 10n ** 21n;
     render(tree());
     await openDetail();
-    fireEvent.click(await screen.findByText("More"));
-    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rebalance" }));
     fireEvent.click(screen.getByRole("button", { name: "Review Rebalance" }));
     expect(await screen.findByText("Maximum token debit: 0 STATICS + 0 WETH")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
@@ -314,9 +322,8 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.liquidity = 100n;
     render(tree());
     await openDetail();
-    fireEvent.click(await screen.findByText("More"));
-    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
-    fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rebalance" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Common/ }));
     fireEvent.click(screen.getByRole("button", { name: "Collect fees" }));
     fireEvent.click(screen.getByRole("button", { name: "Review Collect fees" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
@@ -334,7 +341,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     render(tree());
     await openDeposit();
     expect(screen.getByRole("combobox", { name: "Save to position" })).toHaveValue("1");
-    expect(screen.getByRole("button", { name: "Full range" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Full range/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
@@ -476,8 +483,88 @@ describe("Phase 1 liquidity in the existing screen", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Deposit STATICS" }), {
       target: { value: "100000000" },
     });
-    expect(screen.getByRole("alert")).toHaveTextContent("Insufficient token balance");
+    expect(screen.getByRole("alert")).toHaveTextContent(/Not enough \w+ for this deposit/);
+    expect(screen.getByRole("link", { name: "Swap for STATICS" })).toHaveAttribute(
+      "href",
+      `/app/swap?in=${address("3")}&out=${address("2")}`
+    );
     expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("builds a range from strategies, steps, chart keys and typed prices, and reviews its ticks", async () => {
+    render(tree());
+    await openDeposit();
+    const min = () => screen.getByRole("textbox", { name: "Min price" });
+    const max = () => screen.getByRole("textbox", { name: "Max price" });
+    expect(min()).toHaveValue("0");
+    expect(max()).toHaveValue("∞");
+    expect(screen.getByRole("button", { name: "Raise Min price one step" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Common/ })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /^Common/ }));
+    expect(screen.getByRole("button", { name: /^Common/ })).toHaveAttribute("aria-pressed", "true");
+    // ±10% around tick 0 with spacing 60: ticks -960 and 960.
+    expect(min()).toHaveValue(
+      new Intl.NumberFormat("en", { maximumSignificantDigits: 7 }).format(1.0001 ** -960)
+    );
+    expect(max()).toHaveValue(
+      new Intl.NumberFormat("en", { maximumSignificantDigits: 7 }).format(1.0001 ** 960)
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Raise Min price one step" }));
+    expect(min()).toHaveValue(
+      new Intl.NumberFormat("en", { maximumSignificantDigits: 7 }).format(1.0001 ** -900)
+    );
+    expect(screen.getByRole("button", { name: /^Common/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Maximum price/ }), { key: "ArrowDown" });
+    expect(max()).toHaveValue(
+      new Intl.NumberFormat("en", { maximumSignificantDigits: 7 }).format(1.0001 ** 900)
+    );
+    // A typed price snaps to the nearest usable tick once the field is left.
+    fireEvent.change(max(), { target: { value: "2" } });
+    expect(max()).toHaveValue("2");
+    fireEvent.blur(max());
+    expect(max()).toHaveValue(
+      new Intl.NumberFormat("en", { maximumSignificantDigits: 7 }).format(1.0001 ** 6960)
+    );
+    const confirm = await provideReview();
+    expect(confirm).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `Price range: ${(1.0001 ** -900).toPrecision(6)} – ${(1.0001 ** 6960).toPrecision(6)} WETH/STATICS`
+      )
+    ).toBeInTheDocument();
+  });
+  it("clears a prepared review and blocks signing when a range draft becomes invalid", async () => {
+    render(tree());
+    await openDeposit();
+    fireEvent.click(screen.getByRole("button", { name: /^Common/ }));
+    await provideReview();
+    fireEvent.change(screen.getByRole("textbox", { name: "Min price" }), {
+      target: { value: "oops" },
+    });
+    expect(screen.queryByRole("button", { name: "Confirm transaction" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review Add liquidity" })).toBeDisabled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("takes only the held token for a one-sided range", async () => {
+    render(tree());
+    await openDeposit();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Below price/ })).toBeEnabled());
+    const below = screen.getByRole("button", { name: /^Below price/ });
+    expect(below).toHaveTextContent("Holds WETH only.");
+    fireEvent.click(below);
+    expect(screen.getByRole("textbox", { name: "Deposit STATICS" })).toBeDisabled();
+    expect(screen.getByText("Not needed for this range")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Deposit WETH" }), {
+      target: { value: "1" },
+    });
+    const review = screen.getByRole("button", { name: "Review Add liquidity" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    expect(
+      await screen.findByText(/^Maximum token debit: 0 STATICS \+ 1 WETH/)
+    ).toBeInTheDocument();
   });
   it("reviews ETH wrapping and stops before approvals if wrapping fails", async () => {
     const read = mocks.read.getMockImplementation()!;
@@ -489,9 +576,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.execute.mockRejectedValue(new Error("Wrapping reverted"));
     render(tree());
     await openDeposit();
-    fireEvent.change(screen.getByRole("combobox", { name: "Pay with" }), {
-      target: { value: "ETH" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "ETH + WETH" }));
     const confirm = await provideReview();
     await screen.findByText("Wrap up to 1 ETH to WETH before depositing.");
     expect(mocks.execute).not.toHaveBeenCalled();
@@ -515,9 +600,7 @@ describe("Phase 1 liquidity in the existing screen", () => {
     mocks.allowance = maxUint256;
     render(tree());
     await openDeposit();
-    fireEvent.change(screen.getByRole("combobox", { name: "Pay with" }), {
-      target: { value: "ETH" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "ETH + WETH" }));
     const confirm = await provideReview();
     weth = 10n ** 18n;
     fireEvent.click(confirm);
@@ -718,9 +801,9 @@ it("waits for live price before enabling custom range defaults", async () => {
   );
   render(tree());
   await openDeposit();
-  expect(screen.getByRole("button", { name: "Custom range" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /^Common/ })).toBeDisabled();
   loaded([1n << 96n, 0, 0, 3000]);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Custom range" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Common/ })).toBeEnabled());
 });
 
 it("accepts a mixed-case bytes32 pool deep link", async () => {

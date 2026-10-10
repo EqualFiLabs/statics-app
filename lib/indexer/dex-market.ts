@@ -134,6 +134,19 @@ export type DexTrade = Readonly<{
   settlement: "wallet" | "core-pool";
 }>;
 export type DexTrades = Observed & Readonly<{ items: readonly DexTrade[] }>;
+/** Initialized-tick liquidity for one pool, for the range chart's depth bars. */
+export type DexDepth = Readonly<{
+  deploymentId: string;
+  indexedAtBlock: bigint;
+  indexedAtTimestamp: bigint;
+  liquidityComplete: boolean;
+  poolId: Hex;
+  tickSpacing: number;
+  tick: number;
+  sqrtPriceX96: bigint;
+  liquidity: bigint;
+  ticks: readonly Readonly<{ tick: number; liquidityNet: bigint }>[];
+}>;
 
 const fail = (what: string): never => {
   throw new Error(`The Phase 1 indexer returned invalid ${what}.`);
@@ -434,6 +447,70 @@ export function parseDexTrades(value: unknown, deploymentId: string): DexTrades 
   };
 }
 
+/**
+ * Quote value of a raw token amount as a display number. The exact ratio is quote units per
+ * whole token, so the amount is scaled by the token's decimals and the result by the quote's.
+ */
+export function quoteValue(
+  price: Pick<DexTokenPrice, "priceNumerator" | "priceDenominator">,
+  amount: bigint,
+  tokenDecimals: number,
+  quoteDecimals: number
+): number | null {
+  if (price.priceNumerator === null || price.priceDenominator === null) return null;
+  if (price.priceDenominator <= 0n) return null;
+  const value =
+    (Number(amount) / 10 ** tokenDecimals) *
+    (Number(price.priceNumerator) / Number(price.priceDenominator) / 10 ** quoteDecimals);
+  return Number.isFinite(value) ? value : null;
+}
+
+const MAX_TICK = 887272;
+const signed = (v: unknown, what: string) =>
+  typeof v === "string" && /^-?(0|[1-9]\d*)$/.test(v) && v.length <= 80 && v !== "-0"
+    ? BigInt(v)
+    : fail(what);
+export function parseDexDepth(value: unknown, deploymentId: string, poolId: Hex): DexDepth {
+  const body = object(value, "depth response");
+  if (body.deploymentId !== deploymentId) fail("deployment");
+  const id = hash(body.poolId, "depth pool");
+  if (id.toLowerCase() !== poolId.toLowerCase()) fail("depth pool");
+  const spacing = int(body.tickSpacing, "tick spacing", 1, 32767);
+  const currentTick = int(body.tick, "pool tick", -MAX_TICK, MAX_TICK);
+  const active = uint(body.liquidity, "active liquidity");
+  const sqrt = uint(body.sqrtPriceX96, "pool price");
+  if (sqrt === 0n || sqrt >= 1n << 160n || active >= 1n << 128n) fail("depth bounds");
+  let previous = -Infinity,
+    running = 0n,
+    expectedActive = 0n;
+  const ticks = list(body.ticks, "depth ticks").map((raw) => {
+    const row = object(raw, "depth tick");
+    const tick = int(row.tick, "depth tick", -MAX_TICK, MAX_TICK);
+    if (tick <= previous) fail("depth tick order");
+    previous = tick;
+    if (tick % spacing !== 0) fail("depth tick alignment");
+    const liquidityNet = signed(row.liquidityNet, "net liquidity");
+    if (liquidityNet === 0n) fail("net liquidity");
+    running += liquidityNet;
+    if (running < 0n || running >= 1n << 128n) fail("depth cumulative liquidity");
+    if (tick <= currentTick) expectedActive = running;
+    return { tick, liquidityNet };
+  });
+  if (running !== 0n || expectedActive !== active) fail("depth liquidity consistency");
+  return {
+    deploymentId,
+    indexedAtBlock: uint(body.indexedAtBlock, "indexed block"),
+    indexedAtTimestamp: uint(body.indexedAtTimestamp, "indexed time"),
+    liquidityComplete: boolean(body.liquidityComplete, "depth coverage"),
+    poolId: id,
+    tickSpacing: spacing,
+    tick: currentTick,
+    sqrtPriceX96: sqrt,
+    liquidity: active,
+    ticks,
+  };
+}
+
 export class DexMarketRestartError extends Error {
   constructor() {
     super("The market snapshot changed. Reload the pool directory.");
@@ -506,4 +583,10 @@ export const loadDexTrades = async (deploymentId: string, quote: DexQuote, limit
       `/phase-one/market/trades${withQuote(quote, { limit: String(limit) })}`
     ),
     deploymentId
+  );
+export const loadDexDepth = async (deploymentId: string, poolId: Hex) =>
+  parseDexDepth(
+    await load(deploymentId, `/phase-one/market/depth${withQuote("usdg", { pool: poolId })}`),
+    deploymentId,
+    poolId
   );

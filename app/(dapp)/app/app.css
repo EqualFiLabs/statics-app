@@ -8333,14 +8333,45 @@
   color: var(--app-text-secondary);
   font-size: var(--text-xs);
 }
-.liquidity-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  align-items: start;
+/* Pool and position facts beside the range and deposit editor; they stack on narrow screens. */
+.liquidity-workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 1.5rem;
 }
-.liquidity-editor.is-summary {
-  grid-template-columns: 1fr;
+.liquidity-side {
+  display: grid;
+  flex: 1 1 300px;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 380px;
+}
+.liquidity-main {
+  display: grid;
+  flex: 999 1 560px;
+  gap: 1rem;
+  min-width: 0;
+}
+.liquidity-side .liquidity-detail-summary {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.liquidity-total {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+.liquidity-editor {
+  display: grid;
+  gap: 1rem;
+}
+.liquidity-token-input[data-unused] {
+  opacity: 0.55;
+}
+@media (max-width: 760px) {
+  .liquidity-side {
+    max-width: none;
+  }
 }
 .liquidity-price-card,
 .liquidity-deposit-card {
@@ -8380,67 +8411,6 @@
   background: var(--app-raised);
   color: var(--app-text);
 }
-.liquidity-range-visual {
-  display: grid;
-  gap: 1.25rem;
-  padding: 1.5rem 0;
-}
-.liquidity-range-status {
-  display: grid;
-  gap: 0.5rem;
-}
-.liquidity-range-status > span {
-  color: var(--app-text-secondary);
-  font-size: var(--text-sm);
-}
-.liquidity-range-status strong {
-  font-size: var(--text-2xl);
-  overflow-wrap: anywhere;
-}
-.liquidity-range-track {
-  position: relative;
-  height: 8rem;
-  margin: 1rem 0 0;
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-md);
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent calc(25% - 1px),
-    var(--app-border) calc(25% - 1px),
-    var(--app-border) 25%
-  );
-}
-.liquidity-range-band {
-  position: absolute;
-  inset: 15% 0;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-}
-.liquidity-range-marker {
-  position: absolute;
-  top: -0.5rem;
-  bottom: -0.5rem;
-  width: 2px;
-  background: var(--accent);
-  transform: translateX(-50%);
-}
-.liquidity-range-marker span {
-  position: absolute;
-  top: -0.25rem;
-  left: -0.25rem;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.liquidity-range-endpoints {
-  display: flex;
-  justify-content: space-between;
-  color: var(--app-text-secondary);
-  font-size: var(--text-sm);
-}
 .liquidity-status {
   display: inline-flex;
   align-items: center;
@@ -8460,21 +8430,12 @@
 .liquidity-status.is-out {
   color: var(--app-text-secondary);
 }
-.liquidity-bound-inputs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-.liquidity-bound-inputs label,
 .liquidity-settings label {
   display: grid;
   gap: 0.5rem;
   min-width: 0;
   color: var(--app-text-secondary);
   font-size: var(--text-sm);
-}
-.liquidity-bound-inputs input {
-  width: 100%;
 }
 .liquidity-settings {
   position: relative;
@@ -8539,6 +8500,11 @@
   box-shadow: none;
 }
 .liquidity-input-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-size: var(--text-xs);
   color: var(--app-text-secondary);
 }
@@ -8612,20 +8578,9 @@
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-.liquidity-detail-actions summary,
 .liquidity-minimums summary {
   color: var(--app-text-secondary);
   font-size: var(--text-sm);
-  cursor: pointer;
-}
-.liquidity-detail-actions details button {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: var(--app-raised);
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-sm);
-  color: var(--app-text);
-  font: inherit;
   cursor: pointer;
 }
 .liquidity-withdrawal {

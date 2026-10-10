@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { buildMarket, pricingConfig, type BuiltMarket } from "../dex-market";
 import { marketSnapshotSql, marketAnchorSql, type DexSnapshot } from "../dex-snapshot";
 import { wire } from "../dex-domain";
+import { poolDepth } from "../dex-depth";
 const TTL = 300_000,
   MAX_BYTES = 50 * 1024 * 1024;
 type Stored = {
@@ -141,11 +142,14 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
   }
   app.get("/phase-one/market/:section", async (c) => {
     const section = c.req.param("section");
-    if (!["summary", "pools", "tokens", "volume", "emissions", "trades"].includes(section))
+    if (!["summary", "pools", "tokens", "volume", "emissions", "trades", "depth"].includes(section))
       return c.notFound();
     const params = new URL(c.req.url).searchParams,
       q = marketQuery(params);
     if (!q) return c.json({ error: "Invalid market query." }, 400);
+    const pool = params.get("pool");
+    if (section === "depth" && !/^0x[0-9a-fA-F]{64}$/.test(pool ?? ""))
+      return c.json({ error: "Depth requires a pool ID." }, 400);
     if (section === "trades" && params.has("limit") && q.limit > 50)
       return c.json({ error: "Trade limit must be 1–50." }, 400);
     const raw = params.get("cursor");
@@ -209,6 +213,12 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
                 ).toString("base64url"),
           snapshot: { id: stored.id, expiresAt: stored.expires },
         });
+      }
+      if (section === "depth") {
+        const depth = poolDepth(stored.snapshot, pool!);
+        if (!depth) return c.json({ error: "Unknown or uninitialized pool." }, 404);
+        const { deploymentId, indexedAtBlock, indexedAtTimestamp } = data.observed;
+        return send(c, { deploymentId, indexedAtBlock, indexedAtTimestamp, ...depth });
       }
       if (section === "volume")
         return send(c, { ...data.volume, days: data.volume.days.slice(-q.days) });

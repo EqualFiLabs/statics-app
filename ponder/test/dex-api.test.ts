@@ -138,6 +138,27 @@ describe("DEX endpoints with real SQL and bounded snapshots", () => {
       (await app.request(`/phase-one/market/pools?limit=1&cursor=${second.nextCursor}`)).status
     ).toBe(409);
   });
+  it("serves one pool's tick depth from the cached snapshot", async () => {
+    const p = pool(2);
+    const response = await app.request(`/phase-one/market/depth?pool=${p.poolId}`);
+    const body = await response.json();
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body).toMatchObject({
+      deploymentId: "selected",
+      indexedAtBlock: "100",
+      poolId: p.poolId,
+      liquidity: range(p).liquidity,
+      ticks: [
+        { tick: -100, liquidityNet: range(p).liquidity },
+        { tick: 100, liquidityNet: `-${range(p).liquidity}` },
+      ],
+    });
+    expect((await app.request("/phase-one/market/depth")).status).toBe(400);
+    expect((await app.request("/phase-one/market/depth?pool=0x12")).status).toBe(400);
+    expect((await app.request(`/phase-one/market/depth?pool=0x${"ab".repeat(32)}`)).status).toBe(
+      404
+    );
+  });
   it("rejects malformed limits, filters and quote choices before querying", async () => {
     for (const query of [
       "days=0",

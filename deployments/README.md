@@ -70,6 +70,18 @@ Phase 1 actions do not repeat deployment audits or wait for unrelated reward,
 gauge, or treasury reads. A configured manifest enables its declared capabilities;
 unavailable basket, Dollar, and loan operations remain gated.
 
+### Adding discovered pools
+
+Registered pools missing from the manifest appear in the app as unreviewed. Run the command
+without PoolIds to list them, then rerun with the ones to approve and commit the diff:
+
+```
+npm run deployment:add-pools -- --manifest path/to/manifest.json --indexer <indexer URL> <poolId>...
+```
+
+The entry uses the indexer's PoolKey, registration block and token metadata. Tokens already in the
+manifest keep their curated metadata.
+
 Local development may supply `NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST`, but
 only for chain `31337` and only when `NEXT_PUBLIC_APP_ENV=development`.
 

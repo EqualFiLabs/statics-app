@@ -8,7 +8,6 @@ import {
   maximumPairedInput,
   pairedLiquidityAmounts,
   priceFromSqrt,
-  rangeMarker,
 } from "@/lib/phase-one/liquidity-preview";
 
 describe("local liquidity previews", () => {
@@ -83,9 +82,6 @@ describe("local liquidity previews", () => {
         amount: 0n,
       })
     ).toEqual([0n, 0n]);
-    expect(rangeMarker(2, 1, 4)).toBe(50);
-    expect(rangeMarker(0.1, 1, 4)).toBe(0);
-    expect(rangeMarker(5, 1, 4)).toBe(100);
   });
   it("limits Max by both balances when the other token is scarce", () => {
     const settings = {

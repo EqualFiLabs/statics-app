@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import {
+  parseDexDepth,
+  quoteValue,
   parseDexEmissions,
   parseDexPools,
   parseDexSummary,
@@ -130,5 +132,84 @@ describe("yield windows", () => {
     for (const pool of legacy.items)
       delete (pool.yieldComponents as { windowSeconds?: string }).windowSeconds;
     expect(() => parseDexPools(legacy, "dex-fixture")).not.toThrow();
+  });
+});
+
+describe("pool depth", () => {
+  const pool = `0x${"ab".repeat(32)}` as const;
+  const body = (overrides: Record<string, unknown> = {}) => ({
+    deploymentId: "fixture",
+    indexedAtBlock: "10",
+    indexedAtTimestamp: "100",
+    liquidityComplete: true,
+    poolId: pool,
+    tickSpacing: 60,
+    tick: 5,
+    sqrtPriceX96: String(1n << 96n),
+    liquidity: "150",
+    ticks: [
+      { tick: -120, liquidityNet: "150" },
+      { tick: 120, liquidityNet: "-150" },
+    ],
+    ...overrides,
+  });
+
+  it("parses signed tick liquidity in ascending order", () => {
+    expect(parseDexDepth(body(), "fixture", pool)).toMatchObject({
+      poolId: pool,
+      tick: 5,
+      liquidity: 150n,
+      ticks: [
+        { tick: -120, liquidityNet: 150n },
+        { tick: 120, liquidityNet: -150n },
+      ],
+    });
+  });
+
+  it("rejects another pool or deployment, unordered ticks and malformed liquidity", () => {
+    expect(() => parseDexDepth(body(), "other", pool)).toThrow("deployment");
+    expect(() => parseDexDepth(body(), "fixture", `0x${"cd".repeat(32)}`)).toThrow("depth pool");
+    expect(() =>
+      parseDexDepth(
+        body({
+          ticks: [
+            { tick: 60, liquidityNet: "1" },
+            { tick: 60, liquidityNet: "-1" },
+          ],
+        }),
+        "fixture",
+        pool
+      )
+    ).toThrow("order");
+    expect(() =>
+      parseDexDepth(body({ ticks: [{ tick: 60, liquidityNet: "-0" }] }), "fixture", pool)
+    ).toThrow("net liquidity");
+    expect(() => parseDexDepth(body({ tick: 900_000 }), "fixture", pool)).toThrow("pool tick");
+    for (const invalid of [
+      { liquidity: "149" },
+      { sqrtPriceX96: "0" },
+      { liquidityComplete: "true" },
+      {
+        ticks: [
+          { tick: -119, liquidityNet: "150" },
+          { tick: 120, liquidityNet: "-150" },
+        ],
+      },
+      { ticks: [{ tick: 120, liquidityNet: "-150" }] },
+    ])
+      expect(() => parseDexDepth(body(invalid), "fixture", pool)).toThrow();
+  });
+});
+
+describe("quote values", () => {
+  it("scales an exact per-token price by the token's and the quote's decimals", () => {
+    // 2,486.45112 USDG (6 decimals) per WETH (18 decimals).
+    const weth = { priceNumerator: 2486451120n, priceDenominator: 1n };
+    expect(quoteValue(weth, 5n * 10n ** 17n, 18, 6)).toBeCloseTo(1243.22556);
+    // A sub-unit price keeps its precision through the ratio.
+    expect(
+      quoteValue({ priceNumerator: 1n, priceDenominator: 3n }, 3n * 10n ** 8n, 8, 6)
+    ).toBeCloseTo(1e-6);
+    expect(quoteValue({ priceNumerator: null, priceDenominator: null }, 1n, 18, 6)).toBeNull();
   });
 });
