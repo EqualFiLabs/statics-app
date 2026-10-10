@@ -3,10 +3,19 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { erc20Abi, formatUnits, parseEventLogs, encodeFunctionData, type Hex } from "viem";
+import {
+  erc20Abi,
+  formatUnits,
+  parseEventLogs,
+  encodeFunctionData,
+  zeroAddress,
+  type Hex,
+} from "viem";
 import Link from "next/link";
 import { IndexedPoolSwapFee } from "@/components/common/IndexedPoolSwapFee";
 import { PoolSummary } from "@/components/liquidity/PoolSummary";
+import { NewPositionPair, type CreatePoolDraft } from "@/components/liquidity/NewPositionPair";
+import { CreatePoolStep } from "@/components/liquidity/CreatePoolStep";
 import { RangeChart } from "@/components/liquidity/RangeChart";
 import chart from "@/components/liquidity/range-chart.module.css";
 import { usePoolMarket, type ChartPeriod } from "@/hooks/usePoolMarket";
@@ -29,7 +38,7 @@ import {
 } from "@/lib/phase-one/liquidity-preview";
 import { wethAbi } from "@statics-protocol/sdk";
 import { staticsAbi, staticsRangeGaugeAbi } from "@statics-protocol/sdk/phase-one";
-import type { PhaseOneDeployment } from "@/lib/deployments/types";
+import type { PhaseOneDeployment, SupportedPublicPool } from "@/lib/deployments/types";
 import { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { usePhaseOnePositions } from "@/hooks/usePhaseOnePositions";
 import { ActionReview } from "@/components/phase-one/ActionReview";
@@ -84,22 +93,67 @@ export function PhaseOneLiquidity({
 }) {
   const t = useTranslations("phaseOne");
   const ux = useTranslations("liquidityUx");
+  const createCopy = useTranslations("createPool");
   // Pools registered after the manifest was reviewed join the list, marked unreviewed.
   const discovery = usePhaseOnePools(reviewedDeployment);
-  const deployment = useMemo(
-    () => withDiscoveredPools(reviewedDeployment, discovery.pools),
-    [reviewedDeployment, discovery.pools]
-  );
-  const canDeposit = (id: Hex) => liquidityDepositsAllowed(id, discovery.pools);
-  const [screen, setView] = useState<"list" | "pool" | "deposit" | "detail" | "focus">(
-    initialPositionId !== null ? "focus" : "list"
-  );
+  // Pools created in this session are usable before the indexer reports them.
+  const [createdPools, setCreatedPools] = useState<readonly SupportedPublicPool[]>([]);
+  const [draft, setDraft] = useState<CreatePoolDraft | null>(null);
+  const deployment = useMemo(() => {
+    const withDiscovered = withDiscoveredPools(reviewedDeployment, discovery.pools);
+    const known = new Set(withDiscovered.supportedPools.map((pool) => pool.poolId.toLowerCase()));
+    const fresh = createdPools.filter((pool) => !known.has(pool.poolId.toLowerCase()));
+    return fresh.length
+      ? { ...withDiscovered, supportedPools: [...withDiscovered.supportedPools, ...fresh] }
+      : withDiscovered;
+  }, [reviewedDeployment, discovery.pools, createdPools]);
+  // Deposits read ERC-20 balances and send no ETH, so native ETH pools are swap-only for now.
+  const nativePool = (id: Hex) =>
+    deployment.supportedPools.some(
+      (pool) =>
+        pool.poolId.toLowerCase() === id.toLowerCase() &&
+        [pool.poolKey.currency0, pool.poolKey.currency1].some(
+          (currency) => currency.toLowerCase() === zeroAddress
+        )
+    );
+  const canDeposit = (id: Hex) =>
+    !nativePool(id) &&
+    (liquidityDepositsAllowed(id, discovery.pools) ||
+      (!discovery.pools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase()) &&
+        createdPools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase())));
+  const [screen, setView] = useState<
+    "list" | "pool" | "newPool" | "create" | "deposit" | "detail" | "focus"
+  >(initialPositionId !== null ? "focus" : "list");
   const action = usePhaseOneAction(deployment);
   const positions = usePhaseOnePositions(deployment.descriptor.deploymentId, action.wallet);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<bigint | null>(null);
+  const [poolSearch, setPoolSearch] = useState("");
   const [poolId, setPoolId] = useState(
     initialPoolId ?? deployment.supportedPools.find((pool) => canDeposit(pool.poolId))?.poolId ?? ""
+  );
+  const searchText = poolSearch.trim().toLowerCase();
+  const depositPools = deployment.supportedPools.filter(
+    (pool) =>
+      canDeposit(pool.poolId) &&
+      (!searchText ||
+        [
+          pool.poolId,
+          pool.token0.symbol,
+          pool.token1.symbol,
+          pool.token0.name,
+          pool.token1.name,
+          pool.token0.address,
+          pool.token1.address,
+          `${pool.token0.symbol}/${pool.token1.symbol}`,
+          `${pool.token1.symbol}/${pool.token0.symbol}`,
+        ].some((value) => {
+          const text = value.toLowerCase();
+          return (
+            text.includes(searchText) ||
+            text.replace(/\s+/g, "").includes(searchText.replace(/\s+/g, ""))
+          );
+        }))
   );
   const initial = useQuery({
     queryKey: [
@@ -277,7 +331,7 @@ export function PhaseOneLiquidity({
     <div className="liquidity-experience">
       <header className="liquidity-heading">
         <div>
-          {view !== "list" && (
+          {view !== "list" && view !== "create" && (
             <button
               className="liquidity-back"
               type="button"
@@ -291,26 +345,35 @@ export function PhaseOneLiquidity({
             </button>
           )}
           <h2>
-            {ux(
-              view === "list"
-                ? "yourLiquidity"
-                : view === "detail"
-                  ? "positionDetails"
-                  : "addLiquidity"
-            )}
+            {view === "newPool" || view === "create"
+              ? createCopy("title")
+              : ux(
+                  view === "list"
+                    ? "yourLiquidity"
+                    : view === "detail"
+                      ? "positionDetails"
+                      : "addLiquidity"
+                )}
           </h2>
           <p className="liquidity-muted">
-            {ux(view === "list" ? "listHelp" : view === "detail" ? "detailHelp" : "depositHelp")}
+            {view === "newPool" || view === "create"
+              ? createCopy("titleHelp")
+              : ux(view === "list" ? "listHelp" : view === "detail" ? "detailHelp" : "depositHelp")}
           </p>
         </div>
         {view === "list" && (
-          <button
-            className="ui-button ui-button--primary"
-            type="button"
-            onClick={() => setView("pool")}
-          >
-            + {ux("addLiquidity")}
-          </button>
+          <div className="liquidity-heading-actions">
+            <button className="ui-button" type="button" onClick={() => setView("newPool")}>
+              {createCopy("createPool")}
+            </button>
+            <button
+              className="ui-button ui-button--primary"
+              type="button"
+              onClick={() => setView("pool")}
+            >
+              + {ux("addLiquidity")}
+            </button>
+          </div>
         )}
       </header>
       {view === "list" ? (
@@ -372,50 +435,84 @@ export function PhaseOneLiquidity({
         <section className="ui-card liquidity-pool-step">
           <p className="liquidity-step">{ux("stepPool")}</p>
           <h3>{ux("choosePool")}</h3>
+          <label className="liquidity-pool-search">
+            <span className="sr-only">{ux("searchPools")}</span>
+            <input
+              type="search"
+              placeholder={ux("searchPools")}
+              value={poolSearch}
+              onChange={(event) => setPoolSearch(event.target.value)}
+            />
+          </label>
           <div className="liquidity-pool-options">
-            {deployment.supportedPools
-              .filter((pool) => canDeposit(pool.poolId))
-              .map((pool) => (
-                <button
-                  className={`liquidity-pool-option${poolId === pool.poolId ? " is-selected" : ""}`}
-                  type="button"
-                  key={pool.poolId}
-                  aria-pressed={poolId === pool.poolId}
-                  onClick={() => setPoolId(pool.poolId)}
-                >
-                  <span className="liquidity-pair-icons" aria-hidden="true">
-                    <span>{pool.token0.symbol.slice(0, 1)}</span>
-                    <span>{pool.token1.symbol.slice(0, 1)}</span>
-                  </span>
-                  <strong>
-                    {pool.token0.symbol} / {pool.token1.symbol}
-                  </strong>
-                  <IndexedPoolSwapFee
-                    deploymentId={deployment.descriptor.deploymentId}
-                    poolId={pool.poolId}
-                    lpFee={pool.poolKey.fee}
-                  />
-                  {hasUnreviewedToken(pool) && (
-                    <span className="liquidity-unreviewed-pill">{ux("unreviewedPool")}</span>
-                  )}
-                </button>
-              ))}
+            {depositPools.map((pool) => (
+              <button
+                className={`liquidity-pool-option${poolId === pool.poolId ? " is-selected" : ""}`}
+                type="button"
+                key={pool.poolId}
+                onClick={() => {
+                  // Choosing a pool opens its deposit; there is no separate Continue step.
+                  setPoolId(pool.poolId);
+                  setView("deposit");
+                }}
+              >
+                <span className="liquidity-pair-icons" aria-hidden="true">
+                  <span>{pool.token0.symbol.slice(0, 1)}</span>
+                  <span>{pool.token1.symbol.slice(0, 1)}</span>
+                </span>
+                <strong>
+                  {pool.token0.symbol} / {pool.token1.symbol}
+                </strong>
+                <IndexedPoolSwapFee
+                  deploymentId={deployment.descriptor.deploymentId}
+                  poolId={pool.poolId}
+                  lpFee={pool.poolKey.fee}
+                />
+                {hasUnreviewedToken(pool) && (
+                  <span className="liquidity-unreviewed-pill">{ux("unreviewedPool")}</span>
+                )}
+              </button>
+            ))}
           </div>
-          <p className="liquidity-muted">{ux("poolHelp")}</p>
-          <button
-            className="ui-button ui-button--primary"
-            disabled={
-              !deployment.supportedPools.some(
-                (pool) =>
-                  canDeposit(pool.poolId) && pool.poolId.toLowerCase() === poolId.toLowerCase()
-              )
-            }
-            type="button"
-            onClick={() => setView("deposit")}
-          >
-            {ux("continue")}
-          </button>
+          {depositPools.length === 0 && <p className="liquidity-muted">{ux("noPoolMatches")}</p>}
+          <p className="liquidity-muted">
+            {ux("poolHelp")}{" "}
+            <button className="liquidity-back" type="button" onClick={() => setView("newPool")}>
+              {createCopy("missingPair")}
+            </button>
+          </p>
         </section>
+      ) : view === "newPool" ? (
+        <NewPositionPair
+          deployment={deployment}
+          canDeposit={canDeposit}
+          initialPoolId={poolId}
+          onExisting={(id) => {
+            setPoolId(id);
+            setView("deposit");
+          }}
+          onCreate={(next) => {
+            setDraft(next);
+            setView("create");
+          }}
+        />
+      ) : view === "create" && draft ? (
+        <CreatePoolStep
+          deployment={deployment}
+          draft={draft}
+          onBack={() => setView("newPool")}
+          onCreated={(pool) => {
+            // Use the new pool right away; discovery picks it up once indexed.
+            setCreatedPools((current) => [
+              ...current.filter(
+                (entry) => entry.poolId.toLowerCase() !== pool.poolId.toLowerCase()
+              ),
+              pool,
+            ]);
+            setPoolId(pool.poolId);
+            setView("deposit");
+          }}
+        />
       ) : focusError || !activePoolAvailable ? (
         <section className="ui-card" role="alert">
           <p>{ux(focusError ? "positionUnavailable" : "poolUnavailable")}</p>

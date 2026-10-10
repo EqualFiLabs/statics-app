@@ -93,6 +93,7 @@ export type DollarActivityKind =
   | "phase-one-swap"
   | "phase-one-close-position"
   | "phase-one-create-position"
+  | "phase-one-create-pool"
   | "phase-one-provide-liquidity"
   | "phase-one-attach-liquidity"
   | "phase-one-increase-liquidity"

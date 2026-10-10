@@ -49,6 +49,23 @@ describe("confirmed transaction reconciliation", () => {
     expect(protocolQueryScopes("phase-one-wrap-native")).toEqual(["wallet"]);
   });
 
+  it("refreshes created-pool fees only in the matching deployment", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-create-pool" as const,
+      scopes: protocolQueryScopes("phase-one-create-pool"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-pool-fees", "local", "default"], detail)
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["phase-one-pool-fees", "other", "default"], detail)
+    ).toBe(false);
+  });
+
   it("refreshes Earn wallet balances on a scoped stake receipt", () => {
     const detail = {
       wallet: "0x0000000000000000000000000000000000000001" as Address,

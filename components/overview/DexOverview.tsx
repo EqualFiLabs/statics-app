@@ -4,7 +4,8 @@ import Link from "next/link";
 import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
 import { useDeferredValue, useState } from "react";
 import { useTranslations } from "next-intl";
-import { formatUnits } from "viem";
+import { formatUnits, zeroAddress } from "viem";
+import { getFundingNetwork } from "@/lib/funding-networks";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useDexOverview } from "@/hooks/useDexOverview";
 import { useAppLocale } from "@/i18n/client";
@@ -15,9 +16,6 @@ import styles from "./dex.module.css";
 
 const SORTS = ["volume", "valueLocked", "yield"] as const;
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
-const symbolOf = (token: DexToken) => token.symbol ?? short(token.address);
-const pairOf = (pool: { token0: DexToken; token1: DexToken }) =>
-  `${symbolOf(pool.token0)} / ${symbolOf(pool.token1)}`;
 
 /**
  * The Phase 1 home: the DEX and its stats. Every value is priced from Statics pools in the
@@ -30,6 +28,19 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
   const [sort, setSort] = useState<(typeof SORTS)[number]>("volume");
   const [search, setSearch] = useState("");
   const [days, setDays] = useState(30);
+  // Native currency (address zero) has no ERC-20 metadata; name it from the chain configuration.
+  const native = getFundingNetwork(deployment.descriptor.chainId)?.chain.nativeCurrency;
+  const withNative = (token: DexToken): DexToken =>
+    native && token.address.toLowerCase() === zeroAddress
+      ? {
+          ...token,
+          symbol: token.symbol ?? native.symbol,
+          decimals: token.decimals ?? native.decimals,
+        }
+      : token;
+  const symbolOf = (token: DexToken) => withNative(token).symbol ?? short(token.address);
+  const pairOf = (pool: { token0: DexToken; token1: DexToken }) =>
+    `${symbolOf(pool.token0)} / ${symbolOf(pool.token1)}`;
   const query = useDeferredValue(search.trim());
   const dex = useDexOverview(deployment, quote, { sort, search: query }, days);
   const accounts = useAccounts(deployment);
@@ -72,10 +83,12 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
         : number(amount, 3)
     } WETH`;
   };
-  const tokenAmount = (value: bigint, token: DexToken) =>
-    token.decimals === null
+  const tokenAmount = (value: bigint, raw: DexToken) => {
+    const token = withNative(raw);
+    return token.decimals === null
       ? t("baseUnits", { amount: String(value) })
       : `${number(Number(formatUnits(value, token.decimals)), 4)} ${symbolOf(token)}`;
+  };
   const change = (bps: number | null | undefined) =>
     bps === null || bps === undefined
       ? { text: "—", tone: "neutral" }

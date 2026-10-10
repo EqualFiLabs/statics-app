@@ -8124,6 +8124,13 @@
   display: grid;
   gap: 0.5rem;
 }
+/* Create pool beside Add liquidity; they wrap together on narrow screens. */
+.liquidity-heading > .liquidity-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 .liquidity-heading h2 {
   font-size: var(--text-2xl);
 }
@@ -8206,6 +8213,10 @@
   color: var(--app-text-secondary);
   font-size: var(--text-xs);
   font-weight: 600;
+}
+.liquidity-pool-search input {
+  width: 100%;
+  box-sizing: border-box;
 }
 .liquidity-pool-options {
   display: grid;

@@ -68,6 +68,7 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "genesis-traits": "genesis",
   "phase-one-pools": "phase-one-market",
   "phase-one-pool": "phase-one-market",
+  "phase-one-pool-fees": "phase-one-market",
   "direct-swap-allowances": "approval",
   "phase-one-positions": "phase-one-position",
   "phase-one-position": "phase-one-position",
@@ -127,6 +128,7 @@ const walletScopedRoots = new Set([
 ]);
 
 const deploymentScopedRoots = new Set([
+  "phase-one-pool-fees",
   "phase-one-pools",
   "phase-one-pool",
   "phase-one-stake-allowance",
@@ -151,6 +153,8 @@ const deploymentScopedRoots = new Set([
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
   if (kind === "phase-one-wrap-native") return ["wallet"];
   if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
+  // A new pool joins discovery, fee rates and market data.
+  if (kind === "phase-one-create-pool") return ["phase-one-market", "wallet"];
   if (
     kind === "phase-one-claim-lp-rewards" ||
     kind === "phase-one-forfeit-lp-reward" ||

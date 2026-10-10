@@ -104,6 +104,7 @@ const deployment = {
     positionManager: address("5"),
     liquidityManager: address("6"),
     stateView: address("7"),
+    publicHook: address("4"),
   },
   supportedPools: [
     {
@@ -210,13 +211,15 @@ beforeEach(() => {
     if (functionName === "getFeeGrowthInside") return [0n, 0n];
     if (functionName === "allowance") return mocks.allowance;
     if (functionName === "positionCreationFee") return 1n;
+    if (functionName === "defaultFeeRate") return [500, 500];
     throw new Error(`Unexpected RPC ${functionName}`);
   });
 });
 async function openDeposit() {
   if (!screen.queryByRole("textbox", { name: "Deposit STATICS" })) {
     fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    // Choosing a pool tile opens its deposit directly.
+    fireEvent.click(screen.getByRole("button", { name: /^STATICS \/ WETH/ }));
   }
   return screen.findByRole("textbox", { name: "Deposit STATICS" });
 }
@@ -397,7 +400,8 @@ describe("Phase 1 liquidity in the existing screen", () => {
     });
     const rendered = render(tree());
     fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    // Choosing a pool tile opens its deposit directly.
+    fireEvent.click(screen.getByRole("button", { name: /^STATICS \/ WETH/ }));
     fireEvent.click(screen.getByRole("button", { name: "Open account" }));
     mocks.execute.mockImplementation(async (request) => {
       if (request.kind === "phase-one-create-position") {
@@ -854,7 +858,6 @@ it("lists a discovered pool as unreviewed and asks for its token to be checked b
   const option = screen.getByRole("button", { name: /STATICS \/ NEWX/ });
   expect(option).toHaveTextContent("Unreviewed");
   fireEvent.click(option);
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.change(await screen.findByRole("textbox", { name: "Deposit STATICS" }), {
     target: { value: "1" },
   });
@@ -907,4 +910,213 @@ it.each([true, false])("keeps a paused pool manageable (reviewed: %s)", async (r
   fireEvent.click(review);
   expect(await screen.findByRole("button", { name: "Confirm transaction" })).toBeEnabled();
   expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+describe("creating a pool from the new position flow", () => {
+  const tier = { lpFee: 10_000, tickSpacing: 200 };
+  const newKey = { ...key, fee: tier.lpFee, tickSpacing: tier.tickSpacing };
+  const newPoolId = v4PoolId(newKey);
+  function creationReads(creationFee: bigint) {
+    const original = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (input) => {
+      if (input.functionName === "poolCreationFee") return creationFee;
+      if (input.functionName === "protocolPolActivationFee") return 25n * 10n ** 15n;
+      if (input.functionName === "poolRegistration")
+        return {
+          currency0: zeroAddress,
+          currency1: zeroAddress,
+          kind: 0,
+          creator: zeroAddress,
+          registered: false,
+        };
+      if (input.functionName === "quotePool")
+        return {
+          key: newKey,
+          poolId: newPoolId,
+          sqrtPriceX96: 1n << 96n,
+          creationFee,
+          polActivationFee: 0n,
+          totalNativeFee: creationFee,
+          authorizationDigest: hash("d"),
+        };
+      return original(input);
+    });
+  }
+  async function chooseNewTier() {
+    fireEvent.click(await screen.findByRole("button", { name: "Create pool" }));
+    const radio = await screen.findByRole("radio", { name: /^1% fee/ });
+    expect(radio).toHaveTextContent("Not created");
+    fireEvent.click(radio);
+    expect(screen.getByText(/No pool exists for this pair and fee tier yet/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    return screen.findByRole("heading", { name: "Create a new pool" });
+  }
+
+  it("creates the pool at the entered price, then continues into its deposit", async () => {
+    creationReads(10n ** 16n);
+    const rendered = render(tree());
+    await chooseNewTier();
+    fireEvent.change(screen.getByRole("textbox", { name: "Starting price" }), {
+      target: { value: "2" },
+    });
+    const create = screen.getByRole("button", { name: "Create pool · 0.01 ETH" });
+    await waitFor(() => expect(create).toBeEnabled());
+    fireEvent.click(create);
+    expect(await screen.findByText("Creation fee: 0.01 ETH")).toBeInTheDocument();
+    // The review is a modal closed by its icon; it has no separate Cancel button.
+    const dialog = screen.getByRole("dialog", { name: "Create STATICS/WETH pool" });
+    expect(dialog).toContainElement(screen.getByRole("button", { name: "Confirm transaction" }));
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Fees: 1% to liquidity providers, Statics 0.05% in and 0.05% out")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Starting price: 1 STATICS = 2 WETH")).toBeInTheDocument();
+    const event = staticsAbi.find(
+      (item) => item.type === "event" && item.name === "ProtocolPoolCreated"
+    ) as Extract<(typeof staticsAbi)[number], { type: "event"; name: "ProtocolPoolCreated" }>;
+    mocks.execute.mockImplementation(async (request) => {
+      if (request.kind !== "phase-one-create-pool") return hash("e");
+      const args = {
+        poolId: newPoolId,
+        creator: wallet,
+        currency0: newKey.currency0,
+        currency1: newKey.currency1,
+        lpFee: tier.lpFee,
+        tickSpacing: tier.tickSpacing,
+        sqrtPriceX96: 1n << 96n,
+        tick: 0,
+      };
+      await request.verifyConfirmation({
+        blockNumber: 50n,
+        logs: [
+          {
+            address: deployment.contracts.diamond,
+            topics: encodeEventTopics({ abi: [event], eventName: "ProtocolPoolCreated", args }),
+            data: encodeAbiParameters(
+              event.inputs.filter((input) => !("indexed" in input && input.indexed)),
+              event.inputs
+                .filter((input) => !("indexed" in input && input.indexed))
+                .map((input) => args[input.name as keyof typeof args])
+            ),
+            logIndex: 0,
+          },
+        ],
+      });
+      return hash("e");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() =>
+      expect(mocks.execute.mock.calls.some(([r]) => r.kind === "phase-one-create-pool")).toBe(true)
+    );
+    const [request] = mocks.execute.mock.calls.find(([r]) => r.kind === "phase-one-create-pool")!;
+    expect(request.to).toBe(deployment.contracts.diamond);
+    expect(request.value).toBe(10n ** 16n);
+    const decoded = decodeFunctionData({ abi: staticsAbi, data: request.data });
+    expect(decoded.functionName).toBe("createPool");
+    const [params, authorization] = decoded.args as unknown as [Record<string, unknown>, string];
+    expect(authorization).toBe("0x");
+    expect(params).toMatchObject({
+      tokenA: address("2"),
+      tokenB: address("3"),
+      lpFee: tier.lpFee,
+      tickSpacing: tier.tickSpacing,
+      initialFeeRate: { inputFeePips: 500, outputFeePips: 500 },
+      creator: wallet,
+      activateManagedPol: false,
+    });
+    // 1 STATICS = 2 WETH, both 18 decimals: sqrt(2) × 2^96.
+    expect(Number(params.sqrtPriceBPerAX96) / 2 ** 96).toBeCloseTo(Math.SQRT2, 9);
+    expect(await screen.findByRole("textbox", { name: "Deposit STATICS" })).toBeInTheDocument();
+    // A local receipt must not override an indexed deposit pause later on.
+    discoveredPools.value = [
+      {
+        poolId: newPoolId,
+        poolKey: newKey,
+        token0: token("2", "STATICS"),
+        token1: token("3", "WETH"),
+        reviewed: false,
+        swappable: false,
+        liquidityEnabled: false,
+      },
+    ] as never;
+    rendered.rerender(tree());
+    expect(
+      await screen.findByText("This pool is unavailable. Choose an enabled pool to continue.")
+    ).toBeInTheDocument();
+  });
+
+  it("keeps Add liquidity on the pool list and links to creation from it", async () => {
+    render(tree());
+    fireEvent.click((await screen.findAllByRole("button", { name: /Add liquidity$/ }))[0]!);
+    expect(await screen.findByRole("heading", { name: "Choose a pool" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /fee/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Don't see your pair? Create a pool" }));
+    expect(await screen.findByRole("heading", { name: "Select pair" })).toBeInTheDocument();
+  });
+
+  it("searches the pool list and opens a pool's deposit in one click", async () => {
+    const fresh = address("7");
+    const freshKey = { ...key, currency1: fresh };
+    discoveredPools.value = [
+      {
+        poolId: v4PoolId(freshKey),
+        poolKey: freshKey,
+        token0: token("2", "STATICS"),
+        token1: { ...token("7", "NEWX"), metadataSource: "onchain-import" },
+        reviewed: false,
+        swappable: true,
+      },
+    ] as never;
+    render(tree());
+    fireEvent.click((await screen.findAllByRole("button", { name: /Add liquidity$/ }))[0]!);
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "Search pair, token or address" });
+    fireEvent.change(search, { target: { value: "newx" } });
+    expect(screen.queryByRole("button", { name: /^STATICS \/ WETH/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^STATICS \/ NEWX/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "statics / weth" } });
+    expect(screen.queryByRole("button", { name: /^STATICS \/ NEWX/ })).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: fresh.toLowerCase() } });
+    expect(screen.getByRole("button", { name: /^STATICS \/ NEWX/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "nothing-like-this" } });
+    expect(screen.getByText("No pools match your search.")).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /^STATICS \/ WETH/ }));
+    expect(await screen.findByRole("textbox", { name: "Deposit STATICS" })).toBeInTheDocument();
+    discoveredPools.value = [];
+  });
+
+  it("explains that creation is closed when the network has no creation fee", async () => {
+    creationReads(0n);
+    render(tree());
+    await chooseNewTier();
+    expect(
+      await screen.findByText("Pool creation isn't open on this network yet.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Create pool/ })).not.toBeInTheDocument();
+  });
+
+  it("enforces the Statics fee bounds before creation", async () => {
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Create pool" }));
+    fireEvent.click(await screen.findByRole("radio", { name: /^1% fee/ }));
+    fireEvent.click(screen.getByText("Advanced: other fee tiers and Statics fee"));
+    fireEvent.change(screen.getByRole("textbox", { name: "Statics fee on input (%)" }), {
+      target: { value: "0.0001" },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The Statics fee must be at least 0.001% on each side."
+    );
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Statics fee on input (%)" }), {
+      target: { value: "1.5" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Statics fee on output (%)" }), {
+      target: { value: "0.6" },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The Statics fee can be at most 2% combined."
+    );
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
 });
