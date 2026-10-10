@@ -219,6 +219,9 @@ export function CreatePoolStep({
   return (
     <section className={`ui-card ${styles.step}`} aria-labelledby="create-pool-title">
       <div className={styles.heading}>
+        <button className="liquidity-back" type="button" disabled={action.busy} onClick={onBack}>
+          ← {t("back")}
+        </button>
         <h3 id="create-pool-title">{t("creatingTitle")}</h3>
         <p className="liquidity-muted">
           {t("creatingHelp", {
@@ -322,9 +325,6 @@ export function CreatePoolStep({
           )}
           <p className="liquidity-muted">{t("afterCreate")}</p>
           <div className={styles.actions}>
-            <button className="ui-button" type="button" disabled={action.busy} onClick={onBack}>
-              {t("back")}
-            </button>
             <button
               className="ui-button ui-button--primary"
               type="button"

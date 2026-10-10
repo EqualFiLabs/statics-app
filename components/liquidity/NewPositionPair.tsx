@@ -113,7 +113,7 @@ export function NewPositionPair({
 
   const pair = tokenA && tokenB && !same(tokenA.address, tokenB.address) ? [tokenA, tokenB] : null;
   const existing = (tier: FeeTier) => {
-    if (!pair) return null;
+    if (!pair || validateTier(tier)) return null;
     const id = candidatePoolId(pair[0].address, pair[1].address, tier, hook).toLowerCase();
     return deployment.supportedPools.find((pool) => pool.poolId.toLowerCase() === id) ?? null;
   };

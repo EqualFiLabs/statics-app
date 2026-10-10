@@ -1094,6 +1094,32 @@ describe("creating a pool from the new position flow", () => {
       await screen.findByText("Pool creation isn't open on this network yet.")
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Create pool/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    expect(await screen.findByRole("heading", { name: "Select pair" })).toBeInTheDocument();
+  });
+
+  it("shows invalid custom tiers without hashing out-of-range PoolKeys", async () => {
+    render(tree());
+    fireEvent.click(await screen.findByRole("button", { name: "Create pool" }));
+    fireEvent.click(await screen.findByRole("radio", { name: /^1% fee/ }));
+    fireEvent.click(screen.getByText("Advanced: other fee tiers and Statics fee"));
+    fireEvent.change(screen.getByRole("textbox", { name: "LP fee (%)" }), {
+      target: { value: "99999999" },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The LP fee must be between 0% and 99.9999%."
+    );
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "LP fee (%)" }), {
+      target: { value: "0.25" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tick spacing" }), {
+      target: { value: "99999999" },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Tick spacing must be a whole number from 1 to 32,767."
+    );
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
   it("enforces the Statics fee bounds before creation", async () => {
