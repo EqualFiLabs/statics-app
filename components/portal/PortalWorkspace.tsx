@@ -11,6 +11,7 @@ import { SolanaSwapPanel } from "@/components/portal/SolanaSwapPanel";
 import { usePortalSlippage } from "@/hooks/usePortalSlippage";
 import { writePortalSlippage } from "@/lib/portal/slippage";
 import { useWalletState } from "@/providers/wallet-context";
+import { useDeployment } from "@/providers/deployment-context";
 
 export type PortalMode = "swap" | "bridge";
 
@@ -25,6 +26,7 @@ export function PortalWorkspace({
 }) {
   const t = useTranslations("portal");
   const wallet = useWalletState();
+  const { active } = useDeployment();
   const [mode, setMode] = useState<PortalMode>(initialMode);
   const [swapRuntime, setSwapRuntime] = useState<"evm" | "solana">(initialSwapRuntime);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -91,10 +93,12 @@ export function PortalWorkspace({
 
       {mode === "bridge" && <AcrossBridgePanel />}
 
-      <div className="portal-dollar-route">
-        <span>{t("dollarPrompt")}</span>
-        <Link href="/app/dollar?profile=USDG">{t("openDollar")} →</Link>
-      </div>
+      {active.descriptor.capabilities.includes("dollar") && (
+        <div className="portal-dollar-route">
+          <span>{t("dollarPrompt")}</span>
+          <Link href="/app/dollar?profile=USDG">{t("openDollar")} →</Link>
+        </div>
+      )}
 
       <p className="portal-runtime-state" aria-live="polite">
         {wallet.status === "ready" ? wallet.fundingNetworkName : "--"}

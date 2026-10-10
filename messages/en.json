@@ -506,7 +506,7 @@
       "label": "Overview",
       "status": "Portfolio",
       "title": "Your portfolio",
-      "description": "Everything you hold in one place: your Dollar balance, accounts, collateral, and rewards waiting to be claimed."
+      "description": "Everything you hold in one place: your assets, accounts, and rewards waiting to be claimed."
     },
     "swap": {
       "label": "Swap",
@@ -536,7 +536,7 @@
       "label": "Add funds",
       "status": "Add funds",
       "title": "Add funds to Statics",
-      "description": "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar."
+      "description": "Bring funds in from another network or token using swaps and bridges."
     },
     "baskets": {
       "label": "Baskets",
@@ -1503,7 +1503,6 @@
     "allocatorClaim": "Review allocator rewards",
     "close": "Review closing account",
     "closeHelp": "Unstake, exit liquidity, and resolve rewards before closing this account.",
-    "unsupported": "Basket, Dollar, and loan operations are unavailable for this account.",
     "minimum": "Minimum payout",
     "newPosition": "Open account",
     "reviewStake": "Review stake",

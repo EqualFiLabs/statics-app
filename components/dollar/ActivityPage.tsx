@@ -343,8 +343,12 @@ export function ActivityPage() {
           empty={{
             title: t("emptyTitle"),
             description: t("emptyDescription"),
-            action: { label: t("getDollar"), href: "/app/dollar" },
-            secondary: { label: t("addFunds"), href: "/app/portal" },
+            action: active.descriptor.capabilities.includes("dollar")
+              ? { label: t("getDollar"), href: "/app/dollar" }
+              : { label: t("addFunds"), href: "/app/portal" },
+            secondary: active.descriptor.capabilities.includes("dollar")
+              ? { label: t("addFunds"), href: "/app/portal" }
+              : undefined,
           }}
         />
       ) : (

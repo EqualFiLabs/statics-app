@@ -506,7 +506,7 @@
       "label": "Resumen",
       "status": "Cartera",
       "title": "Tu cartera",
-      "description": "Todo lo que tienes en un solo lugar: saldo en dólares, cuentas, garantía y recompensas pendientes de reclamar."
+      "description": "Todo lo que tienes en un solo lugar: tus activos, cuentas y recompensas pendientes de reclamar."
     },
     "swap": {
       "label": "Intercambiar",
@@ -536,7 +536,7 @@
       "label": "Añadir fondos",
       "status": "Añadir fondos",
       "title": "Añade fondos a Statics",
-      "description": "Transfiere dinero desde otra red u otro token. Intercambia, usa un puente o conviértelo a Statics Dollar."
+      "description": "Añade fondos desde otra red o token mediante intercambios y puentes."
     },
     "baskets": {
       "label": "Cestas",
@@ -1503,7 +1503,6 @@
     "allocatorClaim": "Revisar recompensas de asignación",
     "close": "Revisar cierre de cuenta",
     "closeHelp": "Retira el stake y la liquidez y resuelve las recompensas antes de cerrar esta cuenta.",
-    "unsupported": "Las operaciones con cestas, Dollar y préstamos no están disponibles para esta cuenta.",
     "minimum": "Pago mínimo",
     "newPosition": "Abrir cuenta",
     "reviewStake": "Revisar depósito",

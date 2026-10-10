@@ -506,7 +506,7 @@
       "label": "概览",
       "status": "资产组合",
       "title": "你的资产组合",
-      "description": "在一个地方查看你持有的一切：美元余额、账户、抵押品以及待领取的奖励。"
+      "description": "在一个地方查看你持有的一切：资产、账户以及待领取的奖励。"
     },
     "swap": {
       "label": "兑换",
@@ -536,7 +536,7 @@
       "label": "添加资金",
       "status": "添加资金",
       "title": "向 Statics 添加资金",
-      "description": "从其他网络或其他代币转入资金。进行兑换、跨链或转换为 Statics Dollar。"
+      "description": "通过兑换和跨链桥，从其他网络或代币转入资金。"
     },
     "baskets": {
       "label": "篮子",
@@ -1503,7 +1503,6 @@
     "allocatorClaim": "审核分配者奖励",
     "close": "审核关闭账户",
     "closeHelp": "关闭此账户前，请取消质押、退出流动性并处理奖励。",
-    "unsupported": "此账户暂不支持篮子、Dollar 和贷款操作。",
     "minimum": "最低领取金额",
     "newPosition": "开设账户",
     "reviewStake": "审核质押",

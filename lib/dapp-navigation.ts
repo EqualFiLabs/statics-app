@@ -67,7 +67,7 @@ const routePresentations = {
     status: "Portfolio",
     title: "Your portfolio",
     description:
-      "Everything you hold in one place: your Dollar balance, accounts, collateral, and rewards waiting to be claimed.",
+      "Everything you hold in one place: your assets, accounts, and rewards waiting to be claimed.",
   },
   swap: {
     label: "Swap",
@@ -101,8 +101,7 @@ const routePresentations = {
     label: "Add funds",
     status: "Add funds",
     title: "Add funds to Statics",
-    description:
-      "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar.",
+    description: "Bring funds in from another network or token using swaps and bridges.",
   },
   baskets: {
     label: "Baskets",
@@ -116,7 +115,7 @@ const routePresentations = {
     status: "Accounts",
     title: "Your accounts",
     description:
-      "Each account is a Position NFT holding your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
+      "Each account is a Position NFT. Open one to see its balances, history and controls.",
   },
   loans: {
     label: "Loans",
