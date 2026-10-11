@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatEther, isHash, zeroAddress, type Address, type Hex } from "viem";
 import type { PhaseOneDeployment, PublicPoolToken } from "@/lib/deployments/types";
@@ -43,6 +44,10 @@ const short = (address: Address) => `${address.slice(0, 6)}…${address.slice(-4
 
 export function CreatorPoolsPage() {
   const { active } = useDeployment();
+  const router = useRouter();
+  useEffect(() => {
+    if (!active.phaseOne) router.replace("/app/liquidity");
+  }, [active.phaseOne, router]);
   if (!active.phaseOne) return null;
   return (
     <CreatorPools key={active.phaseOne.descriptor.deploymentId} deployment={active.phaseOne} />
