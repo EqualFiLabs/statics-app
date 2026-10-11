@@ -224,10 +224,6 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
         }
       />
 
-      {summary &&
-        Object.values(summary.current.coverage).some(
-          (c) => !c.historyComplete || c.omittedPools > 0
-        ) && <p className={styles.notice}>{t("incompleteCoverage")}</p>}
       {dex.pools.data?.items.some((p) => p.priceFallback) && (
         <p className={styles.notice}>{t("fallbackPrices")}</p>
       )}

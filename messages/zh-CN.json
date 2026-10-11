@@ -2710,7 +2710,6 @@
     "allocate": "分配 STATICS",
     "pricingNote": "价格仅来自 Statics 池，按 30 分钟时间加权，并通过最深的连接池以 USDG（≈ $）或 WETH 计价。低于流动性下限的池不会为其他代币定价。无法连接到计价货币的池只显示交易对价格，并不计入总计。",
     "incompleteHoldings": "持仓数据不完整",
-    "incompleteCoverage": "部分市场总值不包含未定价项目，或历史数据不完整。",
     "fallbackPrices": "部分价格因不足30分钟历史，使用最新观察价格。",
     "quoteFallback": "USDG未配置。本页以WETH计价。",
     "spotFallback": "最新价格",

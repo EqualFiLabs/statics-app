@@ -2710,7 +2710,6 @@
     "allocate": "Allocate STATICS",
     "pricingNote": "Prices come from Statics pools only, time-weighted over 30 minutes, and are quoted in USDG (≈ $) or WETH through the deepest connecting pools. Pools below the liquidity floor never price other tokens. A pool whose tokens cannot be connected to the quote currency shows its pair price only and is left out of totals.",
     "incompleteHoldings": "incomplete holdings",
-    "incompleteCoverage": "Some market totals omit unpriced contributions or have incomplete history.",
     "fallbackPrices": "Some prices use the latest observed price because a full 30-minute history is unavailable.",
     "quoteFallback": "USDG is unconfigured. Values on this page are quoted in WETH.",
     "spotFallback": "Latest price",
