@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { cspReportLimiterState as limiterState } from "@/lib/security/csp-report-state";
+
 const maximumBodyBytes = 16 * 1024;
 const maximumReports = 20;
 const rateWindowMs = 60_000;
@@ -7,7 +9,6 @@ const perClientLimit = 30;
 const globalLimit = 600;
 const maximumLimiterEntries = 2_000;
 
-type Counter = { windowStartedAt: number; count: number };
 type NormalizedReport = Readonly<{
   documentURL?: string;
   blockedURL?: string;
@@ -19,10 +20,6 @@ type NormalizedReport = Readonly<{
   lineNumber?: number;
   columnNumber?: number;
 }>;
-
-const limiterState = globalThis as typeof globalThis & {
-  __staticsCspReportLimits?: Map<string, Counter>;
-};
 
 function response(status: number): Response {
   return new Response(null, {
@@ -175,8 +172,4 @@ export async function POST(request: Request): Promise<Response> {
     console.warn(JSON.stringify({ event: "csp_violation", release, ...report }));
   }
   return response(204);
-}
-
-export function resetCspReportLimiterForTests(): void {
-  limiterState.__staticsCspReportLimits?.clear();
 }

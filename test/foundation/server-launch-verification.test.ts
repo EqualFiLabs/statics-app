@@ -30,6 +30,8 @@ import {
 const deployment = {
   descriptor: { deploymentId: "launch", chainId: 4_663 },
   protocolCommit: "commit",
+  deploymentStartBlock: 1n,
+  market: { poolId: "0x1234" },
   contracts: { statics: "0x1111111111111111111111111111111111111111" },
   runtimeCodeHashes: { statics: "0x1234" },
 } as unknown as LaunchDeployment;
@@ -72,6 +74,18 @@ describe("server launch verification cache", () => {
     await verifyLaunchDeploymentOnServer(deployment).verification;
     const second = verifyLaunchDeploymentOnServer(changed);
 
+    expect(second.status).toBe("miss");
+    await second.verification;
+    expect(mocks.verify).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reuse verification after the market changes at unchanged contract addresses", async () => {
+    await verifyLaunchDeploymentOnServer(deployment).verification;
+    const changed = {
+      ...deployment,
+      market: { ...deployment.market, poolId: `0x${"ab".repeat(32)}` as const },
+    };
+    const second = verifyLaunchDeploymentOnServer(changed);
     expect(second.status).toBe("miss");
     await second.verification;
     expect(mocks.verify).toHaveBeenCalledTimes(2);

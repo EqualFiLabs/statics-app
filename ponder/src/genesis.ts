@@ -25,6 +25,37 @@ export type GenesisNftMutation = { type: "delete"; key: string } | GenesisNftUps
 
 const genesisKey = (deploymentId: string, genesisId: bigint) => `${deploymentId}:${genesisId}`;
 
+export function genesisConsecutiveTransferMutations(input: {
+  deploymentId: string;
+  fromTokenId: bigint;
+  toTokenId: bigint;
+  from: Address;
+  to: Address;
+  vault?: Address;
+  blockNumber: bigint;
+}): GenesisNftMutation[] {
+  if (
+    input.fromTokenId < 1n ||
+    input.toTokenId > GENESIS_SUPPLY ||
+    input.toTokenId < input.fromTokenId
+  ) {
+    throw new Error("Consecutive Operator IDs are outside the collection range.");
+  }
+  // Constructor minting into the vault creates no circulating ownership rows.
+  if (
+    input.from === zeroAddress &&
+    input.vault !== undefined &&
+    input.to.toLowerCase() === input.vault.toLowerCase()
+  ) {
+    return [];
+  }
+  const mutations: GenesisNftMutation[] = [];
+  for (let genesisId = input.fromTokenId; genesisId <= input.toTokenId; genesisId += 1n) {
+    mutations.push(genesisTransferMutation({ ...input, genesisId }));
+  }
+  return mutations;
+}
+
 export function genesisTransferMutation(input: {
   deploymentId: string;
   genesisId: bigint;

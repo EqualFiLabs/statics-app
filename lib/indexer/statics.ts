@@ -68,7 +68,7 @@ function wait(delay: number): Promise<void> {
 }
 
 /** One bounded retry; query callers must not layer another retry over this request. */
-async function fetchIndexer(url: string | URL, cache: RequestCache): Promise<Response> {
+export async function fetchIndexer(url: string | URL, cache: RequestCache): Promise<Response> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, {
@@ -100,9 +100,9 @@ function configuredIndexerUrl(): string | null {
 
 export function configuredIndexerUrlForDeployment(deploymentId: string): string | null {
   const value =
-    deploymentId === "local-anvil-genesis"
+    deploymentId === "local-anvil-genesis" || deploymentId === "local-anvil-phase-one"
       ? process.env.NEXT_PUBLIC_STATICS_LOCAL_INDEXER_URL?.trim()
-      : deploymentId === "robinhood-genesis"
+      : deploymentId === "robinhood-genesis" || deploymentId === "robinhood-phase-one"
         ? process.env.NEXT_PUBLIC_STATICS_MAINNET_INDEXER_URL?.trim()
         : process.env.NEXT_PUBLIC_STATICS_INDEXER_URL?.trim();
   if (!value) return null;

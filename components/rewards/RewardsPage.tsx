@@ -11,7 +11,9 @@ import {
   parseEventLogs,
 } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { EarnView } from "@/lib/rewards/earn";
 import { useTranslations } from "next-intl";
 
 import {
@@ -52,6 +54,8 @@ import { useWalletState } from "@/providers/wallet-context";
 import { useAppLocale } from "@/i18n/client";
 import type { AppLocale } from "@/i18n/config";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
+import { useDeployment } from "@/providers/deployment-context";
+import { PhaseOneRewards } from "@/components/rewards/PhaseOneRewards";
 
 function displayAmount(value: bigint, decimals = 18, precision = 6): string {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -67,14 +71,41 @@ function parseAmount(value: string, decimals: number, locale: AppLocale): bigint
   }
 }
 
-export function RewardsPage({ initialPositionId = null }: { initialPositionId?: bigint | null }) {
+export function RewardsPage({
+  initialPositionId = null,
+  earnView = "overview",
+}: {
+  initialPositionId?: bigint | null;
+  earnView?: EarnView;
+}) {
   const wallet = useWalletState();
+  const { active } = useDeployment();
+  if (active.phaseOne) {
+    return (
+      <PhaseOneRewards
+        key={`${active.phaseOne.descriptor.deploymentId}:${wallet.address}`}
+        deployment={active.phaseOne}
+        initialPositionId={initialPositionId}
+        view={earnView}
+      />
+    );
+  }
+  if (earnView !== "overview") return <UnsupportedEarnFeature />;
   if (wallet.status === "unconfigured") return <UnconfiguredSurface subject="Rewards" />;
   return (
     <ProtocolActionScope>
       <RewardsRuntime initialPositionId={initialPositionId} />
     </ProtocolActionScope>
   );
+}
+
+function UnsupportedEarnFeature() {
+  const t = useTranslations("earnUx");
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/app/rewards");
+  }, [router]);
+  return <Link href="/app/rewards">{t("title")}</Link>;
 }
 
 function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | null }) {
@@ -211,7 +242,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
     setActionError(null);
     try {
       const refreshed = await catalog.refetch();
-      if (!refreshed.data) throw new Error("The current Position state is unavailable.");
+      if (!refreshed.data) throw new Error("The current account state is unavailable.");
       const token = refreshed.data.stakingToken;
       const diamond = deploymentState.deployment.contracts.diamond;
       const targetPosition =
@@ -338,7 +369,7 @@ function RewardsRuntime({ initialPositionId }: { initialPositionId: bigint | nul
         wallet,
         chainId: deploymentState.deployment.chainId,
         kind: "claim-rewards",
-        label: `Claim rewards from Position #${key}`,
+        label: `Claim rewards from Account #${key}`,
         amount: rewards
           .map(
             (reward) =>

@@ -32,13 +32,13 @@ test.describe("landing foundation", () => {
     await page.goto("/");
   });
 
-  test("reports mainnet status and time without horizontal overflow", async ({ page }) => {
+  test("retains accessible status and time without horizontal overflow", async ({ page }) => {
     await expect(
-      page.getByRole("heading", { name: /static assets.*dynamic markets/i })
+      page.getByRole("heading", { name: /create markets.*grow liquidity/i })
     ).toBeVisible();
     const readout = page.getByLabel("System status");
     await expect(readout.getByText(/system status:/i)).toContainText("Mainnet");
-    await expect(readout.getByText(/time:/i)).toBeVisible();
+    await expect(readout.getByText(/time:/i)).toBeAttached();
     await expect(readout.locator("p")).toHaveCount(2);
     await expect(readout.getByText(/network:/i)).toHaveCount(0);
     await expect(readout.getByText(/deployment:/i)).toHaveCount(0);
@@ -80,7 +80,7 @@ test.describe("landing foundation", () => {
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
       await expect(page.getByRole("navigation", { name: "Main menu" })).toBeVisible();
-      await page.getByRole("link", { name: "Baskets", exact: true }).click();
+      await page.getByRole("link", { name: "Markets", exact: true }).click();
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
     }
 
@@ -123,7 +123,9 @@ test.describe("landing foundation", () => {
 });
 
 test.describe("Dollar DApp foundation", () => {
-  test("provides every reviewable DApp destination", async ({ page }) => {
+  test("keeps common utilities available and unsupported protocol routes fail closed", async ({
+    page,
+  }) => {
     await page.goto("/app");
     await navigateDapp(page, "/app/wallet");
     await expect(page).toHaveURL(/\/app\/wallet$/);
@@ -137,39 +139,9 @@ test.describe("Dollar DApp foundation", () => {
     await expect(page.getByRole("dialog", { name: "Funding Portal" })).toBeVisible();
     await page.keyboard.press("Escape");
 
-    await navigateDapp(page, "/app/swap");
-    await expect(page).toHaveURL(/\/app\/swap$/);
-    await expect(page.getByRole("heading", { name: "Launch market not deployed" })).toBeVisible();
-
-    await navigateDapp(page, "/app/dollar");
-    await expect(page).toHaveURL(/\/app\/dollar$/);
-
-    await navigateDapp(page, "/app/baskets");
-    await expect(page).toHaveURL(/\/app\/baskets$/);
-    await page.goto("/app/baskets/0");
-    await expect(page).toHaveURL(/\/app\/baskets\/0$/);
-    await page.goto("/app/create");
-    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
-
-    await navigateDapp(page, "/app/positions");
-    await expect(page).toHaveURL(/\/app\/positions$/);
-    await page.goto("/app/positions/0");
-    await expect(page).toHaveURL(/\/app\/positions\/0$/);
-
-    await navigateDapp(page, "/app/loans");
-    await expect(page).toHaveURL(/\/app\/loans$/);
-
-    await navigateDapp(page, "/app/rewards");
-    await expect(page).toHaveURL(/\/app\/rewards$/);
-
-    await navigateDapp(page, "/app/genesis");
-    await expect(page).toHaveURL(/\/app\/genesis$/);
-
-    await page.goto("/app/genesis-rewards");
-    await expect(page).toHaveURL(/\/app\/genesis$/);
-
-    await navigateDapp(page, "/app/liquidity");
-    await expect(page).toHaveURL(/\/app\/liquidity$/);
+    await page.goto("/app/swap");
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
 
     await navigateDapp(page, "/app/activity");
     await expect(page).toHaveURL(/\/app\/activity$/);
@@ -225,10 +197,10 @@ test.describe("Dollar DApp foundation", () => {
     );
   });
 
-  test("keeps basket creation navigable and wallet-gated", async ({ page }) => {
+  test("keeps basket creation fail closed without a deployment", async ({ page }) => {
     await page.goto("/app/create");
 
-    await expect(page.getByRole("heading", { name: "Connect your wallet" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Statics is not configured" })).toBeVisible();
     await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
   });
 

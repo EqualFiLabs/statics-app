@@ -66,7 +66,8 @@ describe("Uniswap API routes", () => {
         tokenInChainId: "8453",
         tokenOutChainId: "8453",
         slippageTolerance: 0.5,
-      })
+      }),
+      expect.any(AbortSignal)
     );
     expect(callApi.mock.calls[0]?.[1]).not.toHaveProperty("integratorFee");
   });

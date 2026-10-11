@@ -13,6 +13,10 @@
     "./genesis-credit": {
       "types": "./dist/genesis-credit.d.ts",
       "import": "./dist/genesis-credit.js"
+    },
+    "./phase-one": {
+      "types": "./dist/phase-one/index.d.ts",
+      "import": "./dist/phase-one/index.js"
     }
   },
   "peerDependencies": {

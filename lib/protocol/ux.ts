@@ -58,3 +58,12 @@ export function formatTokenAmount(value: bigint, decimals: number, fractionDigit
     .replace(/0+$/, "");
   return `${negative ? "-" : ""}${whole.toString()}${fraction ? `.${fraction}` : ""}`;
 }
+
+/** Keep positive rewards visible even when they are below the displayed precision. */
+export function formatRewardAmount(value: bigint, decimals: number, fractionDigits = 6): string {
+  const displayUnit = 10n ** BigInt(decimals - Math.min(decimals, fractionDigits));
+  if (value > 0n && value < displayUnit) {
+    return `<${formatTokenAmountGrouped(displayUnit, decimals, fractionDigits)}`;
+  }
+  return formatTokenAmountGrouped(value, decimals, fractionDigits);
+}

@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
 import { defaultNetworkId, deploymentRegistry, findDeployment } from "@/lib/deployments/registry";
+import type { PublicDeploymentSnapshot } from "@/lib/deployments/public-manifests";
 import type { DeploymentOption, StaticsNetworkId } from "@/lib/deployments/types";
 
 export type DeploymentContextValue = Readonly<{
@@ -25,20 +26,30 @@ export const DeploymentContext = createContext<DeploymentContextValue>({
   selectNetwork: () => undefined,
 });
 
-export function DeploymentProvider({ children }: { children: React.ReactNode }) {
-  const [active, setActive] = useState(initial);
+export function DeploymentProvider({
+  children,
+  deploymentSnapshot,
+}: {
+  children: React.ReactNode;
+  deploymentSnapshot?: PublicDeploymentSnapshot;
+}) {
+  // Pin configuration for this page session, including every reviewed transaction.
+  const [sessionOptions] = useState(() => deploymentRegistry(undefined, deploymentSnapshot));
+  const [active, setActive] = useState(
+    () => findDeployment(sessionOptions, defaultNetworkId()) ?? sessionOptions[0]!
+  );
 
   const value = useMemo<DeploymentContextValue>(
     () => ({
       active,
-      options,
+      options: sessionOptions,
       selectNetwork: (networkId) => {
-        const selected = options.find((option) => option.networkId === networkId);
+        const selected = sessionOptions.find((option) => option.networkId === networkId);
         if (!selected) return;
         setActive(selected);
       },
     }),
-    [active]
+    [active, sessionOptions]
   );
   return <DeploymentContext.Provider value={value}>{children}</DeploymentContext.Provider>;
 }

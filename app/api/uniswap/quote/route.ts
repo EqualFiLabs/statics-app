@@ -45,19 +45,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await callUniswapApi("/quote", {
-    type: "EXACT_INPUT",
-    tokenInChainId: String(chainId),
-    tokenOutChainId: String(chainId),
-    tokenIn: input.tokenIn,
-    tokenOut: input.tokenOut,
-    amount,
-    swapper: input.swapper,
-    slippageTolerance: slippage,
-    routingPreference: "BEST_PRICE",
-    urgency: "normal",
-    protocols: ["V2", "V3", "V4"],
-    ...fee,
-  });
+  const result = await callUniswapApi(
+    "/quote",
+    {
+      type: "EXACT_INPUT",
+      tokenInChainId: String(chainId),
+      tokenOutChainId: String(chainId),
+      tokenIn: input.tokenIn,
+      tokenOut: input.tokenOut,
+      amount,
+      swapper: input.swapper,
+      slippageTolerance: slippage,
+      routingPreference: "BEST_PRICE",
+      urgency: "normal",
+      protocols: ["V2", "V3", "V4"],
+      ...fee,
+    },
+    request.signal
+  );
   return NextResponse.json(result.payload, { status: result.status });
 }

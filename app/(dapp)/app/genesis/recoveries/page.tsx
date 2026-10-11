@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { GenesisRecoveriesPage } from "@/components/genesis/GenesisRecoveriesPage";
 
-export const metadata: Metadata = {
-  title: "Operator recoveries | Statics",
-  description:
-    "Discover Operators NFTs whose secured credit has matured and recover them permissionlessly for the caller incentive.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.operatorRecoveries");
+  return { title: t("title"), description: t("description") };
+}
 
 export default function GenesisRecoveriesRoute() {
   return <GenesisRecoveriesPage />;

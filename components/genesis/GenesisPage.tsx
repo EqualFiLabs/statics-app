@@ -35,8 +35,7 @@ function describeGenesisError(error: unknown): string {
   if (message.includes("GenesisLinkedOnTransfer"))
     return "Unlink this Operator NFT before transferring it.";
   if (message.includes("GenesisAlreadyLinked")) return "This Operator NFT is already linked.";
-  if (message.includes("PositionAlreadyLinked"))
-    return "That Position already has an Operator NFT.";
+  if (message.includes("PositionAlreadyLinked")) return "That account already has an Operator NFT.";
   if (message.includes("InvalidActivationTier")) return "Choose a higher activation tier.";
   if (message.includes("ERC20InsufficientAllowance"))
     return "Approve STATICS before activating this tier.";
@@ -416,7 +415,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                       ? "Linking…"
                       : currentTier === 0
                         ? "Activate before linking"
-                        : "Link to Position"}
+                        : "Link to account"}
                   </button>
                 </div>
               )}

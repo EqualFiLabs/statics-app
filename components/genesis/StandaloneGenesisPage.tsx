@@ -44,7 +44,7 @@ import {
 } from "@/lib/genesis/owned";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
-import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
+import { formatRewardAmount, formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { useWalletState } from "@/providers/wallet-context";
 
 type GenesisErrorCopy = Readonly<{
@@ -378,14 +378,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
               {(
                 [
                   [deployment.contracts.statics, "STATICS", summary.ownerStatics, 2],
-                  [deployment.contracts.weth, "WETH", summary.ownerWeth, 4],
+                  [deployment.contracts.weth, "WETH", summary.ownerWeth, 8],
                 ] as const
               ).map(([asset, symbol, amount, digits]) => (
                 <li key={asset}>
                   <div>
                     <span>{symbol}</span>
                     <strong className={amount === 0n ? "is-muted" : undefined}>
-                      {formatTokenAmountGrouped(amount, 18, digits)}
+                      {formatRewardAmount(amount, 18, digits)}
                     </strong>
                   </div>
                   <button
@@ -465,10 +465,10 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         <div className="ui-stat">
           <span className="ui-stat__label">{t("claimableNow")}</span>
           <strong className="ui-stat__value is-accent">
-            {formatTokenAmountGrouped(summary.claimableStatics, 18, 2)} STATICS
+            {formatRewardAmount(summary.claimableStatics, 18, 2)} STATICS
           </strong>
           <small>
-            {formatTokenAmountGrouped(summary.claimableWeth, 18, 4)} WETH
+            {formatRewardAmount(summary.claimableWeth, 18, 8)} WETH
             {summary.ownerStatics > 0n || summary.ownerWeth > 0n ? t("includesPast") : ""}
           </small>
         </div>
@@ -571,7 +571,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   {!selected.registered
                     ? t("notRegistered")
                     : t("pendingAmount", {
-                        amount: formatTokenAmountGrouped(selected.pendingStatics, 18, 2),
+                        amount: formatRewardAmount(selected.pendingStatics, 18, 2),
                       })}
                 </small>
               </button>
@@ -725,14 +725,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       {(
                         [
                           [deployment.contracts.statics, "STATICS", selected.pendingStatics, 2],
-                          [deployment.contracts.weth, "WETH", selected.pendingWeth, 4],
+                          [deployment.contracts.weth, "WETH", selected.pendingWeth, 8],
                         ] as const
                       ).map(([asset, symbol, amount, digits]) => (
                         <li key={asset}>
                           <div>
                             <span>{t("pendingAsset", { asset: symbol })}</span>
                             <strong className={amount === 0n ? "is-muted" : undefined}>
-                              {formatTokenAmountGrouped(amount, 18, digits)}
+                              {formatRewardAmount(amount, 18, digits)}
                             </strong>
                           </div>
                           <button
@@ -763,7 +763,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                           <div>
                             <span>{t("previousOperators")}</span>
                             <strong>
-                              {formatTokenAmountGrouped(summary.ownerStatics, 18, 2)} STATICS
+                              {formatRewardAmount(summary.ownerStatics, 18, 2)} STATICS
                             </strong>
                           </div>
                           <button

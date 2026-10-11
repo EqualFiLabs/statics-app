@@ -392,6 +392,7 @@ export function WalletPage() {
                         symbol: asset.symbol,
                         logoURI: asset.logoURI,
                       }}
+                      chainId={wallet.fundingChainId}
                     />
                     <div>
                       <strong>{asset.symbol}</strong>
@@ -613,7 +614,7 @@ function TokenBrowser({
                 onClose();
               }}
             >
-              <TokenLogo token={token} />
+              <TokenLogo token={token} chainId={chainId} />
               <span>
                 <strong>{token.symbol}</strong>
                 <small>{token.name}</small>

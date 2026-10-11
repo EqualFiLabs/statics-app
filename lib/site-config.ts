@@ -51,23 +51,24 @@ export function readPublicEnvironment(
   return { appEnvironment, siteUrl } as const;
 }
 
+export const DOCS_URL = "https://docs.staticsprotocol.com";
+const GITHUB_URL = "https://github.com/EqualFiLabs/statics";
+
 export const primaryNavigation: readonly SiteNavigationItem[] = [
-  { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
-  { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
-  { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
-  { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
-  {
-    label: "Docs",
-    messageKey: "docs",
-    kind: "route",
-    href: "https://docs.staticsprotocol.com",
-  },
-  {
-    label: "Dev",
-    messageKey: "dev",
-    kind: "route",
-    href: "https://github.com/EqualFiLabs/statics",
-  },
+  { label: "Operators", messageKey: "operators", kind: "route", href: "/app/genesis" },
+  { label: "Markets", messageKey: "markets", kind: "route", href: "/app" },
+  { label: "Swap", messageKey: "swap", kind: "route", href: "/app/swap" },
+  { label: "Liquidity", messageKey: "liquidity", kind: "route", href: "/app/liquidity" },
+  { label: "Docs", messageKey: "docs", kind: "route", href: DOCS_URL },
+  { label: "Dev", messageKey: "dev", kind: "route", href: GITHUB_URL },
+] as const;
+
+/** Footer project links; Docs and GitHub match the header's Docs and Dev. */
+export const projectLinks = [
+  { messageKey: "docs", href: DOCS_URL },
+  { messageKey: "github", href: GITHUB_URL },
+  { messageKey: "telegram", href: "https://t.me/EqualFi" },
+  { messageKey: "twitter", href: "https://x.com/staticsprotocol" },
 ] as const;
 
 export const protocolStatus = {
@@ -291,4 +292,45 @@ export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNa
     "wallet",
   ];
   return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));
+}
+
+export function isNavigationItemAvailable(
+  item: AppNavigationItem,
+  capabilities: readonly DeploymentCapability[]
+): boolean {
+  if (capabilities.includes(item.capability)) return true;
+  if (item.capability === "canonical-statics-market") {
+    return capabilities.includes("public-direct-swaps");
+  }
+  if (item.capability === "protocol-liquidity") {
+    return capabilities.includes("public-lp-positions");
+  }
+  if (item.capability === "positions") {
+    return capabilities.includes("position-staking");
+  }
+  if (item.capability === "protocol-rewards") {
+    return (
+      capabilities.includes("global-rewards") ||
+      capabilities.includes("lp-rewards") ||
+      capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
+}
+
+export function appNavigationGroupsForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationGroup[] {
+  return appNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isNavigationItemAvailable(item, capabilities)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function appTabNavigationForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationItem[] {
+  return appTabNavigation.filter((item) => isNavigationItemAvailable(item, capabilities));
 }

@@ -418,9 +418,9 @@ export async function validateCustomRewardAsset(
 
 const positionErrorMessages: Readonly<Record<string, string>> = {
   IncorrectPositionCreationFee:
-    "The Position account fee changed. Refresh the current fee and try again.",
+    "The account opening fee changed. Refresh the current fee and try again.",
   PositionCreationFeeTransferFailed:
-    "The protocol could not forward the Position account fee to treasury.",
+    "The protocol could not forward the account opening fee to treasury.",
   PositionHasActiveLegs: "Remove every active position leg before closing this PositionNFT.",
   PositionHasUnresolvedObligations:
     "Resolve every outstanding position obligation before closing this PositionNFT.",

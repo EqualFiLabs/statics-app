@@ -28,3 +28,31 @@ export function configuredCanonicalPool(
   }
   return value;
 }
+
+export function configuredLogBlockRange(
+  environment: Environment = process.env
+): number | undefined {
+  const value = environment.PONDER_LOG_BLOCK_RANGE?.trim();
+  if (!value) return undefined;
+  const range = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(range) || range < 1 || range > 1_000_000) {
+    throw new Error("PONDER_LOG_BLOCK_RANGE must be an integer from 1 through 1000000.");
+  }
+  return range;
+}
+
+/** Inherited Genesis history has its own boundary, independent of later protocol deployments. */
+export function configuredGenesisStartBlock(
+  name: string,
+  environment: Environment = process.env
+): number {
+  const source = environment[name]?.trim();
+  const shared = environment.PONDER_GENESIS_START_BLOCK?.trim();
+  const raw = source || shared;
+  if (!raw) return 0;
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${source ? name : "PONDER_GENESIS_START_BLOCK"} must be a block number.`);
+  }
+  return value;
+}

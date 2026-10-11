@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  genesisConsecutiveTransferMutations,
   genesisTransferMutation,
   genesisWeightChangedMutation,
   nextAvailableGenesisId,
   type GenesisNftMutation,
   type GenesisNftRow,
 } from "../src/genesis";
+import { zeroAddress } from "viem";
 import { activeGenesisCreditMutation } from "../src/genesis-credit";
 
 function applyGenesisMutation(
@@ -36,6 +38,43 @@ describe("Genesis NFT event ordering", () => {
   const deploymentId = "robinhood-genesis";
   const vault = "0x8AAAF9a22f439589987B8f1e69d79ca4f648C297" as const;
   const buyer = "0x1111111111111111111111111111111111111111" as const;
+
+  it("discovers the initial treasury batch before any ordinary transfer", () => {
+    const rows = new Map<string, GenesisNftRow>();
+    for (const [fromTokenId, toTokenId, to] of [
+      [1n, 5_000n, vault],
+      [5_001n, 5_555n, buyer],
+    ] as const) {
+      for (const mutation of genesisConsecutiveTransferMutations({
+        deploymentId,
+        fromTokenId,
+        toTokenId,
+        from: zeroAddress,
+        to,
+        vault,
+        blockNumber: 47_688_979n,
+      })) {
+        const key = mutation.type === "delete" ? mutation.key : mutation.row.key;
+        const row = applyGenesisMutation(rows.get(key), mutation);
+        if (row) rows.set(row.key, row);
+      }
+    }
+    expect(rows.size).toBe(555);
+    expect(rows.get(`${deploymentId}:5001`)).toMatchObject({ owner: buyer, registered: false });
+    expect(rows.has(`${deploymentId}:5555`)).toBe(true);
+    expect(nextAvailableGenesisId([...rows.values()].map((row) => row.id))).toBe(1n);
+
+    const mutation = genesisTransferMutation({
+      deploymentId,
+      genesisId: 5_001n,
+      to: vault,
+      vault,
+      blockNumber: 47_688_980n,
+    });
+    expect(mutation).toEqual({ type: "delete", key: `${deploymentId}:5001` });
+    rows.delete(`${deploymentId}:5001`);
+    expect(rows.size).toBe(554);
+  });
 
   it("materializes weight before a vault-to-owner Transfer and preserves it", () => {
     const blockNumber = 50_132_467n;
@@ -151,8 +190,34 @@ describe("activeGenesisCreditMutation", () => {
     });
   });
 
-  it.each(["repaid", "recovered"] as const)("deletes a %s credit", (type) => {
-    expect(activeGenesisCreditMutation({ type, deploymentId, genesisId: 42n })).toEqual({
+  it("keeps a credit indexed through a draw and partial repayment", () => {
+    for (const [type, principal, blockNumber] of [
+      ["drawn", 150n, 8n],
+      ["repaid", 50n, 9n],
+    ] as const) {
+      expect(
+        activeGenesisCreditMutation({ type, deploymentId, genesisId: 42n, principal, blockNumber })
+      ).toEqual({
+        type: "update",
+        key: `${deploymentId}:42`,
+        values: { principal, updatedAtBlock: blockNumber },
+      });
+    }
+  });
+
+  it("deletes a credit only after full repayment or recovery", () => {
+    expect(
+      activeGenesisCreditMutation({
+        type: "repaid",
+        deploymentId,
+        genesisId: 42n,
+        principal: 0n,
+        blockNumber: 10n,
+      })
+    ).toEqual({ type: "delete", key: `${deploymentId}:42` });
+    expect(
+      activeGenesisCreditMutation({ type: "recovered", deploymentId, genesisId: 42n })
+    ).toEqual({
       type: "delete",
       key: `${deploymentId}:42`,
     });
