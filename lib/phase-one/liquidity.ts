@@ -4,6 +4,7 @@ import {
   getAddress,
   maxUint256,
   toHex,
+  zeroAddress,
   type Address,
   type Hex,
   type PublicClient,
@@ -211,7 +212,8 @@ export function planPublicLiquidityApprovals(input: {
     spender: input.deployment.contracts.diamond,
     required: required as bigint,
     allowance: allowance as bigint,
-    needed: (allowance as bigint) < (required as bigint),
+    // Native ETH is paid as the transaction value; it has no ERC-20 allowance.
+    needed: !isNativeCurrency(token as Address) && (allowance as bigint) < (required as bigint),
     target: token as Address,
     calldata: encodeFunctionData({
       abi: erc20Abi,
@@ -238,13 +240,26 @@ export async function buildCreatePositionNftTransaction(input: {
   };
 }
 
+/** Address zero is the native currency in a v4 PoolKey; it can only be `currency0`. */
+export function isNativeCurrency(currency: Address): boolean {
+  return currency.toLowerCase() === zeroAddress;
+}
+
+/**
+ * Native-ETH pools take their token0 maximum as the transaction value, exactly: the contract
+ * requires `msg.value == amount0Maximum` and refunds whatever the position does not use.
+ */
+export function nativeLiquidityValue(pool: PublicPoolSelection, amount0Maximum: bigint): bigint {
+  return isNativeCurrency(pool.poolKey.currency0) ? amount0Maximum : 0n;
+}
+
 export function buildProvidePublicLiquidityTransaction(input: {
   deployment: PhaseOneDeployment;
   pool: PublicPoolSelection;
   positionId: bigint;
   quote: PublicLiquidityQuote;
   deadline: bigint;
-}): Readonly<{ target: Address; calldata: Hex; value: 0n }> {
+}): Readonly<{ target: Address; calldata: Hex; value: bigint }> {
   return {
     target: input.deployment.contracts.diamond,
     calldata: buildProvideRangeLiquidityCall(input.positionId, {
@@ -256,7 +271,7 @@ export function buildProvidePublicLiquidityTransaction(input: {
       amount1Maximum: input.quote.maximumAmount1,
       deadline: input.deadline,
     }),
-    value: 0n,
+    value: nativeLiquidityValue(input.pool, input.quote.maximumAmount0),
   };
 }
 
@@ -375,7 +390,7 @@ export function buildPublicLiquidityChangeTransaction(input: {
   positionId: bigint;
   deadline: bigint;
   change: PublicLiquidityChange;
-}): Readonly<{ target: Address; calldata: Hex; value: 0n }> {
+}): Readonly<{ target: Address; calldata: Hex; value: bigint }> {
   let calldata: Hex;
   switch (input.change.kind) {
     case "increase":
@@ -425,7 +440,12 @@ export function buildPublicLiquidityChangeTransaction(input: {
       );
       break;
   }
-  return { target: input.deployment.contracts.diamond, calldata, value: 0n };
+  // Increases and rebalances pay token0 additions in ETH on native pools; withdrawals send none.
+  const value =
+    input.change.kind === "increase" || input.change.kind === "rebalance"
+      ? nativeLiquidityValue(input.pool, input.change.amount0Maximum)
+      : 0n;
+  return { target: input.deployment.contracts.diamond, calldata, value };
 }
 
 export async function readPublicManagedLiquidityPosition(input: {

@@ -8,7 +8,7 @@ import {
   formatUnits,
   parseEventLogs,
   encodeFunctionData,
-  zeroAddress,
+  maxUint256,
   type Hex,
 } from "viem";
 import Link from "next/link";
@@ -58,6 +58,7 @@ import {
   quoteWithdrawalAmounts,
   readPublicManagedLiquidityPosition,
   readPublicLiquidityFees,
+  isNativeCurrency,
   planPublicLiquidityApprovals,
   usableTickBounds,
   publicLiquidityDeadline,
@@ -107,20 +108,10 @@ export function PhaseOneLiquidity({
       ? { ...withDiscovered, supportedPools: [...withDiscovered.supportedPools, ...fresh] }
       : withDiscovered;
   }, [reviewedDeployment, discovery.pools, createdPools]);
-  // Deposits read ERC-20 balances and send no ETH, so native ETH pools are swap-only for now.
-  const nativePool = (id: Hex) =>
-    deployment.supportedPools.some(
-      (pool) =>
-        pool.poolId.toLowerCase() === id.toLowerCase() &&
-        [pool.poolKey.currency0, pool.poolKey.currency1].some(
-          (currency) => currency.toLowerCase() === zeroAddress
-        )
-    );
   const canDeposit = (id: Hex) =>
-    !nativePool(id) &&
-    (liquidityDepositsAllowed(id, discovery.pools) ||
-      (!discovery.pools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase()) &&
-        createdPools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase())));
+    liquidityDepositsAllowed(id, discovery.pools) ||
+    (!discovery.pools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase()) &&
+      createdPools.some((pool) => pool.poolId.toLowerCase() === id.toLowerCase()));
   const [screen, setView] = useState<
     "list" | "pool" | "newPool" | "create" | "deposit" | "detail" | "focus"
   >(initialPositionId !== null ? "focus" : "list");
@@ -825,18 +816,25 @@ function ManagedLiquidity({
     queryFn: () =>
       Promise.all(
         [pool.token0, pool.token1].map((token) =>
-          action.publicClient!.readContract({
-            address: token.address,
-            abi: erc20Abi,
-            functionName: "balanceOf",
-            args: [action.wallet!],
-          })
+          // Native ETH (address zero) is the wallet's ETH balance, not an ERC-20 balance.
+          isNativeCurrency(token.address)
+            ? action.publicClient!.getBalance({ address: action.wallet! })
+            : action.publicClient!.readContract({
+                address: token.address,
+                abi: erc20Abi,
+                functionName: "balanceOf",
+                args: [action.wallet!],
+              })
         )
       ),
   });
-  const wrappedIndex = [pool.token0, pool.token1].findIndex(
-    (token) => token.address.toLowerCase() === deployment.contracts.weth?.toLowerCase()
-  );
+  // ETH/WETH pools already spend native ETH directly. Do not offer the same ETH
+  // balance again for wrapping into the other side of that deposit.
+  const wrappedIndex = [pool.token0, pool.token1].some((token) => isNativeCurrency(token.address))
+    ? -1
+    : [pool.token0, pool.token1].findIndex(
+        (token) => token.address.toLowerCase() === deployment.contracts.weth?.toLowerCase()
+      );
   const nativeBalance = useQuery({
     queryKey: [
       "phase-one-liquidity-native-balance",
@@ -846,8 +844,14 @@ function ManagedLiquidity({
     enabled: action.ready && wrappedIndex >= 0,
     queryFn: () => action.publicClient!.getBalance({ address: action.wallet! }),
   });
+  // Native ETH keeps 0.001 ETH back for gas, as the ETH + WETH funding option does.
+  const gasReserve = 10n ** 15n;
   const spendable = (index: number) =>
-    (balances.data?.[index] ?? 0n) +
+    (isNativeCurrency((index === 0 ? pool.token0 : pool.token1).address)
+      ? (balances.data?.[index] ?? 0n) > gasReserve
+        ? (balances.data?.[index] ?? 0n) - gasReserve
+        : 0n
+      : (balances.data?.[index] ?? 0n)) +
     (fundWithEth && index === wrappedIndex
       ? (nativeBalance.data ?? 0n) > 10n ** 15n
         ? (nativeBalance.data ?? 0n) - 10n ** 15n
@@ -1112,12 +1116,15 @@ function ManagedLiquidity({
     const read = async () =>
       Promise.all(
         [pool.token0, pool.token1].map((token) =>
-          action.publicClient!.readContract({
-            address: token.address,
-            abi: erc20Abi,
-            functionName: "allowance",
-            args: [action.wallet!, deployment.contracts.diamond],
-          })
+          // Native ETH is sent as the transaction value and needs no approval.
+          isNativeCurrency(token.address)
+            ? Promise.resolve(maxUint256)
+            : action.publicClient!.readContract({
+                address: token.address,
+                abi: erc20Abi,
+                functionName: "allowance",
+                args: [action.wallet!, deployment.contracts.diamond],
+              })
         )
       );
     const [allowance0, allowance1] = await queryClient.fetchQuery({
@@ -1406,6 +1413,7 @@ function ManagedLiquidity({
               : `${tokenAmount(min0, 0)} + ${tokenAmount(min1, 1)}`,
             to: transaction.target,
             data: transaction.calldata,
+            value: transaction.value,
           });
           setCompleted(true);
         },

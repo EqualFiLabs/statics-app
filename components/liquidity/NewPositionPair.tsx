@@ -11,6 +11,7 @@ import { loadDexPools } from "@/lib/indexer/dex-market";
 import { dexRoot } from "@/hooks/useDexOverview";
 import { ReviewDrawer } from "@/components/rewards/ReviewDrawer";
 import { isReviewedToken } from "@/lib/phase-one/pool-discovery";
+import { getFundingNetwork } from "@/lib/funding-networks";
 import {
   FEE_TIERS,
   candidatePoolId,
@@ -55,9 +56,18 @@ export function NewPositionPair({
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const hook = deployment.contracts.publicHook;
 
-  // Native ETH pools cannot be funded by the add-liquidity flow yet, so pairs use WETH.
+  // The chain's native currency is always offered; address zero is its v4 currency.
+  const native = getFundingNetwork(deployment.descriptor.chainId)?.chain.nativeCurrency;
   const tokens = useMemo(() => {
     const seen = new Map<string, PublicPoolToken>();
+    if (native)
+      seen.set(zeroAddress, {
+        address: zeroAddress,
+        symbol: native.symbol,
+        name: native.name,
+        decimals: native.decimals,
+        metadataSource: "reviewed-manifest",
+      });
     for (const pool of deployment.supportedPools)
       for (const token of [pool.token0, pool.token1]) {
         if (same(token.address, zeroAddress)) continue;
@@ -69,7 +79,7 @@ export function NewPositionPair({
       (a, b) =>
         Number(isReviewedToken(b)) - Number(isReviewedToken(a)) || a.symbol.localeCompare(b.symbol)
     );
-  }, [deployment.supportedPools]);
+  }, [deployment.supportedPools, native]);
   const initial = deployment.supportedPools.find(
     (pool) => pool.poolId.toLowerCase() === initialPoolId.toLowerCase() && canDeposit(pool.poolId)
   );

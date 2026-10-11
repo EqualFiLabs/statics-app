@@ -4,6 +4,7 @@ import {
   getAddress,
   maxUint256,
   toHex,
+  zeroAddress,
   type PublicClient,
 } from "viem";
 import { describe, expect, it, vi } from "vitest";
@@ -157,6 +158,73 @@ describe("Phase 1 public liquidity", () => {
       "rebalanceLiquidity",
       "exitLiquidity",
     ]);
+  });
+});
+
+describe("native ETH pools", () => {
+  const nativeKey: V4PoolKey = { ...poolKey, currency0: zeroAddress };
+  const nativePool: PublicPoolSelection = {
+    ...pool,
+    poolId: v4PoolId(nativeKey),
+    poolKey: nativeKey,
+    token0: token(zeroAddress, "ETH"),
+  };
+
+  it("sends exactly the token0 maximum as value and approves only the ERC-20 side", () => {
+    const quote = quotePublicLiquidity({
+      sqrtPriceX96: 1n << 96n,
+      currentTick: 0,
+      tickSpacing: 60,
+      tickLower: -60,
+      tickUpper: 60,
+      amount0Maximum: 10n ** 18n,
+      amount1Maximum: 10n ** 18n,
+      toleranceBps: 50,
+    });
+    const args = { deployment, positionId: 7n, quote, deadline: 2_000n };
+    expect(buildProvidePublicLiquidityTransaction({ ...args, pool: nativePool }).value).toBe(
+      quote.maximumAmount0
+    );
+    expect(buildProvidePublicLiquidityTransaction({ ...args, pool }).value).toBe(0n);
+    const approvals = planPublicLiquidityApprovals({
+      deployment,
+      pool: nativePool,
+      amount0Maximum: 100n,
+      amount1Maximum: 200n,
+      allowance0: 0n,
+      allowance1: 0n,
+    });
+    expect(approvals.map((approval) => approval.needed)).toEqual([false, true]);
+  });
+
+  it("attaches value only to changes that add liquidity", () => {
+    const build = (change: Parameters<typeof buildPublicLiquidityChangeTransaction>[0]["change"]) =>
+      buildPublicLiquidityChangeTransaction({
+        deployment,
+        pool: nativePool,
+        positionId: 7n,
+        deadline: 2_000n,
+        change,
+      }).value;
+    expect(
+      build({ kind: "increase", liquidity: 10n, amount0Maximum: 100n, amount1Maximum: 50n })
+    ).toBe(100n);
+    expect(
+      build({
+        kind: "rebalance",
+        tickLower: -120,
+        tickUpper: 120,
+        liquidity: 10n,
+        amount0Maximum: 30n,
+        amount1Maximum: 50n,
+        amount0Minimum: 1n,
+        amount1Minimum: 1n,
+      })
+    ).toBe(30n);
+    expect(build({ kind: "decrease", liquidity: 5n, amount0Minimum: 1n, amount1Minimum: 1n })).toBe(
+      0n
+    );
+    expect(build({ kind: "exit", amount0Minimum: 1n, amount1Minimum: 1n })).toBe(0n);
   });
 });
 

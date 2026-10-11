@@ -390,6 +390,85 @@ describe("Phase 1 liquidity in the existing screen", () => {
       mocks.read.mock.calls.filter(([input]) => input.functionName === "allowance")
     ).toHaveLength(4);
   });
+  it("funds a native ETH pool with the transaction value and approves only the ERC-20 side", async () => {
+    const nativeKey = { ...key, currency0: zeroAddress, currency1: address("2") };
+    const nativeId = v4PoolId(nativeKey);
+    const native = {
+      ...deployment,
+      supportedPools: [
+        ...deployment.supportedPools,
+        {
+          poolId: nativeId,
+          poolKey: nativeKey,
+          token0: { ...token("0", "ETH"), address: zeroAddress },
+          token1: token("2", "STATICS"),
+          enabled: true,
+        },
+      ],
+    } as unknown as PhaseOneDeployment;
+    mocks.fees.mockResolvedValue({
+      items: [poolId, nativeId].map((id) => ({
+        poolId: id,
+        inputFeePips: 500,
+        outputFeePips: 500,
+      })),
+    });
+    mocks.execute.mockImplementation(async () => {
+      mocks.allowance = maxUint256;
+      return hash("a");
+    });
+    render(tree(null, null, { ...option, phaseOne: native }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /^ETH \/ STATICS/ }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Deposit ETH" }), {
+      target: { value: "1" },
+    });
+    const button = screen.getByRole("button", { name: "Review Add liquidity" });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+    await waitFor(() =>
+      expect(
+        mocks.execute.mock.calls.some(([request]) => request.kind === "phase-one-provide-liquidity")
+      ).toBe(true)
+    );
+    const requests = mocks.execute.mock.calls.map(([request]) => request);
+    const approvals = requests.filter((request) => request.kind === "phase-one-approve-token");
+    expect(approvals.map((request) => request.to)).toEqual([address("2")]);
+    const provide = requests.at(-1)!;
+    const decoded = decodeFunctionData({ abi: staticsRangeGaugeAbi, data: provide.data });
+    expect(provide.value).toBeGreaterThan(0n);
+    expect(provide.value).toBe((decoded.args?.[1] as { amount0Maximum: bigint }).amount0Maximum);
+    expect(
+      mocks.read.mock.calls.some(
+        ([input]) => input.functionName === "allowance" && input.address === zeroAddress
+      )
+    ).toBe(false);
+  });
+  it("does not count native ETH twice when funding an ETH/WETH pool", async () => {
+    const nativeKey = { ...key, currency0: zeroAddress };
+    const nativeId = v4PoolId(nativeKey);
+    const native = {
+      ...deployment,
+      supportedPools: [
+        {
+          poolId: nativeId,
+          poolKey: nativeKey,
+          token0: { ...token("0", "ETH"), address: zeroAddress },
+          token1: token("3", "WETH"),
+          enabled: true,
+        },
+      ],
+    } as unknown as PhaseOneDeployment;
+    mocks.fees.mockResolvedValue({
+      items: [{ poolId: nativeId, inputFeePips: 500, outputFeePips: 500 }],
+    });
+    render(tree(null, null, { ...option, phaseOne: native }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Add liquidity$/ })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /^ETH \/ WETH/ }));
+    expect(await screen.findByRole("textbox", { name: "Deposit ETH" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ETH + WETH" })).not.toBeInTheDocument();
+  });
   it("recovers an interrupted provision using the receipt-created and indexed NFT without creating another", async () => {
     window.localStorage.setItem("unrelated-setting", "preserved");
     mocks.positions.mockResolvedValue({
