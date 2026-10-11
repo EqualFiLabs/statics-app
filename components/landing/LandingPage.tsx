@@ -149,7 +149,7 @@ export async function LandingPage() {
           >
             <Corners />
             <h2 id="glance-title">
-              <span aria-hidden="true">{"///"}</span> <a href={DOCS_URL}>{t("theDocs")}</a>
+              <span aria-hidden="true">{"///"}</span> {t("theMechanics")}
             </h2>
             <dl className="stat-grid">
               <div>

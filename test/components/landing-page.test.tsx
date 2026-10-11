@@ -77,9 +77,13 @@ describe("landing page", () => {
   it("states Phase 1 mechanics rather than empty metrics", async () => {
     await renderLanding();
 
-    expect(screen.getByRole("heading", { name: /the docs/i })).toBeInTheDocument();
+    const mechanics = screen.getByRole("heading", { name: /the mechanics/i });
+    expect(mechanics).toBeInTheDocument();
+    expect(within(mechanics).queryByRole("link")).not.toBeInTheDocument();
     for (const link of screen.getAllByRole("link", { name: /the docs/i }))
       expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");
+    expect(spanish.landing.theMechanics).toBe("La mecánica");
+    expect(chinese.landing.theMechanics).toBe("运作机制");
     expect(screen.getByText("5%")).toBeInTheDocument();
     expect(screen.getByText("16")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();

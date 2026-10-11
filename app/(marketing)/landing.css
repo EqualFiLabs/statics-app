@@ -1739,13 +1739,17 @@ html:has(.landing-page) {
 
   .landing-page .dollar-modes {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
     margin: 0;
-    width: auto;
+    width: 100%;
   }
 
   .landing-page .dollar-modes li {
-    min-height: 54px;
+    min-width: 0;
+    min-height: 76px;
+    height: 100%;
+    overflow-wrap: anywhere;
   }
 
   .landing-page .dollar-modes strong {

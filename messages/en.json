@@ -1450,7 +1450,8 @@
     "staticsPrinciple": "STATICS directs liquidity incentives.",
     "lpPrinciple": "LPs earn in-range rewards.",
     "marketPrinciple": "Open markets. Permissioned venues. Shared infrastructure.",
-    "theDocs": "The Docs"
+    "theDocs": "The Docs",
+    "theMechanics": "The Mechanics"
   },
   "glossary": {
     "position": {
