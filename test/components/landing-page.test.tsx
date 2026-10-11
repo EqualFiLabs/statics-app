@@ -79,6 +79,7 @@ describe("landing page", () => {
 
     const mechanics = screen.getByRole("heading", { name: /the mechanics/i });
     expect(mechanics).toBeInTheDocument();
+    expect(mechanics).toHaveTextContent("// The Mechanics");
     expect(within(mechanics).queryByRole("link")).not.toBeInTheDocument();
     for (const link of screen.getAllByRole("link", { name: /the docs/i }))
       expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");

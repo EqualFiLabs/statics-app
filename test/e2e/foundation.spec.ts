@@ -91,6 +91,7 @@ test.describe("landing foundation", () => {
 
     const mechanics = page.getByRole("heading", { name: "The Mechanics" });
     await expect(mechanics).toBeVisible();
+    await expect(mechanics).toContainText("// The Mechanics");
     await expect(mechanics.getByRole("link")).toHaveCount(0);
   });
 
