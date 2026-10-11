@@ -1,8 +1,13 @@
+import {
+  deploymentScopedCache,
+  withDeploymentSnapshot,
+  serverDeploymentRegistry,
+} from "@/lib/server/deployment-manifests";
 import { createPublicClient, http, isHex, size } from "viem";
 
 import { v4QuoterAbi } from "@statics-protocol/sdk";
 
-import { deploymentRegistry, ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
+import { ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { canonicalWethPerStaticsFromPrice1Per0, WAD } from "@/lib/market/analytics";
 import {
@@ -24,18 +29,20 @@ const BID_ASK_WETH_NOTIONAL = 10n ** 16n;
 
 type TickerPayload = readonly [ReturnType<typeof coinGeckoTicker>];
 
-let tickerCache: Readonly<{ value: TickerPayload; fetchedAt: number }> | null = null;
-let tickerInFlight: Promise<Readonly<{ value: TickerPayload; fetchedAt: number }>> | null = null;
+const cache = deploymentScopedCache(() => ({
+  tickerCache: null as Readonly<{ value: TickerPayload; fetchedAt: number }> | null,
+  tickerInFlight: null as Promise<Readonly<{ value: TickerPayload; fetchedAt: number }>> | null,
+}));
 
 function mainnetLaunch(): LaunchDeployment {
-  const launch = deploymentRegistry().find(
+  const launch = serverDeploymentRegistry().find(
     (option) => option.descriptor.deploymentId === ROBINHOOD_GENESIS_DEPLOYMENT_ID
   )?.launch;
   if (!launch?.analytics) throw new Error("The reviewed Robinhood launch manifest is unavailable.");
   return launch;
 }
 
-export function coinGeckoSpotMarket(): CoinGeckoSpotMarket {
+function coinGeckoSpotMarketForSnapshot(): CoinGeckoSpotMarket {
   const deployment = mainnetLaunch();
   return {
     tickerId: coinGeckoTickerId(deployment.contracts.statics, deployment.contracts.weth),
@@ -189,29 +196,31 @@ async function refreshTicker(now: number) {
   return { value, fetchedAt: now } as const;
 }
 
-export async function loadCoinGeckoTickers(now = Date.now()): Promise<TickerPayload> {
-  if (tickerCache && now - tickerCache.fetchedAt <= TICKER_TTL_MS) return tickerCache.value;
-  if (!tickerInFlight) {
-    tickerInFlight = refreshTicker(now)
+async function loadCoinGeckoTickersForSnapshot(now = Date.now()): Promise<TickerPayload> {
+  const state = cache();
+  if (state.tickerCache && now - state.tickerCache.fetchedAt <= TICKER_TTL_MS)
+    return state.tickerCache.value;
+  if (!state.tickerInFlight) {
+    state.tickerInFlight = refreshTicker(now)
       .then((result) => {
-        tickerCache = result;
+        state.tickerCache = result;
         return result;
       })
       .finally(() => {
-        tickerInFlight = null;
+        state.tickerInFlight = null;
       });
   }
   try {
-    return (await tickerInFlight).value;
+    return (await state.tickerInFlight).value;
   } catch (error) {
-    if (tickerCache && now - tickerCache.fetchedAt <= TICKER_MAX_STALE_MS) {
-      return tickerCache.value;
+    if (state.tickerCache && now - state.tickerCache.fetchedAt <= TICKER_MAX_STALE_MS) {
+      return state.tickerCache.value;
     }
     throw error;
   }
 }
 
-export async function loadCoinGeckoHistoricalTrades(
+async function loadCoinGeckoHistoricalTradesForSnapshot(
   query: Readonly<{
     limit: number;
     from?: string;
@@ -230,7 +239,7 @@ export async function loadCoinGeckoHistoricalTrades(
   return coinGeckoHistoricalTrades(trades, market, query.side);
 }
 
-export async function loadCoinGeckoStatus(now = Date.now()) {
+async function loadCoinGeckoStatusForSnapshot(now = Date.now()) {
   const [overview, indexerResponse] = await Promise.all([
     loadMarketSpotOverview(now),
     fetch(staticsMainnetIndexerUrl("status"), {
@@ -283,6 +292,31 @@ export async function loadCoinGeckoStatus(now = Date.now()) {
 }
 
 export function resetCoinGeckoMarketCacheForTest(): void {
-  tickerCache = null;
-  tickerInFlight = null;
+  const state = cache();
+  state.tickerCache = null;
+  state.tickerInFlight = null;
+}
+
+export async function loadCoinGeckoTickers(
+  ...args: Parameters<typeof loadCoinGeckoTickersForSnapshot>
+): ReturnType<typeof loadCoinGeckoTickersForSnapshot> {
+  return withDeploymentSnapshot(() => loadCoinGeckoTickersForSnapshot(...args));
+}
+
+export async function loadCoinGeckoHistoricalTrades(
+  ...args: Parameters<typeof loadCoinGeckoHistoricalTradesForSnapshot>
+): ReturnType<typeof loadCoinGeckoHistoricalTradesForSnapshot> {
+  return withDeploymentSnapshot(() => loadCoinGeckoHistoricalTradesForSnapshot(...args));
+}
+
+export async function loadCoinGeckoStatus(
+  ...args: Parameters<typeof loadCoinGeckoStatusForSnapshot>
+): ReturnType<typeof loadCoinGeckoStatusForSnapshot> {
+  return withDeploymentSnapshot(() => loadCoinGeckoStatusForSnapshot(...args));
+}
+
+export function coinGeckoSpotMarket(
+  ...args: Parameters<typeof coinGeckoSpotMarketForSnapshot>
+): ReturnType<typeof coinGeckoSpotMarketForSnapshot> {
+  return withDeploymentSnapshot(() => coinGeckoSpotMarketForSnapshot(...args));
 }

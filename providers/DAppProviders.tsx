@@ -29,6 +29,7 @@ import {
   getAddressExplorerUrl,
   readWalletEnvironment,
 } from "@/lib/wallet-config";
+import type { PublicDeploymentSnapshot } from "@/lib/deployments/public-manifests";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
 import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
@@ -517,7 +518,13 @@ function UnconfiguredWalletBridge({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DAppProviders({ children }: { children: React.ReactNode }) {
+export function DAppProviders({
+  children,
+  deploymentSnapshot,
+}: {
+  children: React.ReactNode;
+  deploymentSnapshot?: PublicDeploymentSnapshot;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -538,7 +545,7 @@ export function DAppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ProtocolQueryReconciler />
-      <DeploymentProvider>
+      <DeploymentProvider deploymentSnapshot={deploymentSnapshot}>
         {walletEnvironment.configured ? (
           <ConfiguredWalletProviders>{children}</ConfiguredWalletProviders>
         ) : (

@@ -91,3 +91,12 @@ Statics quote errors remain errors. Routing stays internal to the card. Liquidit
 Positions, Rewards, and Activity extend the existing screens. Liquidity recovery
 uses receipts, transaction history, and indexed ownership; saved workflow records
 are no longer read or written.
+
+## Runtime publication
+
+Public manifests may also be published as a reviewed, versioned runtime bundle using
+`STATICS_RUNTIME_MANIFEST_PATH`. The app and server readers use that bundle without a Next.js
+rebuild; the existing manifest checks still apply. See
+[Runtime deployment manifests](../docs/runtime-deployment-manifests.md) for staging, generation,
+atomic publication, failure behavior and rollback. Private deployment configuration is never
+part of the public bundle.

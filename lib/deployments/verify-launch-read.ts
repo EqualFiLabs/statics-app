@@ -1,3 +1,4 @@
+import { launchManifestIdentity } from "./launch-identity";
 import type { PublicClient } from "viem";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
@@ -31,6 +32,7 @@ export async function verifyLaunchDeploymentForRead(
     body: JSON.stringify({
       chainId: deployment.descriptor.chainId,
       deploymentId: deployment.descriptor.deploymentId,
+      manifestIdentity: launchManifestIdentity(deployment),
     }),
   });
   const payload = (await response.json().catch(() => ({}))) as VerificationResponse;

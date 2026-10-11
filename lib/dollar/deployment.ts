@@ -55,7 +55,7 @@ export type DollarDeployment = Readonly<{
    * Where these addresses came from. The environment path is restricted to
    * local Anvil; every other chain must come from a reviewed manifest.
    */
-  source: "development-environment" | "checked-in-manifest";
+  source: "development-environment" | "checked-in-manifest" | "runtime-manifest";
   contracts: Readonly<Record<DollarContractName, Address>>;
   runtimeCodeHashes: Readonly<Record<DollarContractName, Hex>>;
   genesis?: GenesisDeployment | null;

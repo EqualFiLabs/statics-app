@@ -1,3 +1,4 @@
+import type { PublicDeploymentSnapshot } from "./public-manifests";
 import { launchDeploymentManifests } from "@/deployments/launch-manifests";
 import { deploymentManifests } from "@/deployments/manifests";
 import { phaseOneDeploymentManifests } from "@/deployments/phase-one-manifests";
@@ -115,9 +116,12 @@ function localLaunch(environment: Record<string, string | undefined>): LaunchDep
   return deployment;
 }
 
-function publicLaunch(deploymentId: string): LaunchDeployment | null {
-  const manifest = launchDeploymentManifests[deploymentId];
-  return manifest ? parseLaunchDeploymentManifest(manifest) : null;
+function publicLaunch(
+  deploymentId: string,
+  snapshot?: PublicDeploymentSnapshot
+): LaunchDeployment | null {
+  const manifest = (snapshot?.manifests.launch ?? launchDeploymentManifests)[deploymentId];
+  return manifest ? parseLaunchDeploymentManifest(manifest, snapshot?.source) : null;
 }
 
 function localPhaseOne(environment: Record<string, string | undefined>): PhaseOneDeployment | null {
@@ -141,14 +145,18 @@ function localPhaseOne(environment: Record<string, string | undefined>): PhaseOn
   return parsePhaseOneDeploymentManifest(manifest, "development-fixture");
 }
 
-function publicPhaseOne(deploymentId: string): PhaseOneDeployment | null {
-  const manifest = phaseOneDeploymentManifests[deploymentId];
-  return manifest ? parsePhaseOneDeploymentManifest(manifest) : null;
+function publicPhaseOne(
+  deploymentId: string,
+  snapshot?: PublicDeploymentSnapshot
+): PhaseOneDeployment | null {
+  const manifest = (snapshot?.manifests.phaseOne ?? phaseOneDeploymentManifests)[deploymentId];
+  return manifest ? parsePhaseOneDeploymentManifest(manifest, snapshot?.source) : null;
 }
 
 function protocolDeployment(
   chainId: number,
-  environment: Record<string, string | undefined>
+  environment: Record<string, string | undefined>,
+  snapshot?: PublicDeploymentSnapshot
 ): ProtocolDeployment | null {
   if (chainId === 31_337) {
     const state = readDollarDeployment(environment);
@@ -167,7 +175,7 @@ function protocolDeployment(
       protocol: state.deployment,
     };
   }
-  const manifest = deploymentManifests[chainId];
+  const manifest = (snapshot?.manifests.protocol ?? deploymentManifests)[chainId];
   if (!manifest) return null;
   const protocol = parseDeploymentManifest(manifest);
   return {
@@ -181,7 +189,7 @@ function protocolDeployment(
       capabilities: protocolCapabilities,
       available: true,
     },
-    protocol,
+    protocol: snapshot ? { ...protocol, source: snapshot.source } : protocol,
   };
 }
 
@@ -199,7 +207,8 @@ function publicEnvironment(): Record<string, string | undefined> {
 }
 
 export function deploymentRegistry(
-  environment: Record<string, string | undefined> = publicEnvironment()
+  environment: Record<string, string | undefined> = publicEnvironment(),
+  snapshot?: PublicDeploymentSnapshot
 ): readonly DeploymentOption[] {
   const options: DeploymentOption[] = [];
   const appEnvironment = environment.NEXT_PUBLIC_APP_ENV ?? "development";
@@ -230,17 +239,17 @@ export function deploymentRegistry(
       "robinhood",
       "Robinhood Chain",
       4_663,
-      publicLaunch(ROBINHOOD_GENESIS_DEPLOYMENT_ID),
-      publicPhaseOne(ROBINHOOD_PHASE_ONE_DEPLOYMENT_ID),
-      protocolDeployment(4_663, environment)
+      publicLaunch(ROBINHOOD_GENESIS_DEPLOYMENT_ID, snapshot),
+      publicPhaseOne(ROBINHOOD_PHASE_ONE_DEPLOYMENT_ID, snapshot),
+      protocolDeployment(4_663, environment, snapshot)
     ),
     target(
       "robinhood-testnet",
       "Robinhood Chain Testnet",
       46_630,
-      publicLaunch(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID),
-      publicPhaseOne(ROBINHOOD_TESTNET_PHASE_ONE_DEPLOYMENT_ID),
-      protocolDeployment(46_630, environment)
+      publicLaunch(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID, snapshot),
+      publicPhaseOne(ROBINHOOD_TESTNET_PHASE_ONE_DEPLOYMENT_ID, snapshot),
+      protocolDeployment(46_630, environment, snapshot)
     )
   );
   // A chain ID can target only one RPC in a wallet session. Keep the local

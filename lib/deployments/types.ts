@@ -75,7 +75,7 @@ export type LaunchDeployment = Readonly<{
   descriptor: DeploymentDescriptor;
   deploymentStartBlock: bigint;
   protocolCommit: string;
-  source: "checked-in-manifest" | "development-fixture";
+  source: "checked-in-manifest" | "runtime-manifest" | "development-fixture";
   contracts: Readonly<Record<LaunchContractName, Address>>;
   runtimeCodeHashes: Readonly<Partial<Record<LaunchContractName, Hex>>>;
   analytics?: Readonly<{
@@ -144,7 +144,7 @@ export type PhaseOneDeployment = Readonly<{
   protocolCommit: string;
   sdkCommit: string;
   installedPhase: 1;
-  source: "checked-in-manifest" | "development-fixture";
+  source: "checked-in-manifest" | "runtime-manifest" | "development-fixture";
   contracts: Readonly<Record<PhaseOneContractName, Address>>;
   runtimeCodeHashes: Readonly<Partial<Record<PhaseOneContractName, Hex>>>;
   facetFingerprint?: Hex;

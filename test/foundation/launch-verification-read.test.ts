@@ -1,3 +1,6 @@
+import genesis from "@/deployments/robinhood-genesis.json";
+import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
+import { launchManifestIdentity } from "@/lib/deployments/launch-identity";
 import type { PublicClient } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,10 +14,9 @@ vi.mock("@/lib/deployments/verify-launch", () => ({
 
 import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
 
-const deployment = {
-  descriptor: { deploymentId: "robinhood-genesis", chainId: 4_663 },
-  source: "checked-in-manifest",
-} as unknown as LaunchDeployment;
+const deployment = parseLaunchDeploymentManifest(
+  genesis as Parameters<typeof parseLaunchDeploymentManifest>[0]
+);
 const publicClient = {} as PublicClient;
 
 describe("read-only launch verification", () => {
@@ -37,7 +39,11 @@ describe("read-only launch verification", () => {
     expect(fetch).toHaveBeenCalledWith(
       "/api/deployments/launch-verification",
       expect.objectContaining({
-        body: JSON.stringify({ chainId: 4_663, deploymentId: "robinhood-genesis" }),
+        body: JSON.stringify({
+          chainId: 4_663,
+          deploymentId: "robinhood-genesis",
+          manifestIdentity: launchManifestIdentity(deployment),
+        }),
         method: "POST",
       })
     );

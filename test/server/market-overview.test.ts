@@ -1,3 +1,7 @@
+import { mkdtempSync, unlinkSync, rmdirSync, writeFileSync, renameSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runtimeManifests } from "@/test/fixtures/public-manifests";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -164,5 +168,44 @@ describe("shared market fundamentals", () => {
         lastWethPerStaticsWad: null,
       },
     });
+  });
+});
+
+describe("runtime analytics cutover", () => {
+  it("separates real fundamentals and unfinished requests when a new release is published", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "statics-runtime-analytics-"));
+    const path = join(dir, "active.json");
+    const before = runtimeManifests();
+    writeFileSync(path, JSON.stringify(before));
+    vi.stubEnv("STATICS_RUNTIME_MANIFEST_PATH", path);
+    let finish!: (block: bigint) => void;
+    mocks.getBlockNumber.mockImplementationOnce(
+      () =>
+        new Promise<bigint>((resolve) => {
+          finish = resolve;
+        })
+    );
+    try {
+      const previousRequest = loadMarketSupplySnapshot(NOW);
+      await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+      const next = runtimeManifests();
+      next.phaseOne["robinhood-phase-one"].contracts.diamond.address = `0x${"6".repeat(40)}`;
+      writeFileSync(join(dir, "candidate.json"), JSON.stringify(next));
+      renameSync(join(dir, "candidate.json"), path);
+      await expect(loadMarketSupplySnapshot(NOW)).resolves.toMatchObject({ asOfBlock: "123" });
+      finish(122n);
+      await expect(previousRequest).resolves.toMatchObject({ asOfBlock: "122" });
+      await expect(loadMarketSupplySnapshot(NOW)).resolves.toMatchObject({ asOfBlock: "123" });
+      expect(mocks.getBlockNumber).toHaveBeenCalledTimes(2);
+      writeFileSync(path, "broken");
+      await expect(loadMarketSupplySnapshot(NOW)).rejects.toThrow(
+        "Public deployment configuration is unavailable."
+      );
+    } finally {
+      if (finish) finish(122n);
+      vi.unstubAllEnvs();
+      unlinkSync(path);
+      rmdirSync(dir);
+    }
   });
 });
