@@ -40,3 +40,19 @@ export function configuredLogBlockRange(
   }
   return range;
 }
+
+/** Inherited Genesis history has its own boundary, independent of later protocol deployments. */
+export function configuredGenesisStartBlock(
+  name: string,
+  environment: Environment = process.env
+): number {
+  const source = environment[name]?.trim();
+  const shared = environment.PONDER_GENESIS_START_BLOCK?.trim();
+  const raw = source || shared;
+  if (!raw) return 0;
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${source ? name : "PONDER_GENESIS_START_BLOCK"} must be a block number.`);
+  }
+  return value;
+}

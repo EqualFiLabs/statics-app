@@ -24,6 +24,7 @@ import {
   configuredAddress,
   configuredCanonicalPool,
   configuredLogBlockRange,
+  configuredGenesisStartBlock,
 } from "./src/source-config";
 
 function required(name: string): string {
@@ -139,37 +140,31 @@ export default createConfig({
       chain: "active",
       abi: staticsGenesisAbi,
       address: optionalAddress("PONDER_STATICS_GENESIS_ADDRESS"),
-      startBlock: optionalStartBlock("PONDER_STATICS_GENESIS_START_BLOCK", deploymentStartBlock),
+      startBlock: configuredGenesisStartBlock("PONDER_STATICS_GENESIS_START_BLOCK"),
     },
     GenesisVault: {
       chain: "active",
       abi: staticsGenesisCreditAbi,
       address: optionalAddress("PONDER_GENESIS_VAULT_ADDRESS"),
-      startBlock: optionalStartBlock("PONDER_GENESIS_VAULT_START_BLOCK", deploymentStartBlock),
+      startBlock: configuredGenesisStartBlock("PONDER_GENESIS_VAULT_START_BLOCK"),
     },
     GenesisActivationRegistry: {
       chain: "active",
       abi: genesisActivationRegistryAbi,
       address: optionalAddress("PONDER_GENESIS_ACTIVATION_REGISTRY_ADDRESS"),
-      startBlock: optionalStartBlock("PONDER_GENESIS_ACTIVATION_START_BLOCK", deploymentStartBlock),
+      startBlock: configuredGenesisStartBlock("PONDER_GENESIS_ACTIVATION_START_BLOCK"),
     },
     GenesisLaunchDistributor: {
       chain: "active",
       abi: genesisLaunchDistributorAbi,
       address: optionalAddress("PONDER_GENESIS_LAUNCH_DISTRIBUTOR_ADDRESS"),
-      startBlock: optionalStartBlock(
-        "PONDER_GENESIS_DISTRIBUTOR_START_BLOCK",
-        deploymentStartBlock
-      ),
+      startBlock: configuredGenesisStartBlock("PONDER_GENESIS_DISTRIBUTOR_START_BLOCK"),
     },
     StaticsFeeReceiver: {
       chain: "active",
       abi: staticsFeeReceiverAbi,
       address: optionalAddress("PONDER_STATICS_FEE_RECEIVER_ADDRESS"),
-      startBlock: optionalStartBlock(
-        "PONDER_STATICS_FEE_RECEIVER_START_BLOCK",
-        deploymentStartBlock
-      ),
+      startBlock: configuredGenesisStartBlock("PONDER_STATICS_FEE_RECEIVER_START_BLOCK"),
     },
     DexPublicPoolManager: {
       chain: "active",
@@ -181,10 +176,7 @@ export default createConfig({
       chain: "active",
       abi: poolManagerEventsAbi,
       address: poolManagerAddress ?? zeroAddress,
-      startBlock: optionalStartBlock(
-        "PONDER_CANONICAL_LIQUIDITY_START_BLOCK",
-        optionalStartBlock("PONDER_GENESIS_START_BLOCK", 0)
-      ),
+      startBlock: configuredGenesisStartBlock("PONDER_CANONICAL_LIQUIDITY_START_BLOCK"),
       filter: [
         { event: "Initialize", args: { id: canonicalPoolId ?? zeroHash } },
         { event: "ModifyLiquidity", args: { id: canonicalPoolId ?? zeroHash } },

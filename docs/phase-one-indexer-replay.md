@@ -36,3 +36,23 @@ Acceptance before any separately reviewed cutover:
 4. Stop only the isolated replay process gracefully. Retain its database and evidence. Do not automatically switch the app's indexer URL, replace the serving database or delete older data.
 
 Directory observation blocks are distinct from `/status` freshness. Silent contract checkpoints and temporary same-block allocation memberships cannot always be reconstructed from events; see [allocation directory semantics](allocation-directory-indexer.md).
+
+## Inherited history boundaries
+
+Keep inherited history separate from a later Phase 1 deployment or fork snapshot. Set
+`PONDER_GENESIS_START_BLOCK` to the reviewed Genesis deployment block. The five Genesis
+sources use it unless their own start-block override is provided; without either value they
+start at block 0. `PONDER_DEPLOYMENT_START_BLOCK` must not truncate inherited history.
+For the Robinhood deployment, Genesis starts at **47,688,979**.
+
+Set `PONDER_CANONICAL_LIQUIDITY_START_BLOCK` to the canonical pool's initialization block,
+recorded as `market.initializationBlock` in the reviewed launch manifest (**47,690,074**
+for Robinhood). This backfills initialization and all range changes. Keep
+`PONDER_POOL_MANAGER_START_BLOCK` at the fork snapshot when only local swap/price history
+is wanted. Changing log ranges to speed replay does not change these boundaries.
+
+A database indexed from the snapshot alone needs replay with the corrected source starts.
+A healthy `/ready` response and a current `/status` checkpoint do not establish historical
+completeness. Check inherited Operator ownership, active credits and canonical range
+inventory after replay. Resyncing the indexer requires neither an Anvil restart nor an app
+restart.

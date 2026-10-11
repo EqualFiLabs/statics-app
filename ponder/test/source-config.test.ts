@@ -52,3 +52,18 @@ describe("configured log block ranges", () => {
     }
   );
 });
+
+describe("Genesis history boundaries", () => {
+  it.each(["-1", "1.5", "NaN", "9007199254740992"])(
+    "rejects invalid shared or source boundary %s",
+    async (value) => {
+      const { configuredGenesisStartBlock } = await import("../src/source-config");
+      expect(() =>
+        configuredGenesisStartBlock("SOURCE", { PONDER_GENESIS_START_BLOCK: value })
+      ).toThrow("block number");
+      expect(() => configuredGenesisStartBlock("SOURCE", { SOURCE: value })).toThrow(
+        "block number"
+      );
+    }
+  );
+});

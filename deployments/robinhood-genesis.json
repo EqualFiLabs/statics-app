@@ -67,6 +67,7 @@
     }
   },
   "market": {
+    "initializationBlock": "47690074",
     "poolId": "0xe79228d6cae086a58bf5b22220b454e5d1ca4f13da767ea5bbe032d5a1e82e8a",
     "poolKey": {
       "currency0": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
