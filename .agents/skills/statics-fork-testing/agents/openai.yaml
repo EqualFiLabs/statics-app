@@ -1,0 +1,4 @@
+interface:
+  display_name: "Statics Fork Testing"
+  short_description: "Verify state and run isolated fork acceptance"
+  default_prompt: "Use $statics-fork-testing to verify my Statics fork and report testing results."

@@ -73,7 +73,15 @@ const launch = parseLaunchDeploymentManifest(
   JSON.parse(readFileSync(resolve(root, "cleanup-launch-manifest.json"), "utf8")),
   "development-fixture"
 );
-const transport = http("http://127.0.0.1:8663");
+const rpcUrl = process.env.STATICS_FORK_RPC_URL ?? "http://127.0.0.1:8663";
+const endpoint = new URL(rpcUrl);
+if (
+  endpoint.protocol !== "http:" ||
+  !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname)
+) {
+  throw new Error("Fork lifecycle RPC must be loopback Anvil.");
+}
+const transport = http(rpcUrl);
 const forkChain = { ...anvil, id: phaseOne.descriptor.chainId };
 const client = createPublicClient({ chain: forkChain, transport });
 const account = mnemonicToAccount("test test test test test test test test test test test junk");
@@ -163,25 +171,14 @@ async function createPosition() {
   expect(event).toBeDefined();
   return event!.args.positionId;
 }
-beforeAll(async () => {
-  expect(await client.getChainId()).toBe(forkChain.id);
-  expect([31_337, 4_663]).toContain(forkChain.id);
-  await client.request({ method: "anvil_getAutomine" as never });
-  expect(phaseOne.descriptor.chainId).toBe(forkChain.id);
-  expect(launch.descriptor.chainId).toBe(forkChain.id);
-  expect(phaseOne.descriptor.deploymentId).toContain("local");
-  await client.request({
-    method: "anvil_setBalance" as never,
-    params: [account.address, "0x3635c9adc5dea00000"] as never,
-  });
-  // Repeated rehearsals consume activation fees. Replenish through the real Genesis swap path.
-  const balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
+async function ensureFixtureStatics(minimum: bigint) {
+  let balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
     account.address,
   ]);
-  if (balance < parseEther("100000")) {
+  for (let attempt = 0; balance < minimum && attempt < 8; attempt++) {
     const route = selectSwapRoute(option, forkChain.id, eth, statics);
     if (route.kind !== "direct") throw new Error("Expected configured Genesis funding route.");
-    const amountIn = parseEther("1");
+    const amountIn = parseEther(String(2 ** attempt));
     const quoted = await quoteDirectSwap(client, route, amountIn, account.address);
     const tx = buildV4ExactInputSingleSwap({
       router: route.router,
@@ -193,7 +190,34 @@ beforeAll(async () => {
       settlement: route.settlement,
     });
     await send(tx.target, tx.calldata, tx.value);
+    balance = await read<bigint>(phaseOne.contracts.statics, erc20Abi, "balanceOf", [
+      account.address,
+    ]);
   }
+  expect(balance).toBeGreaterThanOrEqual(minimum);
+}
+beforeAll(async () => {
+  if (process.env.STATICS_FORK_PROFILE_ID) {
+    const profile = JSON.parse(readFileSync(resolve(root, "profile.json"), "utf8"));
+    if (profile.id !== process.env.STATICS_FORK_PROFILE_ID || !profile.profile.startsWith("test-"))
+      throw new Error("Lifecycle suite requires its isolated owned test profile");
+    const { verifyAnvil } = await import(
+      /* @vite-ignore */ new URL("../../scripts/fork/profile.mjs", import.meta.url).href
+    );
+    await verifyAnvil(profile, rpcUrl);
+  }
+
+  expect(await client.getChainId()).toBe(forkChain.id);
+  expect([31_337, 4_663]).toContain(forkChain.id);
+  await client.request({ method: "anvil_getAutomine" as never });
+  expect(phaseOne.descriptor.chainId).toBe(forkChain.id);
+  expect(launch.descriptor.chainId).toBe(forkChain.id);
+  expect(phaseOne.descriptor.deploymentId).toContain("local");
+  await client.request({
+    method: "anvil_setBalance" as never,
+    params: [account.address, "0x3635c9adc5dea00000"] as never,
+  });
+  await ensureFixtureStatics(parseEther("100000"));
 });
 
 it("executes Genesis and Phase 1 native input/output swaps using the configured pool routes", async () => {
@@ -497,11 +521,19 @@ it("preserves Operator acquisition, activation, rewards, redemption and closed-e
       break;
   }
   expect(id).toBeLessThanOrEqual(5555n);
-  const quote = await read<{ requiredNative: bigint; epochActive: boolean }>(
+  const quote = await read<{ staticsPrice: bigint; requiredNative: bigint; epochActive: boolean }>(
     launch.contracts.vault,
     currentGenesisVaultAbi,
     "quoteGenesisPurchase"
   );
+  const activationCost = await read<bigint>(
+    launch.contracts.activationRegistry,
+    genesisActivationRegistryAbi,
+    "tierCost",
+    [1]
+  );
+  // Earlier groups and the Operator purchase consume the same fixture balance.
+  await ensureFixtureStatics((resume ? 0n : quote.staticsPrice) + activationCost);
   if (!resume) {
     await approve(launch.contracts.statics, launch.contracts.vault);
     const buy = buildBuyGenesisTransaction(id, account.address, quote.requiredNative);
@@ -567,22 +599,41 @@ it("preserves Operator acquisition, activation, rewards, redemption and closed-e
   );
 });
 
-it("repays an existing forked Operator credit and executes permissionless recovery after its grace period", async () => {
-  let id = 1n;
-  let state;
-  for (; id <= 100n; id++) {
-    const credit = await read<{ principal: bigint; recoverableAt: number; active: boolean }>(
-      launch.contracts.vault,
-      staticsGenesisCreditAbi,
-      "credit",
-      [id]
-    );
-    if (credit.active && credit.principal > parseEther("1")) {
-      state = credit;
-      break;
-    }
+it("repays an existing forked Operator credit and executes permissionless recovery after its grace period", async (context) => {
+  let id = 0n;
+  let state: { principal: bigint; recoverableAt: number; active: boolean } | undefined;
+  const indexer = process.env.STATICS_FORK_INDEXER_URL;
+  if (!indexer) {
+    context.skip("Snapshot prerequisite unavailable: indexed credit discovery URL");
+    return;
   }
-  expect(state).toBeDefined();
+  let cursor: string | null = null;
+  do {
+    const response: Response = await fetch(
+      `${indexer}/genesis/credits/recoverable?asOf=1099511627776&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+    );
+    if (!response.ok) throw new Error("Indexed credit discovery failed");
+    const page: { items: { genesisId: string }[]; nextCursor: string | null } =
+      await response.json();
+    for (const row of page.items) {
+      const credit = await read<{ principal: bigint; recoverableAt: number; active: boolean }>(
+        launch.contracts.vault,
+        staticsGenesisCreditAbi,
+        "credit",
+        [BigInt(row.genesisId)]
+      );
+      if (credit.active && credit.principal > parseEther("1")) {
+        id = BigInt(row.genesisId);
+        state = credit;
+        break;
+      }
+    }
+    cursor = page.nextCursor;
+  } while (cursor && !state);
+  if (!state) {
+    context.skip("Snapshot prerequisite unavailable: active Operator credit above 1 ETH");
+    return;
+  }
   await approve(launch.contracts.statics, launch.contracts.vault);
   await send(launch.contracts.vault, buildRepayGenesisCreditCall(id, parseEther("1")));
   const repaid = await read<{ principal: bigint; recoverableAt: number }>(

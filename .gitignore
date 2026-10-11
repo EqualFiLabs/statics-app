@@ -33,7 +33,11 @@ cache/
 
 # Local contributor and publication working files
 /AGENTS.md
-/.agents/
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/statics-fork-setup/
+!/.agents/skills/statics-fork-testing/
 /.codex/
 /STATICS-DAPP-BUILD-PLAN.md
 /WALLET-DOLLAR-REHEARSAL.md
