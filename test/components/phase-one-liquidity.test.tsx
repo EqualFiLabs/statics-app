@@ -203,6 +203,17 @@ beforeEach(() => {
         assets: [address("2"), zeroAddress, zeroAddress, zeroAddress, zeroAddress],
         amounts: [mocks.reward, 0n, 0n, 0n, 0n],
       };
+    if (functionName === "poolRewardConfig")
+      return {
+        initialized: true,
+        slotCount: 1,
+        assets: [address("2"), zeroAddress, zeroAddress, zeroAddress, zeroAddress],
+        allocatorShareBps: [0, 0, 0, 0, 0],
+      };
+    if (functionName === "gaugeRewardDuration") return 604800;
+    if (functionName === "poolRewardStream")
+      return { periodFinish: 0, periodBudget: 0n, periodEmitted: 0n };
+    if (functionName === "gaugePool") return { initialized: true, stopped: false };
     if (functionName === "gaugeReserve")
       return { activated: false, periodFinish: 0, lastCheckpoint: 0 };
     if (functionName === "maxGaugeCatchupPeriods") return 52;
