@@ -261,9 +261,6 @@ export function AccountPage({
         >
           {t("withdraw")}
         </button>
-        <a className="ui-button ui-button--secondary" href="#account-rewards">
-          {t("collect")}
-        </a>
         <Link className="ui-button ui-button--secondary" href={stakingHref}>
           {t("manageEarning")}
         </Link>
