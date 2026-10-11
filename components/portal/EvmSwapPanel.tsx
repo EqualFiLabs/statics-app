@@ -13,6 +13,7 @@ import {
   zeroAddress,
   type Address,
   type Hex,
+  type PublicClient,
 } from "viem";
 import { dopplerStaticsTokenAbi, permit2AllowanceAbi } from "@statics-protocol/sdk";
 
@@ -47,7 +48,8 @@ import {
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { isUniswapSwapChainId } from "@/lib/portal/uniswap";
 import { buildV4ExactInputSingleSwap } from "@/lib/trade/v4-execution";
-import { quoteSwapRoute, selectSwapRoute } from "@/lib/trade/swap-routing";
+import { quoteSwapRoute, selectSwapRoute, type DirectSwapRoute } from "@/lib/trade/swap-routing";
+import { priceImpactPercent, readPricedHops, routeHops } from "@/lib/trade/quote-details";
 import { buildV4ExactInputPathSwap, type PathHop } from "@/lib/trade/v4-path";
 
 const PERMIT_TTL = 20n * 60n;
@@ -62,7 +64,14 @@ const erc20BalanceAbi = [
   },
 ] as const;
 
+type DirectQuoteDetails = {
+  priceImpact?: number;
+  gasFeeNative?: string;
+  gasAfterApproval?: boolean;
+};
+
 type QuotePayload = {
+  directDetails?: Promise<DirectQuoteDetails>;
   routeId?: string;
   /** The Statics pools a multi-pool quote goes through, in order. */
   path?: readonly PathHop[];
@@ -73,6 +82,10 @@ type QuotePayload = {
     aggregatedOutputs?: Array<{ amount: string; minAmount?: string; token: string }>;
     gasFeeUSD?: string;
     priceImpact?: number;
+    /** Direct Statics routes: estimated gas in the network's native currency. */
+    gasFeeNative?: string;
+    /** Direct ERC-20 routes estimate gas only once the swap approvals exist. */
+    gasAfterApproval?: boolean;
     quoteId?: string;
   };
   detail?: string;
@@ -341,9 +354,117 @@ export function EvmSwapPanel({
     balanceVersion,
   ]);
 
+  /** Each figure is best effort: a failed read leaves that row at "--", never the quote. */
+  const directQuoteDetails = async (
+    publicClient: PublicClient,
+    route: DirectSwapRoute,
+    path: readonly PathHop[] | undefined,
+    amountOut: bigint,
+    minimum: bigint,
+    network: NonNullable<ReturnType<typeof getFundingNetwork>>
+  ): Promise<DirectQuoteDetails> => {
+    const account = getAddress(wallet.address!);
+    const contracts = active.phaseOne?.contracts ?? active.launch?.contracts;
+    const impact = async () => {
+      if (!contracts) return undefined;
+      const hops = await readPricedHops(
+        publicClient,
+        {
+          stateView: contracts.stateView,
+          staticsHook: active.phaseOne?.contracts.publicHook ?? null,
+        },
+        routeHops(route, path)
+      );
+      return hops ? priceImpactPercent(parsedAmount, amountOut, hops) : undefined;
+    };
+    const gas = async (): Promise<{ gasFeeNative?: string; gasAfterApproval?: boolean }> => {
+      if (source!.kind !== "native") {
+        const [{ token, permit }, block] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: [
+              "direct-swap-allowances",
+              route.deploymentId,
+              selectedChainId,
+              account,
+              route.inputToken,
+              route.permit2,
+              route.router,
+            ],
+            staleTime: 30_000,
+            queryFn: async () => {
+              const [token, permit] = await Promise.all([
+                publicClient.readContract({
+                  address: route.inputToken,
+                  abi: dopplerStaticsTokenAbi,
+                  functionName: "allowance",
+                  args: [account, route.permit2],
+                }),
+                publicClient.readContract({
+                  address: route.permit2,
+                  abi: permit2AllowanceAbi,
+                  functionName: "allowance",
+                  args: [account, route.inputToken, route.router],
+                }),
+              ]);
+              return { token, permit };
+            },
+          }),
+          publicClient.getBlock(),
+        ]);
+        if (
+          token < parsedAmount ||
+          !hasUsablePermit2Allowance(permit[0], permit[1], parsedAmount, Number(block.timestamp))
+        )
+          return { gasAfterApproval: true };
+      }
+      const block = await publicClient.getBlock();
+      const execution = path
+        ? buildV4ExactInputPathSwap({
+            router: route.router,
+            currencyIn: route.inputToken,
+            path,
+            amountIn: parsedAmount,
+            amountOutMinimum: minimum,
+            deadline: block.timestamp + PERMIT_TTL,
+            settlement: route.settlement,
+          })
+        : buildV4ExactInputSingleSwap({
+            router: route.router,
+            poolKey: route.poolKey,
+            zeroForOne: route.zeroForOne,
+            amountIn: parsedAmount,
+            amountOutMinimum: minimum,
+            deadline: block.timestamp + PERMIT_TTL,
+            settlement: route.settlement,
+          });
+      const [units, price] = await Promise.all([
+        publicClient.estimateGas({
+          account,
+          to: execution.target,
+          data: execution.calldata,
+          value: execution.value,
+        }),
+        publicClient.getGasPrice(),
+      ]);
+      const cost = formatUnits(units * price, network.chain.nativeCurrency.decimals);
+      // Gas costs are tiny decimals; four significant digits are enough to read them.
+      const shown = new Intl.NumberFormat(locale, { maximumSignificantDigits: 4 }).format(
+        Number(cost)
+      );
+      return { gasFeeNative: `${shown} ${network.chain.nativeCurrency.symbol}` };
+    };
+    const [priceImpact, cost] = await Promise.all([
+      impact().catch(() => undefined),
+      gas().catch(() => ({})),
+    ]);
+    return { priceImpact, ...cost };
+  };
+
   const requestQuote = async (
     signal?: AbortSignal,
-    pinnedPath?: readonly PathHop[]
+    pinnedPath?: readonly PathHop[],
+    /** Price impact and network cost are display-only; execution re-quotes skip them. */
+    details = false
   ): Promise<QuotePayload> => {
     if (!wallet.address || !source || !destination || !route || parsedAmount <= 0n) {
       throw new Error("Enter an amount and choose two assets.");
@@ -364,16 +485,21 @@ export function EvmSwapPanel({
       );
       const bps = slippagePercentToBps(slippage);
       if (bps === null) throw new Error("Choose a valid slippage tolerance.");
+      const minimum = minimumWithSlippage(amountOut, bps);
+      const directDetails = details
+        ? directQuoteDetails(publicClient, route, path, amountOut, minimum, network)
+        : undefined;
       return {
         routeId: route.id,
         path,
+        directDetails,
         quote: {
           input: { amount: parsedAmount.toString(), token: source.address },
           output: { amount: amountOut.toString(), token: destination.address },
           aggregatedOutputs: [
             {
               amount: amountOut.toString(),
-              minAmount: minimumWithSlippage(amountOut, bps).toString(),
+              minAmount: minimum.toString(),
               token: destination.address,
             },
           ],
@@ -419,9 +545,22 @@ export function EvmSwapPanel({
     const timeout = window.setTimeout(() => {
       setQuoteLoading(true);
       setError(null);
-      void requestQuote(controller.signal)
+      void requestQuote(controller.signal, undefined, true)
         .then((next) => {
-          if (!controller.signal.aborted) setQuote(next);
+          if (controller.signal.aborted) return;
+          const { directDetails, ...payload } = next;
+          setQuote(payload);
+          // Display-only RPCs must not hold the quote or update a newer request.
+          void directDetails
+            ?.then((extra) => {
+              if (!controller.signal.aborted)
+                setQuote((current) =>
+                  current === payload
+                    ? { ...payload, quote: { ...payload.quote!, ...extra } }
+                    : current
+                );
+            })
+            .catch(() => undefined);
         })
         .catch((cause) => {
           if (!controller.signal.aborted) {
@@ -926,7 +1065,15 @@ export function EvmSwapPanel({
           />
           <QuoteDatum
             label={t("networkCost")}
-            value={quote.quote.gasFeeUSD ? `$${quote.quote.gasFeeUSD}` : "--"}
+            value={
+              quote.quote.gasFeeUSD
+                ? `$${quote.quote.gasFeeUSD}`
+                : quote.quote.gasFeeNative
+                  ? `≈ ${quote.quote.gasFeeNative}`
+                  : quote.quote.gasAfterApproval
+                    ? t("networkCostAfterApproval")
+                    : "--"
+            }
           />
         </dl>
       )}

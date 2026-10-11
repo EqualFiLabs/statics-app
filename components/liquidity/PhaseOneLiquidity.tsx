@@ -17,6 +17,8 @@ import { PoolSummary } from "@/components/liquidity/PoolSummary";
 import { NewPositionPair, type CreatePoolDraft } from "@/components/liquidity/NewPositionPair";
 import { CreatePoolStep } from "@/components/liquidity/CreatePoolStep";
 import { RangeChart } from "@/components/liquidity/RangeChart";
+import { PoolIncentivesCard } from "@/components/liquidity/FundIncentives";
+import { knownTokens } from "@/lib/phase-one/creator";
 import chart from "@/components/liquidity/range-chart.module.css";
 import { usePoolMarket, type ChartPeriod } from "@/hooks/usePoolMarket";
 import {
@@ -95,6 +97,7 @@ export function PhaseOneLiquidity({
   const t = useTranslations("phaseOne");
   const ux = useTranslations("liquidityUx");
   const createCopy = useTranslations("createPool");
+  const creatorCopy = useTranslations("creatorPools");
   // Pools registered after the manifest was reviewed join the list, marked unreviewed.
   const discovery = usePhaseOnePools(reviewedDeployment);
   // Pools created in this session are usable before the indexer reports them.
@@ -354,6 +357,9 @@ export function PhaseOneLiquidity({
         </div>
         {view === "list" && (
           <div className="liquidity-heading-actions">
+            <Link className="ui-button" href="/app/liquidity/creator">
+              {creatorCopy("openFromLiquidity")}
+            </Link>
             <button className="ui-button" type="button" onClick={() => setView("newPool")}>
               {createCopy("createPool")}
             </button>
@@ -1601,6 +1607,11 @@ function ManagedLiquidity({
             series={series}
             stats={market.stats}
             quote={market.statsQuote}
+          />
+          <PoolIncentivesCard
+            deployment={deployment}
+            pool={pool}
+            known={knownTokens(deployment.supportedPools)}
           />
         </aside>
         <div className="liquidity-main">

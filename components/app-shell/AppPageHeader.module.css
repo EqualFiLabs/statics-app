@@ -44,6 +44,7 @@
 }
 
 .header[data-feature="liquidity"],
+.header[data-feature="liquidityCreator"],
 .header[data-feature="faucet"] {
   --header-art: url("/assets/visual-direction/waves.webp");
   --header-art-size: 380px;

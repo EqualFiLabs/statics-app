@@ -51,7 +51,8 @@
 .listHead,
 .row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.6fr) minmax(200px, 1.4fr) auto;
+  /* A fixed status track: content-sized pills would shift every other column per row. */
+  grid-template-columns: minmax(160px, 1.1fr) minmax(200px, 1.3fr) minmax(180px, 1.4fr) 16rem;
   align-items: center;
   gap: 8px 20px;
 }
@@ -123,15 +124,21 @@
 .cellLabel {
   display: none;
 }
+/* One holding per line: amounts right-aligned in a fixed track, symbols beside them. */
 .holdings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 14px;
+  display: grid;
+  gap: 2px;
 }
 .holding {
+  display: grid;
+  grid-template-columns: 6.5rem auto;
+  align-items: baseline;
+  gap: 8px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.holding strong {
+  text-align: right;
 }
 .holding small {
   color: var(--app-text-muted);

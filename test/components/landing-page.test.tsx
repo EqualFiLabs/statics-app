@@ -77,7 +77,9 @@ describe("landing page", () => {
   it("states Phase 1 mechanics rather than empty metrics", async () => {
     await renderLanding();
 
-    expect(screen.getByRole("heading", { name: /the mechanics/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /the docs/i })).toBeInTheDocument();
+    for (const link of screen.getAllByRole("link", { name: /the docs/i }))
+      expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");
     expect(screen.getByText("5%")).toBeInTheDocument();
     expect(screen.getByText("16")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
@@ -121,16 +123,23 @@ describe("landing page", () => {
     expect(launchLinks).toHaveLength(2);
     for (const link of launchLinks) expect(link).toHaveAttribute("href", "/app");
 
-    expect(screen.getByRole("link", { name: "Docs" })).toHaveAttribute(
-      "href",
-      "https://docs.staticsprotocol.com"
-    );
     expect(screen.getByRole("link", { name: "Dev" })).toHaveAttribute(
       "href",
       "https://github.com/EqualFiLabs/statics"
     );
-    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
-    expect(screen.getByText("GitHub")).toHaveAttribute("aria-disabled", "true");
+    for (const [name, href] of [
+      ["Operators", "/app/genesis"],
+      ["Markets", "/app"],
+      ["Swap", "/app/swap"],
+      ["Liquidity", "/app/liquidity"],
+      // The footer's Docs and GitHub match the header's Docs and Dev.
+      ["GitHub", "https://github.com/EqualFiLabs/statics"],
+      ["Telegram", "https://t.me/EqualFi"],
+      ["X / Twitter", "https://x.com/staticsprotocol"],
+    ])
+      expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
+    for (const link of screen.getAllByRole("link", { name: "Docs" }))
+      expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");
   });
 
   it("opens and closes mobile navigation with accurate accessible state", async () => {

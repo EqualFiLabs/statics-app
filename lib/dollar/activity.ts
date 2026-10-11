@@ -114,7 +114,15 @@ export type DollarActivityKind =
   | "phase-one-checkpoint-schedule"
   | "phase-one-checkpoint-pool"
   | "phase-one-settle-rewards"
-  | "phase-one-settle-revenue";
+  | "phase-one-settle-revenue"
+  | "phase-one-creator-claim"
+  | "phase-one-creator-recipient"
+  | "phase-one-creator-transfer"
+  | "phase-one-creator-accept"
+  | "phase-one-activate-pol"
+  | "phase-one-creator-reward-token"
+  | "phase-one-creator-reward-share"
+  | "phase-one-fund-incentives";
 
 /** Wall clock for an activity record. Impure, so it stays out of components. */
 export function activityTimestamp(): number {

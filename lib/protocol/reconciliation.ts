@@ -69,6 +69,8 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-pools": "phase-one-market",
   "phase-one-pool": "phase-one-market",
   "phase-one-pool-fees": "phase-one-market",
+  // Pool creator controls and incentive streams: public pool state, not wallet-scoped.
+  "phase-one-creator": "phase-one-market",
   "direct-swap-allowances": "approval",
   "phase-one-positions": "phase-one-position",
   "phase-one-position": "phase-one-position",
@@ -129,6 +131,7 @@ const walletScopedRoots = new Set([
 
 const deploymentScopedRoots = new Set([
   "phase-one-pool-fees",
+  "phase-one-creator",
   "phase-one-pools",
   "phase-one-pool",
   "phase-one-stake-allowance",
@@ -155,6 +158,13 @@ export function protocolQueryScopes(kind: ProtocolActivityKind): readonly Protoc
   if (kind === "phase-one-swap") return ["phase-one-market", "wallet"];
   // A new pool joins discovery, fee rates and market data.
   if (kind === "phase-one-create-pool") return ["phase-one-market", "wallet"];
+  if (kind.startsWith("phase-one-creator-reward-") || kind === "phase-one-settle-revenue")
+    return ["phase-one-market", "phase-one-reward", "wallet"];
+  // Creator controls change pool state; claims and funding also move wallet balances.
+  if (kind.startsWith("phase-one-creator-") || kind === "phase-one-activate-pol")
+    return ["phase-one-market", "wallet"];
+  if (kind === "phase-one-fund-incentives")
+    return ["phase-one-market", "phase-one-liquidity", "phase-one-reward", "wallet"];
   if (
     kind === "phase-one-claim-lp-rewards" ||
     kind === "phase-one-forfeit-lp-reward" ||

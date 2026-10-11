@@ -11,6 +11,7 @@ import {
   getEveBridgeDeployment,
 } from "@/lib/portal/eve-bridge";
 import { getTokenListEntry } from "@/lib/token-list";
+import { chainTokenLogoURI } from "@/lib/token-icons";
 import type { StaticsDeployment } from "@/lib/deployments/types";
 
 export type WalletToken = Readonly<{
@@ -41,7 +42,7 @@ export function defaultWalletTokens(
         symbol: catalog?.symbol ?? token.symbol,
         name: catalog?.name ?? token.name,
         decimals: catalog?.decimals ?? token.decimals,
-        logoURI: catalog?.logoURI,
+        logoURI: catalog?.logoURI ?? chainTokenLogoURI(chainId, token.address),
         isDefault: true,
       };
     });
@@ -158,7 +159,7 @@ export function loadWalletTokens(
             symbol: catalog?.symbol ?? record.symbol,
             name: catalog?.name ?? record.name,
             decimals: catalog?.decimals ?? Number(record.decimals),
-            logoURI: catalog?.logoURI,
+            logoURI: catalog?.logoURI ?? chainTokenLogoURI(chainId, value.address),
           },
         ];
       });

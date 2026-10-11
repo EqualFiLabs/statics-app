@@ -12,6 +12,9 @@ import {
 } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const quoteDetailReads = new Set(["getSlot0", "poolFeeRate", "allowance"]);
+const readNames = () =>
+  mocks.readContract.mock.calls.map(([input]) => (input as { functionName: string }).functionName);
 const mocks = vi.hoisted(() => ({
   walletTokenChains: [] as number[],
   tokens: [] as { address: `0x${string}`; decimals: number; name: string; symbol: string }[],
@@ -253,7 +256,8 @@ it("reviews and executes a discovered native ETH pool without wrapping or approv
     expect(mocks.execute).toHaveBeenCalledWith(
       expect.objectContaining({ data: expected.calldata, value: 10n ** 15n })
     );
-    expect(mocks.readContract).not.toHaveBeenCalled();
+    // Only the display-only price impact reads; no wrapping or approval reads for native ETH.
+    expect(readNames().every((name) => quoteDetailReads.has(name))).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
   } finally {
     mocks.discovered = [];
@@ -382,10 +386,25 @@ describe("integrated swap execution", () => {
     expect(mocks.call).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
     expect(mocks.call).toHaveBeenCalledTimes(1);
-    expect(mocks.readContract).not.toHaveBeenCalled();
-    expect(mocks.getBlock).not.toHaveBeenCalled();
+    // Price impact and network cost read pool prices, fee rates and swap allowances only.
+    expect(readNames().every((name) => quoteDetailReads.has(name))).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+
+  it("shows a direct quote without waiting for display-only pool reads", async () => {
+    mocks.readContract.mockImplementation(({ functionName }) => {
+      if (functionName === "getSlot0") return new Promise(() => {});
+      if (functionName === "allowance") return Promise.resolve(0n);
+      return Promise.resolve(100n * 10n ** 18n);
+    });
+    renderCanonicalTrade(descriptor.chainId, true);
+    const input = await screen.findByRole("textbox", { name: "You pay amount" });
+    await waitFor(() => expect(input).toHaveValue(""));
+    fireEvent.change(input, { target: { value: "1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    expect(readNames()).toContain("getSlot0");
+    expect(screen.getByRole("textbox", { name: "You receive amount" })).not.toHaveValue("");
   });
 
   it("requires a new review after a quote falls below the accepted minimum", async () => {

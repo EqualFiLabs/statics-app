@@ -22,7 +22,10 @@ export function RewardAssetModal({
   now,
   onCancel,
   onConfirm,
+  chainId,
 }: {
+  /** The deployment's chain, for reviewed per-chain token logos. */
+  chainId?: number;
   title: string;
   options: readonly RewardAssetOption[];
   initial: readonly Address[];
@@ -82,7 +85,7 @@ export function RewardAssetModal({
                   disabled={!checked && atLimit}
                   onChange={() => toggle(option.address)}
                 />
-                <TokenLogo token={option} size={32} />
+                <TokenLogo token={option} size={32} chainId={chainId} />
                 <span className={styles.assetName}>
                   <strong>{option.name}</strong>
                   <span className={styles.cellMeta} title={option.address}>

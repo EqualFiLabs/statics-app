@@ -51,23 +51,24 @@ export function readPublicEnvironment(
   return { appEnvironment, siteUrl } as const;
 }
 
+export const DOCS_URL = "https://docs.staticsprotocol.com";
+const GITHUB_URL = "https://github.com/EqualFiLabs/statics";
+
 export const primaryNavigation: readonly SiteNavigationItem[] = [
-  { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
-  { label: "Markets", messageKey: "markets", kind: "anchor", href: "#markets" },
-  { label: "Gauges", messageKey: "gauges", kind: "anchor", href: "#gauges" },
-  { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
-  {
-    label: "Docs",
-    messageKey: "docs",
-    kind: "route",
-    href: "https://docs.staticsprotocol.com",
-  },
-  {
-    label: "Dev",
-    messageKey: "dev",
-    kind: "route",
-    href: "https://github.com/EqualFiLabs/statics",
-  },
+  { label: "Operators", messageKey: "operators", kind: "route", href: "/app/genesis" },
+  { label: "Markets", messageKey: "markets", kind: "route", href: "/app" },
+  { label: "Swap", messageKey: "swap", kind: "route", href: "/app/swap" },
+  { label: "Liquidity", messageKey: "liquidity", kind: "route", href: "/app/liquidity" },
+  { label: "Docs", messageKey: "docs", kind: "route", href: DOCS_URL },
+  { label: "Dev", messageKey: "dev", kind: "route", href: GITHUB_URL },
+] as const;
+
+/** Footer project links; Docs and GitHub match the header's Docs and Dev. */
+export const projectLinks = [
+  { messageKey: "docs", href: DOCS_URL },
+  { messageKey: "github", href: GITHUB_URL },
+  { messageKey: "telegram", href: "https://t.me/EqualFi" },
+  { messageKey: "twitter", href: "https://x.com/staticsprotocol" },
 ] as const;
 
 export const protocolStatus = {

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
+import { DOCS_URL, projectLinks } from "@/lib/site-config";
 import { PlaceholderLink } from "./PlaceholderLink";
 import { SiteHeader } from "./SiteHeader";
 import { UtcClock } from "./UtcClock";
@@ -66,10 +67,10 @@ export async function LandingPage() {
                   <Link className="button button-primary" href="/app">
                     {tNavigation("launchApp")} <span aria-hidden="true">→</span>
                   </Link>
-                  <a className="button button-ghost" href="#protocol-glance">
-                    {t("mechanics")}{" "}
+                  <a className="button button-ghost" href={DOCS_URL}>
+                    {t("theDocs")}{" "}
                     <span className="doc-icon" aria-hidden="true">
-                      ↓
+                      ↗
                     </span>
                   </a>
                 </div>
@@ -148,7 +149,7 @@ export async function LandingPage() {
           >
             <Corners />
             <h2 id="glance-title">
-              <span aria-hidden="true">{"///"}</span> {t("mechanics")}
+              <span aria-hidden="true">{"///"}</span> <a href={DOCS_URL}>{t("theDocs")}</a>
             </h2>
             <dl className="stat-grid">
               <div>
@@ -235,8 +236,10 @@ export async function LandingPage() {
         <footer className="site-footer">
           <p>© {new Date().getUTCFullYear()} Statics Protocol</p>
           <nav aria-label={t("projectLinks")}>
-            {(["docs", "github", "discord", "twitter"] as const).map((key) => (
-              <PlaceholderLink key={key} label={t(key)} />
+            {projectLinks.map((link) => (
+              <a key={link.messageKey} href={link.href}>
+                {t(link.messageKey)}
+              </a>
             ))}
           </nav>
           <nav aria-label={t("legalLinks")}>

@@ -2451,9 +2451,49 @@
   object-fit: cover;
 }
 
+/* No logo: a filled first-letter badge, the same size as a logo. */
 .wallet-token-logo-fallback {
-  color: var(--accent);
-  font-size: var(--text-sm);
+  border-color: transparent;
+  background: var(--token-badge-0);
+  color: var(--app-bg);
+  font-weight: 700;
+  line-height: 1;
+}
+.wallet-token-logo-fallback[data-tone="0"] {
+  background: var(--token-badge-0);
+}
+.wallet-token-logo-fallback[data-tone="1"] {
+  background: var(--token-badge-1);
+}
+.wallet-token-logo-fallback[data-tone="2"] {
+  background: var(--token-badge-2);
+}
+.wallet-token-logo-fallback[data-tone="3"] {
+  background: var(--token-badge-3);
+}
+.wallet-token-logo-fallback[data-tone="4"] {
+  background: var(--token-badge-4);
+}
+.wallet-token-logo-fallback[data-tone="5"] {
+  background: var(--token-badge-5);
+}
+.wallet-token-logo-fallback[data-tone="6"] {
+  background: var(--token-badge-6);
+}
+.wallet-token-logo-fallback[data-tone="7"] {
+  background: var(--token-badge-7);
+}
+.wallet-token-logo-fallback[data-tone="8"] {
+  background: var(--token-badge-8);
+}
+.wallet-token-logo-fallback[data-tone="9"] {
+  background: var(--token-badge-9);
+}
+.wallet-token-logo-fallback[data-tone="10"] {
+  background: var(--token-badge-10);
+}
+.wallet-token-logo-fallback[data-tone="11"] {
+  background: var(--token-badge-11);
 }
 
 .wallet-asset-row > div {

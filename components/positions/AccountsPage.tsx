@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { formatEther, parseEventLogs } from "viem";
+import { formatEther, formatUnits, parseEventLogs } from "viem";
 import { buildCreatePositionCall, staticsAbi } from "@statics-protocol/sdk/phase-one";
 import { ActionReview } from "@/components/phase-one/ActionReview";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/positions/accounts";
 import { useAccountNicknames } from "@/lib/positions/nicknames";
 import { rewardDisplay } from "@/lib/rewards/earn";
+import { useAppLocale } from "@/i18n/client";
 import { waitForIndexedPosition } from "@/lib/rewards/indexed-position";
 import earn from "@/components/rewards/earn.module.css";
 import styles from "./accounts.module.css";
@@ -32,6 +33,7 @@ const tone = { attention: "warning", active: "positive", empty: "neutral" } as c
  */
 export function AccountsPage({ deployment }: { deployment: PhaseOneDeployment }) {
   const t = useTranslations("accounts");
+  const locale = useAppLocale();
   const id = deployment.descriptor.deploymentId;
   const queryClient = useQueryClient();
   const { action, positions, accounts, loading, rewardsLoaded, unavailable } =
@@ -127,6 +129,19 @@ export function AccountsPage({ deployment }: { deployment: PhaseOneDeployment })
       ? t("baseUnits", { amount: String(value) })
       : rewardDisplay(value, decimals).display;
 
+  // One precision rule for the whole column; the exact amount stays in the tooltip.
+  const compact = (value: bigint, decimals: number) => {
+    const number = Number(formatUnits(value, decimals));
+    const options: Intl.NumberFormatOptions =
+      number >= 1_000
+        ? { maximumFractionDigits: 0 }
+        : number >= 1
+          ? { maximumFractionDigits: 4 }
+          : { maximumSignificantDigits: 4 };
+    return value > 0n && number > 0 && number < 0.0001
+      ? `<${new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(0.0001)}`
+      : new Intl.NumberFormat(locale, options).format(number);
+  };
   const holdings = (account: AccountSummary) => {
     if (!account.holdings.length)
       return (
@@ -139,7 +154,17 @@ export function AccountsPage({ deployment }: { deployment: PhaseOneDeployment })
       <span className={styles.holdings}>
         {listed.map((holding) => (
           <span key={holding.asset.address} className={styles.holding}>
-            <strong>{amount(holding.amount, holding.asset.decimals)}</strong>{" "}
+            <strong
+              title={
+                holding.asset.decimals === null
+                  ? amount(holding.amount, null)
+                  : formatUnits(holding.amount, holding.asset.decimals)
+              }
+            >
+              {holding.asset.decimals === null
+                ? amount(holding.amount, null)
+                : compact(holding.amount, holding.asset.decimals)}
+            </strong>
             <small>{holding.asset.symbol}</small>
           </span>
         ))}

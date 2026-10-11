@@ -16,7 +16,8 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
   if (pathname === "/app/positions" || pathname.startsWith("/app/positions/")) return "positions";
   if (pathname === "/app/loans") return "loans";
   if (pathname === "/app/rewards") return "protocol-rewards";
-  if (pathname === "/app/liquidity") return "protocol-liquidity";
+  if (pathname === "/app/liquidity" || pathname === "/app/liquidity/creator")
+    return "protocol-liquidity";
   if (pathname === "/app/faucet") return "faucet";
   return null;
 }
@@ -28,7 +29,7 @@ export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescr
   if (pathname === "/app/swap") {
     return descriptor.capabilities.includes("public-direct-swaps");
   }
-  if (pathname === "/app/liquidity") {
+  if (pathname === "/app/liquidity" || pathname === "/app/liquidity/creator") {
     return descriptor.capabilities.includes("public-lp-positions");
   }
   if (capability === "positions") {
@@ -151,6 +152,13 @@ const routePresentations = {
     description:
       "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
   },
+  liquidityCreator: {
+    label: "Your pools",
+    status: "Your pools",
+    title: "Your pools",
+    description:
+      "Pools you created. Creators earn 5% of the Statics fee on every swap. Settle and claim it, fund incentives and manage each pool.",
+  },
   create: {
     label: "Create basket",
     status: "Create",
@@ -189,6 +197,8 @@ export function getDappRouteId(pathname: string): DappRouteId {
   // Ordered before the /app/genesis prefix, which would otherwise swallow it.
   if (pathname.startsWith("/app/genesis/recoveries")) return "genesisRecoveries";
   if (pathname.startsWith("/app/genesis")) return "genesis";
+  // Ordered before the /app/liquidity prefix, which would otherwise swallow it.
+  if (pathname.startsWith("/app/liquidity/creator")) return "liquidityCreator";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";
   if (pathname.startsWith("/app/tools")) return "tools";

@@ -280,7 +280,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? "baskets"
       : routeId === "genesisRecoveries"
         ? "genesis"
-        : null;
+        : routeId === "liquidityCreator"
+          ? "liquidity"
+          : null;
   const useLaunchRouteCopy =
     active.descriptor.stage === "launch" &&
     (routeId === "overview" || routeId === "swap" || routeId === "genesis");

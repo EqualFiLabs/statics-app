@@ -76,6 +76,22 @@
   --warning: #f5c451;
   --warning-wash: rgba(245, 196, 81, 0.12);
 
+  /* ---- Token badges ------------------------------------------------ */
+  /* Letter badges for tokens without a logo. Each is light enough for a
+     --app-bg letter; a token keeps one colour, picked from its address. */
+  --token-badge-0: #e9a6ff;
+  --token-badge-1: #f5c451;
+  --token-badge-2: #5ec8ff;
+  --token-badge-3: #ff8a65;
+  --token-badge-4: #c4a1ff;
+  --token-badge-5: #4dd4ac;
+  --token-badge-6: #ff7eb6;
+  --token-badge-7: #b8e986;
+  --token-badge-8: #ffb347;
+  --token-badge-9: #8fb3ff;
+  --token-badge-10: #e8e36a;
+  --token-badge-11: #6fdede;
+
   /* ---- Radius ------------------------------------------------------ */
   --radius-sm: 8px;
   --radius-md: 12px;

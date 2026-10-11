@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "chainId": 4663,
+  "robinhoodCdn": {},
+  "remoteImages": {
+    "STATICS": {
+      "address": "0x2d8d6F4A93AcD7a916A5a654ec8b690bA3B3EAdd",
+      "url": "https://cdn.dexscreener.com/cms/images/Qz1Ng4vCRN0gABM3?width=256&height=256&fit=crop&quality=95&format=auto"
+    }
+  },
+  "tokenListAliases": {
+    "WETH": {
+      "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+      "source": {
+        "chainId": 1,
+        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      }
+    },
+    "USDG": {
+      "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "source": {
+        "chainId": 1,
+        "address": "0xe343167631d89B6Ffc58B88d6b7fB0228795491D"
+      }
+    }
+  },
+  "localFiles": {}
+}

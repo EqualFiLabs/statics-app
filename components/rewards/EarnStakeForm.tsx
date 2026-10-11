@@ -799,6 +799,7 @@ export function EarnStakeForm({
       </section>
       {assetsFor && (assetsFor === "new" || modalRow?.selectedAssets) && (
         <RewardAssetModal
+          chainId={deployment.descriptor.chainId}
           title={assetsFor === "new" ? t("assetsTitleNew") : t("assetsTitle", { id: assetsFor })}
           options={assetOptions(assetsFor === "new" ? chosenNewAssets : modalRow!.selectedAssets!)}
           initial={assetsFor === "new" ? chosenNewAssets : modalRow!.selectedAssets!}
