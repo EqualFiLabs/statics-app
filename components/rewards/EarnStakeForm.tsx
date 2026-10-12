@@ -30,7 +30,8 @@ import { useEarnPositionTable } from "@/hooks/useEarnPositionTable";
 import type { usePhaseOneAction } from "@/hooks/usePhaseOneAction";
 import { ActionReview } from "@/components/phase-one/ActionReview";
 import { ReviewDrawer } from "./ReviewDrawer";
-import { RewardAssetModal, type RewardAssetOption } from "./RewardAssetModal";
+import { RewardAssetModal } from "./RewardAssetModal";
+import { stakingRewardAssetOptions } from "@/lib/rewards/staking-assets";
 import styles from "./earn.module.css";
 
 const PICKER_PAGE = 5;
@@ -173,26 +174,9 @@ export function EarnStakeForm({
     (largestIndexed ? rowOf(largestIndexed.positionId)?.selectedAssets : undefined) ??
     [];
   const shortAddress = (asset: Address) => `${asset.slice(0, 6)}…${asset.slice(-4)}`;
-  const knownTokens: RewardAssetOption[] = [
-    ...new Map(
-      [
-        { address: deployment.contracts.statics, symbol: "STATICS", name: "Statics" },
-        ...deployment.supportedPools.flatMap((pool) => [pool.token0, pool.token1]),
-      ].map((token) => [
-        token.address.toLowerCase(),
-        { address: token.address, symbol: token.symbol, name: token.name },
-      ])
-    ).values(),
-  ];
-  // Every known token, plus anything the position already holds that the manifest lacks.
-  const assetOptions = (held: readonly Address[]): RewardAssetOption[] => [
-    ...knownTokens,
-    ...held
-      .filter(
-        (asset) => !knownTokens.some((token) => token.address.toLowerCase() === asset.toLowerCase())
-      )
-      .map((address) => ({ address, symbol: shortAddress(address), name: t("unknownToken") })),
-  ];
+  const knownTokens = stakingRewardAssetOptions(deployment);
+  const assetOptions = (held: readonly Address[]) =>
+    stakingRewardAssetOptions(deployment, held, t("unknownToken"));
   const symbolOf = (asset: Address) =>
     knownTokens.find((token) => token.address.toLowerCase() === asset.toLowerCase())?.symbol ??
     shortAddress(asset);
