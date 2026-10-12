@@ -54,6 +54,47 @@ test.describe("landing foundation", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test("keeps mobile gauge tiles uniform and mechanics as a heading", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile");
+
+    const tiles = page.locator("#gauges .dollar-modes li");
+    await expect(tiles).toHaveCount(4);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      const boxes = await Promise.all([0, 1, 2, 3].map((index) => tiles.nth(index).boundingBox()));
+      expect(boxes.every(Boolean)).toBe(true);
+      const [first, second, third, fourth] = boxes;
+      if (!first || !second || !third || !fourth) return;
+
+      expect(Math.abs(first.width - second.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(first.width - third.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(first.height - second.height)).toBeLessThanOrEqual(1);
+      expect(Math.abs(first.height - third.height)).toBeLessThanOrEqual(1);
+      expect(Math.abs(first.height - fourth.height)).toBeLessThanOrEqual(1);
+      expect(second.x).toBeGreaterThan(first.x);
+      expect(third.y).toBeGreaterThan(first.y);
+      for (const [index, tile] of boxes.entries()) {
+        if (!tile) continue;
+        const labels = tiles.nth(index).locator("strong, span");
+        for (const label of await labels.all()) {
+          const bounds = await label.boundingBox();
+          expect(bounds).not.toBeNull();
+          if (!bounds) continue;
+          expect(bounds.x).toBeGreaterThanOrEqual(tile.x - 1);
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(tile.x + tile.width + 1);
+          expect(bounds.y + bounds.height).toBeLessThanOrEqual(tile.y + tile.height + 1);
+        }
+      }
+    }
+
+    const mechanics = page.getByRole("heading", { name: "The Mechanics" });
+    await expect(mechanics).toBeVisible();
+    await expect(mechanics).toContainText("// The Mechanics");
+    await expect(mechanics.getByRole("link")).toHaveCount(0);
+  });
+
   test("routes to the app while future links remain visible placeholders", async ({ page }) => {
     const placeholders = page.locator("[data-placeholder-link]");
     await expect(placeholders).not.toHaveCount(0);

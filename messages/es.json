@@ -1450,7 +1450,8 @@
     "staticsPrinciple": "STATICS dirige los incentivos de liquidez.",
     "lpPrinciple": "Los LPs ganan recompensas dentro del rango.",
     "marketPrinciple": "Mercados abiertos. Espacios con permisos. Infraestructura compartida.",
-    "theDocs": "La documentación"
+    "theDocs": "La documentación",
+    "theMechanics": "La mecánica"
   },
   "glossary": {
     "position": {
