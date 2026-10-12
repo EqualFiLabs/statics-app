@@ -1416,7 +1416,7 @@ describe("focused Phase 1 Earn", () => {
     const modal = await screen.findByRole("dialog", { name: "Reward assets · new account" });
     expect(within(modal).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
     expect(within(modal).getByText("1 of 10 selected")).toBeInTheDocument();
-    fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
+    fireEvent.click(within(modal).getByRole("checkbox", { name: /^Ether/ }));
     fireEvent.click(within(modal).getByRole("button", { name: "OK" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reward assets for New account" })).toHaveTextContent(
@@ -1450,19 +1450,19 @@ describe("focused Phase 1 Earn", () => {
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
     const modal = await screen.findByRole("dialog", { name: "Reward assets · Account #1" });
-    fireEvent.click(within(modal).getByRole("checkbox", { name: /^WETH/ }));
+    fireEvent.click(within(modal).getByRole("checkbox", { name: /^Ether/ }));
     fireEvent.click(within(modal).getByRole("button", { name: "Cancel" }));
     expect(mocks.execute).not.toHaveBeenCalled();
     fireEvent.click(open);
     const reopened = await screen.findByRole("dialog", { name: "Reward assets · Account #1" });
     // Cancel discarded the draft.
-    expect(within(reopened).getByRole("checkbox", { name: /^WETH/ })).not.toBeChecked();
+    expect(within(reopened).getByRole("checkbox", { name: /^Ether/ })).not.toBeChecked();
     const search = within(reopened).getByRole("searchbox", { name: "Search reward assets" });
     fireEvent.change(search, { target: { value: "zzz" } });
     expect(within(reopened).getByText("No assets match your search.")).toBeInTheDocument();
-    fireEvent.change(search, { target: { value: "we" } });
+    fireEvent.change(search, { target: { value: "eth" } });
     expect(within(reopened).getAllByRole("checkbox")).toHaveLength(1);
-    fireEvent.click(within(reopened).getByRole("checkbox", { name: /^WETH/ }));
+    fireEvent.click(within(reopened).getByRole("checkbox", { name: /^Ether/ }));
     // Clearing the search keeps the existing selection that was hidden by it.
     fireEvent.change(search, { target: { value: "" } });
     expect(within(reopened).getByRole("checkbox", { name: /^STATICS/ })).toBeChecked();
@@ -1470,7 +1470,7 @@ describe("focused Phase 1 Earn", () => {
     const review = await screen.findByRole("dialog", {
       name: "Update reward assets for Account #1",
     });
-    expect(within(review).getByText("+ WETH")).toBeInTheDocument();
+    expect(within(review).getByText("+ ETH")).toBeInTheDocument();
     expect(within(review).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(review).getByRole("button", { name: "Close" })).toBeEnabled();
     fireEvent.click(within(review).getByRole("button", { name: "Confirm transaction" }));
