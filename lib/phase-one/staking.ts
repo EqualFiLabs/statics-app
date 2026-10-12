@@ -18,6 +18,7 @@ import {
 } from "@statics-protocol/sdk/phase-one";
 
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
+import { stakingRewardAssets } from "@/lib/rewards/staking-assets";
 
 export type PositionStakingState = Readonly<{
   positionId: bigint;
@@ -66,12 +67,13 @@ export async function buildCreateAndStakeTransaction(input: {
       functionName: "maxRewardAssetsPerPosition",
     }),
   ]);
-  if (BigInt(input.rewardAssets.length) > maximumRewardAssets) {
+  const rewardAssets = stakingRewardAssets(input.deployment, input.rewardAssets);
+  if (BigInt(rewardAssets.length) > maximumRewardAssets) {
     throw new Error("Selected reward assets exceed the live per-position limit.");
   }
   return {
     target: input.deployment.contracts.diamond,
-    calldata: buildCreateAndStakeCall(input.amount, input.receiver, input.rewardAssets),
+    calldata: buildCreateAndStakeCall(input.amount, input.receiver, rewardAssets),
     value: creationFee,
   };
 }
@@ -103,7 +105,10 @@ export function buildPositionStakingTransaction(input: {
       break;
     case "opt-in":
       if (input.action.assets.length === 0) throw new Error("Select at least one reward asset.");
-      calldata = buildOptInRewardAssetsCall(input.positionId, input.action.assets);
+      calldata = buildOptInRewardAssetsCall(
+        input.positionId,
+        stakingRewardAssets(input.deployment, input.action.assets)
+      );
       break;
     case "opt-out":
       if (input.action.assets.length === 0) throw new Error("Select at least one reward asset.");
