@@ -21,7 +21,7 @@ const deployment = {
     { token0: token(zeroAddress, "ETH"), token1: token(statics, "STATICS") },
     { token0: token(weth, "WETH"), token1: token(other, "USDG") },
   ],
-} as PhaseOneDeployment;
+} as unknown as PhaseOneDeployment;
 
 describe("ETH staking reward choice", () => {
   it("offers one ETH choice backed by WETH even with native and wrapped pools", () => {
