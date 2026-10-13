@@ -68,6 +68,7 @@ type ActionTab = "activate" | "rewards" | "credit";
 
 export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
   const t = useTranslations("operators");
+  const tShell = useTranslations("shell");
   const errorCopy: GenesisErrorCopy = {
     walletRejected: t("walletRejected"),
     notOwner: t("notOwner"),
@@ -307,10 +308,27 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
     ) : null;
 
   if (!wallet) {
+    const action =
+      walletState.status === "signed-out" || walletState.status === "error"
+        ? {
+            label: tShell(walletState.status === "error" ? "retrySignIn" : "signIn"),
+            onClick: walletState.login,
+          }
+        : walletState.status === "wallet-missing"
+          ? {
+              label: tShell("createWallet"),
+              onClick: () => void walletState.createWallet(),
+              disabled: walletState.busyAction !== null,
+            }
+          : undefined;
     return (
       <div className="genesis-page">
         {recoveriesLink}
-        <EmptyState title={t("connectTitle")} description={t("connectDescription")} />
+        <EmptyState
+          title={t("connectTitle")}
+          description={t("connectDescription")}
+          action={action}
+        />
       </div>
     );
   }

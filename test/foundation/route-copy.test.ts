@@ -11,6 +11,7 @@ import {
   appNavigationGroups,
   appNavigationGroupsForStage,
   appTabNavigation,
+  appTabNavigationForCapabilities,
   appTabNavigationForStage,
 } from "@/lib/site-config";
 import english from "@/messages/en.json";
@@ -135,6 +136,24 @@ describe("stage-aware dapp navigation", () => {
   it("leaves the complete catalog unchanged for full protocol", () => {
     expect(appNavigationGroupsForStage("full-protocol")).toBe(appNavigationGroups);
     expect(appTabNavigationForStage("full-protocol")).toBe(appTabNavigation);
+  });
+
+  it("promotes Markets and Swap on Phase 1 mobile navigation", () => {
+    expect(appTabNavigationForStage("phase-one").map((item) => item.href)).toEqual([
+      "/app",
+      "/app/swap",
+      "/app/rewards",
+      "/app/wallet",
+    ]);
+    expect(
+      appTabNavigationForCapabilities(
+        ["overview", "public-direct-swaps", "global-rewards", "wallet"],
+        "phase-one"
+      ).map((item) => item.href)
+    ).toEqual(["/app", "/app/swap", "/app/rewards", "/app/wallet"]);
+    expect(
+      appTabNavigationForCapabilities(launch.capabilities, "launch").map((item) => item.href)
+    ).toEqual(["/app/wallet"]);
   });
 
   it("maps Phase 1 product capabilities onto shared routes and position details", () => {
