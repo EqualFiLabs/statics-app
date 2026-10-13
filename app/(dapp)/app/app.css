@@ -8656,6 +8656,10 @@
     align-items: flex-start;
     flex-wrap: wrap;
   }
+  .liquidity-heading > .liquidity-heading-actions {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
   .liquidity-position-card {
     grid-template-columns: 1fr auto;
   }
