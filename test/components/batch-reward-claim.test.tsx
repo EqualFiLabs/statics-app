@@ -23,7 +23,11 @@ const wallet = getAddress(`0x${"9".repeat(40)}`);
 const token = getAddress(`0x${"2".repeat(40)}`);
 const deployment = {
   descriptor: { deploymentId: "fork", chainId: 4663 },
-  contracts: { diamond: getAddress(`0x${"1".repeat(40)}`), statics: token },
+  contracts: {
+    diamond: getAddress(`0x${"1".repeat(40)}`),
+    statics: token,
+    weth: getAddress(`0x${"3".repeat(40)}`),
+  },
   supportedPools: [],
 } as unknown as PhaseOneDeployment;
 const rows = (count = 1): PositionRewardPortfolio[] =>

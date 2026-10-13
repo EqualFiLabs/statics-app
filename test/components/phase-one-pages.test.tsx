@@ -778,9 +778,9 @@ describe("focused Phase 1 Earn", () => {
       "Before you owned this account"
     );
     expect(within(statement).getAllByRole("heading", { level: 4 })).toHaveLength(2);
-    expect(within(statement).queryByText("WETH earning scheduled")).not.toBeInTheDocument();
+    expect(within(statement).queryByText("ETH earning scheduled")).not.toBeInTheDocument();
     fireEvent.click(within(statement).getByRole("checkbox", { name: "Show reward accounting" }));
-    expect(within(statement).getByText("WETH earning scheduled")).toBeInTheDocument();
+    expect(within(statement).getByText("ETH earning scheduled")).toBeInTheDocument();
     fireEvent.click(within(statement).getByRole("button", { name: "Show older activity" }));
     expect(await within(statement).findByText("Account opened")).toBeInTheDocument();
     expect(mocks.statement).toHaveBeenCalledWith(
