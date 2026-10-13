@@ -79,6 +79,38 @@ describe("DApp wallet shell", () => {
     expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
   });
 
+  it("shows Markets and Swap in the Phase 1 mobile tabs", () => {
+    const descriptor = {
+      deploymentId: "phase-one-fixture",
+      label: "Phase 1",
+      network: "Robinhood Chain",
+      chainId: 4_663,
+      stage: "phase-one",
+      capabilities: ["overview", "public-direct-swaps", "global-rewards", "wallet"],
+      available: true,
+    } as const;
+    const active = {
+      networkId: "robinhood",
+      descriptor,
+      launch: null,
+      protocol: null,
+    } satisfies DeploymentOption;
+    renderWithWallet(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <AppShell>Markets</AppShell>
+      </DeploymentContext.Provider>
+    );
+
+    const tabs = within(screen.getByRole("navigation", { name: "Primary" }));
+    expect(tabs.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Markets",
+      "Swap",
+      "Earn",
+      "Wallet",
+    ]);
+    expect(tabs.getByRole("button", { name: /Application menu/ })).toBeInTheDocument();
+  });
+
   it("offers independent Privy sign-in and external wallet connection", () => {
     const login = vi.fn();
     const connectWallet = vi.fn();

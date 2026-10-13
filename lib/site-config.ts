@@ -259,6 +259,9 @@ export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.f
 export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filter(
   (item) => typeof item.tabLabel === "string"
 );
+const phaseOneTabNavigation: readonly AppNavigationItem[] = appNavigation.filter((item) =>
+  ["/app", "/app/swap", "/app/rewards", "/app/wallet"].includes(item.href)
+);
 /** The only product capabilities promoted by a launch deployment. */
 export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [
   "overview",
@@ -286,6 +289,7 @@ export function appNavigationGroupsForStage(stage: DeploymentStage): readonly Ap
 
 export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNavigationItem[] {
   if (stage === "full-protocol") return appTabNavigation;
+  if (stage === "phase-one") return phaseOneTabNavigation;
   const launchTabCapabilities: readonly DeploymentCapability[] = [
     "canonical-statics-market",
     "genesis-vault",
@@ -330,7 +334,9 @@ export function appNavigationGroupsForCapabilities(
 }
 
 export function appTabNavigationForCapabilities(
-  capabilities: readonly DeploymentCapability[]
+  capabilities: readonly DeploymentCapability[],
+  stage: DeploymentStage
 ): readonly AppNavigationItem[] {
-  return appTabNavigation.filter((item) => isNavigationItemAvailable(item, capabilities));
+  const tabs = stage === "phase-one" ? phaseOneTabNavigation : appTabNavigation;
+  return tabs.filter((item) => isNavigationItemAvailable(item, capabilities));
 }

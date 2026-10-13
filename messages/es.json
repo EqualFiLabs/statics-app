@@ -124,6 +124,7 @@
     },
     "items": {
       "overview": "Resumen",
+      "markets": "Mercados",
       "swap": "Intercambiar",
       "earn": "Ganar",
       "genesis": "Operator NFT",

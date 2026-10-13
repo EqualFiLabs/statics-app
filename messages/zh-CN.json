@@ -124,6 +124,7 @@
     },
     "items": {
       "overview": "概览",
+      "markets": "市场",
       "swap": "兑换",
       "earn": "赚取",
       "genesis": "Operator NFT",

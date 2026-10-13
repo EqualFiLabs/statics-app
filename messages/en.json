@@ -124,6 +124,7 @@
     },
     "items": {
       "overview": "Overview",
+      "markets": "Markets",
       "swap": "Swap",
       "earn": "Earn",
       "genesis": "Operator NFT",

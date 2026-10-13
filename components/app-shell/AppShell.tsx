@@ -262,7 +262,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const wallet = useWalletState();
   const { active, options } = useDeployment();
   const navigationGroups = appNavigationGroupsForCapabilities(active.descriptor.capabilities);
-  const tabNavigation = appTabNavigationForCapabilities(active.descriptor.capabilities);
+  const tabNavigation = appTabNavigationForCapabilities(
+    active.descriptor.capabilities,
+    active.descriptor.stage
+  );
   const tCommon = useTranslations("common");
   const tNavigation = useTranslations("navigation");
   const tGroups = useTranslations("navigation.groups");
@@ -394,9 +397,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       onClick={() => closeNavigation()}
                     >
                       <NavigationIcon name={item.messageKey} />
-                      {active.descriptor.stage === "launch" && item.capability !== "wallet"
-                        ? tLaunchRoutes(`${item.messageKey}.label`)
-                        : tItems(item.messageKey)}
+                      {active.descriptor.stage === "phase-one" && item.href === "/app"
+                        ? tItems("markets")
+                        : active.descriptor.stage === "launch" && item.capability !== "wallet"
+                          ? tLaunchRoutes(`${item.messageKey}.label`)
+                          : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
@@ -464,9 +469,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={currentActive ? "page" : undefined}
             >
-              {active.descriptor.stage === "launch" && item.capability !== "wallet"
-                ? tLaunchRoutes(`${item.messageKey}.label`)
-                : tItems(item.messageKey)}
+              {active.descriptor.stage === "phase-one" && item.href === "/app"
+                ? tItems("markets")
+                : active.descriptor.stage === "launch" && item.capability !== "wallet"
+                  ? tLaunchRoutes(`${item.messageKey}.label`)
+                  : tItems(item.messageKey)}
             </Link>
           );
         })}
