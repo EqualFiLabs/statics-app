@@ -297,6 +297,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? tLaunchRoutes(`${routeId}.description`)
       : tRoutes(`${routeId}.description`),
   };
+  const currentRouteLabel =
+    active.descriptor.stage === "phase-one" && routeId === "overview"
+      ? tItems("markets")
+      : routeCopy.label;
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
     if (restoreFocus) {
@@ -481,7 +485,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ref={navigationToggleRef}
           className="dapp-tab dapp-nav-toggle"
           type="button"
-          aria-label={tNavigation("mobileMenu", { route: routeCopy.label })}
+          aria-label={tNavigation("mobileMenu", { route: currentRouteLabel })}
           aria-expanded={navigationOpen}
           aria-controls="dapp-navigation-panel"
           onClick={navigationOpen ? () => closeNavigation() : openNavigation}

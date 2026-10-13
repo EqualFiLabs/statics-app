@@ -77,6 +77,9 @@ describe("DApp wallet shell", () => {
       within(screen.getByLabelText("DApp navigation")).getByRole("link", { name: "Wallet" })
     ).toHaveAttribute("href", "/app/wallet");
     expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
+    expect(
+      screen.getByRole("button", { name: "Application menu. Current route: Overview" })
+    ).toBeInTheDocument();
   });
 
   it("shows Markets and Swap in the Phase 1 mobile tabs", () => {
@@ -108,7 +111,9 @@ describe("DApp wallet shell", () => {
       "Earn",
       "Wallet",
     ]);
-    expect(tabs.getByRole("button", { name: /Application menu/ })).toBeInTheDocument();
+    expect(
+      tabs.getByRole("button", { name: "Application menu. Current route: Markets" })
+    ).toBeInTheDocument();
   });
 
   it("offers independent Privy sign-in and external wallet connection", () => {
