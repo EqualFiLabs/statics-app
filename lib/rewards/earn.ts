@@ -117,6 +117,10 @@ export function scopeRewardAmounts(
   return [...totals.values()];
 }
 export function rewardToken(deployment: PhaseOneDeployment, asset: Address) {
+  // Reward revenue uses WETH even when every configured pool settles native ETH.
+  if (asset.toLowerCase() === deployment.contracts.weth.toLowerCase()) {
+    return { address: asset, symbol: "ETH", decimals: 18 };
+  }
   return (
     deployment.supportedPools
       .flatMap((pool) => [pool.token0, pool.token1])
