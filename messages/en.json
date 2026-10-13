@@ -2692,6 +2692,7 @@
     },
     "fee": "{fee}% fee",
     "unpriced": "Unpriced: pair price only",
+    "noLiquidity": "No liquidity yet",
     "pairPrice": "1 {token0} = {price} {token1}",
     "streams": "{count, plural, one {# stream} other {# streams}}",
     "swap": "Swap",

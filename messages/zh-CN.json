@@ -2692,6 +2692,7 @@
     },
     "fee": "{fee}% 手续费",
     "unpriced": "未定价：仅显示交易对价格",
+    "noLiquidity": "暂无流动性",
     "pairPrice": "1 {token0} = {price} {token1}",
     "streams": "{count, plural, other {# 个激励流}}",
     "swap": "兑换",

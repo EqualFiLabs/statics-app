@@ -382,6 +382,8 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
             <tbody>
               {(dex.pools.data?.items ?? []).map((pool) => {
                 const moved = change(pool.change24hBps);
+                const noLiquidity =
+                  pool.liquidityComplete && pool.amount0 === 0n && pool.amount1 === 0n;
                 return (
                   <tr key={pool.poolId}>
                     <th scope="row">
@@ -397,6 +399,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                           <span className={styles.pill}>{t("spotFallback")}</span>
                         )}
                         {!pool.priced && <span className={styles.pill}>{t("unpriced")}</span>}
+                        {noLiquidity && <span className={styles.pill}>{t("noLiquidity")}</span>}
                       </span>
                     </th>
                     <td className={styles.pairPrice} data-label={t("column.pairPrice")}>
@@ -442,13 +445,24 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                     </td>
                     <td className={styles.rowActions}>
                       <div className={styles.actions}>
-                        <Link
-                          className="ui-button ui-button--secondary ui-button--sm"
-                          href={`/app/swap?in=${pool.token0.address}&out=${pool.token1.address}`}
-                          aria-label={t("swapIn", { pool: pairOf(pool) })}
-                        >
-                          {t("swap")}
-                        </Link>
+                        {noLiquidity ? (
+                          <button
+                            type="button"
+                            className="ui-button ui-button--secondary ui-button--sm"
+                            disabled
+                            title={t("noLiquidity")}
+                          >
+                            {t("swap")}
+                          </button>
+                        ) : (
+                          <Link
+                            className="ui-button ui-button--secondary ui-button--sm"
+                            href={`/app/swap?in=${pool.token0.address}&out=${pool.token1.address}`}
+                            aria-label={t("swapIn", { pool: pairOf(pool) })}
+                          >
+                            {t("swap")}
+                          </Link>
+                        )}
                         <Link
                           className="ui-button ui-button--primary ui-button--sm"
                           href={`/app/liquidity?poolId=${pool.poolId}`}
