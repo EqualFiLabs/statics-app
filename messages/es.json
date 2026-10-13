@@ -1836,6 +1836,8 @@
   "earnUx": {
     "title": "Ganar",
     "overviewHelp": "Tu stake y recompensas en todas tus cuentas.",
+    "connectTitle": "Conecta tu billetera para ver tus ganancias",
+    "connectHelp": "Conecta tu billetera para ver cuentas, recompensas y acciones.",
     "staking": "Staking",
     "gauge": "Recompensas de liquidez",
     "allocations": "Asignaciones",

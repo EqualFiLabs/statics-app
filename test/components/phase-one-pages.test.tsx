@@ -538,6 +538,23 @@ describe("DEX overview", () => {
 });
 
 describe("focused Phase 1 Earn", () => {
+  it("shows a connection prompt without account controls when disconnected", () => {
+    const active = { ...option, phaseOne };
+    render(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <WalletContext.Provider value={defaultWalletState}>
+          <RewardsPage />
+        </WalletContext.Provider>
+      </DeploymentContext.Provider>
+    );
+    expect(
+      screen.getByRole("heading", { name: "Connect to see your earnings" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Earn features" })).toBeInTheDocument();
+    expect(screen.queryByText("No claimable rewards")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /search/i })).not.toBeInTheDocument();
+  });
   it("shows an account's balances, actions and what still blocks closing it", async () => {
     mocks.statement.mockResolvedValue(
       statementPage([statementEntry(9, "PositionCreated", { category: "lifecycle" })])

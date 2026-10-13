@@ -1836,6 +1836,8 @@
   "earnUx": {
     "title": "收益",
     "overviewHelp": "查看所有账户的质押与奖励。",
+    "connectTitle": "连接钱包以查看收益",
+    "connectHelp": "连接钱包以查看账户、奖励和操作。",
     "staking": "质押",
     "gauge": "流动性奖励",
     "allocations": "分配",

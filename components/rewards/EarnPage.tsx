@@ -57,6 +57,7 @@ export function EarnPage({
   }, [redirectUrl, router]);
   const data = useEarnPortfolio(deployment, view, filters),
     { action, positions } = data;
+  const disconnected = !action.wallet && action.walletState.status !== "loading";
   const sources = sourceForView(view),
     rows = mergeEarnRewardSources(data.rewards);
   const loading =
@@ -167,7 +168,15 @@ export function EarnPage({
           </Link>
         ))}
       </nav>
-      {!action.ready && <ActionReview action={action} />}
+      {disconnected ? (
+        <section className={styles.connectCard} aria-labelledby="earn-connect-title">
+          <h2 id="earn-connect-title">{t("connectTitle")}</h2>
+          <p>{t("connectHelp")}</p>
+          <ActionReview action={action} />
+        </section>
+      ) : (
+        !action.ready && <ActionReview action={action} />
+      )}
       {(action.walletState.status === "loading" ||
         data.ownershipLoading ||
         loading ||
@@ -193,7 +202,7 @@ export function EarnPage({
           </Link>
         </div>
       )}
-      {view === "overview" ? (
+      {!action.wallet ? null : view === "overview" ? (
         <EarnPositionsTable
           deployment={deployment}
           action={action}
