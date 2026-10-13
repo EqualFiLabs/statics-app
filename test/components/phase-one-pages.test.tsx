@@ -477,6 +477,32 @@ describe("DEX overview", () => {
     await waitFor(() => expect(within(totals).getAllByText(/ WETH$/).length).toBeGreaterThan(0));
     expect(within(totals).queryByText("≈ $1.07M")).not.toBeInTheDocument();
   });
+  it("keeps empty pools available for liquidity but disables their swap action", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) =>
+          index === 0 ? { ...pool, amount0: "0", amount1: "0", valueLocked: "0" } : pool
+        ),
+      };
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const pools = await screen.findByRole("region", { name: "Pools" });
+    const empty = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
+    expect(within(empty).getByText("No liquidity yet")).toBeInTheDocument();
+    expect(within(empty).getByRole("button", { name: "Swap" })).toBeDisabled();
+    expect(within(empty).queryByRole("link", { name: "Swap in STATICS / WETH" })).toBeNull();
+    expect(
+      within(empty).getByRole("link", { name: "Add liquidity to STATICS / WETH" })
+    ).toHaveAttribute("href", `/app/liquidity?poolId=${hash("1")}`);
+    const funded = within(pools).getByText("STATICS / TOKEN").closest("tr")!;
+    expect(within(funded).getByRole("link", { name: "Swap in STATICS / TOKEN" })).toHaveAttribute(
+      "href",
+      `/app/swap?in=${tokens[0].address}&out=${tokens[2].address}`
+    );
+  });
   it("shows an unpriced pool with its pair price and says the totals exclude it", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
@@ -538,6 +564,23 @@ describe("DEX overview", () => {
 });
 
 describe("focused Phase 1 Earn", () => {
+  it("shows a connection prompt without account controls when disconnected", () => {
+    const active = { ...option, phaseOne };
+    render(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <WalletContext.Provider value={defaultWalletState}>
+          <RewardsPage />
+        </WalletContext.Provider>
+      </DeploymentContext.Provider>
+    );
+    expect(
+      screen.getByRole("heading", { name: "Connect to see your earnings" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Earn features" })).toBeInTheDocument();
+    expect(screen.queryByText("No claimable rewards")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /search/i })).not.toBeInTheDocument();
+  });
   it("shows an account's balances, actions and what still blocks closing it", async () => {
     mocks.statement.mockResolvedValue(
       statementPage([statementEntry(9, "PositionCreated", { category: "lifecycle" })])

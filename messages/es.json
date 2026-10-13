@@ -1837,6 +1837,8 @@
   "earnUx": {
     "title": "Ganar",
     "overviewHelp": "Tu stake y recompensas en todas tus cuentas.",
+    "connectTitle": "Conecta tu billetera para ver tus ganancias",
+    "connectHelp": "Conecta tu billetera para ver cuentas, recompensas y acciones.",
     "staking": "Staking",
     "gauge": "Recompensas de liquidez",
     "allocations": "Asignaciones",
@@ -2691,6 +2693,7 @@
     },
     "fee": "comisión {fee}%",
     "unpriced": "Sin precio: solo precio del par",
+    "noLiquidity": "Aún sin liquidez",
     "pairPrice": "1 {token0} = {price} {token1}",
     "streams": "{count, plural, one {# flujo} other {# flujos}}",
     "swap": "Swap",

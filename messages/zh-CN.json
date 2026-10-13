@@ -1837,6 +1837,8 @@
   "earnUx": {
     "title": "收益",
     "overviewHelp": "查看所有账户的质押与奖励。",
+    "connectTitle": "连接钱包以查看收益",
+    "connectHelp": "连接钱包以查看账户、奖励和操作。",
     "staking": "质押",
     "gauge": "流动性奖励",
     "allocations": "分配",
@@ -2691,6 +2693,7 @@
     },
     "fee": "{fee}% 手续费",
     "unpriced": "未定价：仅显示交易对价格",
+    "noLiquidity": "暂无流动性",
     "pairPrice": "1 {token0} = {price} {token1}",
     "streams": "{count, plural, other {# 个激励流}}",
     "swap": "兑换",

@@ -1837,6 +1837,8 @@
   "earnUx": {
     "title": "Earn",
     "overviewHelp": "Your stake and rewards, across every account.",
+    "connectTitle": "Connect to see your earnings",
+    "connectHelp": "Connect your wallet to view accounts, rewards, and actions.",
     "staking": "Staking",
     "gauge": "Liquidity rewards",
     "allocations": "Allocations",
@@ -2691,6 +2693,7 @@
     },
     "fee": "{fee}% fee",
     "unpriced": "Unpriced: pair price only",
+    "noLiquidity": "No liquidity yet",
     "pairPrice": "1 {token0} = {price} {token1}",
     "streams": "{count, plural, one {# stream} other {# streams}}",
     "swap": "Swap",
