@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, renderWithLocale, screen } from "@/test/render";
+import { fireEvent, render, renderWithLocale, screen } from "@/test/render";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
@@ -64,12 +64,13 @@ const option = {
 describe("standalone Genesis surface", () => {
   it("keeps the Genesis management page focused on owned NFTs", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const login = vi.fn();
     render(
       <QueryClientProvider client={queryClient}>
         <DeploymentContext.Provider
           value={{ active: option, options: [option], selectNetwork: vi.fn() }}
         >
-          <WalletContext.Provider value={{ ...defaultWalletState, status: "signed-out" }}>
+          <WalletContext.Provider value={{ ...defaultWalletState, status: "signed-out", login }}>
             <GenesisPage />
           </WalletContext.Provider>
         </DeploymentContext.Provider>
@@ -77,6 +78,8 @@ describe("standalone Genesis surface", () => {
     );
 
     expect(screen.getByText("Connect your wallet")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(login).toHaveBeenCalledOnce();
     expect(screen.queryByText("Explore the Vault")).not.toBeInTheDocument();
     expect(screen.queryByText("Launch rewards")).not.toBeInTheDocument();
   });
@@ -99,5 +102,27 @@ describe("standalone Genesis surface", () => {
 
     expect(screen.getByText("连接你的钱包")).toBeInTheDocument();
     expect(screen.getByText("连接钱包以查看和管理你的 Operator NFT。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
+  });
+
+  it("offers wallet creation when signed in without an embedded wallet", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const createWallet = vi.fn().mockResolvedValue(undefined);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DeploymentContext.Provider
+          value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+        >
+          <WalletContext.Provider
+            value={{ ...defaultWalletState, status: "wallet-missing", createWallet }}
+          >
+            <GenesisPage />
+          </WalletContext.Provider>
+        </DeploymentContext.Provider>
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create wallet" }));
+    expect(createWallet).toHaveBeenCalledOnce();
   });
 });
