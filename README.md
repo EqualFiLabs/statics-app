@@ -62,7 +62,8 @@ Robinhood Chain 4663, an embedded Privy EOA can activate the pinned Calibur dele
 reviewed, browser-funded temporary relayer, then use the verified ERC-7821 self-call. Funding and
 activation are separate confirmations; delegation remains until revoked. Recoverable relayer ETH
 is returned to the same wallet; a small balance below refund gas cost may remain. Keep the browser
-tab open through the refund. The production Operator panel also lets the same embedded wallet
+tab open through the refund. The Operators page keeps Calibur removal and relay refund recovery
+available even when the wallet holds no Operators. It also lets the same embedded wallet
 review and sign a Calibur removal authorization. Removal uses the temporary browser relayer,
 checks that the delegation, implementation code, and wallet nonce still match the review, and
 verifies that the wallet code is `0x` after confirmation. It disables atomic Operator batching
