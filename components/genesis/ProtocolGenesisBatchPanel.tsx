@@ -17,7 +17,6 @@ import {
   type PreparedAtomicBatch,
 } from "@/lib/genesis/atomic-batch";
 import { ROBINHOOD_CALIBUR_CODE_HASH } from "@/lib/genesis/calibur";
-import { BrowserCaliburActivationPanel } from "@/components/genesis/BrowserCaliburActivationPanel";
 import {
   buildProtocolGenesisBatch,
   type ProtocolBatchAction,
@@ -265,7 +264,6 @@ export function ProtocolGenesisBatchPanel({
         <h3>{t("title")}</h3>
         <p>{t("protocolDescription")}</p>
       </div>
-      {deployment.source !== "development-environment" && <BrowserCaliburActivationPanel />}
       <label className="ui-field">
         {t("action")}
         <select

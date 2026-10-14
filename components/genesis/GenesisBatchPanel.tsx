@@ -30,7 +30,6 @@ import {
   type PreparedAtomicBatch,
 } from "@/lib/genesis/atomic-batch";
 import { ROBINHOOD_CALIBUR_CODE_HASH } from "@/lib/genesis/calibur";
-import { BrowserCaliburActivationPanel } from "@/components/genesis/BrowserCaliburActivationPanel";
 import type { OwnedGenesis } from "@/lib/genesis/owned";
 import {
   buildLaunchBatchPreview,
@@ -374,7 +373,6 @@ export function GenesisBatchPanel({
         <h3>{t("title")}</h3>
         <p>{t("launchDescription")}</p>
       </div>
-      {deployment.source !== "development-fixture" && <BrowserCaliburActivationPanel />}
       <label className="ui-field">
         {t("action")}
         <select
