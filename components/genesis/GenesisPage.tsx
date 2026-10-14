@@ -17,6 +17,8 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
+import { BrowserCaliburActivationPanel } from "@/components/genesis/BrowserCaliburActivationPanel";
+import { ProtocolGenesisBatchPanel } from "@/components/genesis/ProtocolGenesisBatchPanel";
 import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { loadWalletGenesis } from "@/lib/indexer/statics";
 import { loadPositionCatalog } from "@/lib/positions/positions";
@@ -46,13 +48,39 @@ function describeGenesisError(error: unknown): string {
 
 export function GenesisPage() {
   const { active } = useDeployment();
+  const wallet = useWalletState();
+  const supportsCalibur = active.launch
+    ? active.launch.source !== "development-fixture" && active.launch.descriptor.chainId === 4663
+    : Boolean(
+        active.protocol?.protocol.genesis &&
+        active.protocol.protocol.source !== "development-environment" &&
+        active.protocol.protocol.chainId === 4663
+      );
+  // Delegation and relay funds belong to the wallet, even after its last Operator leaves.
+  const walletControls =
+    supportsCalibur &&
+    wallet.status === "ready" &&
+    wallet.address &&
+    wallet.walletKind === "embedded" ? (
+      <BrowserCaliburActivationPanel />
+    ) : null;
   if (active.launch) {
-    return <StandaloneGenesisPage deployment={active.launch} />;
+    return (
+      <>
+        {walletControls}
+        <StandaloneGenesisPage deployment={active.launch} />
+      </>
+    );
   }
   if (!active.protocol) {
     return <UnconfiguredSurface subject="Genesis" />;
   }
-  return <ProtocolGenesisPage deployment={active.protocol.protocol} />;
+  return (
+    <>
+      {walletControls}
+      <ProtocolGenesisPage deployment={active.protocol.protocol} />
+    </>
+  );
 }
 
 function ProtocolGenesisPage({ deployment }: { deployment: DollarDeployment }) {
@@ -246,6 +274,14 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
           {error}
         </div>
       )}
+      <ProtocolGenesisBatchPanel
+        deployment={deployment}
+        operators={portfolio.data.genesis}
+        positions={availablePositions}
+        onConfirmed={async () => {
+          await portfolio.refetch();
+        }}
+      />
       <div className="genesis-grid">
         {portfolio.data.genesis.map(({ id, state }) => {
           const currentTier = Number(state.tier);
