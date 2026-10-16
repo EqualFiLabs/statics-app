@@ -559,6 +559,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           />
 
           <div className="genesis-actions">
+            <Link
+              className="ui-button ui-button--primary"
+              href={`/app/swap?mode=nft&action=redeem&operatorId=${selected.id.toString()}`}
+            >
+              {t("redeemOperator")}
+            </Link>
             <div className="genesis-tabs" role="tablist" aria-label={t("actionsAria")}>
               <button
                 type="button"
