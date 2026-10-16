@@ -386,6 +386,7 @@
     "circulationDescription": "Hay {circulating} de {supply} NFT de Operators en circulación, cada uno respaldado por {backing} STATICS.",
     "vaultEmptyDescription": "Adquiere un NFT de Operator con respaldo total mediante la Bóveda.",
     "acquire": "Adquirir un NFT de Operator",
+    "redeemOperator": "Canjear Operator",
     "pastRewardsAria": "Recompensas de titulares anteriores",
     "pastRewardsTitle": "Recompensas de titulares anteriores",
     "pastRewardsDescription": "Se acumularon mientras tenías un NFT de Operator que después transferiste. Siguen siendo tuyas para reclamar.",

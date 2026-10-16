@@ -52,7 +52,15 @@ function describeError(error: unknown, copy: ErrorCopy): string {
   return message || copy.transactionFailed;
 }
 
-export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeployment }) {
+export function GenesisVaultSwapPanel({
+  deployment,
+  initialDirection = "acquire",
+  initialOperatorId,
+}: {
+  deployment: LaunchDeployment;
+  initialDirection?: VaultDirection;
+  initialOperatorId?: string;
+}) {
   const t = useTranslations("operatorVault");
   const errorCopy: ErrorCopy = {
     walletRejected: t("walletRejected"),
@@ -66,8 +74,8 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const wallet =
     walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-  const [selectedOwnedId, setSelectedOwnedId] = useState<string>("");
-  const [direction, setDirection] = useState<VaultDirection>("acquire");
+  const [selectedOwnedId, setSelectedOwnedId] = useState<string>(initialOperatorId ?? "");
+  const [direction, setDirection] = useState<VaultDirection>(initialDirection);
   const [busy, setBusy] = useState<"buy" | "redeem" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,6 +160,12 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
       return { owned, stale: discovery.stale };
     },
   });
+
+  const owned = walletOperators.data?.owned ?? [];
+  const selected = selectedOwnedId
+    ? (owned.find((item) => item.id.toString() === selectedOwnedId) ?? null)
+    : (owned[0] ?? null);
+  const selectedLocked = selected?.creditActive ?? false;
 
   const requireWallet = () => {
     if (walletState.status === "signed-out" || walletState.status === "error") {
@@ -258,11 +272,11 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   };
 
   const redeem = async () => {
-    if (!requireWallet() || !wallet || !publicClient || !selectedOwnedId) return;
+    if (!requireWallet() || !wallet || !publicClient || !selected || selectedLocked) return;
     setBusy("redeem");
     setError(null);
     try {
-      const id = BigInt(selectedOwnedId);
+      const id = selected.id;
       const redemptionQuote = await publicClient.readContract({
         address: deployment.contracts.vault,
         abi: currentGenesisVaultAbi,
@@ -339,7 +353,6 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const purchaseQuote = vault.data?.purchaseQuote;
   const redemptionQuote = vault.data?.redemptionQuote;
   const accounting = vault.data?.accounting;
-  const owned = walletOperators.data?.owned ?? [];
 
   const statics = (value: bigint | undefined, digits = 0) =>
     `${formatTokenAmountGrouped(value ?? 0n, 18, digits)} STATICS`;
@@ -355,9 +368,6 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
   const staticsShort = wallet && staticsHeld < staticsNeeded ? staticsNeeded - staticsHeld : 0n;
   const nativeShort = wallet && nativeHeld < nativeNeeded ? nativeNeeded - nativeHeld : 0n;
   const cannotAfford = staticsShort > 0n || nativeShort > 0n;
-
-  const selected = owned.find((item) => item.id.toString() === selectedOwnedId) ?? owned[0] ?? null;
-  const selectedLocked = selected?.creditActive ?? false;
 
   return (
     <div className="genesis-vault-swap">
@@ -609,14 +619,16 @@ export function GenesisVaultSwapPanel({ deployment }: { deployment: LaunchDeploy
                 <button
                   className="portal-primary-action"
                   type="button"
-                  disabled={busy !== null || !selected || !selectedOwnedId || selectedLocked}
+                  disabled={busy !== null || !selected || selectedLocked}
                   onClick={() => void redeem()}
                 >
                   {busy === "redeem"
                     ? t("confirming")
                     : selectedLocked
                       ? t("repayFirst")
-                      : t("redeemOperator", { id: selected?.id.toString() ?? "" })}
+                      : selected
+                        ? t("redeemOperator", { id: selected.id.toString() })
+                        : t("chooseOperator")}
                 </button>
               </>
             )}

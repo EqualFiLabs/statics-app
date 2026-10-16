@@ -386,6 +386,7 @@
     "circulationDescription": "{circulating} of {supply} Operators NFTs are in circulation, each backed by {backing} STATICS.",
     "vaultEmptyDescription": "Acquire a fully backed Operator NFT through the Vault.",
     "acquire": "Acquire an Operator NFT",
+    "redeemOperator": "Redeem Operator",
     "pastRewardsAria": "Rewards from past ownership",
     "pastRewardsTitle": "Rewards from past ownership",
     "pastRewardsDescription": "These accrued while you held an Operator NFT that has since moved on. They remain yours to claim.",

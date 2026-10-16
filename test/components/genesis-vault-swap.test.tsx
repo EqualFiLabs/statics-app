@@ -126,7 +126,9 @@ function reads({ credits = new Map<string, boolean>() }: { credits?: Map<string,
   });
 }
 
-function renderPanel() {
+function renderPanel(
+  options: { initialDirection?: "acquire" | "redeem"; initialOperatorId?: string } = {}
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -143,7 +145,7 @@ function renderPanel() {
             isTargetChain: true,
           }}
         >
-          <GenesisVaultSwapPanel deployment={deployment} />
+          <GenesisVaultSwapPanel deployment={deployment} {...options} />
         </WalletContext.Provider>
       </DeploymentContext.Provider>
     </QueryClientProvider>
@@ -159,6 +161,84 @@ beforeEach(() => {
 });
 
 describe("Genesis Vault trade card", () => {
+  it("opens redemption with the linked owned Operator selected", async () => {
+    reads();
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n, 4419n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
+    renderPanel({ initialDirection: "redeem", initialOperatorId: "4419" });
+
+    expect(await screen.findByRole("tab", { name: "Redeem" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(await screen.findByRole("radio", { name: /4419/ })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Redeem Operator #4419" })).toBeEnabled();
+  });
+
+  it("uses the visible default selection for redemption eligibility", async () => {
+    reads();
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
+    renderPanel({ initialDirection: "redeem" });
+
+    expect(await screen.findByRole("radio", { name: /1204/ })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Redeem Operator #1204" })).toBeEnabled();
+  });
+
+  it("does not select an Operator ID that the wallet does not own", async () => {
+    reads();
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
+    renderPanel({ initialDirection: "redeem", initialOperatorId: "4419" });
+
+    const card = await screen.findByRole("radio", { name: /1204/ });
+    expect(card).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("button", { name: "Choose an Operator to redeem" })).toBeDisabled();
+    fireEvent.click(card);
+    expect(screen.getByRole("button", { name: "Redeem Operator #1204" })).toBeEnabled();
+  });
+
+  it("shows the repayment path for a linked Operator with active credit", async () => {
+    reads({ credits: new Map([["4419", true]]) });
+    discoverWalletGenesisSnapshot.mockResolvedValue({
+      ids: [1204n, 4419n],
+      indexed: [],
+      indexedBlock: 1n,
+      chainHead: 1n,
+      stale: false,
+    });
+    renderPanel({ initialDirection: "redeem", initialOperatorId: "4419" });
+
+    expect(
+      await screen.findByText("Operator #4419 has active secured credit.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Repay it in My Operators/ })).toHaveAttribute(
+      "href",
+      "/app/genesis"
+    );
+    expect(screen.getByRole("button", { name: "Repay credit first" })).toBeDisabled();
+  });
   it("names the shortfall instead of failing after the click", async () => {
     // The wallet holds 84,120.55 against a 180,000 price. Previously the button
     // was enabled and buy() threw once the transaction was already in flight.
