@@ -7203,6 +7203,74 @@
   font-size: var(--text-sm);
 }
 
+.genesis-batch-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.genesis-tools {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.genesis-action-modal[role="dialog"] {
+  width: min(100%, 640px);
+}
+
+.genesis-action-modal[role="dialog"] > div {
+  overflow-y: auto;
+}
+
+.genesis-modal-content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.genesis-modal-content .ui-field :is(input, select) {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.genesis-modal-content p {
+  margin: 0;
+}
+
+.genesis-modal-content > p,
+.genesis-modal-content .genesis-panel-head {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.genesis-batch-select-all,
+.genesis-batch-selection label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+}
+
+.genesis-batch-review {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.genesis-batch-review p,
+.genesis-batch-review ol {
+  margin: 0;
+}
+
+.genesis-batch-review ol {
+  padding-left: 1.4rem;
+}
+
 /* ---- Tier ladder ------------------------------------------------------ */
 
 .genesis-ladder {

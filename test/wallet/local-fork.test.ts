@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { v4PoolId } from "@statics-protocol/sdk";
 
 import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
-import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
+import {
+  localForkTransactionParameters,
+  localForkWalletProvider,
+  verifyLocalForkWalletProvider,
+} from "@/lib/wallet/local-fork";
 
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 
@@ -128,6 +132,96 @@ describe("local fork wallet provider", () => {
       expect(request).not.toHaveBeenCalledWith(
         expect.objectContaining({ method: "eth_sendTransaction" })
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("local fork embedded transaction parameters", () => {
+  const fixture = deployment("0x6001600055");
+  const fork = { ...fixture, descriptor: { ...fixture.descriptor, chainId: 4_663 } };
+
+  it("uses a fresh pending fork nonce and coherent fees even when the suggested tip is 1 gwei", async () => {
+    let nonce = "0x14";
+    const requests: { method: string; params?: unknown[] }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url, init) => {
+        const input = JSON.parse(init.body);
+        requests.push(input);
+        const results: Record<string, unknown> = {
+          eth_chainId: "0x1237",
+          web3_clientVersion: "anvil/v1.8.2",
+          eth_getTransactionCount: nonce,
+          eth_gasPrice: "0x7",
+          eth_maxPriorityFeePerGas: "0x3b9aca00",
+          eth_getBlockByNumber: { number: "0x57c6e4d", baseFeePerGas: "0x7", transactions: [] },
+        };
+        if (!(input.method in results)) throw new Error("Unexpected RPC method");
+        return new Response(
+          JSON.stringify({ jsonrpc: "2.0", id: input.id, result: results[input.method] })
+        );
+      })
+    );
+    try {
+      expect(
+        await localForkTransactionParameters(fork, address("e"), "http://127.0.0.1:8663")
+      ).toEqual({
+        nonce: 20,
+        maxFeePerGas: 15n,
+        maxPriorityFeePerGas: 1n,
+      });
+      nonce = "0x15";
+      expect(
+        await localForkTransactionParameters(fork, address("e"), "http://127.0.0.1:8663")
+      ).toMatchObject({ nonce: 21 });
+      expect(requests.filter((row) => row.method === "eth_getTransactionCount")).toEqual([
+        expect.objectContaining({ params: [address("e"), "pending"] }),
+        expect.objectContaining({ params: [address("e"), "pending"] }),
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects a same-chain mainnet endpoint before preparing local transaction fields", async () => {
+    const fetch = vi.fn(async (_url, init) => {
+      const input = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: input.id,
+          result: input.method === "eth_chainId" ? "0x1237" : "Arbitrum/v1",
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    try {
+      await expect(
+        localForkTransactionParameters(fork, address("e"), "http://127.0.0.1:8663")
+      ).rejects.toThrow("Point your wallet's Robinhood RPC");
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not override public deployments or Funding Portal transactions on other chains", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    try {
+      expect(
+        await localForkTransactionParameters(
+          { ...fork, source: "checked-in-manifest" },
+          address("e"),
+          "http://127.0.0.1:8663"
+        )
+      ).toEqual({});
+      expect(
+        await localForkTransactionParameters(fork, address("e"), "http://127.0.0.1:8663", 8_453)
+      ).toEqual({});
+      expect(fetch).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

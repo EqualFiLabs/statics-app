@@ -291,6 +291,12 @@
   font-size: var(--text-2xl);
   margin: 0;
 }
+.drawerHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .drawerBody {
   /* Keep layered content (sticky table columns) below the sticky header. */
   isolation: isolate;

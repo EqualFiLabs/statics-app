@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Hex } from "viem";
+import { createPublicClient, http, type Address, type Hex } from "viem";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { ROBINHOOD_READ_METHODS } from "@/lib/server/robinhood-rpc-methods";
@@ -34,6 +34,33 @@ export async function verifyLocalForkWalletProvider(
       throw new Error("Point your wallet's Robinhood RPC at the local Anvil fork before signing.");
     }
   }
+}
+
+export async function localForkTransactionParameters(
+  deployment: LocalDeployment,
+  wallet: Address,
+  rpcUrl: string,
+  requestedChainId = deployment.descriptor.chainId
+): Promise<{ nonce?: number; maxFeePerGas?: bigint; maxPriorityFeePerGas?: bigint }> {
+  if (
+    deployment.source !== "development-fixture" ||
+    requestedChainId !== deployment.descriptor.chainId
+  )
+    return {};
+  const client = createPublicClient({ transport: http(rpcUrl, { retryCount: 0 }) });
+  await verifyLocalForkWalletProvider(client, deployment, requestedChainId);
+  // Fork and mainnet share a chain ID, but not their nonce history or fee market.
+  // Supply all three fields so wallet defaults cannot mix either chain's values.
+  const [nonce, gasPrice, block] = await Promise.all([
+    client.getTransactionCount({ address: wallet, blockTag: "pending" }),
+    client.getGasPrice(),
+    client.getBlock(),
+  ]);
+  const maxPriorityFeePerGas = gasPrice / 4n > 0n ? gasPrice / 4n : 1n;
+  const base = block.baseFeePerGas ?? gasPrice;
+  const bufferedBaseFee = base * 2n + maxPriorityFeePerGas;
+  const maxFeePerGas = gasPrice * 2n > bufferedBaseFee ? gasPrice * 2n : bufferedBaseFee;
+  return { nonce, maxFeePerGas, maxPriorityFeePerGas };
 }
 
 export function localForkWalletProvider<Provider extends WalletProvider>(

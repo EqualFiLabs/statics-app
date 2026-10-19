@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import {
@@ -21,6 +21,7 @@ import {
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisCarousel } from "@/components/genesis/GenesisCarousel";
+import { GenesisBatchPanel } from "@/components/genesis/GenesisBatchPanel";
 import { GenesisCreditPanel } from "@/components/genesis/GenesisCreditPanel";
 import { GenesisIdentityPanel } from "@/components/genesis/GenesisIdentityPanel";
 import {
@@ -32,7 +33,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
-import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
+import { genesisVaultEpochQuery } from "@/lib/genesis/vault-epoch-query";
 import {
   EMPTY_GENESIS_PORTFOLIO,
   batchGenesisIds,
@@ -66,7 +67,13 @@ function describeGenesisError(error: unknown, copy: GenesisErrorCopy): string {
 
 type ActionTab = "activate" | "rewards" | "credit";
 
-export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
+export function StandaloneGenesisPage({
+  deployment,
+  controls,
+}: {
+  deployment: LaunchDeployment;
+  controls?: ReactNode;
+}) {
   const t = useTranslations("operators");
   const tShell = useTranslations("shell");
   const errorCopy: GenesisErrorCopy = {
@@ -90,25 +97,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const [error, setError] = useState<string | null>(null);
   const [claimProgress, setClaimProgress] = useState<string | null>(null);
 
-  const vault = useQuery({
-    queryKey: ["genesis-vault-epoch", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient),
-    queryFn: async () => {
-      if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      const accounting = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: currentGenesisVaultAbi,
-        functionName: "vaultAccounting",
-      });
-      return {
-        epochActive: accounting.epochActive,
-        genesisEpochEnd: Number(accounting.genesisEpochEnd),
-        vaultPrice: accounting.vaultPrice,
-        maximumSupply: accounting.maximumSupply,
-        circulatingGenesis: accounting.circulatingGenesis,
-      };
-    },
-  });
+  const vault = useQuery(genesisVaultEpochQuery(publicClient, deployment));
 
   // Shared with the Overview: same key, same fetcher, one walk of the wallet.
   const owned = useQuery({
@@ -306,6 +295,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         {t("recoverOperatorCredit")} <span aria-hidden="true">→</span>
       </Link>
     ) : null;
+  const pageActions = (
+    <>
+      {recoveriesLink}
+      {controls}
+    </>
+  );
 
   if (!wallet) {
     const action =
@@ -323,7 +318,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           : undefined;
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("connectTitle")}
           description={t("connectDescription")}
@@ -332,11 +327,17 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       </div>
     );
   }
-  if (owned.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
+  if (owned.isLoading)
+    return (
+      <div className="genesis-page">
+        {pageActions}
+        <p className="dapp-loading">{t("loading")}</p>
+      </div>
+    );
   if (owned.error) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           tone="error"
           title={t("unavailable")}
@@ -353,7 +354,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length && owned.data?.stale) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("syncingTitle")}
           description={t("syncing")}
@@ -369,7 +370,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("emptyTitle")}
           description={
@@ -447,7 +448,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
   return (
     <div className="genesis-page">
-      {recoveriesLink}
+      {pageActions}
       {owned.data?.stale && (
         <p className="genesis-note is-warning" role="status">
           {t("syncing")}
@@ -526,6 +527,8 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           {error}
         </p>
       )}
+
+      <GenesisBatchPanel deployment={deployment} items={items} onConfirmed={refresh} />
 
       <GenesisCarousel
         items={items.map((item) => ({

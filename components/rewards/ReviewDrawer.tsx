@@ -16,6 +16,7 @@ export function ReviewDrawer({
   busy = false,
   onClose,
   children,
+  headerActions,
   variant = "drawer",
   className = "",
 }: {
@@ -27,6 +28,8 @@ export function ReviewDrawer({
   className?: string;
   onClose: () => void;
   children: ReactNode;
+  /** Optional controls immediately before the close button. */
+  headerActions?: ReactNode;
 }) {
   const t = useTranslations("earnUx"),
     titleId = useId();
@@ -139,15 +142,18 @@ export function ReviewDrawer({
       >
         <header className={styles.drawerHeader}>
           <h2 id={titleId}>{title}</h2>
-          <button
-            type="button"
-            className="ui-button ui-button--ghost"
-            disabled={busy}
-            onClick={onClose}
-            aria-label={t("close")}
-          >
-            ×
-          </button>
+          <div className={styles.drawerHeaderActions}>
+            {headerActions}
+            <button
+              type="button"
+              className="ui-button ui-button--ghost"
+              disabled={busy}
+              onClick={onClose}
+              aria-label={t("close")}
+            >
+              ×
+            </button>
+          </div>
         </header>
         <div className={styles.drawerBody}>{children}</div>
       </div>
