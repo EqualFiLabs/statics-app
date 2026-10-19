@@ -436,7 +436,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               routeId === "markets")
           ) && (
             <div className="dapp-page-intro">
-              {detailParent && (
+              {detailParent && routeId !== "liquidityCreator" && (
                 <Link className="dapp-header-breadcrumb" href={`/app/${detailParent}`}>
                   ← {tRoutes(`${detailParent}.label`)}
                 </Link>
@@ -448,6 +448,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 compact={detailParent !== null}
               />
             </div>
+          )}
+
+          {routeId === "liquidityCreator" && (
+            <Link className="liquidity-back dapp-liquidity-return" href="/app/liquidity">
+              ← {tRoutes("liquidity.label")}
+            </Link>
           )}
 
           {wallet.error && (

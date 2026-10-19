@@ -83,6 +83,14 @@
   color: var(--app-text);
 }
 
+.dapp-shell .dapp-liquidity-return {
+  display: block;
+  width: fit-content;
+  margin-bottom: 1rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .dapp-eyebrow {
   color: var(--visual-brand);
   font-family: var(--font-mono);
