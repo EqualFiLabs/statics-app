@@ -3043,17 +3043,6 @@
       "ofSupply": "固定总量 {count}",
       "unavailable": "Operator 数据暂时不可用。"
     },
-    "fees": {
-      "title": "Statics 手续费的去向",
-      "meta": "通用池当前分配比例",
-      "pol": "协议自有流动性",
-      "stakers": "STATICS 质押者",
-      "treasury": "国库",
-      "creator": "资金池创建者",
-      "share": "{label} · {share}%",
-      "unavailable": "手续费分配暂时不可用。",
-      "hint": "此处为配置比例，尚未考虑各池的 POL 设置和奖励资格回退。实际分配可能不同；许可池使用各自的条款。"
-    },
     "activity": {
       "title": "协议动态",
       "filter": "筛选动态",

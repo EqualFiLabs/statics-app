@@ -585,8 +585,6 @@ describe("protocol overview", () => {
     const base = mocks.read.getMockImplementation()!;
     mocks.read.mockImplementation(async (call: { functionName: string; args?: unknown[] }) => {
       if (call.functionName === "totalStaked") return parseEther("2500000");
-      if (call.functionName === "generalFeeAllocation")
-        return { polShareBps: 4000, staticsStakerShareBps: 3500, treasuryShareBps: 2000 };
       if (call.functionName === "rewardAsset")
         return {
           eligibleStake: 0n,
@@ -621,20 +619,18 @@ describe("protocol overview", () => {
     expect(await screen.findByRole("heading", { name: "Overview", level: 1 })).toBeInTheDocument();
     const totals = screen.getByRole("region", { name: "Protocol totals" });
     expect(await within(totals).findByText("0.25% of supply")).toBeInTheDocument();
-    for (const name of ["Exchange", "Staking", "Gauges", "Where the Statics fee goes"])
+    for (const name of ["Exchange", "Staking", "Gauges"])
       expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Markets ›" })).toHaveAttribute(
       "href",
       "/app/markets"
     );
-    // Show configuration only: current shares cannot reconstruct historical fee routing.
-    const fees = screen.getByRole("region", { name: "Where the Statics fee goes" });
-    expect(await within(fees).findByText("Protocol-owned liquidity · 40%")).toBeInTheDocument();
-    expect(within(fees).getByText("Pool creator · 5%")).toBeInTheDocument();
     expect(
-      within(fees).getByText(/Configured shares, before pool-specific POL/)
-    ).toBeInTheDocument();
-    expect(within(fees).queryByText(/≈/)).not.toBeInTheDocument();
+      screen.queryByRole("region", { name: "Where the Statics fee goes" })
+    ).not.toBeInTheDocument();
+    expect(mocks.read).not.toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "generalFeeAllocation" })
+    );
     // Only assets whose reward index has moved are listed as paid to stakers.
     const staking = screen.getByRole("region", { name: "Staking" });
     expect(await within(staking).findByText("WETH")).toBeInTheDocument();

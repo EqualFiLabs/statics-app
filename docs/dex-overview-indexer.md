@@ -99,14 +99,12 @@ not recover past events; the active local database is not reset by this change.
 
 The Phase 1 home at `/app` reuses these market endpoints for totals, top pools and trades.
 It also reads deployment-scoped `/phase-one/gauges` and `/phase-one/activity?limit=10`,
-plus the deployment diamond's `totalStaked`, `generalFeeAllocation` and `rewardAsset` views.
+plus the deployment diamond's `totalStaked` and `rewardAsset` views.
 Reward-asset discovery is limited to ERC-20 assets in reviewed supported pools.
 Connected-wallet data reuses the accounts and Genesis portfolio queries; unavailable reads
 remain unknown instead of becoming zero balances. Overview queries reconcile after confirmed
 transactions and public protocol data refreshes every 30 seconds.
 
-The fee card shows current general-pool configuration, not historical payouts. Pool-specific
-POL settings, reward eligibility fallbacks and permissioned terms can change actual routing.
 The Operator supply chart shows current vault inventory and circulation without assuming
 that the initial treasury allocation is still held. Expired activated gauge periods are
 separate from reserves that have never been activated and from unavailable emissions data.

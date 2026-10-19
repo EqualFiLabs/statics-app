@@ -3043,17 +3043,6 @@
       "ofSupply": "of {count} fixed",
       "unavailable": "Operator figures are unavailable right now."
     },
-    "fees": {
-      "title": "Where the Statics fee goes",
-      "meta": "Current general-pool allocation",
-      "pol": "Protocol-owned liquidity",
-      "stakers": "STATICS stakers",
-      "treasury": "Treasury",
-      "creator": "Pool creator",
-      "share": "{label} · {share}%",
-      "unavailable": "The fee split is unavailable right now.",
-      "hint": "Configured shares, before pool-specific POL settings and reward eligibility fallbacks. Actual distributions can differ; permissioned pools use their own terms."
-    },
     "activity": {
       "title": "Protocol activity",
       "filter": "Filter activity",

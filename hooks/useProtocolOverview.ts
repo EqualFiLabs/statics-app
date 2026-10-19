@@ -9,20 +9,11 @@ import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import { loadGaugeReserve, loadPhaseOneProtocolActivity } from "@/lib/indexer/phase-one";
 import { useWalletState } from "@/providers/wallet-context";
 
-const BPS = 10_000;
 const LIVE_MS = 30_000;
 
-export type FeeAllocation = Readonly<{
-  pol: number;
-  stakers: number;
-  treasury: number;
-  /** Whatever the three configured shares leave, which goes to the pool creator. */
-  creator: number;
-}>;
-
 /**
- * The Phase 1 figures the protocol overview adds to the DEX data: global staking, the general
- * pool fee split, which assets have paid stakers, the gauge reserve, recent protocol events,
+ * The Phase 1 figures the protocol overview adds to the DEX data: global staking,
+ * which assets have paid stakers, the gauge reserve, recent protocol events,
  * and the connected wallet's STATICS. Chain reads use the deployment's own chain.
  */
 export function useProtocolOverview(deployment: PhaseOneDeployment) {
@@ -52,16 +43,11 @@ export function useProtocolOverview(deployment: PhaseOneDeployment) {
             .map((token) => [token.address.toLowerCase(), token])
         ).values(),
       ];
-      const [totalStaked, allocation, assets] = await Promise.all([
+      const [totalStaked, assets] = await Promise.all([
         publicClient.readContract({
           address: diamond,
           abi: staticsAbi,
           functionName: "totalStaked",
-        }),
-        publicClient.readContract({
-          address: diamond,
-          abi: staticsAbi,
-          functionName: "generalFeeAllocation",
         }),
         Promise.all(
           candidates.map((token) =>
@@ -74,21 +60,8 @@ export function useProtocolOverview(deployment: PhaseOneDeployment) {
           )
         ),
       ]);
-      const fees: FeeAllocation = {
-        pol: allocation.polShareBps,
-        stakers: allocation.staticsStakerShareBps,
-        treasury: allocation.treasuryShareBps,
-        creator: Math.max(
-          0,
-          BPS -
-            allocation.polShareBps -
-            allocation.staticsStakerShareBps -
-            allocation.treasuryShareBps
-        ),
-      };
       return {
         totalStaked,
-        fees,
         rewardAssets: candidates
           .filter((_, index) => assets[index]!.indexRay > 0n)
           .map((token) => ({ address: token.address, symbol: token.symbol })),

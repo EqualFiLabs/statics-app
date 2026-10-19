@@ -3043,17 +3043,6 @@
       "ofSupply": "de {count} fijos",
       "unavailable": "Las cifras de Operadores no están disponibles ahora."
     },
-    "fees": {
-      "title": "Adónde va la comisión de Statics",
-      "meta": "Asignación actual de pools generales",
-      "pol": "Liquidez propia del protocolo",
-      "stakers": "Quienes hacen staking de STATICS",
-      "treasury": "Tesorería",
-      "creator": "Creador del pool",
-      "share": "{label} · {share}%",
-      "unavailable": "El reparto de comisiones no está disponible ahora.",
-      "hint": "Porcentajes configurados antes de los ajustes POL de cada pool y las reglas de elegibilidad. La distribución real puede variar; los pools con permiso usan sus propios términos."
-    },
     "activity": {
       "title": "Actividad del protocolo",
       "filter": "Filtrar actividad",

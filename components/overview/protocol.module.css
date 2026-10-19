@@ -1,4 +1,4 @@
-/* The Phase 1 protocol overview: STATICS, every live module, the fee split and activity. */
+/* The Phase 1 protocol overview: STATICS, every live module and activity. */
 .page {
   display: grid;
   gap: 20px;
@@ -332,58 +332,15 @@
   color: var(--app-text-secondary);
   font-size: var(--text-xs);
 }
-.legend span,
-.legendItem {
+.legend span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.legend i,
-.legendItem i {
+.legend i {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-pill);
-}
-
-/* ---- Fee split ------------------------------------------------------------------------- */
-.feeBar {
-  display: flex;
-  gap: 2px;
-  height: 24px;
-  overflow: hidden;
-  border-radius: var(--radius-sm);
-}
-.feeBar [data-fee="pol"],
-.legendItem [data-fee="pol"] {
-  background: var(--token-badge-2);
-}
-.feeBar [data-fee="stakers"],
-.legendItem [data-fee="stakers"] {
-  background: var(--token-badge-4);
-}
-.feeBar [data-fee="treasury"],
-.legendItem [data-fee="treasury"] {
-  background: var(--app-text-muted);
-}
-.feeBar [data-fee="creator"],
-.legendItem [data-fee="creator"] {
-  background: var(--warning);
-}
-.feeRows {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-.feeRows > div {
-  display: grid;
-  gap: 2px;
-}
-.legendItem {
-  color: var(--app-text-secondary);
-  font-size: var(--text-xs);
-}
-.feeRows strong {
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Activity and pools ---------------------------------------------------------------- */
@@ -496,9 +453,6 @@
   .modules,
   .split {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .feeRows {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (width < 600px) {

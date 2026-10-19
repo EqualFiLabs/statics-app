@@ -49,7 +49,7 @@ const valueOf = (amount: bigint | null | undefined, price: bigint | null | undef
 /**
  * The Phase 1 home: every live part of Statics on one page. STATICS and the protocol totals
  * lead, then the connected wallet across both phases, then one card per module (exchange,
- * staking, gauges and, where Genesis is deployed beside Phase 1, Operators), the fee split,
+ * staking, gauges and, where Genesis is deployed beside Phase 1, Operators),
  * a mixed activity feed and the top pools. The full DEX dashboard lives at /app/markets.
  */
 export function ProtocolOverview({
@@ -216,19 +216,6 @@ export function ProtocolOverview({
   const share = (count: bigint) =>
     supply > 0n ? `${(Number(count) / Number(supply)) * 100}%` : "0%";
   const count = (value: bigint) => new Intl.NumberFormat(locale).format(value);
-
-  // ---- Fee split -----------------------------------------------------------------------------
-  const fees = staking?.fees ?? null;
-  const feeRows = fees
-    ? (
-        [
-          ["pol", fees.pol],
-          ["stakers", fees.stakers],
-          ["treasury", fees.treasury],
-          ["creator", fees.creator],
-        ] as const
-      ).map(([key, bps]) => ({ key, bps }))
-    : [];
 
   // ---- Activity ------------------------------------------------------------------------------
   type Row = Readonly<{
@@ -754,44 +741,6 @@ export function ProtocolOverview({
           </section>
         )}
       </div>
-
-      <section className={styles.card} aria-labelledby="overview-fees">
-        <div className={styles.cardHeading}>
-          <h2 id="overview-fees">{t("fees.title")}</h2>
-          <span className={styles.secondary}>{t("fees.meta")}</span>
-        </div>
-        {fees ? (
-          <>
-            <div
-              className={styles.feeBar}
-              role="img"
-              aria-label={feeRows
-                .map((row) => `${t(`fees.${row.key}`)} ${row.bps / 100}%`)
-                .join(", ")}
-            >
-              {feeRows.map((row) => (
-                <span key={row.key} data-fee={row.key} style={{ width: `${row.bps / 100}%` }} />
-              ))}
-            </div>
-            <div className={styles.feeRows}>
-              {feeRows.map((row) => (
-                <div key={row.key}>
-                  <span className={styles.legendItem}>
-                    <i data-fee={row.key} aria-hidden="true" />
-                    {t("fees.share", { label: t(`fees.${row.key}`), share: row.bps / 100 })}
-                  </span>
-                  <strong>{row.bps / 100}%</strong>
-                </div>
-              ))}
-            </div>
-            <p className={styles.secondary}>{t("fees.hint")}</p>
-          </>
-        ) : (
-          <p className={styles.secondary}>
-            {protocol.staking.isError ? t("fees.unavailable") : tDex("loading")}
-          </p>
-        )}
-      </section>
 
       <div className={styles.split}>
         <section className={styles.card} aria-labelledby="overview-activity">
