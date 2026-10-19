@@ -15,7 +15,7 @@ import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { compactNumber, quoteAmount } from "./format";
 import styles from "./dex.module.css";
 
-const SORTS = ["volume", "valueLocked", "yield"] as const;
+const SORTS = ["volume", "valueLocked", "apr"] as const;
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 
 /**
@@ -340,7 +340,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                 <th scope="col">{t("column.volume")}</th>
                 <th scope="col">{t("column.fees")}</th>
                 <th scope="col">{t("column.valueLocked")}</th>
-                <th scope="col">{t("column.incentives")}</th>
+                <th scope="col">{t("column.projectedApr")}</th>
                 <th scope="col">{t("column.yield")}</th>
                 <th scope="col">
                   <span className={styles.srOnly}>{t("column.actions")}</span>
@@ -394,8 +394,27 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                     >
                       {pool.priced ? money(pool.valueLocked, false, dex.pools.data?.quote) : "—"}
                     </td>
-                    <td data-label={t("column.incentives")}>
-                      {pool.incentiveStreams ? t("streams", { count: pool.incentiveStreams }) : "—"}
+                    <td
+                      className={styles.yield}
+                      data-label={t("column.projectedApr")}
+                      title={`${t("projectedAprHelp")} ${t("eligibleLpValue", {
+                        value: money(
+                          pool.lpRewardProjection?.eligibleValueLocked,
+                          false,
+                          dex.pools.data?.quote
+                        ),
+                      })}`}
+                    >
+                      {pool.projectedLpAprBps === null
+                        ? "—"
+                        : `${(pool.projectedLpAprBps / 100).toFixed(1)}%`}
+                      {pool.lpRewardProjection?.status === "paused" ? (
+                        <span className={styles.yieldWindow}>{t("rewardsPaused")}</span>
+                      ) : pool.incentiveStreams > 0 ? (
+                        <span className={styles.yieldWindow}>
+                          {t("streams", { count: pool.incentiveStreams })}
+                        </span>
+                      ) : null}
                     </td>
                     <td className={styles.yield} data-label={t("column.yield")}>
                       {yieldText(pool)}
@@ -469,6 +488,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
             {t("restartPools")}
           </button>
         )}
+        <span className={styles.muted}>{t("projectedAprNote")}</span>
         <span className={styles.muted}>{t("yieldNote")}</span>
       </section>
 

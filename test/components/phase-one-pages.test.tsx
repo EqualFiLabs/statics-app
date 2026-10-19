@@ -480,6 +480,15 @@ describe("Markets", () => {
     const pools = screen.getByRole("region", { name: "Pools" });
     const row = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
     expect(
+      within(pools).getByRole("columnheader", { name: "Projected LP APR" })
+    ).toBeInTheDocument();
+    expect(
+      within(pools).getByRole("columnheader", { name: "Trailing 7-day yield" })
+    ).toBeInTheDocument();
+    expect(within(row).getByText("3.2%")).toHaveAttribute("data-label", "Projected LP APR");
+    expect(within(row).getByText("41.8%")).toHaveAttribute("data-label", "Trailing 7-day yield");
+    fireEvent.click(within(pools).getByRole("button", { name: "LP reward APR" }));
+    expect(
       within(row).getByRole("link", { name: "Add liquidity to STATICS / WETH" })
     ).toHaveAttribute("href", `/app/liquidity?poolId=${hash("1")}`);
     expect(screen.getByRole("region", { name: "Tokens" })).toHaveTextContent("STATICS");

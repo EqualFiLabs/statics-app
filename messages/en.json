@@ -2755,7 +2755,8 @@
     "sort": {
       "volume": "Volume",
       "valueLocked": "Value locked",
-      "yield": "Yield"
+      "yield": "Yield",
+      "apr": "LP reward APR"
     },
     "column": {
       "pool": "Pool",
@@ -2764,11 +2765,11 @@
       "volume": "Volume 24h",
       "fees": "Est. LP fees",
       "valueLocked": "Value locked",
-      "incentives": "Incentives",
-      "yield": "Est. yield",
+      "yield": "Trailing 7-day yield",
       "actions": "Actions",
       "token": "Token",
-      "price": "Price"
+      "price": "Price",
+      "projectedApr": "Projected LP APR"
     },
     "fee": "{fee}% fee",
     "unpriced": "Unpriced: pair price only",
@@ -2780,7 +2781,7 @@
     "addLiquidityTo": "Add liquidity to {pool}",
     "noMatch": "No pools match.",
     "noPools": "No pools yet.",
-    "yieldNote": "Est. yield = trading fees plus STATICS emissions and incentives paid to liquidity, annualised from the last 7 days, or from the history available when a pool is newer (at least a day). An estimate, not a promise.",
+    "yieldNote": "Trailing yield includes estimated LP trading fees, credited STATICS emissions and accrued LP incentives, annualised over up to 7 days of history (at least one day). It does not project the current reward rate.",
     "tokensTitle": "Tokens",
     "via": "via {route}",
     "tradesTitle": "Recent trades",
@@ -2805,7 +2806,11 @@
     "yieldWindow": "{days, plural, one {# day} other {# days}} of history",
     "feeUnavailable": "Fee unavailable",
     "approximateFee": "≈ {fee}% fee",
-    "feeBreakdown": "{lp}% LP fee; {input}% input fee; {output}% output fee. Combined rate is approximate."
+    "feeBreakdown": "{lp}% LP fee; {input}% input fee; {output}% output fee. Combined rate is approximate.",
+    "projectedAprHelp": "Pool-average estimate at current reward prices and eligible managed LP value. Additional deposits dilute APR. Your return depends on your range and time in range.",
+    "projectedAprNote": "Projected LP APR annualises the current LP reward rate over eligible managed liquidity at current prices, using 52 weeks without compounding. Allocator rewards and trading fees are excluded; LPs retain their native fees on top. This rate applies while funding lasts; top-ups, prices and liquidity can change it.",
+    "rewardsPaused": "Rewards paused: no in-range LPs",
+    "eligibleLpValue": "Eligible managed LP value: {value}"
   },
   "rangeChart": {
     "description": "Current price {current} {unit}. Range {min} to {max}.",

@@ -232,3 +232,39 @@ it("retains headline price provenance and accepts older indexers without it", ()
     )
   ).toThrow(/price fallback/);
 });
+
+describe("LP reward projections", () => {
+  it("retains the projection separately from trailing yield and tolerates older indexers", () => {
+    const sample = dexFixture(deployment, "usdg");
+    const current = parseDexPools(sample.pools, "dex-fixture").items[0]!;
+    expect(current.projectedLpAprBps).toBeGreaterThan(0);
+    expect(current.projectedLpAprBps).not.toBe(current.estimatedYieldBps);
+    expect(current.lpRewardProjection?.annualRewardValue).toBe(100_000n * 10n ** 6n);
+    const legacy = structuredClone(sample.pools);
+    for (const p of legacy.items) {
+      delete (p as { projectedLpAprBps?: number }).projectedLpAprBps;
+      delete (p as { lpRewardProjection?: unknown }).lpRewardProjection;
+    }
+    expect(parseDexPools(legacy, "dex-fixture").items[0]).toMatchObject({
+      projectedLpAprBps: null,
+      lpRewardProjection: null,
+    });
+  });
+  it("rejects APRs with missing or inconsistent denominators and malformed projection data", () => {
+    const sample = dexFixture(deployment, "usdg");
+    for (const update of [
+      { eligibleValueLocked: "0" },
+      { annualRewardValue: null },
+      { status: "unknown" },
+      { basis: "total-pool-tvl" },
+      { assets: ["not-an-address"] },
+    ]) {
+      const pools = structuredClone(sample.pools);
+      Object.assign(pools.items[0]!.lpRewardProjection, update);
+      expect(() => parseDexPools(pools, "dex-fixture")).toThrow();
+    }
+    const pools = structuredClone(sample.pools);
+    pools.items[0]!.projectedLpAprBps = 999;
+    expect(() => parseDexPools(pools, "dex-fixture")).toThrow("projected LP APR");
+  });
+});

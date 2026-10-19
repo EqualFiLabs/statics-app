@@ -28,7 +28,7 @@ export function marketQuery(params: URLSearchParams) {
     days = integer("days", 30, 90);
   if (
     !["usdg", "weth"].includes(quote) ||
-    !["volume", "valueLocked", "fees", "yield", "created"].includes(sort) ||
+    !["volume", "valueLocked", "fees", "yield", "apr", "created"].includes(sort) ||
     !["asc", "desc"].includes(direction) ||
     search.length > 256 ||
     limit === null ||
@@ -46,11 +46,13 @@ export function marketPoolPage(data: BuiltMarket, q: Query, offset: number) {
       ? "volume24h"
       : q.sort === "fees"
         ? "lpFees24h"
-        : q.sort === "yield"
-          ? "estimatedYieldBps"
-          : q.sort === "created"
-            ? "createdAtBlock"
-            : "valueLocked";
+        : q.sort === "apr"
+          ? "projectedLpAprBps"
+          : q.sort === "yield"
+            ? "estimatedYieldBps"
+            : q.sort === "created"
+              ? "createdAtBlock"
+              : "valueLocked";
   const rows = data.pools
     .filter((p) =>
       [
