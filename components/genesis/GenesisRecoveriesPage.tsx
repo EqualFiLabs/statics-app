@@ -14,7 +14,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
-import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
+import { genesisVaultEpochQuery } from "@/lib/genesis/vault-epoch-query";
 import { loadRecoverableGenesisCredits } from "@/lib/indexer/statics";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
 import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
@@ -105,23 +105,11 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
   const [busy, setBusy] = useState<bigint | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const epoch = useQuery({
-    queryKey: ["genesis-vault-epoch", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient),
-    queryFn: async () => {
-      if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      const accounting = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: currentGenesisVaultAbi,
-        functionName: "vaultAccounting",
-      });
-      return accounting.epochActive;
-    },
-  });
+  const epoch = useQuery(genesisVaultEpochQuery(publicClient, deployment));
 
   const recoveries = useQuery({
     queryKey: ["launch-genesis-recoveries", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient && epoch.data === false),
+    enabled: Boolean(publicClient && epoch.data?.epochActive === false),
     queryFn: async (): Promise<readonly RecoveryCredit[]> => {
       if (!publicClient) return [];
       await verifyLaunchDeploymentForRead(publicClient, deployment);
@@ -226,7 +214,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
     }
   };
 
-  if (epoch.isLoading) {
+  if (epoch.isPending) {
     return <p className="dapp-loading">Checking recovery availability…</p>;
   }
   if (epoch.error) {
@@ -236,7 +224,7 @@ function LaunchGenesisRecoveries({ deployment }: { deployment: LaunchDeployment 
       </p>
     );
   }
-  if (epoch.data !== false) {
+  if (epoch.data.epochActive) {
     return (
       <EmptyState
         title="Recovery opens after the Genesis Epoch"

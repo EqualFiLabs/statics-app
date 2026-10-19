@@ -33,7 +33,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
-import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
+import { genesisVaultEpochQuery } from "@/lib/genesis/vault-epoch-query";
 import {
   EMPTY_GENESIS_PORTFOLIO,
   batchGenesisIds,
@@ -97,25 +97,7 @@ export function StandaloneGenesisPage({
   const [error, setError] = useState<string | null>(null);
   const [claimProgress, setClaimProgress] = useState<string | null>(null);
 
-  const vault = useQuery({
-    queryKey: ["genesis-vault-epoch", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient),
-    queryFn: async () => {
-      if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      const accounting = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: currentGenesisVaultAbi,
-        functionName: "vaultAccounting",
-      });
-      return {
-        epochActive: accounting.epochActive,
-        genesisEpochEnd: Number(accounting.genesisEpochEnd),
-        vaultPrice: accounting.vaultPrice,
-        maximumSupply: accounting.maximumSupply,
-        circulatingGenesis: accounting.circulatingGenesis,
-      };
-    },
-  });
+  const vault = useQuery(genesisVaultEpochQuery(publicClient, deployment));
 
   // Shared with the Overview: same key, same fetcher, one walk of the wallet.
   const owned = useQuery({
