@@ -368,6 +368,7 @@
   "operators": {
     "bulk": {
       "activation": {
+        "settings": "Calibur 设置",
         "title": "为此 Privy 钱包启用原子批次",
         "description": "Calibur 委托会持续生效，直到你主动移除。此钱包会为临时浏览器中继账户提供资金以完成激活，可退回的 ETH 随后返还。低于退款 Gas 费用的少量余额可能留在中继账户。退款完成前请保持此标签页打开。",
         "checking": "正在检查…",

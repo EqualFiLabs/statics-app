@@ -21,6 +21,7 @@ import {
 import { delegationFromCode } from "@/lib/genesis/atomic-batch";
 import { REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES, ROBINHOOD_CALIBUR } from "@/lib/genesis/calibur";
 import { useWalletState } from "@/providers/wallet-context";
+import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
 
 type Review =
   | { action: "activate"; quote: BrowserRelayQuote }
@@ -212,8 +213,7 @@ export function BrowserCaliburActivationPanel() {
   };
 
   return (
-    <section className="genesis-browser-relay" aria-label={t("title")}>
-      <h4>{t("title")}</h4>
+    <GenesisActionModal label={t("settings")} busy={busy}>
       <p>{t("description")}</p>
       {delegation === "fresh" && (
         <button
@@ -310,6 +310,6 @@ export function BrowserCaliburActivationPanel() {
       )}
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
-    </section>
+    </GenesisActionModal>
   );
 }

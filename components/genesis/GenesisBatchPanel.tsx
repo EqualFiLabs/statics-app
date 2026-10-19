@@ -39,6 +39,7 @@ import {
 import { oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { useWalletState } from "@/providers/wallet-context";
+import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
 
 type ReviewedBatch = Readonly<{
   items: readonly OwnedGenesis[];
@@ -144,13 +145,12 @@ export function GenesisBatchPanel({
     (deployment.descriptor.chainId !== 4663 || walletState.walletKind !== "embedded")
   ) {
     return (
-      <section className="ui-card genesis-panel" aria-label={t("title")}>
+      <GenesisActionModal label={t("title")} busy={busy}>
         <div className="genesis-panel-head">
-          <h3>{t("title")}</h3>
           <p>{t("pendingVerification")}</p>
         </div>
         <p className="genesis-note">{t("unsupported")}</p>
-      </section>
+      </GenesisActionModal>
     );
   }
 
@@ -368,9 +368,8 @@ export function GenesisBatchPanel({
   };
 
   return (
-    <section className="ui-card genesis-panel" aria-label={t("title")}>
+    <GenesisActionModal label={t("title")} busy={busy}>
       <div className="genesis-panel-head">
-        <h3>{t("title")}</h3>
         <p>{t("launchDescription")}</p>
       </div>
       <label className="ui-field">
@@ -545,6 +544,6 @@ export function GenesisBatchPanel({
         </p>
       )}
       <p className="genesis-note">{t("unsupported")}</p>
-    </section>
+    </GenesisActionModal>
   );
 }

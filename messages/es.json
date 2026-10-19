@@ -368,6 +368,7 @@
   "operators": {
     "bulk": {
       "activation": {
+        "settings": "Configuración de Calibur",
         "title": "Activar lotes atómicos para esta billetera Privy",
         "description": "La delegación a Calibur permanece hasta que la elimines. Un relayer temporal del navegador, financiado por esta billetera, la activa y devuelve el ETH recuperable. Puede quedar un pequeño saldo inferior al coste de gas del reembolso. Mantén esta pestaña abierta hasta que termine el reembolso.",
         "checking": "Comprobando…",

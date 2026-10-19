@@ -7211,18 +7211,35 @@
   overflow: auto;
 }
 
-.genesis-browser-relay {
-  display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-md);
+.genesis-tools {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.genesis-browser-relay h4,
-.genesis-browser-relay p {
+.genesis-action-modal[role="dialog"] {
+  width: min(100%, 640px);
+}
+
+.genesis-action-modal[role="dialog"] > div {
+  overflow-y: auto;
+}
+
+.genesis-modal-content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.genesis-modal-content p {
   margin: 0;
+}
+
+.genesis-modal-content > p,
+.genesis-modal-content .genesis-panel-head {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 
 .genesis-batch-selection label {

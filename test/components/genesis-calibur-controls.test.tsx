@@ -16,7 +16,7 @@ import {
 } from "@/lib/genesis/owned";
 import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState, type WalletState } from "@/providers/wallet-context";
-import { act, render, screen, waitFor } from "@/test/render";
+import { act, fireEvent, render, screen, waitFor, within } from "@/test/render";
 
 const mocks = vi.hoisted(() => ({ getCode: vi.fn(), signAuthorization: vi.fn() }));
 const publicClient = { getCode: mocks.getCode };
@@ -154,13 +154,14 @@ function renderPage(option: DeploymentOption, count: number, walletState = conne
 }
 
 async function expectWalletControls() {
+  if (!screen.queryByRole("dialog", { name: "Calibur settings" })) {
+    fireEvent.click(screen.getByRole("button", { name: "Calibur settings" }));
+  }
   expect(
     await screen.findByRole("button", { name: "Review Calibur delegation removal" })
   ).toBeEnabled();
   expect(await screen.findByRole("button", { name: "Recover unused relay ETH" })).toBeEnabled();
-  expect(
-    screen.getAllByRole("region", { name: "Activate atomic batches for this Privy wallet" })
-  ).toHaveLength(1);
+  expect(screen.getAllByRole("dialog", { name: "Calibur settings" })).toHaveLength(1);
   expect(mocks.signAuthorization).not.toHaveBeenCalled();
 }
 
@@ -187,6 +188,35 @@ describe.each([
     }
   );
 
+  it("keeps wallet and bulk controls behind separate dialogs and preserves selection", async () => {
+    renderPage(option, 2);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review Calibur delegation removal" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const settings = screen.getByRole("button", { name: "Calibur settings" });
+    settings.focus();
+    fireEvent.click(settings);
+    await expectWalletControls();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(settings).toHaveFocus();
+    expect(settings).toHaveAttribute("aria-expanded", "false");
+
+    const manage = screen.getByRole("button", { name: "Manage Operators together" });
+    manage.focus();
+    fireEvent.click(manage);
+    const dialog = screen.getByRole("dialog", { name: "Manage Operators together" });
+    const selection = within(dialog).getAllByRole("checkbox")[0];
+    fireEvent.click(selection);
+    expect(selection).toBeChecked();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(manage).toHaveFocus();
+    fireEvent.click(manage);
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
+    expect(mocks.signAuthorization).not.toHaveBeenCalled();
+  });
+
   it("preserves the controls when holdings fall from two to one to zero", async () => {
     const client = renderPage(option, 2);
     await expectWalletControls();
@@ -199,14 +229,13 @@ describe.each([
 
   it("keeps the controls hidden for external wallets", () => {
     renderPage(option, 2, { ...connectedWallet, walletKind: "external" });
-    expect(
-      screen.queryByRole("region", { name: "Activate atomic batches for this Privy wallet" })
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
   });
 
   it("offers activation for an undelegated embedded wallet with no Operators", async () => {
     mocks.getCode.mockResolvedValue("0x");
     renderPage(option, 0);
+    fireEvent.click(screen.getByRole("button", { name: "Calibur settings" }));
     expect(await screen.findByRole("button", { name: "Review Calibur activation" })).toBeEnabled();
     expect(mocks.signAuthorization).not.toHaveBeenCalled();
   });
@@ -228,9 +257,7 @@ describe.each([
           },
         };
     renderPage(otherChain, 2);
-    expect(
-      screen.queryByRole("region", { name: "Activate atomic batches for this Privy wallet" })
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
   });
 });
 
@@ -245,7 +272,5 @@ it("keeps full-protocol development deployments without verified Calibur support
     },
     2
   );
-  expect(
-    screen.queryByRole("region", { name: "Activate atomic batches for this Privy wallet" })
-  ).toBeNull();
+  expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
 });

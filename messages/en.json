@@ -368,6 +368,7 @@
   "operators": {
     "bulk": {
       "activation": {
+        "settings": "Calibur settings",
         "title": "Activate atomic batches for this Privy wallet",
         "description": "Calibur delegation persists until you remove it. A temporary browser relayer funded by this wallet activates it, then returns recoverable ETH. A small balance may remain below the refund gas cost. Keep this tab open until the refund finishes.",
         "checking": "Checking…",

@@ -24,6 +24,7 @@ import {
 } from "@/lib/genesis/protocol-batch-planner";
 import { rewardAssetsNeedingCheckpoint } from "@/lib/positions/staking";
 import { useWalletState } from "@/providers/wallet-context";
+import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
 
 type Operator = Readonly<{
   id: bigint;
@@ -82,13 +83,12 @@ export function ProtocolGenesisBatchPanel({
     (deployment.chainId !== 4663 || walletState.walletKind !== "embedded")
   ) {
     return (
-      <section className="ui-card genesis-panel" aria-label={t("title")}>
+      <GenesisActionModal label={t("title")} busy={busy}>
         <div className="genesis-panel-head">
-          <h3>{t("title")}</h3>
           <p>{t("pendingVerification")}</p>
         </div>
         <p className="genesis-note">{t("unsupported")}</p>
-      </section>
+      </GenesisActionModal>
     );
   }
 
@@ -259,9 +259,8 @@ export function ProtocolGenesisBatchPanel({
   };
 
   return (
-    <section className="ui-card genesis-panel" aria-label={t("title")}>
+    <GenesisActionModal label={t("title")} busy={busy}>
       <div className="genesis-panel-head">
-        <h3>{t("title")}</h3>
         <p>{t("protocolDescription")}</p>
       </div>
       <label className="ui-field">
@@ -425,6 +424,6 @@ export function ProtocolGenesisBatchPanel({
         </p>
       )}
       <p className="genesis-note">{t("unsupported")}</p>
-    </section>
+    </GenesisActionModal>
   );
 }
