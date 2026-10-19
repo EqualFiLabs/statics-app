@@ -15,7 +15,7 @@ import { useAppLocale } from "@/i18n/client";
 import type { LaunchDeployment, PhaseOneDeployment } from "@/lib/deployments/types";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { EMPTY_GENESIS_PORTFOLIO, summariseGenesisRewards } from "@/lib/genesis/owned";
-import type { DexQuote, DexToken } from "@/lib/indexer/dex-market";
+import type { DexQuote, DexToken, DexTotals } from "@/lib/indexer/dex-market";
 import type { PhaseOneProtocolActivity } from "@/lib/indexer/phase-one";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
@@ -61,6 +61,7 @@ export function ProtocolOverview({
 }) {
   const t = useTranslations("protocolOverview");
   const tDex = useTranslations("dexOverview");
+  const tLaunch = useTranslations("launchOverview");
   const locale = useAppLocale();
   const walletState = useWalletState();
   const [quote, setQuote] = useState<DexQuote>("usdg");
@@ -130,7 +131,15 @@ export function ProtocolOverview({
   const staking = protocol.staking.data;
   const vault = genesis.metrics.data?.vault ?? null;
   const analytics = genesis.marketAnalytics.data ?? null;
-  const poolsValue = summary?.current.valueLocked ?? null;
+  const metricComplete = (metric: keyof DexTotals["coverage"]) => {
+    const coverage = summary?.current.coverage[metric];
+    return Boolean(
+      coverage &&
+      coverage.omittedPools === 0 &&
+      (metric === "valueLocked" || coverage.historyComplete)
+    );
+  };
+  const poolsValue = metricComplete("valueLocked") ? (summary?.current.valueLocked ?? null) : null;
   const stakedValue = valueOf(staking?.totalStaked, price);
   const vaultValue = vault ? valueOf(vault.tokenBacking, price) : null;
   // A total with a missing part would read as a drop, so it waits for every part.
@@ -138,7 +147,10 @@ export function ProtocolOverview({
     poolsValue === null || stakedValue === null || (launch && vaultValue === null)
       ? null
       : poolsValue + stakedValue + (vaultValue ?? 0n);
-  const marketCap = analytics ? valueOf(BigInt(analytics.supply.publicDistributed), price) : null;
+  const marketCap =
+    analytics?.status === "fresh"
+      ? valueOf(BigInt(analytics.supply.publicDistributed), price)
+      : null;
   const stakedShare = staking
     ? Math.round(Number((staking.totalStaked * 100_000n) / STATICS_MAX_SUPPLY) / 10) / 100
     : null;
@@ -246,7 +258,12 @@ export function ProtocolOverview({
         ? ""
         : tokenAmount(
             event.amount,
-            event.asset ? tokens.get(event.asset.toLowerCase()) : undefined,
+            event.asset
+              ? tokens.get(event.asset.toLowerCase())
+              : event.kind === "protocol-gauge-reward-credited" ||
+                  event.kind === "protocol-gauge-reward-recycled"
+                ? { address: deployment.contracts.statics, symbol: "STATICS", decimals: 18 }
+                : undefined,
             event.asset
           );
     return {
@@ -271,6 +288,18 @@ export function ProtocolOverview({
     .slice(0, 8);
 
   const bars = (dex.volume.data?.days ?? []).slice(-30);
+  const partialHistory = bars.some(
+    (day) => !day.coverage.historyComplete || day.coverage.omittedPools > 0
+  );
+  const partialTotals =
+    summary &&
+    Object.keys(summary.current.coverage).some(
+      (metric) => !metricComplete(metric as keyof DexTotals["coverage"])
+    );
+  const fallbackPrices =
+    summary?.statics.priceFallback ||
+    dex.tokens.data?.items.some((token) => token.priceFallback) ||
+    dex.pools.data?.items.some((pool) => pool.priceFallback);
   const maxBar = bars.reduce(
     (max, day) => (day.volume !== null && day.volume > max ? day.volume : max),
     0n
@@ -326,6 +355,16 @@ export function ProtocolOverview({
         </p>
       )}
 
+      {partialTotals && (
+        <p className={styles.notice} role="status">
+          {t("partialTotals")}
+        </p>
+      )}
+      {fallbackPrices && (
+        <p className={styles.notice} role="status">
+          {tDex("fallbackPrices")}
+        </p>
+      )}
       <section className={styles.tiles} aria-label={t("totals")}>
         <div className={styles.tile}>
           <span className={styles.label}>{t("tile.price")}</span>
@@ -339,7 +378,11 @@ export function ProtocolOverview({
         <div className={styles.tile}>
           <span className={styles.label}>{t("tile.marketCap")}</span>
           <strong>{money(marketCap)}</strong>
-          <span>{t("tile.marketCapHint")}</span>
+          <span>
+            {analytics && analytics.status !== "fresh"
+              ? tLaunch(`analyticsStatus.${analytics.status}`)
+              : t("tile.marketCapHint")}
+          </span>
         </div>
         <div className={styles.tile}>
           <span className={styles.label}>{t("tile.value")}</span>
@@ -480,13 +523,15 @@ export function ProtocolOverview({
           <div className={styles.stats}>
             <div>
               <span className={styles.label}>{tDex("tile.volume")}</span>
-              <strong>{money(summary?.current.volume)}</strong>
+              <strong>{money(metricComplete("volume") ? summary?.current.volume : null)}</strong>
             </div>
             <div>
               <span className={styles.label}>{tDex("tile.fees")}</span>
               <strong>
                 {money(
                   summary &&
+                    metricComplete("lpFees") &&
+                    metricComplete("protocolFees") &&
                     summary.current.lpFees !== null &&
                     summary.current.protocolFees !== null
                     ? summary.current.lpFees + summary.current.protocolFees
@@ -512,10 +557,11 @@ export function ProtocolOverview({
                 style={{
                   height: `${day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
                 }}
-                title={`${day.day}: ${money(day.volume)}`}
+                title={`${day.day}: ${money(day.volume)}${!day.coverage.historyComplete || day.coverage.omittedPools > 0 ? ` · ${tDex("incompleteHistory")}` : ""}`}
               />
             ))}
           </div>
+          {partialHistory && <p className={styles.secondary}>{tDex("incompleteHistory")}</p>}
         </section>
 
         <section className={styles.card} aria-labelledby="overview-staking">

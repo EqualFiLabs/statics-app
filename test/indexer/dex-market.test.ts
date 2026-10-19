@@ -213,3 +213,22 @@ describe("quote values", () => {
     expect(quoteValue({ priceNumerator: null, priceDenominator: null }, 1n, 18, 6)).toBeNull();
   });
 });
+
+it("retains headline price provenance and accepts older indexers without it", () => {
+  const sample = dexFixture(deployment, "usdg");
+  expect(
+    parseDexSummary(
+      { ...sample.summary, statics: { ...sample.summary.statics, priceFallback: true } },
+      "dex-fixture"
+    ).statics.priceFallback
+  ).toBe(true);
+  const legacy = structuredClone(sample.summary);
+  delete (legacy.statics as { priceFallback?: boolean }).priceFallback;
+  expect(parseDexSummary(legacy, "dex-fixture").statics.priceFallback).toBeNull();
+  expect(() =>
+    parseDexSummary(
+      { ...sample.summary, statics: { ...sample.summary.statics, priceFallback: "false" } },
+      "dex-fixture"
+    )
+  ).toThrow(/price fallback/);
+});

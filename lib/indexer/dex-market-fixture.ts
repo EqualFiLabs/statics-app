@@ -192,7 +192,7 @@ export function dexFixture(
       },
       activePools: pools.length,
       unpricedPools: poolItems.filter((pool) => !pool.priced).length,
-      statics: { price: usd(0.01149), change24hBps: 310 },
+      statics: { price: usd(0.01149), change24hBps: 310, priceFallback: false },
     },
     pools: {
       ...base,

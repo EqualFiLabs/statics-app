@@ -34,8 +34,14 @@ import { PositionListPage } from "@/components/positions/PositionListPage";
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
 import { DeploymentOverview, MarketsOverview } from "@/components/overview/DeploymentOverview";
 import { dexFixture } from "@/lib/indexer/dex-market-fixture";
+import { ProtocolOverview } from "@/components/overview/ProtocolOverview";
+import { EMPTY_GENESIS_PORTFOLIO } from "@/lib/genesis/owned";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
-import type { DeploymentOption, PhaseOneDeployment } from "@/lib/deployments/types";
+import type {
+  DeploymentOption,
+  PhaseOneDeployment,
+  LaunchDeployment,
+} from "@/lib/deployments/types";
 import {
   AllocationDirectoryChangedError,
   StatementHistoryChangedError,
@@ -57,12 +63,14 @@ const mocks = vi.hoisted(() => ({
   statement: vi.fn(),
   gauges: vi.fn(),
   protocolActivity: vi.fn(),
+  launch: vi.fn(),
   dex: vi.fn(),
   block: vi.fn(),
   params: new URLSearchParams(),
   push: vi.fn(),
   replace: vi.fn(),
 }));
+vi.mock("@/hooks/useLaunchOverview", () => ({ useLaunchOverview: mocks.launch }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
   useSearchParams: () => mocks.params,
@@ -306,6 +314,11 @@ function withPhaseOne(ui: React.ReactElement, deployment = phaseOne) {
   );
 }
 beforeEach(() => {
+  mocks.launch.mockReset().mockReturnValue({
+    metrics: { data: undefined, isError: false },
+    portfolio: { data: EMPTY_GENESIS_PORTFOLIO, isError: false },
+    marketAnalytics: { data: undefined, isError: false },
+  });
   mocks.block.mockReset().mockResolvedValue({ timestamp: 3000n });
   mocks.params = new URLSearchParams();
   mocks.push.mockReset();
@@ -685,6 +698,117 @@ describe("protocol overview", () => {
     expect(within(yours).queryByText("0 STATICS")).not.toBeInTheDocument();
     expect(within(yours).queryByText("0 accounts")).not.toBeInTheDocument();
     expect(within(yours).queryByText("Nothing to claim yet")).not.toBeInTheDocument();
+  });
+
+  it("withholds aggregate values for omitted pools and flags incomplete chart history", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "summary")
+        return {
+          ...sample.summary,
+          current: {
+            ...sample.summary.current,
+            coverage: Object.fromEntries(
+              Object.entries(sample.summary.current.coverage).map(([key, value]) => [
+                key,
+                { ...value, omittedPools: 1 },
+              ])
+            ),
+          },
+        };
+      if (endpoint === "volume")
+        return {
+          ...sample.volume,
+          days: sample.volume.days.map((day) => ({
+            ...day,
+            coverage: { ...day.coverage, historyComplete: false },
+          })),
+        };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    expect(
+      await screen.findByText(
+        "Some pool data is incomplete. Affected aggregate values are unavailable."
+      )
+    ).toBeInTheDocument();
+    const totals = screen.getByRole("region", { name: "Protocol totals" });
+    expect(
+      within(totals).getByText("Value in Statics").parentElement?.querySelector("strong")
+    ).toHaveTextContent("—");
+    const exchange = screen.getByRole("region", { name: "Exchange" });
+    expect(
+      within(exchange).getByText("Volume 24h").parentElement?.querySelector("strong")
+    ).toHaveTextContent("—");
+    expect(
+      await within(exchange).findByText("Historical coverage is incomplete")
+    ).toBeInTheDocument();
+  });
+
+  it("discloses a headline spot fallback even when token metadata is unavailable", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "tokens") throw new Error("Metadata unavailable");
+      if (endpoint === "summary")
+        return { ...sample.summary, statics: { ...sample.summary.statics, priceFallback: true } };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    expect(
+      await screen.findByText(
+        "Some prices use the latest observed price because a full 30-minute history is unavailable."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("qualifies stale Genesis supply and uses reported circulation", async () => {
+    mocks.launch.mockReturnValue({
+      metrics: {
+        data: {
+          vault: {
+            maximumSupply: 5555n,
+            vaultInventory: 1000n,
+            circulatingGenesis: 4555n,
+            tokenBacking: parseEther("1000"),
+            epochActive: false,
+          },
+          purchase: { staticsPrice: parseEther("200000"), reserveBuyIn: 0n, nativeFee: 0n },
+        },
+        isError: false,
+      },
+      portfolio: { data: EMPTY_GENESIS_PORTFOLIO, isError: false },
+      marketAnalytics: {
+        data: { status: "stale", supply: { publicDistributed: String(parseEther("500000")) } },
+        isError: false,
+      },
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={{} as LaunchDeployment} />);
+    expect(await screen.findByText("Using recent data")).toBeInTheDocument();
+    expect(screen.getByText("Market cap").parentElement?.querySelector("strong")).toHaveTextContent(
+      "—"
+    );
+    const operators = screen.getByRole("region", { name: "Operator NFTs" });
+    expect(within(operators).getByText("Circulating 4,555")).toBeInTheDocument();
+    expect(within(operators).queryByText(/Treasury/)).not.toBeInTheDocument();
+  });
+
+  it("formats native gauge accounting events as STATICS rather than raw units", async () => {
+    mocks.protocolActivity.mockResolvedValue([
+      {
+        kind: "protocol-gauge-reward-credited",
+        positionId: null,
+        poolId: null,
+        asset: null,
+        amount: parseEther("1"),
+        actor: null,
+        transactionHash: hash("d"),
+        blockNumber: 10n,
+        blockTimestamp: 1n,
+        logIndex: 0,
+      },
+    ]);
+    withPhaseOne(<DeploymentOverview />);
+    expect(await screen.findByText("1 STATICS gauge reward credited")).toBeInTheDocument();
   });
 
   it("mixes trades with protocol events and filters them by kind", async () => {

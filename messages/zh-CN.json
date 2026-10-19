@@ -3097,7 +3097,8 @@
       "meta": "按 24 小时交易量",
       "all": "在市场中查看 {count, plural, other {# 个资金池}}"
     },
-    "note": "价格仅来自 Statics 资金池，按 30 分钟时间加权。Statics 中的价值按 STATICS 价格合计资金池流动性、Operator 支撑和已质押的 STATICS。收益率为估算值，并非承诺。",
-    "dataUnavailable": "暂不可用"
+    "note": "价格仅来自 Statics 池；历史数据充足时采用 30 分钟时间加权价格，否则使用最新观察价格。Statics 总价值按 STATICS 价格合计池流动性、Operator 支持资产和质押的 STATICS。收益率为估计值，并非承诺。",
+    "dataUnavailable": "暂不可用",
+    "partialTotals": "部分池数据不完整。受影响的汇总值暂不可用。"
   }
 }

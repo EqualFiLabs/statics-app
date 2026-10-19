@@ -3097,7 +3097,8 @@
       "meta": "por volumen 24 h",
       "all": "Ver {count, plural, one {# pool} other {# pools}} en Mercados"
     },
-    "note": "Los precios provienen solo de pools de Statics, ponderados en 30 minutos. El valor en Statics suma la liquidez de los pools, el respaldo de Operadores y los STATICS en staking al precio de STATICS. Los rendimientos son estimaciones, no promesas.",
-    "dataUnavailable": "No disponible"
+    "note": "Los precios proceden de pools de Statics y se ponderan durante 30 minutos cuando hay historial suficiente; de lo contrario se usa el último precio observado. El valor en Statics suma liquidez, respaldo de Operators y STATICS en staking al precio de STATICS. Los rendimientos son estimaciones, no promesas.",
+    "dataUnavailable": "No disponible",
+    "partialTotals": "Algunos datos de pools están incompletos. Los totales afectados no están disponibles."
   }
 }

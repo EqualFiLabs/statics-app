@@ -3097,7 +3097,8 @@
       "meta": "by 24h volume",
       "all": "View {count, plural, one {# pool} other {# pools}} in Markets"
     },
-    "note": "Prices come from Statics pools only, time-weighted over 30 minutes. Value in Statics adds pool liquidity, Operator backing and staked STATICS at the STATICS price. Yields are estimates, not promises.",
-    "dataUnavailable": "Unavailable"
+    "note": "Prices come from Statics pools only, time-weighted over 30 minutes where history is available; otherwise the latest observed price is used. Value in Statics adds pool liquidity, Operator backing and staked STATICS at the STATICS price. Yields are estimates, not promises.",
+    "dataUnavailable": "Unavailable",
+    "partialTotals": "Some pool data is incomplete. Affected aggregate values are unavailable."
   }
 }
