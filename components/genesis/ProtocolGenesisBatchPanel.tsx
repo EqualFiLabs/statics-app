@@ -92,7 +92,18 @@ export function ProtocolGenesisBatchPanel({
     );
   }
 
-  const selected = operators.filter((operator) => selectedIds.includes(operator.id.toString()));
+  const isAvailable = (operator: Operator): boolean =>
+    action === "activate"
+      ? operator.state.tier < targetTier
+      : action === "link"
+        ? operator.state.tier > 0 && operator.state.linkedPositionId === 0n
+        : operator.state.linkedPositionId > 0n;
+  const selectableIds = operators.filter(isAvailable).map((operator) => operator.id.toString());
+  const selected = operators.filter(
+    (operator) => isAvailable(operator) && selectedIds.includes(operator.id.toString())
+  );
+  const allSelected = selectableIds.length > 0 && selected.length === selectableIds.length;
+
   const allowedTargets = [deployment.contracts.diamond, deployment.genesis.token];
 
   const makePlan = async (group: readonly Operator[]): Promise<Plan> => {
@@ -298,21 +309,31 @@ export function ProtocolGenesisBatchPanel({
           </select>
         </label>
       )}
+      <label className="genesis-batch-select-all">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={(input) => {
+            if (input) input.indeterminate = selected.length > 0 && !allSelected;
+          }}
+          disabled={busy || selectableIds.length === 0}
+          onChange={(event) => {
+            setSelectedIds(event.target.checked ? selectableIds : []);
+            setReviewed(null);
+          }}
+        />
+        {t("selectAll")}
+      </label>
       <div className="genesis-batch-selection">
         {operators.map((operator) => {
           const key = operator.id.toString();
-          const available =
-            action === "activate"
-              ? operator.state.tier < targetTier
-              : action === "link"
-                ? operator.state.tier > 0 && operator.state.linkedPositionId === 0n
-                : operator.state.linkedPositionId > 0n;
+          const available = isAvailable(operator);
           return (
             <div key={key}>
               <label>
                 <input
                   type="checkbox"
-                  checked={selectedIds.includes(key)}
+                  checked={available && selectedIds.includes(key)}
                   disabled={busy || !available}
                   onChange={(event) => {
                     setSelectedIds((ids) =>
@@ -323,7 +344,7 @@ export function ProtocolGenesisBatchPanel({
                 />
                 {t("operator", { id: key })}
               </label>
-              {action === "link" && selectedIds.includes(key) && (
+              {action === "link" && available && selectedIds.includes(key) && (
                 <select
                   aria-label={t("positionFor", { id: key })}
                   value={positionIds[key] ?? ""}

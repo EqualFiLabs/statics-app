@@ -98,11 +98,16 @@ const connectedWallet: WalletState = {
   isTargetChain: true,
 };
 
-function seedOperators(client: QueryClient, count: number, option = launchOption) {
+function seedOperators(
+  client: QueryClient,
+  count: number,
+  option = launchOption,
+  tiers: readonly number[] = []
+) {
   const deploymentId = option.launch?.descriptor.deploymentId ?? launch.descriptor.deploymentId;
   const items: OwnedGenesis[] = Array.from({ length: count }, (_, index) => ({
     id: BigInt(index + 1),
-    tier: 0,
+    tier: tiers[index] ?? 0,
     multiplierBps: 10_000,
     registered: true,
     rewardWeight: 10_000n,
@@ -205,7 +210,7 @@ describe.each([
     manage.focus();
     fireEvent.click(manage);
     const dialog = screen.getByRole("dialog", { name: "Manage Operators together" });
-    const selection = within(dialog).getAllByRole("checkbox")[0];
+    const selection = within(dialog).getByRole("checkbox", { name: "Operator #1" });
     fireEvent.click(selection);
     expect(selection).toBeChecked();
     const settings = within(dialog).getByRole("button", { name: "Calibur settings" });
@@ -225,8 +230,70 @@ describe.each([
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(manage).toHaveFocus();
     fireEvent.click(manage);
-    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Operator #1" })).toBeChecked();
     expect(mocks.signAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("selects all eligible Operators, shows partial selection, and clears all", async () => {
+    renderPage(option, 3);
+    await openBatchModal();
+    const all = screen.getByRole("checkbox", { name: "Select all" });
+    const first = screen.getByRole("checkbox", { name: "Operator #1" });
+    const second = screen.getByRole("checkbox", { name: "Operator #2" });
+    const third = screen.getByRole("checkbox", { name: "Operator #3" });
+    const review = screen.getByRole("button", { name: "Review atomic batch" });
+    expect(all).not.toBeChecked();
+    expect(review).toBeDisabled();
+    fireEvent.click(first);
+    expect(all).toBePartiallyChecked();
+    fireEvent.click(all);
+    for (const checkbox of [all, first, second, third]) expect(checkbox).toBeChecked();
+    expect(review).toBeEnabled();
+    fireEvent.click(second);
+    expect(all).toBePartiallyChecked();
+    fireEvent.click(all);
+    expect(second).toBeChecked();
+    fireEvent.click(all);
+    for (const checkbox of [all, first, second, third]) expect(checkbox).not.toBeChecked();
+    expect(all).not.toBePartiallyChecked();
+    expect(review).toBeDisabled();
+    expect(mocks.signAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("excludes unavailable Operators and follows action and tier changes", async () => {
+    const client = renderPage(option, 3);
+    act(() => seedOperators(client, 3, option, [0, 1, 4]));
+    await openBatchModal();
+    const all = screen.getByRole("checkbox", { name: "Select all" });
+    const first = screen.getByRole("checkbox", { name: "Operator #1" });
+    const second = screen.getByRole("checkbox", { name: "Operator #2" });
+    const third = screen.getByRole("checkbox", { name: "Operator #3" });
+    await waitFor(() => expect(second).toBeDisabled());
+    expect(third).toBeDisabled();
+    fireEvent.click(all);
+    expect(first).toBeChecked();
+    expect(all).toBeChecked();
+    expect(second).not.toBeChecked();
+    expect(third).not.toBeChecked();
+    fireEvent.change(screen.getByRole("combobox", { name: "Target tier" }), {
+      target: { value: "2" },
+    });
+    expect(all).toBePartiallyChecked();
+    fireEvent.click(all);
+    expect(second).toBeChecked();
+    expect(third).not.toBeChecked();
+    // Lowering the tier must also remove ineligible Operators from the reviewed selection.
+    fireEvent.change(screen.getByRole("combobox", { name: "Target tier" }), {
+      target: { value: "1" },
+    });
+    expect(second).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Review atomic batch" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("combobox", { name: "Action" }), {
+      target: { value: option.protocol ? "unlink" : "register" },
+    });
+    expect(all).toBeDisabled();
+    expect(all).not.toBeChecked();
+    expect(all).not.toBePartiallyChecked();
   });
 
   it("preserves the controls when holdings fall from two to one to zero", async () => {

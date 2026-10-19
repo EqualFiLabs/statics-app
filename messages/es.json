@@ -367,6 +367,7 @@
   },
   "operators": {
     "bulk": {
+      "selectAll": "Seleccionar todos",
       "activation": {
         "settings": "Configuración de Calibur",
         "title": "Activar lotes atómicos para esta billetera Privy",

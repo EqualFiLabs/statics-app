@@ -367,6 +367,7 @@
   },
   "operators": {
     "bulk": {
+      "selectAll": "Select all",
       "activation": {
         "settings": "Calibur settings",
         "title": "Activate atomic batches for this Privy wallet",

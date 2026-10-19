@@ -7242,6 +7242,7 @@
   line-height: 1.6;
 }
 
+.genesis-batch-select-all,
 .genesis-batch-selection label {
   display: flex;
   gap: 0.5rem;

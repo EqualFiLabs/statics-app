@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   formatEther,
@@ -135,10 +135,6 @@ export function GenesisBatchPanel({
   const [confirmedHashes, setConfirmedHashes] = useState<readonly string[]>([]);
   const [confirmedIds, setConfirmedIds] = useState<readonly bigint[]>([]);
 
-  const selected = useMemo(
-    () => items.filter((item) => selectedIds.includes(item.id.toString())),
-    [items, selectedIds]
-  );
   if (items.length < 2 || !wallet) return null;
   if (
     deployment.source !== "development-fixture" &&
@@ -153,6 +149,24 @@ export function GenesisBatchPanel({
       </GenesisBatchContent>
     );
   }
+
+  const isAvailable = (item: OwnedGenesis): boolean =>
+    action === "activate"
+      ? item.tier < targetTier
+      : action === "register"
+        ? !item.registered
+        : action === "open-credit"
+          ? !item.creditActive
+          : action === "draw-credit" || action === "extend-credit"
+            ? item.creditActive
+            : action === "repay"
+              ? item.creditActive && item.creditPrincipal > 0n
+              : !item.creditActive;
+  const selectableIds = items.filter(isAvailable).map((item) => item.id.toString());
+  const selected = items.filter(
+    (item) => isAvailable(item) && selectedIds.includes(item.id.toString())
+  );
+  const allSelected = selectableIds.length > 0 && selected.length === selectableIds.length;
 
   const allowedTargets = [
     deployment.contracts.statics,
@@ -425,25 +439,29 @@ export function GenesisBatchPanel({
           />
         </label>
       )}
+      <label className="genesis-batch-select-all">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={(input) => {
+            if (input) input.indeterminate = selected.length > 0 && !allSelected;
+          }}
+          disabled={busy || selectableIds.length === 0}
+          onChange={(event) => {
+            setSelectedIds(event.target.checked ? selectableIds : []);
+            setReviewed(null);
+          }}
+        />
+        {t("selectAll")}
+      </label>
       <div className="genesis-batch-selection">
         {items.map((item) => {
-          const available =
-            action === "activate"
-              ? item.tier < targetTier
-              : action === "register"
-                ? !item.registered
-                : action === "open-credit"
-                  ? !item.creditActive
-                  : action === "draw-credit" || action === "extend-credit"
-                    ? item.creditActive
-                    : action === "repay"
-                      ? item.creditActive && item.creditPrincipal > 0n
-                      : !item.creditActive;
+          const available = isAvailable(item);
           return (
             <label key={item.id.toString()}>
               <input
                 type="checkbox"
-                checked={selectedIds.includes(item.id.toString())}
+                checked={available && selectedIds.includes(item.id.toString())}
                 disabled={busy || !available}
                 onChange={(event) => {
                   setSelectedIds((ids) =>

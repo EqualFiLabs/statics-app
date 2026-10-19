@@ -367,6 +367,7 @@
   },
   "operators": {
     "bulk": {
+      "selectAll": "全选",
       "activation": {
         "settings": "Calibur 设置",
         "title": "为此 Privy 钱包启用原子批次",
