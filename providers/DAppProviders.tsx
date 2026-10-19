@@ -32,7 +32,11 @@ import {
 import type { PublicDeploymentSnapshot } from "@/lib/deployments/public-manifests";
 import { fundingNetworks, getFundingNetwork, isFundingChainId } from "@/lib/funding-networks";
 import { selectActiveStaticsWallet } from "@/lib/wallet/selection";
-import { localForkWalletProvider, verifyLocalForkWalletProvider } from "@/lib/wallet/local-fork";
+import {
+  localForkTransactionParameters,
+  localForkWalletProvider,
+  verifyLocalForkWalletProvider,
+} from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
 import { ProtocolQueryReconciler } from "./ProtocolQueryReconciler";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
@@ -328,6 +332,14 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
         }
 
         if (walletKind === "embedded") {
+          const localParameters = localForkDeployment
+            ? await localForkTransactionParameters(
+                localForkDeployment,
+                request.wallet,
+                walletEnvironment.anvilRpcUrl,
+                request.chainId
+              )
+            : {};
           const result = await sendEmbeddedTransaction(
             {
               from: request.wallet,
@@ -336,6 +348,7 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
               value: request.value,
               gasLimit: request.gasLimit,
               chainId: request.chainId,
+              ...localParameters,
             },
             {
               address,
