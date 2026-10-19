@@ -44,7 +44,13 @@ import {
   rewardRestriction,
   v4Position,
 } from "ponder:schema";
-import { absoluteAmount, candleBucket, marketCandleKey, marketSwapMetrics } from "./market";
+import {
+  absoluteAmount,
+  candleBucket,
+  isZeroForOneSwap,
+  marketCandleKey,
+  marketSwapMetrics,
+} from "./market";
 import {
   allocationSnapshotJson,
   normalizeGaugeAllocationSnapshot,
@@ -437,6 +443,7 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
 
   const bucketTimestamp = candleBucket(event.block.timestamp);
   const sqrtPriceX96 = event.args.sqrtPriceX96;
+  const zeroForOne = isZeroForOneSwap(event.args.amount0);
   await context.db
     .insert(marketCandle)
     .values({
@@ -450,8 +457,8 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
       closeSqrtPriceX96: sqrtPriceX96,
       volume0: absoluteAmount(event.args.amount0),
       volume1: absoluteAmount(event.args.amount1),
-      zeroForOneCount: event.args.amount0 > 0n ? 1 : 0,
-      oneForZeroCount: event.args.amount0 > 0n ? 0 : 1,
+      zeroForOneCount: zeroForOne ? 1 : 0,
+      oneForZeroCount: zeroForOne ? 0 : 1,
       swapCount: 1,
       firstBlock: event.block.number,
       lastBlock: event.block.number,
@@ -462,8 +469,8 @@ onPoolManager("PoolManager:Swap", async ({ event, context }) => {
       closeSqrtPriceX96: sqrtPriceX96,
       volume0: row.volume0 + absoluteAmount(event.args.amount0),
       volume1: row.volume1 + absoluteAmount(event.args.amount1),
-      zeroForOneCount: row.zeroForOneCount + (event.args.amount0 > 0n ? 1 : 0),
-      oneForZeroCount: row.oneForZeroCount + (event.args.amount0 > 0n ? 0 : 1),
+      zeroForOneCount: row.zeroForOneCount + (zeroForOne ? 1 : 0),
+      oneForZeroCount: row.oneForZeroCount + (zeroForOne ? 0 : 1),
       swapCount: row.swapCount + 1,
       lastBlock: event.block.number,
     }));

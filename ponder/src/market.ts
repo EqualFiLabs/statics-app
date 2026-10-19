@@ -23,6 +23,15 @@ export function absoluteAmount(value: bigint): bigint {
   return value < 0n ? -value : value;
 }
 
+/**
+ * Uniswap v4 `Swap` events report the swapper's balance delta: the currency the
+ * swapper paid in is negative and the currency paid out is positive. A
+ * zero-for-one swap therefore has a negative `amount0`.
+ */
+export function isZeroForOneSwap(amount0: bigint): boolean {
+  return amount0 < 0n;
+}
+
 export function marketSwapMetrics(amount0: bigint, amount1: bigint) {
   const volume0 = absoluteAmount(amount0);
   const volume1 = absoluteAmount(amount1);

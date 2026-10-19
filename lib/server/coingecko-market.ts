@@ -233,8 +233,8 @@ async function loadCoinGeckoHistoricalTradesForSnapshot(
     query.side === undefined
       ? undefined
       : (query.side === "buy") === market.staticsIsCurrency0
-        ? "negative"
-        : "positive";
+        ? "positive"
+        : "negative";
   const trades = await loadIndexedTrades({ ...query, amount0Sign });
   return coinGeckoHistoricalTrades(trades, market, query.side);
 }

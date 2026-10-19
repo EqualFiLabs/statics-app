@@ -94,11 +94,12 @@ const overview = {
   },
 } satisfies StaticsMarketOverview;
 
+// v4 Swap amounts are the swapper's deltas: this buyer pays WETH and receives STATICS.
 function indexedTrade(overrides: Partial<IndexedMarketTrade> = {}): IndexedMarketTrade {
   return {
     poolId: market.poolId,
-    amount0: (-2n * WAD).toString(),
-    amount1: (8n * 10n ** 12n).toString(),
+    amount0: (2n * WAD).toString(),
+    amount1: (-8n * 10n ** 12n).toString(),
     volume0: (2n * WAD).toString(),
     volume1: (8n * 10n ** 12n).toString(),
     price1Per0Wad: 4_000_000_000_000n.toString(),
@@ -176,7 +177,13 @@ describe("CoinGecko market payloads", () => {
     });
     expect(
       coinGeckoHistoricalTrades(
-        [indexedTrade({ amount0: (2n * WAD).toString(), logIndex: 8 })],
+        [
+          indexedTrade({
+            amount0: (-2n * WAD).toString(),
+            amount1: (8n * 10n ** 12n).toString(),
+            logIndex: 8,
+          }),
+        ],
         market,
         "buy"
       )
@@ -188,8 +195,8 @@ describe("CoinGecko market payloads", () => {
     const result = coinGeckoHistoricalTrades(
       [
         indexedTrade({
-          amount0: (-8n * 10n ** 12n).toString(),
-          amount1: (2n * WAD).toString(),
+          amount0: (8n * 10n ** 12n).toString(),
+          amount1: (-2n * WAD).toString(),
           volume0: (8n * 10n ** 12n).toString(),
           volume1: (2n * WAD).toString(),
           price1Per0Wad: (250_000n * WAD).toString(),
