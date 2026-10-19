@@ -2755,7 +2755,8 @@
     "sort": {
       "volume": "Volumen",
       "valueLocked": "Valor bloqueado",
-      "yield": "Rendimiento"
+      "yield": "Rendimiento",
+      "apr": "APR de recompensas LP"
     },
     "column": {
       "pool": "Pool",
@@ -2764,11 +2765,11 @@
       "volume": "Volumen 24h",
       "fees": "Comisiones LP estimadas",
       "valueLocked": "Valor bloqueado",
-      "incentives": "Incentivos",
-      "yield": "Rend. est.",
+      "yield": "Rendimiento de los últimos 7 días",
       "actions": "Acciones",
       "token": "Token",
-      "price": "Precio"
+      "price": "Precio",
+      "projectedApr": "APR proyectada para LP"
     },
     "fee": "comisión {fee}%",
     "unpriced": "Sin precio: solo precio del par",
@@ -2780,7 +2781,7 @@
     "addLiquidityTo": "Añadir liquidez a {pool}",
     "noMatch": "Ningún pool coincide.",
     "noPools": "Aún no hay pools.",
-    "yieldNote": "Rend. est. = comisiones más emisiones de STATICS e incentivos pagados a la liquidez, anualizados a partir de los últimos 7 días, o del historial disponible si el pool es más reciente (al menos un día). Una estimación, no una promesa.",
+    "yieldNote": "El rendimiento histórico incluye comisiones LP estimadas, emisiones STATICS acreditadas e incentivos LP devengados, anualizados sobre hasta 7 días de historial (al menos uno). No proyecta la tasa actual de recompensas.",
     "tokensTitle": "Tokens",
     "via": "vía {route}",
     "tradesTitle": "Operaciones recientes",
@@ -2805,7 +2806,11 @@
     "yieldWindow": "{days, plural, one {# día} other {# días}} de historial",
     "feeUnavailable": "Comisión no disponible",
     "approximateFee": "≈ {fee}% de comisión",
-    "feeBreakdown": "{lp}% para LP; {input}% de entrada; {output}% de salida. La tasa combinada es aproximada."
+    "feeBreakdown": "{lp}% para LP; {input}% de entrada; {output}% de salida. La tasa combinada es aproximada.",
+    "projectedAprHelp": "Estimación media del pool con precios actuales de las recompensas y valor de LP gestionada elegible. Los depósitos adicionales diluyen la APR. Tu rendimiento depende de tu rango y del tiempo dentro de él.",
+    "projectedAprNote": "La APR proyectada anualiza la tasa actual de recompensas LP sobre la liquidez gestionada elegible a precios actuales, usando 52 semanas sin capitalización. Excluye recompensas de asignadores y comisiones de negociación; los LP conservan sus comisiones nativas además de estas recompensas. La tasa se aplica mientras haya fondos; las aportaciones, los precios y la liquidez pueden cambiarla.",
+    "rewardsPaused": "Recompensas pausadas: sin LP en rango",
+    "eligibleLpValue": "Valor LP gestionado elegible: {value}"
   },
   "rangeChart": {
     "description": "Precio actual {current} {unit}. Rango de {min} a {max}.",

@@ -64,6 +64,16 @@ export type DexPool = Readonly<{
   incentiveStreams: number;
   emissionShareBps: number;
   estimatedYieldBps: number | null;
+  projectedLpAprBps: number | null;
+  /** Absent on older indexers; never substitute historical yield for a projection. */
+  lpRewardProjection: Readonly<{
+    eligibleValueLocked: bigint | null;
+    annualRewardValue: bigint | null;
+    creatorAnnualRewards: bigint | null;
+    gaugeAnnualRewards: bigint | null;
+    status: "active" | "paused" | "inactive";
+    assets: readonly Address[];
+  }> | null;
   priced: boolean;
   source: "genesis" | "phase-one";
   priceFallback: boolean;
@@ -278,6 +288,40 @@ export function parseDexPools(value: unknown, deploymentId: string): DexPoolPage
       (p.estimatedYieldBps !== null && windowSeconds < 86_400n)
     )
       fail("estimated yield");
+    const rawProjection = p.lpRewardProjection;
+    let projection: DexPool["lpRewardProjection"] = null;
+    const projectedLpAprBps =
+      p.projectedLpAprBps == null ? null : int(p.projectedLpAprBps, "projected LP APR", 0);
+    if (rawProjection !== undefined && rawProjection !== null) {
+      const lp = object(rawProjection, "LP reward projection");
+      const status =
+        lp.status === "active" || lp.status === "paused" || lp.status === "inactive"
+          ? lp.status
+          : fail("LP projection status");
+      if (lp.basis !== "current-lp-reward-rate-over-managed-principal") fail("LP projection basis");
+      projection = {
+        eligibleValueLocked: optionalUint(lp.eligibleValueLocked, "eligible LP value"),
+        annualRewardValue: optionalUint(lp.annualRewardValue, "annual LP rewards"),
+        creatorAnnualRewards: optionalUint(lp.creatorAnnualRewards, "annual creator LP rewards"),
+        gaugeAnnualRewards: optionalUint(lp.gaugeAnnualRewards, "annual gauge LP rewards"),
+        status,
+        assets: unique(
+          list(lp.assets, "LP reward assets").map((a) => address(a, "LP reward asset")),
+          (a) => a.toLowerCase(),
+          "LP reward assets"
+        ),
+      };
+    }
+    if (
+      projectedLpAprBps !== null &&
+      (!projection ||
+        projection.eligibleValueLocked === null ||
+        projection.eligibleValueLocked === 0n ||
+        projection.annualRewardValue === null ||
+        BigInt(projectedLpAprBps) !==
+          (projection.annualRewardValue * 10000n) / projection.eligibleValueLocked)
+    )
+      fail("projected LP APR");
     return {
       poolId: hash(p.poolId, "pool ID"),
       token0: token(p.token0),
@@ -299,6 +343,8 @@ export function parseDexPools(value: unknown, deploymentId: string): DexPoolPage
       amount1: uint(p.amount1, "pool amount1"),
       incentiveStreams: int(p.incentiveStreams, "incentive streams", 0),
       emissionShareBps: int(p.emissionShareBps, "emission share", 0, 10_000),
+      projectedLpAprBps,
+      lpRewardProjection: projection,
       estimatedYieldBps: p.estimatedYieldBps === null ? null : int(p.estimatedYieldBps, "yield", 0),
       priced,
       source: p.source === "genesis" || p.source === "phase-one" ? p.source : fail("market source"),

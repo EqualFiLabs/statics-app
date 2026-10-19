@@ -6,7 +6,8 @@ import * as schema from "../ponder.schema";
 const { execute } = vi.hoisted(() => ({ execute: vi.fn() }));
 vi.mock("ponder:api", () => ({ db: { execute } }));
 vi.mock("ponder:schema", () => schema);
-import { dexMarketRoutes } from "../src/api/dex-market";
+import { dexMarketRoutes, marketPoolPage, marketQuery } from "../src/api/dex-market";
+import type { BuiltMarket } from "../src/dex-market";
 import { pool, range, points } from "./dex-fixtures";
 const client = new PGlite(),
   database = drizzle(client);
@@ -182,4 +183,29 @@ describe("DEX endpoints with real SQL and bounded snapshots", () => {
     expect(result.total).toBeGreaterThan(0);
     expect(result.items[0].poolId).toBe(pool(1).poolId);
   });
+});
+
+it("sorts projected APR independently of trailing yield, with nulls last and stable ties", () => {
+  const data = {
+    pools: [
+      { ...pool(1), projectedLpAprBps: null, estimatedYieldBps: 99999 },
+      { ...pool(3), projectedLpAprBps: 20000, estimatedYieldBps: 0 },
+      { ...pool(2), projectedLpAprBps: 20000, estimatedYieldBps: 0 },
+      { ...pool(4), projectedLpAprBps: 10000, estimatedYieldBps: 1 },
+    ],
+  } as unknown as BuiltMarket;
+  const query = marketQuery(new URLSearchParams("sort=apr"))!;
+  expect(query).not.toBeNull();
+  expect(marketPoolPage(data, query, 0).items.map((p) => p.poolId)).toEqual([
+    pool(2).poolId,
+    pool(3).poolId,
+    pool(4).poolId,
+    pool(1).poolId,
+  ]);
+  expect(
+    marketPoolPage(data, { ...query, direction: "asc" }, 0).items.map((p) => p.poolId)
+  ).toEqual([pool(4).poolId, pool(2).poolId, pool(3).poolId, pool(1).poolId]);
+  expect(marketPoolPage(data, { ...query, sort: "yield" }, 0).items[0]!.poolId).toBe(
+    pool(1).poolId
+  );
 });

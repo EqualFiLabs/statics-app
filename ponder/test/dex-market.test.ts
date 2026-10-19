@@ -214,3 +214,145 @@ describe("market accounting and history coverage", () => {
     expect(() => pricingConfig("weth", {})).toThrow();
   });
 });
+
+describe("projected LP reward APR", () => {
+  const unit = 10n ** 18n;
+  function funded() {
+    const s = snapshot(),
+      p = s.pools[0]!;
+    p.legs = [{ ...range(p), positionId: "1" }];
+    p.historyStart = "999999"; // A campaign can be projected before one day of history exists.
+    p.streams = [
+      {
+        slot: 1,
+        asset: p.token1.address,
+        start: "1000000",
+        finish: "1604800",
+        last: "1000000",
+        budget: String(unit),
+        emitted: "0",
+      },
+    ];
+    return s;
+  }
+  const build = (s: DexSnapshot) =>
+    buildMarket(s, "selected", config, s.pools[0]!.token0.address).pools[0]!;
+  it("annualizes the current LP-only schedule without trading fees or a history wait", () => {
+    const s = funded();
+    s.metrics = [metric({ bucket: "week", lp0: String(unit * 100n) })];
+    const p = build(s);
+    expect(p.estimatedYieldBps).toBeNull();
+    expect(p.lpRewardProjection).toMatchObject({
+      annualRewardValue: 52n * unit,
+      creatorAnnualRewards: 52n * unit,
+      gaugeAnnualRewards: 0n,
+      eligibleValueLocked: p.valueLocked,
+      status: "active",
+    });
+    expect(p.projectedLpAprBps).toBe(Number((52n * unit * 10000n) / p.valueLocked!));
+  });
+  it("excludes unmanaged TVL, but includes all managed principal including out-of-range legs", () => {
+    const s = funded(),
+      first = build(s),
+      p = s.pools[0]!;
+    s.ranges.push({ ...range(p), rangeKey: "unmanaged" });
+    const unmanaged = build(s);
+    expect(unmanaged.valueLocked).toBe(first.valueLocked! * 2n);
+    expect(unmanaged.projectedLpAprBps).toBe(first.projectedLpAprBps);
+    p.legs.push({ ...range(p), positionId: "2", tickLower: 100, tickUpper: 200 });
+    const moreManaged = build(s);
+    expect(moreManaged.lpRewardProjection.eligibleValueLocked).toBeGreaterThan(first.valueLocked!);
+    expect(moreManaged.projectedLpAprBps!).toBeLessThan(first.projectedLpAprBps!);
+  });
+  it("uses a top-up's rolled budget over its remaining duration immediately", async () => {
+    const { advanceStreams, fundLp } = await import("../src/dex-domain");
+    const s = funded(),
+      p = s.pools[0]!;
+    const before = build(s);
+    s.checkpoint = checkpoint(1302400); // Halfway through a seven-day campaign.
+    advanceStreams(p, 1302400n);
+    fundLp(p, 1, p.token1.address, unit, 1302400n, 1604800n);
+    expect(build(s).lpRewardProjection.annualRewardValue).toBe(
+      3n * before.lpRewardProjection.annualRewardValue!
+    );
+  });
+  it("returns zero for expired/stopped schedules and paused earning, null for missing valuation", () => {
+    const s = funded(),
+      p = s.pools[0]!;
+    p.stopped = true;
+    expect(build(s)).toMatchObject({
+      projectedLpAprBps: 0,
+      lpRewardProjection: { status: "inactive" },
+    });
+    p.stopped = false;
+    s.checkpoint = checkpoint(1604800);
+    expect(build(s).projectedLpAprBps).toBe(0);
+    s.checkpoint = checkpoint(1000000);
+    p.legs[0]!.tickLower = 100;
+    p.legs[0]!.tickUpper = 200;
+    expect(build(s)).toMatchObject({
+      projectedLpAprBps: 0,
+      lpRewardProjection: { status: "paused" },
+    });
+    p.legs = [];
+    expect(build(s).projectedLpAprBps).toBeNull();
+    p.legs = [{ ...range(p), positionId: "1" }];
+    p.streams.push({ ...p.streams[0]!, slot: 2, asset: `0x${"99".repeat(20)}` });
+    expect(build(s).projectedLpAprBps).toBeNull();
+    p.streams.pop();
+    p.liquidityComplete = false;
+    expect(build(s).projectedLpAprBps).toBeNull();
+  });
+  it("adds only the current eligible reserve share without inventing future periods", () => {
+    const s = funded(),
+      p = s.pools[0]!;
+    s.reserve = {
+      activated: true,
+      periodStart: "1000000",
+      periodFinish: "1604800",
+      periodBudget: String(10n * unit),
+      periodAccounted: "0",
+      totalAllocatedWeight: "100",
+      updatedAtBlock: "100",
+      updatedAtTimestamp: "1000000",
+    };
+    s.allocations = [{ poolId: p.poolId, weight: "20", eligible: true, incentiveStreamCount: 1 }];
+    expect(build(s).lpRewardProjection.gaugeAnnualRewards).toBe(104n * unit);
+    s.allocations[0]!.eligible = false;
+    expect(build(s).lpRewardProjection.gaugeAnnualRewards).toBe(0n);
+    s.allocations[0]!.eligible = true;
+    p.quarantined = true;
+    expect(build(s).lpRewardProjection).toMatchObject({
+      gaugeAnnualRewards: 0n,
+      creatorAnnualRewards: 52n * unit,
+    });
+    p.quarantined = false;
+    s.reserve.activated = false;
+    expect(build(s).lpRewardProjection.gaugeAnnualRewards).toBe(0n);
+    s.reserve.activated = true;
+    s.checkpoint = checkpoint(1604800);
+    expect(build(s).lpRewardProjection.gaugeAnnualRewards).toBe(0n);
+  });
+});
+
+it("values mixed-decimal LP reward assets at current prices without including the allocator share", async () => {
+  const { projectLpRewards } = await import("../src/dex-lp-projection");
+  const p = pool();
+  p.legs = [{ ...range(p), positionId: "1" }];
+  const schedule = { start: "1000000", finish: "1604800", last: "1000000", emitted: "0" };
+  // Onchain LP amounts after the 90/10 split of 750k STATICS + 2,500 USDG.
+  p.streams = [
+    { ...schedule, slot: 1, asset: p.token0.address, budget: String(675000n * 10n ** 18n) },
+    { ...schedule, slot: 2, asset: p.token1.address, budget: String(2250n * 10n ** 6n) },
+  ];
+  const quote = (asset: string) =>
+    asset === p.token0.address ? { n: 10120n, d: 10n ** 18n } : { n: 1n, d: 1n };
+  const result = projectLpRewards(p, 1000000n, 500000n * 10n ** 6n, quote, null, undefined, null);
+  expect(result.lpRewardProjection.annualRewardValue).toBe(472212n * 10n ** 6n);
+  expect(result.projectedLpAprBps).toBe(9444);
+  // A sub-quote-unit per-second rate must survive annualization.
+  p.streams = [{ ...schedule, slot: 1, asset: p.token1.address, budget: "1" }];
+  expect(projectLpRewards(p, 1000000n, 100n, quote, null, undefined, null).projectedLpAprBps).toBe(
+    5200
+  );
+});

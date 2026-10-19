@@ -76,6 +76,18 @@ export function dexFixture(
       amount1: String(BigInt(2000 + index * 53) * scale(pool.token1.decimals)),
       incentiveStreams: index % 3,
       emissionShareBps: pools.length ? Math.floor(10000 / pools.length) : 0,
+      projectedLpAprBps: unpriced
+        ? null
+        : Number((BigInt(usd(100_000)) * 10000n) / BigInt(usd(volume * 7.1))),
+      lpRewardProjection: {
+        eligibleValueLocked: unpriced ? null : usd(volume * 7.1),
+        annualRewardValue: unpriced ? null : usd(100_000),
+        creatorAnnualRewards: unpriced ? null : usd(100_000),
+        gaugeAnnualRewards: "0",
+        status: "active",
+        assets: [pool.token0.address],
+        basis: "current-lp-reward-rate-over-managed-principal",
+      },
       estimatedYieldBps: unpriced ? null : Math.max(300, 4180 - index * 410),
       priced: !unpriced,
       source: "phase-one",
@@ -139,9 +151,11 @@ export function dexFixture(
         ? "volume24h"
         : sort === "valueLocked"
           ? "valueLocked"
-          : sort === "yield"
-            ? "estimatedYieldBps"
-            : "createdAtBlock";
+          : sort === "apr"
+            ? "projectedLpAprBps"
+            : sort === "yield"
+              ? "estimatedYieldBps"
+              : "createdAtBlock";
   const filtered = poolItems
     .filter((p) =>
       [

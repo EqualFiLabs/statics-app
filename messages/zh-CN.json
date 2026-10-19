@@ -2755,7 +2755,8 @@
     "sort": {
       "volume": "交易量",
       "valueLocked": "锁定价值",
-      "yield": "收益"
+      "yield": "收益",
+      "apr": "LP 奖励年化收益率"
     },
     "column": {
       "pool": "池",
@@ -2764,11 +2765,11 @@
       "volume": "24 小时交易量",
       "fees": "估算LP手续费",
       "valueLocked": "锁定价值",
-      "incentives": "激励",
-      "yield": "预计收益",
+      "yield": "过去 7 天收益率",
       "actions": "操作",
       "token": "代币",
-      "price": "价格"
+      "price": "价格",
+      "projectedApr": "预计 LP 年化收益率"
     },
     "fee": "{fee}% 手续费",
     "unpriced": "未定价：仅显示交易对价格",
@@ -2780,7 +2781,7 @@
     "addLiquidityTo": "为 {pool} 添加流动性",
     "noMatch": "没有匹配的池。",
     "noPools": "暂无池。",
-    "yieldNote": "预计收益 = 支付给流动性的手续费、STATICS 排放和激励，按过去 7 天年化；较新的池按已有历史（至少一天）年化。仅为估算，不作保证。",
+    "yieldNote": "历史收益率包含估算的 LP 交易手续费、已入账的 STATICS 排放和已产生的 LP 奖励，按最多 7 天历史数据（至少一天）年化。不代表当前奖励速率。",
     "tokensTitle": "代币",
     "via": "经由 {route}",
     "tradesTitle": "最近成交",
@@ -2805,7 +2806,11 @@
     "yieldWindow": "{days, plural, other {# 天}}历史",
     "feeUnavailable": "费用暂不可用",
     "approximateFee": "约 {fee}% 费用",
-    "feeBreakdown": "LP 费用 {lp}%；输入费用 {input}%；输出费用 {output}%。合计费率为近似值。"
+    "feeBreakdown": "LP 费用 {lp}%；输入费用 {input}%；输出费用 {output}%。合计费率为近似值。",
+    "projectedAprHelp": "按当前奖励价格和符合条件的托管 LP 价值估算的池平均值。新增存款会稀释年化收益率。个人回报取决于价格区间及处于区间内的时间。",
+    "projectedAprNote": "预计 LP 年化收益率按当前价格，以当前 LP 奖励速率除以符合条件的托管流动性价值，再按 52 周计算，不计复利。不含分配者奖励和交易手续费；LP 额外保留原生手续费。该速率仅在资金持续期间适用，追加奖励、价格和流动性变化均会改变结果。",
+    "rewardsPaused": "奖励已暂停：没有区间内 LP",
+    "eligibleLpValue": "符合条件的托管 LP 价值：{value}"
   },
   "rangeChart": {
     "description": "当前价格 {current} {unit}。区间 {min} 至 {max}。",

@@ -7,6 +7,7 @@ import {
   type AccrualSegment,
   type DexMetadata,
 } from "./dex-domain";
+import { projectLpRewards } from "./dex-lp-projection";
 import { checkpointObservation } from "./dex-checkpoint";
 import type { DexSnapshot, Metric } from "./dex-snapshot";
 import {
@@ -135,7 +136,11 @@ export function buildMarket(
   const metric = (p: MarketPool, bucket: string) =>
     s.metrics.find((m) => m.poolId === p.poolId && m.bucket === bucket) ??
     zeroMetric(p.poolId, bucket);
-  const inventory = (p: MarketPool, at: bigint, ranges: readonly MarketRange[]) => {
+  const inventory = (
+    p: MarketPool,
+    at: bigint,
+    ranges: readonly Pick<MarketRange, "poolId" | "tickLower" | "tickUpper" | "liquidity">[]
+  ) => {
     const pp = poolPrice(p, s.prices, at);
     if (!pp || !p.liquidityComplete) return null;
     return ranges
@@ -233,6 +238,22 @@ export function buildMarket(
       amount1: amounts?.amount1 ?? 0n,
       incentiveStreams: allocation?.incentiveStreamCount ?? 0,
       emissionShareBps: Math.min(10000, emissionShare),
+      ...projectLpRewards(
+        simulated,
+        now,
+        tvl(
+          p,
+          inventory(
+            p,
+            now,
+            p.legs.map((leg) => ({ ...leg, poolId: p.poolId }))
+          )
+        ),
+        (asset) => price(asset)?.price,
+        s.reserve,
+        allocation,
+        staticsAsset
+      ),
       estimatedYieldBps:
         windowSeconds >= 86400n && earnings !== null && locked !== null && locked > 0n
           ? numberBps((earnings * YEAR_SECONDS * 10000n) / (windowSeconds * locked))

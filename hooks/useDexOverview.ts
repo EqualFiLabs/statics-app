@@ -42,7 +42,6 @@ export function useDexOverview(
   });
   const poolPage = useInfiniteQuery({
     ...common,
-    refetchInterval: false,
     queryKey: [dexRoot, id, "pools", quote, pools.sort, pools.search],
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: DexPoolPage) => last.nextCursor ?? undefined,
