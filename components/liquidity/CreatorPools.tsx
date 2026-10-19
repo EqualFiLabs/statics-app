@@ -770,7 +770,9 @@ function Incentives({
       ]),
   });
   const addable = (allowed.data ?? []).filter(
-    (token) => !assigned.some((slot) => same(slot.asset, token.address))
+    // Slot 0 is protocol emissions; the same token may also have one funded slot.
+    (token) =>
+      !assigned.some((slot) => slot.slot !== STATICS_REWARD_SLOT && same(slot.asset, token.address))
   );
   const days = rewards.data ? Number(rewards.data.rewardDuration / 86_400n) : 7;
   const symbol = (address: Address) =>

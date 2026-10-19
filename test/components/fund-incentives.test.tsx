@@ -46,7 +46,10 @@ function show() {
         known={
           new Map([
             [asset.toLowerCase(), token],
-            [address("4").toLowerCase(), { ...token, address: address("4"), symbol: "STATICS" }],
+            [
+              address("4").toLowerCase(),
+              { ...token, address: address("4"), symbol: "STATICS", decimals: 18 },
+            ],
           ])
         }
         onClose={vi.fn()}
@@ -124,4 +127,38 @@ it("disables new funding for a stopped gauge", async () => {
   expect(await screen.findByText(/New incentives are unavailable/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review funding" })).toBeDisabled();
   expect(mocks.execute).not.toHaveBeenCalled();
+});
+
+it("funds the creator STATICS slot while keeping protocol emissions in slot zero reserved", async () => {
+  const original = mocks.read.getMockImplementation()!;
+  mocks.read.mockImplementation(async (call) => {
+    if (call.functionName === "poolRewardConfig")
+      return {
+        slotCount: 2,
+        assets: [address("4"), address("4"), zeroAddress, zeroAddress, zeroAddress],
+        allocatorShareBps: [0, 2500, 0, 0, 0],
+      };
+    if (call.functionName === "balanceOf") return 5n * 10n ** 18n;
+    return original(call);
+  });
+  show();
+  fireEvent.change(await screen.findByRole("textbox", { name: "STATICS amount" }), {
+    target: { value: "2" },
+  });
+  // Only the creator-funded slot is selectable even though both hold STATICS.
+  expect(screen.queryByRole("group", { name: "Reward token" })).not.toBeInTheDocument();
+  const review = screen.getByRole("button", { name: "Review funding" });
+  await waitFor(() => expect(review).toBeEnabled());
+  fireEvent.click(review);
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm transaction" }));
+  await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+  const [approval, funding] = mocks.execute.mock.calls.map(([call]) => call);
+  expect(approval.to).toBe(address("4"));
+  expect(decodeFunctionData({ abi: staticsAbi, data: funding.data }).args).toEqual([
+    pool.poolId,
+    1,
+    2n * 10n ** 18n,
+    0,
+    2500,
+  ]);
 });
