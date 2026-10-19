@@ -424,6 +424,91 @@ export async function loadIndexedAllocationSnapshot(
   );
 }
 
+/** One protocol-wide Phase 1 event: rewards claimed, fees settled, gauge rewards moved. */
+export type PhaseOneProtocolActivity = Readonly<{
+  kind: string;
+  positionId: bigint | null;
+  poolId: Hex | null;
+  asset: Address | null;
+  amount: bigint | null;
+  actor: Address | null;
+  transactionHash: Hex;
+  blockNumber: bigint;
+  blockTimestamp: bigint;
+  logIndex: number;
+}>;
+export function parsePhaseOneProtocolActivity(
+  value: unknown,
+  deploymentId: string
+): readonly PhaseOneProtocolActivity[] {
+  return (page(value, deploymentId).items as unknown[]).map((raw) => {
+    const item = record(raw, "activity item");
+    if (typeof item.kind !== "string" || !/^[a-z-]{1,64}$/.test(item.kind))
+      throw new Error("The Phase 1 indexer returned an invalid activity kind.");
+    return {
+      kind: item.kind,
+      positionId:
+        item.positionId === null ? null : unsignedBigint(item.positionId, "activity position"),
+      poolId: item.poolId === null ? null : hash(item.poolId, "activity pool"),
+      asset: item.asset === null ? null : address(item.asset, "activity asset"),
+      amount: item.amount === null ? null : unsignedBigint(item.amount, "activity amount"),
+      actor: item.actor === null ? null : address(item.actor, "activity actor"),
+      transactionHash: hash(item.transactionHash, "activity transaction"),
+      blockNumber: unsignedBigint(item.blockNumber, "activity block"),
+      blockTimestamp: unsignedBigint(item.blockTimestamp, "activity time"),
+      logIndex: integer(item.logIndex, "activity log index"),
+    };
+  });
+}
+export async function loadPhaseOneProtocolActivity(deploymentId: string, limit = 10) {
+  return parsePhaseOneProtocolActivity(
+    await load(deploymentId, `/phase-one/activity?limit=${limit}`),
+    deploymentId
+  );
+}
+
+/**
+ * The protocol STATICS gauge reserve that funds weekly liquidity emissions, plus when each
+ * creator-funded reward stream ends. `reserve` is null until the reserve is first configured.
+ */
+export type GaugeReserve = Readonly<{
+  reserve: Readonly<{
+    activated: boolean;
+    available: bigint;
+    deferred: bigint;
+    committed: bigint;
+    periodBudget: bigint;
+    periodFinish: bigint;
+  }> | null;
+  streamFinishes: readonly bigint[];
+}>;
+export function parseGaugeReserve(value: unknown, deploymentId: string): GaugeReserve {
+  const body = record(value, "gauge response");
+  if (body.deploymentId !== deploymentId)
+    throw new Error("The Phase 1 indexer returned data for a different deployment.");
+  if (!Array.isArray(body.rewardSlots))
+    throw new Error("The Phase 1 indexer returned invalid reward streams.");
+  const streamFinishes = body.rewardSlots.map((slot) =>
+    unsignedBigint(record(slot, "reward stream").periodFinish, "stream finish")
+  );
+  if (body.reserve === null) return { reserve: null, streamFinishes };
+  const reserve = record(body.reserve, "gauge reserve");
+  return {
+    reserve: {
+      activated: boolean(reserve.activated, "reserve activation"),
+      available: unsignedBigint(reserve.available, "available reserve"),
+      deferred: unsignedBigint(reserve.deferred, "deferred reserve"),
+      committed: unsignedBigint(reserve.committed, "committed reserve"),
+      periodBudget: unsignedBigint(reserve.periodBudget, "period budget"),
+      periodFinish: unsignedBigint(reserve.periodFinish, "period finish"),
+    },
+    streamFinishes,
+  };
+}
+export async function loadGaugeReserve(deploymentId: string) {
+  return parseGaugeReserve(await load(deploymentId, "/phase-one/gauges"), deploymentId);
+}
+
 const allocationReasons = [
   "gauge-uninitialized",
   "gauge-stopped",

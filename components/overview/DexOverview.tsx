@@ -12,6 +12,7 @@ import { useAppLocale } from "@/i18n/client";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import type { DexPool, DexQuote, DexToken } from "@/lib/indexer/dex-market";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
+import { compactNumber, quoteAmount } from "./format";
 import styles from "./dex.module.css";
 
 const SORTS = ["volume", "valueLocked", "yield"] as const;
@@ -46,43 +47,10 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
   const accounts = useAccounts(deployment);
   const quoteToken = dex.summary.data?.quote;
 
-  const number = (value: number, digits = 2) =>
-    new Intl.NumberFormat(locale, {
-      notation: "compact",
-      maximumFractionDigits: digits,
-      ...(value > 0 && value < 10 ** -digits
-        ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
-        : {}),
-    }).format(value);
+  const number = (value: number, digits = 2) => compactNumber(locale, value, digits);
   /** A quote-currency amount: "≈ $1.07M" in USDG, "412.6 WETH" in WETH. */
-  const money = (value: bigint | null | undefined, price = false, q = quoteToken) => {
-    if (value === null || value === undefined || !q) return "—";
-    const amount = Number(formatUnits(value, q.decimals ?? 18));
-    // Prices keep four significant digits however small; totals are compact.
-    const fraction =
-      price && amount > 0 && amount < 1 ? Math.min(12, Math.ceil(-Math.log10(amount)) + 3) : 2;
-    if (q.kind === "usdg")
-      return `≈ ${new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: "USD",
-        notation: price ? "standard" : "compact",
-        minimumFractionDigits: price ? Math.min(2, fraction) : 0,
-        maximumFractionDigits: price ? fraction : 2,
-        ...(amount > 0 && amount < (price ? 0.000000000001 : 0.01)
-          ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
-          : {}),
-      }).format(amount)}`;
-    return `${
-      price
-        ? new Intl.NumberFormat(locale, {
-            maximumFractionDigits: Math.max(fraction, 4),
-            ...(amount > 0 && amount < 0.000000000001
-              ? { notation: "scientific" as const, maximumSignificantDigits: 4 }
-              : {}),
-          }).format(amount)
-        : number(amount, 3)
-    } WETH`;
-  };
+  const money = (value: bigint | null | undefined, price = false, q = quoteToken) =>
+    quoteAmount(locale, value, q, price);
   const tokenAmount = (value: bigint, raw: DexToken) => {
     const token = withNative(raw);
     return token.decimals === null
@@ -202,7 +170,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
   return (
     <div className={styles.page}>
       <AppPageHeader
-        feature="overview"
+        feature="markets"
         title={t("title")}
         description={t("lead")}
         actions={

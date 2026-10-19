@@ -100,6 +100,10 @@
     "tools": {
       "title": "授权工具",
       "description": "查看、启用和撤销 Statics 应用授权。"
+    },
+    "markets": {
+      "title": "市场",
+      "description": "Statics 的每个资金池、代币和交易，包括交易量、手续费、锁定价值以及本期 STATICS 排放。"
     }
   },
   "navigation": {
@@ -661,6 +665,12 @@
       "status": "工具",
       "title": "授权工具",
       "description": "查看并撤销此钱包授予 Statics 的权限。"
+    },
+    "markets": {
+      "label": "市场",
+      "status": "市场",
+      "title": "市场",
+      "description": "每个资金池的交易量与手续费，以及本期 STATICS 排放的去向。"
     }
   },
   "shell": {
@@ -2946,5 +2956,148 @@
     "approvalNote": "如有需要，包含 {symbol} 的批准",
     "scheduleNote": "剩余金额和日期反映已存储的 LP 计划。检查点可能延长暂停的奖励流；资金按当前 LP 和分配者计划发放。",
     "fundingUnavailable": "此池暂不支持添加新激励。现有收入仍可领取。"
+  },
+  "protocolOverview": {
+    "title": "概览",
+    "lead": "STATICS、交易所、质押、Gauge 与 Operator，尽在一页。",
+    "liveGenesis": "Genesis 与第一阶段已上线",
+    "livePhaseOne": "第一阶段已上线",
+    "unavailable": "部分协议数据未能刷新。可用数据可能来自较早的快照。",
+    "totals": "协议总览",
+    "change24h": "24 小时",
+    "notStarted": "尚未开始",
+    "tile": {
+      "price": "STATICS 价格",
+      "marketCap": "市值",
+      "marketCapHint": "公开流通量按资金池价格计算",
+      "value": "Statics 中的价值",
+      "valueSplit": "资金池 {pools} · Operator 支撑 {vault} · 质押 {staked}",
+      "valueSplitPhaseOne": "资金池 {pools} · 质押 {staked}",
+      "staked": "已质押 STATICS",
+      "stakedShare": "占供应量 {share}%",
+      "emissions": "本期排放"
+    },
+    "yours": {
+      "title": "你的 Statics",
+      "attention": "{count, plural, other {# 个账户需要处理}}",
+      "openAccounts": "打开账户",
+      "reviewRewards": "查看奖励",
+      "inWallet": "钱包中",
+      "staked": "已质押",
+      "stakedAcross": "{count, plural, other {# 个账户}}",
+      "operators": "Operator",
+      "operatorBacking": "由 {amount} STATICS 支撑",
+      "claimable": "Operator 奖励",
+      "nothingToClaim": "暂无可领取奖励",
+      "accountsReady": "{count, plural, other {# 个账户有可领取奖励}}",
+      "accountRewards": "账户奖励"
+    },
+    "connect": {
+      "title": "一并查看你的 STATICS、质押、Operator 和奖励",
+      "description": "连接钱包后，你的持仓会显示在此页面。其余内容均为公开数据。",
+      "action": "连接钱包"
+    },
+    "exchange": {
+      "title": "交易所",
+      "open": "打开市场",
+      "chart": "过去 {days} 天的每日交易量"
+    },
+    "staking": {
+      "title": "质押",
+      "open": "质押 STATICS",
+      "total": "质押总量",
+      "value": "质押价值",
+      "share": "占比",
+      "ofSupply": "占供应量",
+      "assets": "已审核池中有质押奖励的资产",
+      "noAssets": "已审核池的资产暂无已索引的质押奖励"
+    },
+    "gauges": {
+      "title": "Gauge",
+      "open": "分配",
+      "period": "本期",
+      "toLiquidity": "STATICS 用于流动性",
+      "reserve": "储备",
+      "reserveHint": "待排放的 STATICS",
+      "streams": "创建者奖励流",
+      "streamsActive": "当前活跃",
+      "notStarted": "Gauge 储备激活后，每周向流动性排放 STATICS。",
+      "noActivePeriod": "无活跃周期",
+      "noActivePeriodHint": "储备已激活，但当前没有已注资的排放周期。"
+    },
+    "operators": {
+      "title": "Operator NFT",
+      "badge": "Genesis",
+      "open": "管理 Operator",
+      "backing": "每个的支撑",
+      "buyIn": "今日买入",
+      "buyInMeta": "STATICS + {eth} ETH",
+      "epoch": "Genesis 纪元",
+      "epochLeft": "{days} 天 {hours} 小时",
+      "epochEnded": "已结束",
+      "epochActive": "内可按发行价获取",
+      "epochAfter": "买入价现已包含储备",
+      "supplyLabel": "{supply} 个 Operators：金库中 {vault} 个，流通中 {held} 个",
+      "inVault": "金库中 {count}",
+      "held": "流通中 {count}",
+      "ofSupply": "固定总量 {count}",
+      "unavailable": "Operator 数据暂时不可用。"
+    },
+    "fees": {
+      "title": "Statics 手续费的去向",
+      "meta": "通用池当前分配比例",
+      "pol": "协议自有流动性",
+      "stakers": "STATICS 质押者",
+      "treasury": "国库",
+      "creator": "资金池创建者",
+      "share": "{label} · {share}%",
+      "unavailable": "手续费分配暂时不可用。",
+      "hint": "此处为配置比例，尚未考虑各池的 POL 设置和奖励资格回退。实际分配可能不同；许可池使用各自的条款。"
+    },
+    "activity": {
+      "title": "协议动态",
+      "filter": "筛选动态",
+      "filters": {
+        "all": "全部",
+        "trades": "交易",
+        "rewards": "奖励",
+        "fees": "手续费"
+      },
+      "tags": {
+        "swap": "兑换",
+        "claim": "领取",
+        "gauge": "Gauge",
+        "fees": "手续费",
+        "forfeit": "作废",
+        "other": "事件"
+      },
+      "text": {
+        "revenueSettled": "已结算 {amount} 手续费",
+        "creatorClaimed": "已领取 {amount} 创建者手续费",
+        "stakingClaimed": "已领取 {amount} 质押奖励",
+        "lpClaimed": "已领取 {amount} 流动性奖励",
+        "allocatorClaimed": "已领取 {amount} 分配者奖励",
+        "gaugeCredited": "已计入 {amount} Gauge 奖励",
+        "gaugeRecycled": "{amount} Gauge 奖励已退回储备",
+        "forfeited": "{amount} 奖励已作废",
+        "other": "协议事件"
+      },
+      "account": "账户 #{id}",
+      "empty": "暂无动态。",
+      "all": "在市场中查看全部交易"
+    },
+    "ago": {
+      "seconds": "{count} 秒前",
+      "minutes": "{count} 分钟前",
+      "hours": "{count} 小时前",
+      "days": "{count} 天前"
+    },
+    "pools": {
+      "title": "热门资金池",
+      "meta": "按 24 小时交易量",
+      "all": "在市场中查看 {count, plural, other {# 个资金池}}"
+    },
+    "note": "价格仅来自 Statics 资金池，按 30 分钟时间加权。Statics 中的价值按 STATICS 价格合计资金池流动性、Operator 支撑和已质押的 STATICS。收益率为估算值，并非承诺。",
+    "dataUnavailable": "暂不可用"
   }
 }

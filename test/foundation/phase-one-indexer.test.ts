@@ -6,6 +6,8 @@ import {
   parseIndexedPositions,
   parseIndexedPublicPools,
   parsePhaseOneCandles,
+  parseGaugeReserve,
+  parsePhaseOneProtocolActivity,
 } from "@/lib/indexer/phase-one";
 
 const address = (byte: string) => `0x${byte.repeat(40)}`;
@@ -136,5 +138,65 @@ describe("Phase 1 indexed read models", () => {
     expect(() => parseIndexedManagedLiquidity(response, 34n, "other", owner)).toThrow(
       "different deployment"
     );
+  });
+});
+
+describe("protocol overview indexer responses", () => {
+  const event = {
+    kind: "global-reward-claimed",
+    positionId: "9007199254740993",
+    poolId: null,
+    asset: address("1"),
+    amount: "1234567890123456789",
+    actor: address("2"),
+    transactionHash: hash("3"),
+    blockNumber: "42",
+    blockTimestamp: "100",
+    logIndex: 0,
+  };
+  it("accepts empty activity and retains exact event amounts and nullable fields", () => {
+    expect(
+      parsePhaseOneProtocolActivity(
+        { deploymentId: "local", indexedAtBlock: null, items: [] },
+        "local"
+      )
+    ).toEqual([]);
+    const [row] = parsePhaseOneProtocolActivity({ deploymentId: "local", items: [event] }, "local");
+    expect(row?.amount).toBe(1234567890123456789n);
+    expect(row?.positionId).toBe(9007199254740993n);
+    expect(row?.poolId).toBeNull();
+    expect(() =>
+      parsePhaseOneProtocolActivity({ deploymentId: "other", items: [event] }, "local")
+    ).toThrow(/different deployment/);
+    expect(() =>
+      parsePhaseOneProtocolActivity(
+        { deploymentId: "local", items: [{ ...event, amount: "-1" }] },
+        "local"
+      )
+    ).toThrow(/activity amount/);
+  });
+  it("parses a missing or populated reserve, rejecting malformed stream times", () => {
+    const empty = { deploymentId: "local", reserve: null, rewardSlots: [] };
+    expect(parseGaugeReserve(empty, "local")).toEqual({ reserve: null, streamFinishes: [] });
+    const reserve = {
+      activated: true,
+      available: "1234567890123456789",
+      deferred: "2",
+      committed: "3",
+      periodBudget: "4",
+      periodFinish: "604800",
+    };
+    expect(
+      parseGaugeReserve({ ...empty, reserve, rewardSlots: [{ periodFinish: "1000" }] }, "local")
+    ).toMatchObject({
+      reserve: { available: 1234567890123456789n, committed: 3n },
+      streamFinishes: [1000n],
+    });
+    expect(() => parseGaugeReserve({ ...empty, deploymentId: "other" }, "local")).toThrow(
+      /different deployment/
+    );
+    expect(() =>
+      parseGaugeReserve({ ...empty, rewardSlots: [{ periodFinish: -1 }] }, "local")
+    ).toThrow(/stream finish/);
   });
 });

@@ -32,7 +32,7 @@ const staticsBatchRewardsAbi = [
 import { staticsGaugeIncentivesAbi } from "@statics-protocol/sdk/phase-one";
 import { PositionListPage } from "@/components/positions/PositionListPage";
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
-import { DeploymentOverview } from "@/components/overview/DeploymentOverview";
+import { DeploymentOverview, MarketsOverview } from "@/components/overview/DeploymentOverview";
 import { dexFixture } from "@/lib/indexer/dex-market-fixture";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
 import type { DeploymentOption, PhaseOneDeployment } from "@/lib/deployments/types";
@@ -55,6 +55,8 @@ const mocks = vi.hoisted(() => ({
   directory: vi.fn(),
   managed: vi.fn(),
   statement: vi.fn(),
+  gauges: vi.fn(),
+  protocolActivity: vi.fn(),
   dex: vi.fn(),
   block: vi.fn(),
   params: new URLSearchParams(),
@@ -100,6 +102,8 @@ vi.mock("@/lib/indexer/phase-one", async (original) => ({
   loadAllocationDirectory: mocks.directory,
   loadIndexedManagedLiquidity: mocks.managed,
   loadPositionStatement: mocks.statement,
+  loadGaugeReserve: mocks.gauges,
+  loadPhaseOneProtocolActivity: mocks.protocolActivity,
 }));
 const address = (digit: string) => getAddress(`0x${digit.repeat(40)}`);
 const hash = (digit: string) => `0x${digit.repeat(64)}` as const;
@@ -422,7 +426,7 @@ beforeEach(() => {
   });
 });
 
-describe("DEX overview", () => {
+describe("Markets", () => {
   it("keeps tiny positive quote totals visible instead of rounding them to zero", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
@@ -430,7 +434,7 @@ describe("DEX overview", () => {
         return { ...sample.summary, current: { ...sample.summary.current, volume: "1" } };
       return sample[endpoint as keyof typeof sample];
     });
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     const totals = await screen.findByRole("region", { name: "Market totals" });
     expect(await within(totals).findByText("≈ $1E-6")).toBeInTheDocument();
   });
@@ -448,13 +452,13 @@ describe("DEX overview", () => {
         };
       return sample[endpoint as keyof typeof sample];
     });
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     expect(await screen.findByText(/Ends in/)).toBeInTheDocument();
     expect(screen.queryByText("Period ended")).not.toBeInTheDocument();
     expect(await screen.findByText("Historical coverage is incomplete")).toBeInTheDocument();
   });
   it("opens Phase 1 on the DEX with totals, pools, tokens, trades and emissions", async () => {
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     expect(await screen.findByRole("heading", { name: "Markets" })).toBeInTheDocument();
     const totals = await screen.findByRole("region", { name: "Market totals" });
     expect(await within(totals).findByText("≈ $1.07M")).toBeInTheDocument();
@@ -470,7 +474,7 @@ describe("DEX overview", () => {
     expect(
       screen.getByRole("region", { name: "Where emissions go this period" })
     ).toBeInTheDocument();
-    // Operators and Genesis are not part of the Phase 1 home.
+    // Operators and Genesis live on the protocol overview, not on Markets.
     expect(screen.queryByText("Acquire Operators")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "WETH" }));
     await waitFor(() => expect(mocks.dex).toHaveBeenCalledWith("summary", "weth"));
@@ -488,7 +492,7 @@ describe("DEX overview", () => {
         ),
       };
     });
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     const pools = await screen.findByRole("region", { name: "Pools" });
     const empty = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
     expect(within(empty).getByText("No liquidity yet")).toBeInTheDocument();
@@ -525,7 +529,7 @@ describe("DEX overview", () => {
       if (endpoint === "summary") return { ...sample.summary, unpricedPools: 1 };
       return sample[endpoint as keyof typeof sample];
     });
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     const pools = await screen.findByRole("region", { name: "Pools" });
     const row = (await within(pools).findByText("STATICS / TOKEN")).closest("tr")!;
     expect(within(row).getByText("Unpriced: pair price only")).toBeInTheDocument();
@@ -552,14 +556,146 @@ describe("DEX overview", () => {
         ),
       };
     });
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     const pools = await screen.findByRole("region", { name: "Pools" });
     expect(await within(pools).findByText("3 days of history")).toBeInTheDocument();
   });
   it("says when market data is not available yet", async () => {
     mocks.dex.mockRejectedValue(new Error("404"));
-    withPhaseOne(<DeploymentOverview />);
+    withPhaseOne(<MarketsOverview />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Market data is not available yet");
+  });
+});
+
+describe("protocol overview", () => {
+  beforeEach(() => {
+    const base = mocks.read.getMockImplementation()!;
+    mocks.read.mockImplementation(async (call: { functionName: string; args?: unknown[] }) => {
+      if (call.functionName === "totalStaked") return parseEther("2500000");
+      if (call.functionName === "generalFeeAllocation")
+        return { polShareBps: 4000, staticsStakerShareBps: 3500, treasuryShareBps: 2000 };
+      if (call.functionName === "rewardAsset")
+        return {
+          eligibleStake: 0n,
+          eligibleWeight: 0n,
+          pendingStake: 0n,
+          pendingWeight: 0n,
+          indexRay: call.args?.[0] === tokens[1].address ? 1n : 0n,
+          indexedReserve: 0n,
+          totalClaimable: 0n,
+        };
+      return base(call);
+    });
+    mocks.gauges.mockReset().mockResolvedValue({ reserve: null, streamFinishes: [] });
+    mocks.protocolActivity.mockReset().mockResolvedValue([
+      {
+        kind: "global-reward-claimed",
+        positionId: 7n,
+        poolId: null,
+        asset: tokens[1].address,
+        amount: parseEther("0.5"),
+        actor: wallet,
+        transactionHash: hash("c"),
+        blockNumber: 10n,
+        blockTimestamp: 1n,
+        logIndex: 0,
+      },
+    ]);
+  });
+
+  it("opens Phase 1 on every live module rather than the DEX alone", async () => {
+    withPhaseOne(<DeploymentOverview />);
+    expect(await screen.findByRole("heading", { name: "Overview", level: 1 })).toBeInTheDocument();
+    const totals = screen.getByRole("region", { name: "Protocol totals" });
+    expect(await within(totals).findByText("0.25% of supply")).toBeInTheDocument();
+    for (const name of ["Exchange", "Staking", "Gauges", "Where the Statics fee goes"])
+      expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Markets ›" })).toHaveAttribute(
+      "href",
+      "/app/markets"
+    );
+    // Show configuration only: current shares cannot reconstruct historical fee routing.
+    const fees = screen.getByRole("region", { name: "Where the Statics fee goes" });
+    expect(await within(fees).findByText("Protocol-owned liquidity · 40%")).toBeInTheDocument();
+    expect(within(fees).getByText("Pool creator · 5%")).toBeInTheDocument();
+    expect(
+      within(fees).getByText(/Configured shares, before pool-specific POL/)
+    ).toBeInTheDocument();
+    expect(within(fees).queryByText(/≈/)).not.toBeInTheDocument();
+    // Only assets whose reward index has moved are listed as paid to stakers.
+    const staking = screen.getByRole("region", { name: "Staking" });
+    expect(await within(staking).findByText("WETH")).toBeInTheDocument();
+    expect(within(staking).queryByText("TOKEN")).not.toBeInTheDocument();
+    // No Genesis deployment beside this Phase 1 fixture, so no Operators card.
+    expect(screen.queryByRole("heading", { name: "Operator NFTs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your Statics" })).toBeInTheDocument();
+  });
+
+  it("says weekly emissions have not started while the gauge reserve is inactive", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "emissions") return { ...sample.emissions, period: null, pools: [], othersBps: 10000 };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const gauges = await screen.findByRole("region", { name: "Gauges" });
+    expect(
+      await within(gauges).findByText(
+        "Weekly STATICS emissions to liquidity start once the gauge reserve is activated."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("keeps unknown emissions separate from an inactive or ended period", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      if (endpoint === "emissions") throw new Error("Indexer unavailable");
+      return dexFixture(phaseOne, quote)[endpoint as keyof ReturnType<typeof dexFixture>];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const gauges = await screen.findByRole("region", { name: "Gauges" });
+    expect(await within(gauges).findByText("Unavailable")).toBeInTheDocument();
+    expect(within(gauges).queryByText("Not started")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("could not be refreshed");
+  });
+
+  it("describes an expired activated period without saying activation is still required", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "emissions")
+        return {
+          ...sample.emissions,
+          period: { ...sample.emissions.period!, activated: true, expired: true },
+        };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const gauges = await screen.findByRole("region", { name: "Gauges" });
+    expect(await within(gauges).findByText("No active period")).toBeInTheDocument();
+    expect(within(gauges).queryByText("Not started")).not.toBeInTheDocument();
+  });
+
+  it("does not report empty wallet holdings when the account indexer fails", async () => {
+    mocks.page.mockRejectedValue(new Error("Indexer unavailable"));
+    withPhaseOne(<DeploymentOverview />);
+    const yours = await screen.findByRole("region", { name: "Your Statics" });
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("could not be refreshed")
+    );
+    expect(within(yours).queryByText("0 STATICS")).not.toBeInTheDocument();
+    expect(within(yours).queryByText("0 accounts")).not.toBeInTheDocument();
+    expect(within(yours).queryByText("Nothing to claim yet")).not.toBeInTheDocument();
+  });
+
+  it("mixes trades with protocol events and filters them by kind", async () => {
+    withPhaseOne(<DeploymentOverview />);
+    const activity = await screen.findByRole("region", { name: /Protocol activity/ });
+    expect(
+      await within(activity).findByText("0.5 WETH staking reward claimed")
+    ).toBeInTheDocument();
+    expect(within(activity).getAllByText("Swap").length).toBeGreaterThan(0);
+    fireEvent.click(within(activity).getByRole("button", { name: "Rewards" }));
+    expect(within(activity).queryByText("Swap")).not.toBeInTheDocument();
+    expect(within(activity).getByText("0.5 WETH staking reward claimed")).toBeInTheDocument();
   });
 });
 

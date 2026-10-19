@@ -5,6 +5,7 @@ export type DappRouteCapability = DeploymentCapability;
 /** Exact runtime route policy; unknown paths intentionally return null. */
 export function getDappRouteCapability(pathname: string): DappRouteCapability | null {
   if (pathname === "/app" || pathname === "/app/") return "overview";
+  if (pathname === "/app/markets") return "public-market-discovery";
   if (pathname === "/app/swap") return "canonical-statics-market";
   if (pathname === "/app/genesis" || pathname === "/app/genesis/recoveries") return "genesis-vault";
   if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
@@ -69,6 +70,12 @@ const routePresentations = {
     title: "Your portfolio",
     description:
       "Everything you hold in one place: your assets, accounts, and rewards waiting to be claimed.",
+  },
+  markets: {
+    label: "Markets",
+    status: "Markets",
+    title: "Markets",
+    description: "Every pool, its volume and fees, and where STATICS emissions go this period.",
   },
   swap: {
     label: "Swap",
@@ -184,6 +191,7 @@ const routePresentations = {
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/markets")) return "markets";
   if (pathname.startsWith("/app/swap")) return "swap";
   if (pathname.startsWith("/app/wallet")) return "wallet";
   if (pathname.startsWith("/app/faucet")) return "faucet";

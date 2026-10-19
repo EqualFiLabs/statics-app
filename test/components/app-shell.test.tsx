@@ -82,14 +82,20 @@ describe("DApp wallet shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows Markets and Swap in the Phase 1 mobile tabs", () => {
+  it("shows Overview, Markets and Swap in the Phase 1 mobile tabs", () => {
     const descriptor = {
       deploymentId: "phase-one-fixture",
       label: "Phase 1",
       network: "Robinhood Chain",
       chainId: 4_663,
       stage: "phase-one",
-      capabilities: ["overview", "public-direct-swaps", "global-rewards", "wallet"],
+      capabilities: [
+        "overview",
+        "public-market-discovery",
+        "public-direct-swaps",
+        "global-rewards",
+        "wallet",
+      ],
       available: true,
     } as const;
     const active = {
@@ -100,19 +106,19 @@ describe("DApp wallet shell", () => {
     } satisfies DeploymentOption;
     renderWithWallet(
       <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
-        <AppShell>Markets</AppShell>
+        <AppShell>Overview</AppShell>
       </DeploymentContext.Provider>
     );
 
     const tabs = within(screen.getByRole("navigation", { name: "Primary" }));
     expect(tabs.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Overview",
       "Markets",
       "Swap",
       "Earn",
-      "Wallet",
     ]);
     expect(
-      tabs.getByRole("button", { name: "Application menu. Current route: Markets" })
+      tabs.getByRole("button", { name: "Application menu. Current route: Overview" })
     ).toBeInTheDocument();
   });
 

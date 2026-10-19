@@ -3,6 +3,7 @@
 import {
   Activity,
   ArrowLeftRight,
+  ChartColumn,
   CircleDollarSign,
   Coins,
   Droplets,
@@ -35,6 +36,7 @@ import { useWalletState } from "@/providers/wallet-context";
 
 const navigationIcons: Record<string, LucideIcon> = {
   overview: LayoutGrid,
+  markets: ChartColumn,
   swap: ArrowLeftRight,
   earn: Gift,
   liquidity: Droplets,
@@ -297,10 +299,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? tLaunchRoutes(`${routeId}.description`)
       : tRoutes(`${routeId}.description`),
   };
-  const currentRouteLabel =
-    active.descriptor.stage === "phase-one" && routeId === "overview"
-      ? tItems("markets")
-      : routeCopy.label;
+  const currentRouteLabel = routeCopy.label;
   const closeNavigation = (restoreFocus = true) => {
     setOpenNavigationPath(null);
     if (restoreFocus) {
@@ -401,11 +400,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       onClick={() => closeNavigation()}
                     >
                       <NavigationIcon name={item.messageKey} />
-                      {active.descriptor.stage === "phase-one" && item.href === "/app"
-                        ? tItems("markets")
-                        : active.descriptor.stage === "launch" && item.capability !== "wallet"
-                          ? tLaunchRoutes(`${item.messageKey}.label`)
-                          : tItems(item.messageKey)}
+                      {active.descriptor.stage === "launch" && item.capability !== "wallet"
+                        ? tLaunchRoutes(`${item.messageKey}.label`)
+                        : tItems(item.messageKey)}
                     </Link>
                   ) : (
                     <span key={item.label} className="dapp-nav-item" aria-disabled="true">
@@ -431,10 +428,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Every route names itself. This used to be gated to /app, which left
               every other destination -- Genesis included -- with no <h1> at all
               and no statement of what the page is for. */}
-          {/* Phase 1 Earn and the DEX overview carry their own headings. */}
+          {/* Phase 1 Earn, the protocol overview and Markets carry their own headings. */}
           {!(
             active.phaseOne &&
-            (currentPath.startsWith("/app/rewards") || routeId === "overview")
+            (currentPath.startsWith("/app/rewards") ||
+              routeId === "overview" ||
+              routeId === "markets")
           ) && (
             <div className="dapp-page-intro">
               {detailParent && (
@@ -473,11 +472,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={currentActive ? "page" : undefined}
             >
-              {active.descriptor.stage === "phase-one" && item.href === "/app"
-                ? tItems("markets")
-                : active.descriptor.stage === "launch" && item.capability !== "wallet"
-                  ? tLaunchRoutes(`${item.messageKey}.label`)
-                  : tItems(item.messageKey)}
+              {active.descriptor.stage === "launch" && item.capability !== "wallet"
+                ? tLaunchRoutes(`${item.messageKey}.label`)
+                : tItems(item.messageKey)}
             </Link>
           );
         })}

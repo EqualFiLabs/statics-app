@@ -13,6 +13,34 @@ import {
 } from "@/lib/protocol/reconciliation";
 
 describe("confirmed transaction reconciliation", () => {
+  it("refreshes overview staking and wallet balances after a matching receipt", () => {
+    const detail = {
+      wallet: "0x0000000000000000000000000000000000000001" as Address,
+      chainId: 4663,
+      deploymentId: "local",
+      blockNumber: 100n,
+      kind: "phase-one-stake" as const,
+      scopes: protocolQueryScopes("phase-one-stake"),
+    };
+    expect(
+      queryMatchesProtocolReconciliation(["protocol-overview", "local", "staking"], detail)
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(["protocol-overview", "other", "staking"], detail)
+    ).toBe(false);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["protocol-overview-wallet", "local", detail.wallet],
+        detail
+      )
+    ).toBe(true);
+    expect(
+      queryMatchesProtocolReconciliation(
+        ["protocol-overview-wallet", "local", "0x0000000000000000000000000000000000000002"],
+        detail
+      )
+    ).toBe(false);
+  });
   it("refreshes Phase 1 positions after close and reward catch-up", () => {
     expect(protocolQueryScopes("phase-one-close-position")).toContain("phase-one-position");
     expect(protocolQueryScopes("phase-one-checkpoint-schedule")).toContain("phase-one-reward");

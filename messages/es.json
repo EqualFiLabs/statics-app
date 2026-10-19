@@ -100,6 +100,10 @@
     "tools": {
       "title": "Herramientas de aprobación",
       "description": "Revisa, habilita y revoca las aprobaciones de la aplicación Statics."
+    },
+    "markets": {
+      "title": "Mercados",
+      "description": "Cada pool, token y operación de Statics, con volumen, comisiones, valor bloqueado y las emisiones de STATICS de este periodo."
     }
   },
   "navigation": {
@@ -661,6 +665,12 @@
       "status": "Herramientas",
       "title": "Herramientas de permisos",
       "description": "Revisa y revoca los permisos que esta billetera ha concedido a Statics."
+    },
+    "markets": {
+      "label": "Mercados",
+      "status": "Mercados",
+      "title": "Mercados",
+      "description": "Cada pool, su volumen y comisiones, y adónde van las emisiones de STATICS este periodo."
     }
   },
   "shell": {
@@ -2946,5 +2956,148 @@
     "approvalNote": "Incluye una aprobación de {symbol} si hace falta",
     "scheduleNote": "Los importes restantes y las fechas reflejan el calendario de LP almacenado. Los puntos de control pueden ampliar los flujos pausados; la financiación sigue los calendarios actuales de LP y asignadores.",
     "fundingUnavailable": "No se pueden añadir nuevos incentivos a este pool. Los ingresos existentes se pueden reclamar."
+  },
+  "protocolOverview": {
+    "title": "Resumen",
+    "lead": "STATICS, el exchange, el staking, los gauges y los Operadores, en una sola página.",
+    "liveGenesis": "Génesis y la Fase 1 están activas",
+    "livePhaseOne": "La Fase 1 está activa",
+    "unavailable": "No se pudieron actualizar algunas cifras. Los datos disponibles pueden corresponder a instantáneas anteriores.",
+    "totals": "Totales del protocolo",
+    "change24h": "24 h",
+    "notStarted": "Sin iniciar",
+    "tile": {
+      "price": "Precio de STATICS",
+      "marketCap": "Capitalización",
+      "marketCapHint": "Suministro público al precio del pool",
+      "value": "Valor en Statics",
+      "valueSplit": "Pools {pools} · Respaldo de Operadores {vault} · En staking {staked}",
+      "valueSplitPhaseOne": "Pools {pools} · En staking {staked}",
+      "staked": "STATICS en staking",
+      "stakedShare": "{share}% del suministro",
+      "emissions": "Emisiones de este periodo"
+    },
+    "yours": {
+      "title": "Tu Statics",
+      "attention": "{count, plural, one {# cuenta requiere atención} other {# cuentas requieren atención}}",
+      "openAccounts": "Abrir cuentas",
+      "reviewRewards": "Revisar recompensas",
+      "inWallet": "En la billetera",
+      "staked": "En staking",
+      "stakedAcross": "{count, plural, one {# cuenta} other {# cuentas}}",
+      "operators": "Operadores",
+      "operatorBacking": "Respaldado por {amount} STATICS",
+      "claimable": "Recompensas de Operadores",
+      "nothingToClaim": "Nada que reclamar todavía",
+      "accountsReady": "{count, plural, one {# cuenta tiene recompensas listas} other {# cuentas tienen recompensas listas}}",
+      "accountRewards": "Recompensas de cuentas"
+    },
+    "connect": {
+      "title": "Ve tus STATICS, staking, Operadores y recompensas juntos",
+      "description": "Conecta una billetera para añadir tus tenencias a esta página. Todo lo demás es público.",
+      "action": "Conectar billetera"
+    },
+    "exchange": {
+      "title": "Exchange",
+      "open": "Abrir Mercados",
+      "chart": "Volumen diario de los últimos {days} días"
+    },
+    "staking": {
+      "title": "Staking",
+      "open": "Hacer staking de STATICS",
+      "total": "Total en staking",
+      "value": "Valor en staking",
+      "share": "Proporción",
+      "ofSupply": "del suministro",
+      "assets": "Activos de pools revisados con recompensas de staking",
+      "noAssets": "Aún no hay recompensas indexadas para los activos de pools revisados"
+    },
+    "gauges": {
+      "title": "Gauges",
+      "open": "Asignar",
+      "period": "Este periodo",
+      "toLiquidity": "STATICS para liquidez",
+      "reserve": "Reserva",
+      "reserveHint": "STATICS por emitir",
+      "streams": "Flujos de creadores",
+      "streamsActive": "activos ahora",
+      "notStarted": "Las emisiones semanales de STATICS para liquidez empiezan cuando se active la reserva de gauges.",
+      "noActivePeriod": "Sin período activo",
+      "noActivePeriodHint": "La reserva está activada, pero no hay un período activo de emisiones financiadas."
+    },
+    "operators": {
+      "title": "NFT de Operador",
+      "badge": "Génesis",
+      "open": "Gestionar Operadores",
+      "backing": "Respaldo de cada uno",
+      "buyIn": "Compra hoy",
+      "buyInMeta": "STATICS + {eth} ETH",
+      "epoch": "Época Génesis",
+      "epochLeft": "{days} d {hours} h",
+      "epochEnded": "Terminada",
+      "epochActive": "restantes al precio de lanzamiento",
+      "epochAfter": "La compra ya incluye la reserva",
+      "supplyLabel": "{supply} Operators: {vault} en la bóveda, {held} en circulación",
+      "inVault": "En la Bóveda {count}",
+      "held": "En circulación {count}",
+      "ofSupply": "de {count} fijos",
+      "unavailable": "Las cifras de Operadores no están disponibles ahora."
+    },
+    "fees": {
+      "title": "Adónde va la comisión de Statics",
+      "meta": "Asignación actual de pools generales",
+      "pol": "Liquidez propia del protocolo",
+      "stakers": "Quienes hacen staking de STATICS",
+      "treasury": "Tesorería",
+      "creator": "Creador del pool",
+      "share": "{label} · {share}%",
+      "unavailable": "El reparto de comisiones no está disponible ahora.",
+      "hint": "Porcentajes configurados antes de los ajustes POL de cada pool y las reglas de elegibilidad. La distribución real puede variar; los pools con permiso usan sus propios términos."
+    },
+    "activity": {
+      "title": "Actividad del protocolo",
+      "filter": "Filtrar actividad",
+      "filters": {
+        "all": "Todo",
+        "trades": "Operaciones",
+        "rewards": "Recompensas",
+        "fees": "Comisiones"
+      },
+      "tags": {
+        "swap": "Swap",
+        "claim": "Reclamo",
+        "gauge": "Gauge",
+        "fees": "Comisión",
+        "forfeit": "Pérdida",
+        "other": "Evento"
+      },
+      "text": {
+        "revenueSettled": "{amount} en comisiones liquidadas",
+        "creatorClaimed": "{amount} en comisiones de creador reclamadas",
+        "stakingClaimed": "{amount} de recompensa de staking reclamada",
+        "lpClaimed": "{amount} de recompensa de liquidez reclamada",
+        "allocatorClaimed": "{amount} de recompensa de asignación reclamada",
+        "gaugeCredited": "{amount} de recompensa de gauge acreditada",
+        "gaugeRecycled": "{amount} de recompensa de gauge devuelta a la reserva",
+        "forfeited": "{amount} de recompensa perdida",
+        "other": "Evento del protocolo"
+      },
+      "account": "Cuenta #{id}",
+      "empty": "Aún no hay actividad.",
+      "all": "Todas las operaciones en Mercados"
+    },
+    "ago": {
+      "seconds": "hace {count} s",
+      "minutes": "hace {count} min",
+      "hours": "hace {count} h",
+      "days": "hace {count} d"
+    },
+    "pools": {
+      "title": "Pools principales",
+      "meta": "por volumen 24 h",
+      "all": "Ver {count, plural, one {# pool} other {# pools}} en Mercados"
+    },
+    "note": "Los precios provienen solo de pools de Statics, ponderados en 30 minutos. El valor en Statics suma la liquidez de los pools, el respaldo de Operadores y los STATICS en staking al precio de STATICS. Los rendimientos son estimaciones, no promesas.",
+    "dataUnavailable": "No disponible"
   }
 }

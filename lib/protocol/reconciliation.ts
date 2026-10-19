@@ -91,6 +91,8 @@ const scopeRoots: Readonly<Record<string, ProtocolQueryScope>> = {
   "phase-one-statement": "phase-one-reward",
   // DEX overview market data, shared by every wallet on the deployment.
   "phase-one-dex": "phase-one-market",
+  "protocol-overview": "phase-one-reward",
+  "protocol-overview-wallet": "wallet",
 };
 
 const walletScopedRoots = new Set([
@@ -122,6 +124,7 @@ const walletScopedRoots = new Set([
   "phase-one-liquidity-catalog",
   "phase-one-liquidity-balances",
   "earn-wallet-balance",
+  "protocol-overview-wallet",
   "phase-one-liquidity-native-balance",
   "phase-one-liquidity-fees",
   "phase-one-liquidity",
@@ -143,6 +146,7 @@ const deploymentScopedRoots = new Set([
   "phase-one-liquidity-catalog",
   "phase-one-liquidity-balances",
   "earn-wallet-balance",
+  "protocol-overview-wallet",
   "phase-one-liquidity-native-balance",
   "phase-one-liquidity-fees",
   "phase-one-liquidity",
@@ -151,6 +155,7 @@ const deploymentScopedRoots = new Set([
   "phase-one-allocation-directory",
   "phase-one-statement",
   "phase-one-dex",
+  "protocol-overview",
 ]);
 
 export function protocolQueryScopes(kind: ProtocolActivityKind): readonly ProtocolQueryScope[] {
