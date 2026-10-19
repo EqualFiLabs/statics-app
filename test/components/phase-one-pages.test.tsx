@@ -700,18 +700,61 @@ describe("protocol overview", () => {
     expect(within(yours).queryByText("Nothing to claim yet")).not.toBeInTheDocument();
   });
 
-  it("withholds aggregate values for omitted pools and flags incomplete chart history", async () => {
+  it("shows priced totals and discloses unpriced pools without an incomplete-data banner", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
       if (endpoint === "summary")
         return {
           ...sample.summary,
+          activePools: 7,
+          unpricedPools: 2,
+          current: {
+            ...sample.summary.current,
+            valueLocked: "6470000000000",
+            coverage: Object.fromEntries(
+              Object.entries(sample.summary.current.coverage).map(([key, value]) => [
+                key,
+                { ...value, includedPools: 5, omittedPools: 2 },
+              ])
+            ),
+          },
+        };
+      return sample[endpoint as keyof typeof sample];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const exchange = await screen.findByRole("region", { name: "Exchange" });
+    await waitFor(() =>
+      expect(
+        within(exchange).getByText("Value locked").parentElement?.querySelector("strong")
+      ).toHaveTextContent("$6.47M")
+    );
+    const totals = screen.getByRole("region", { name: "Protocol totals" });
+    expect(
+      within(totals).getByText("Value in Statics").parentElement?.querySelector("strong")
+    ).toHaveTextContent("$6.5M");
+    expect(within(totals).getByText("2 unpriced pools excluded")).toBeInTheDocument();
+    expect(within(exchange).getByText("2 unpriced pools excluded")).toBeInTheDocument();
+    expect(
+      within(exchange).getByText("Volume 24h").parentElement?.querySelector("strong")
+    ).not.toHaveTextContent("—");
+    expect(
+      screen.queryByText("Some pool data is incomplete. Affected aggregate values are unavailable.")
+    ).not.toBeInTheDocument();
+  });
+
+  it("withholds values for omissions beyond unpriced pools and flags incomplete history", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "summary")
+        return {
+          ...sample.summary,
+          unpricedPools: 2,
           current: {
             ...sample.summary.current,
             coverage: Object.fromEntries(
               Object.entries(sample.summary.current.coverage).map(([key, value]) => [
                 key,
-                { ...value, omittedPools: 1 },
+                { ...value, omittedPools: 3 },
               ])
             ),
           },

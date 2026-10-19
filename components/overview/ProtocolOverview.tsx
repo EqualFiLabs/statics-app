@@ -135,14 +135,19 @@ export function ProtocolOverview({
     const coverage = summary?.current.coverage[metric];
     return Boolean(
       coverage &&
-      coverage.omittedPools === 0 &&
+      coverage.omittedPools <= (summary?.unpricedPools ?? 0) &&
       (metric === "valueLocked" || coverage.historyComplete)
     );
   };
   const poolsValue = metricComplete("valueLocked") ? (summary?.current.valueLocked ?? null) : null;
+  const poolValueNote = summary
+    ? summary.unpricedPools
+      ? tDex("excludesUnpriced", { count: summary.unpricedPools })
+      : tDex("pools", { count: summary.activePools })
+    : "";
   const stakedValue = valueOf(staking?.totalStaked, price);
   const vaultValue = vault ? valueOf(vault.tokenBacking, price) : null;
-  // A total with a missing part would read as a drop, so it waits for every part.
+  // Known unpriced pools are disclosed; other missing parts still withhold the total.
   const totalValue =
     poolsValue === null || stakedValue === null || (launch && vaultValue === null)
       ? null
@@ -387,6 +392,7 @@ export function ProtocolOverview({
         <div className={styles.tile}>
           <span className={styles.label}>{t("tile.value")}</span>
           <strong>{money(totalValue)}</strong>
+          {summary?.unpricedPools && poolsValue !== null ? <span>{poolValueNote}</span> : null}
           <span>
             {launch
               ? t("tile.valueSplit", {
@@ -542,7 +548,7 @@ export function ProtocolOverview({
             <div>
               <span className={styles.label}>{tDex("tile.valueLocked")}</span>
               <strong>{money(poolsValue)}</strong>
-              <span>{summary ? tDex("pools", { count: summary.activePools }) : ""}</span>
+              <span>{poolValueNote}</span>
             </div>
           </div>
           <div
