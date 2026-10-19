@@ -7231,6 +7231,11 @@
   overflow-wrap: anywhere;
 }
 
+.genesis-modal-content .ui-field :is(input, select) {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
 .genesis-modal-content p {
   margin: 0;
 }
