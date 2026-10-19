@@ -134,7 +134,7 @@ describe("landing page", () => {
     );
     for (const [name, href] of [
       ["Operators", "/app/genesis"],
-      ["Markets", "/app"],
+      ["Markets", "/app/markets"],
       ["Swap", "/app/swap"],
       ["Liquidity", "/app/liquidity"],
       // The footer's Docs and GitHub match the header's Docs and Dev.

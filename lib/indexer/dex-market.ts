@@ -39,7 +39,11 @@ export type DexSummary = Observed &
     previous: DexTotals;
     activePools: number;
     unpricedPools: number;
-    statics: Readonly<{ price: bigint | null; change24hBps: number | null }>;
+    statics: Readonly<{
+      price: bigint | null;
+      change24hBps: number | null;
+      priceFallback: boolean | null;
+    }>;
   }>;
 export type DexPool = Readonly<{
   poolId: Hex;
@@ -241,6 +245,11 @@ export function parseDexSummary(value: unknown, deploymentId: string): DexSummar
     statics: {
       price: optionalUint(statics.price, "STATICS price"),
       change24hBps: optionalInt(statics.change24hBps, "STATICS change"),
+      // Older indexers omit this additive provenance field.
+      priceFallback:
+        statics.priceFallback === undefined
+          ? null
+          : boolean(statics.priceFallback, "STATICS price fallback"),
     },
   };
 }

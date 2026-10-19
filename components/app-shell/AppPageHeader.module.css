@@ -34,6 +34,10 @@
   --header-art-size: 400px;
 }
 
+.header[data-feature="markets"] {
+  --header-art: url("/assets/visual-direction/data-field.webp");
+}
+
 .header[data-feature="swap"] {
   --header-art: url("/assets/visual-direction/orbits.webp");
 }

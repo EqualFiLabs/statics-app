@@ -100,6 +100,10 @@
     "tools": {
       "title": "Approval tools",
       "description": "Review, enable, and revoke Statics application approvals."
+    },
+    "markets": {
+      "title": "Markets",
+      "description": "Every Statics pool, token and trade, with volume, fees, value locked and this period's STATICS emissions."
     }
   },
   "navigation": {
@@ -661,6 +665,12 @@
       "status": "Tools",
       "title": "Approval tools",
       "description": "Review and revoke the permissions this wallet has granted to Statics."
+    },
+    "markets": {
+      "label": "Markets",
+      "status": "Markets",
+      "title": "Markets",
+      "description": "Every pool, its volume and fees, and where STATICS emissions go this period."
     }
   },
   "shell": {
@@ -2946,5 +2956,138 @@
     "approvalNote": "Includes an approval for {symbol} if needed",
     "scheduleNote": "Remaining amounts and dates reflect the stored LP schedule. Checkpoints can extend paused streams; funding follows the current LP and allocator schedules.",
     "fundingUnavailable": "New incentives are unavailable for this pool. Existing revenue remains claimable."
+  },
+  "protocolOverview": {
+    "title": "Overview",
+    "lead": "STATICS, the exchange, staking, gauges and Operators, all on one page.",
+    "liveGenesis": "Genesis and Phase 1 are live",
+    "livePhaseOne": "Phase 1 is live",
+    "unavailable": "Some protocol figures could not be refreshed. Available figures may reflect earlier snapshots.",
+    "totals": "Protocol totals",
+    "change24h": "24h",
+    "notStarted": "Not started",
+    "tile": {
+      "price": "STATICS price",
+      "marketCap": "Market cap",
+      "marketCapHint": "Public supply at the pool price",
+      "value": "Value in Statics",
+      "valueSplit": "Pools {pools} · Operator backing {vault} · Staked {staked}",
+      "valueSplitPhaseOne": "Pools {pools} · Staked {staked}",
+      "staked": "STATICS staked",
+      "stakedShare": "{share}% of supply",
+      "emissions": "Emissions this period"
+    },
+    "yours": {
+      "title": "Your Statics",
+      "attention": "{count, plural, one {# account needs attention} other {# accounts need attention}}",
+      "openAccounts": "Open accounts",
+      "reviewRewards": "Review rewards",
+      "inWallet": "In wallet",
+      "staked": "Staked",
+      "stakedAcross": "{count, plural, one {# account} other {# accounts}}",
+      "operators": "Operators",
+      "operatorBacking": "Backed by {amount} STATICS",
+      "claimable": "Operator rewards",
+      "nothingToClaim": "Nothing to claim yet",
+      "accountsReady": "{count, plural, one {# account has rewards ready} other {# accounts have rewards ready}}",
+      "accountRewards": "Account rewards"
+    },
+    "connect": {
+      "title": "See your STATICS, stakes, Operators and rewards together",
+      "description": "Connect a wallet to add your holdings to this page. Everything else here is public.",
+      "action": "Connect wallet"
+    },
+    "exchange": {
+      "title": "Exchange",
+      "open": "Open Markets",
+      "chart": "Daily volume over the last {days} days"
+    },
+    "staking": {
+      "title": "Staking",
+      "open": "Stake STATICS",
+      "total": "Total staked",
+      "value": "Staked value",
+      "share": "Share",
+      "ofSupply": "of supply",
+      "assets": "Reviewed pool assets with staking rewards",
+      "noAssets": "No indexed staking rewards for reviewed pool assets yet"
+    },
+    "gauges": {
+      "title": "Gauges",
+      "open": "Allocate",
+      "period": "This period",
+      "toLiquidity": "STATICS to liquidity",
+      "reserve": "Reserve",
+      "reserveHint": "STATICS left to emit",
+      "streams": "Creator streams",
+      "streamsActive": "active now",
+      "notStarted": "Weekly STATICS emissions to liquidity start once the gauge reserve is activated.",
+      "noActivePeriod": "No active period",
+      "noActivePeriodHint": "The reserve is activated, but no funded emissions period is active."
+    },
+    "operators": {
+      "title": "Operator NFTs",
+      "badge": "Genesis",
+      "open": "Manage Operators",
+      "backing": "Backing each",
+      "buyIn": "Buy-in today",
+      "buyInMeta": "STATICS + {eth} ETH",
+      "epoch": "Genesis Epoch",
+      "epochLeft": "{days}d {hours}h",
+      "epochEnded": "Ended",
+      "epochActive": "left at the launch price",
+      "epochAfter": "Buy-in now includes the reserve",
+      "supplyLabel": "{supply} Operators: {vault} in the Vault, {held} circulating",
+      "inVault": "In Vault {count}",
+      "held": "Circulating {count}",
+      "ofSupply": "of {count} fixed",
+      "unavailable": "Operator figures are unavailable right now."
+    },
+    "activity": {
+      "title": "Protocol activity",
+      "filter": "Filter activity",
+      "filters": {
+        "all": "All",
+        "trades": "Trades",
+        "rewards": "Rewards",
+        "fees": "Fees"
+      },
+      "tags": {
+        "swap": "Swap",
+        "claim": "Claim",
+        "gauge": "Gauge",
+        "fees": "Fees",
+        "forfeit": "Forfeit",
+        "other": "Event"
+      },
+      "text": {
+        "revenueSettled": "{amount} in fees settled",
+        "creatorClaimed": "{amount} in creator fees claimed",
+        "stakingClaimed": "{amount} staking reward claimed",
+        "lpClaimed": "{amount} liquidity reward claimed",
+        "allocatorClaimed": "{amount} allocator reward claimed",
+        "gaugeCredited": "{amount} gauge reward credited",
+        "gaugeRecycled": "{amount} gauge reward returned to the reserve",
+        "forfeited": "{amount} reward forfeited",
+        "other": "Protocol event"
+      },
+      "account": "Account #{id}",
+      "empty": "No activity yet.",
+      "all": "All trades in Markets"
+    },
+    "ago": {
+      "seconds": "{count}s ago",
+      "minutes": "{count}m ago",
+      "hours": "{count}h ago",
+      "days": "{count}d ago"
+    },
+    "pools": {
+      "title": "Top pools",
+      "meta": "by 24h volume",
+      "all": "View {count, plural, one {# pool} other {# pools}} in Markets"
+    },
+    "note": "Prices come from Statics pools only, time-weighted over 30 minutes where history is available; otherwise the latest observed price is used. Value in Statics adds pool liquidity, Operator backing and staked STATICS at the STATICS price. Yields are estimates, not promises.",
+    "dataUnavailable": "Unavailable",
+    "partialTotals": "Some pool data is incomplete. Affected aggregate values are unavailable."
   }
 }

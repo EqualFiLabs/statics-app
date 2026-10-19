@@ -1,6 +1,6 @@
 # Integrated DEX overview
 
-The overview uses the six additive `/phase-one/market` endpoints. It includes public Phase 1 markets and the inherited Genesis/Doppler canonical market; existing market, allocation, Activity and statement endpoints remain compatible. The selected Phase 1 deployment scopes the unified market registry. Each pool retains its actual source deployment and source kind.
+The Markets dashboard at `/app/markets` uses the six additive `/phase-one/market` endpoints. It includes public Phase 1 markets and the inherited Genesis/Doppler canonical market; existing market, allocation, Activity and statement endpoints remain compatible. The selected Phase 1 deployment scopes the unified market registry. Each pool retains its actual source deployment and source kind.
 
 ## Configuration and replay
 
@@ -94,3 +94,17 @@ explicit pool overrides remain unchanged. This handler uses database state witho
 Existing indexer databases need replay from the configured hook deployment start to recover
 previously unhandled default changes. No schema migration is required. Restarting alone does
 not recover past events; the active local database is not reset by this change.
+
+## Protocol overview
+
+The Phase 1 home at `/app` reuses these market endpoints for totals, top pools and trades.
+It also reads deployment-scoped `/phase-one/gauges` and `/phase-one/activity?limit=10`,
+plus the deployment diamond's `totalStaked` and `rewardAsset` views.
+Reward-asset discovery is limited to ERC-20 assets in reviewed supported pools.
+Connected-wallet data reuses the accounts and Genesis portfolio queries; unavailable reads
+remain unknown instead of becoming zero balances. Overview queries reconcile after confirmed
+transactions and public protocol data refreshes every 30 seconds.
+
+The Operator supply chart shows current vault inventory and circulation without assuming
+that the initial treasury allocation is still held. Expired activated gauge periods are
+separate from reserves that have never been activated and from unavailable emissions data.

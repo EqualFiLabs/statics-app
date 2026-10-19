@@ -56,7 +56,7 @@ const GITHUB_URL = "https://github.com/EqualFiLabs/statics";
 
 export const primaryNavigation: readonly SiteNavigationItem[] = [
   { label: "Operators", messageKey: "operators", kind: "route", href: "/app/genesis" },
-  { label: "Markets", messageKey: "markets", kind: "route", href: "/app" },
+  { label: "Markets", messageKey: "markets", kind: "route", href: "/app/markets" },
   { label: "Swap", messageKey: "swap", kind: "route", href: "/app/swap" },
   { label: "Liquidity", messageKey: "liquidity", kind: "route", href: "/app/liquidity" },
   { label: "Docs", messageKey: "docs", kind: "route", href: DOCS_URL },
@@ -126,6 +126,13 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         enabled: true,
         href: "/app",
         capability: "overview",
+      },
+      {
+        label: "Markets",
+        messageKey: "markets",
+        enabled: true,
+        href: "/app/markets",
+        capability: "public-market-discovery",
       },
       {
         label: "Swap",
@@ -260,7 +267,7 @@ export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filt
   (item) => typeof item.tabLabel === "string"
 );
 const phaseOneTabNavigation: readonly AppNavigationItem[] = appNavigation.filter((item) =>
-  ["/app", "/app/swap", "/app/rewards", "/app/wallet"].includes(item.href)
+  ["/app", "/app/markets", "/app/swap", "/app/rewards"].includes(item.href)
 );
 /** The only product capabilities promoted by a launch deployment. */
 export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [

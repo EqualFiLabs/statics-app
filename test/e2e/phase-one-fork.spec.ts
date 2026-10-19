@@ -113,3 +113,30 @@ test("retains the Funding Portal network selector", async ({ page }) => {
   await page.getByRole("tab", { name: "Swap", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Funding network" })).toBeVisible();
 });
+
+test("separates protocol Overview from Markets on desktop and mobile", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("/app");
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true, level: 1 })
+    ).toBeVisible();
+    await expect(page.locator("h1")).toHaveCount(1);
+    for (const name of ["Exchange", "Staking", "Gauges", "Operator NFTs"]) {
+      await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole("region", { name: "Protocol totals" })).toBeVisible();
+    await page.getByRole("link", { name: "Open Markets ›", exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/markets$/);
+    await expect(
+      page.getByRole("heading", { name: "Markets", exact: true, level: 1 })
+    ).toBeVisible();
+    await expect(page.locator("h1")).toHaveCount(1);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
