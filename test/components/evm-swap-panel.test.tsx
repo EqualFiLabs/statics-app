@@ -9,6 +9,7 @@ import {
   getAddress,
   maxUint256,
   zeroAddress,
+  type Address,
 } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -287,20 +288,25 @@ describe("integrated swap execution", () => {
   const usd = getAddress("0x8888888888888888888888888888888888888888");
   const apiQuote = (minimum = "199000000", output = "200000000") => ({
     quote: {
-      input: { amount: "1000000000000000000", token: zeroAddress },
+      input: { amount: "1000000000000000000", token: zeroAddress as Address },
       output: { amount: output, token: usd },
       aggregatedOutputs: [{ amount: output, minAmount: minimum, token: usd }],
     },
   });
-  const unsupported = async () => {
+  const unsupported = async (inputToken: Address = zeroAddress, amount = "1") => {
     mocks.tokens = [{ address: usd, decimals: 6, name: "Dollar", symbol: "USD" }];
-    renderCanonicalTrade(descriptor.chainId, true);
+    const view = renderCanonicalTrade(descriptor.chainId, true);
     fireEvent.change(await screen.findByRole("combobox", { name: "You receive asset" }), {
       target: { value: usd },
     });
+    if (inputToken !== zeroAddress)
+      fireEvent.change(screen.getByRole("combobox", { name: "You pay asset" }), {
+        target: { value: inputToken },
+      });
     fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
-      target: { value: "1" },
+      target: { value: amount },
     });
+    return view;
   };
   it("executes unsupported-pair API fixtures on the selected chain and preserves the reviewed floor", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
@@ -339,6 +345,151 @@ describe("integrated swap execution", () => {
       to: usd,
       data: "0x1234",
     });
+  });
+
+  it.each(["1202239584", "1196333639", "1203000000"])(
+    "preserves the complete reviewed API quote when WETH output refreshes to %s",
+    async (output) => {
+      const weth = deployment.contracts.weth;
+      const reviewed = apiQuote("1196333639", "1202345366");
+      reviewed.quote.input = { amount: "500000000000000000", token: weth };
+      const reviewedQuote = {
+        ...reviewed.quote,
+        quoteId: "reviewed-route",
+        slippage: 0.5,
+        output: { ...reviewed.quote.output, minimumAmount: "1196333639" },
+        route: [{ pool: "reviewed-pool" }],
+        aggregatedOutputs: [
+          { ...reviewed.quote.aggregatedOutputs[0], recipient: walletAddress },
+          { amount: "100", minAmount: "99", token: usd, recipient: zeroAddress },
+        ],
+      };
+      const freshQuote = {
+        ...apiQuote(((BigInt(output) * 995n) / 1000n).toString(), output).quote,
+        quoteId: "different-refreshed-route",
+      };
+      let quotes = 0;
+      mocks.readContract.mockResolvedValue(100n * 10n ** 18n);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (String(url) === "/api/uniswap/quote")
+          return Response.json({ quote: ++quotes === 1 ? reviewedQuote : freshQuote });
+        if (String(url) === "/api/uniswap/check-approval")
+          return Response.json({
+            approval: { to: weth, from: walletAddress, chainId: 4663, data: "0xaaaa" },
+          });
+        return Response.json({
+          swap: { to: usd, from: walletAddress, chainId: 4663, data: "0xbbbb" },
+        });
+      });
+      await unsupported(weth, "0.5");
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled()
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+      await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
+      expect(quotes).toBe(3); // Display, before approval, after approval.
+      const swap = fetchSpy.mock.calls.find(([url]) => url === "/api/uniswap/swap");
+      expect(JSON.parse(swap![1]!.body as string).quote).toEqual(reviewedQuote);
+      expect(mocks.execute.mock.calls.map(([tx]) => tx.kind)).toEqual(["approve-swap", "swap"]);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    }
+  );
+
+  it.each([2, 3])(
+    "stops when the recipient output falls below the reviewed floor on quote %s",
+    async (failedQuote) => {
+      let quotes = 0;
+      mocks.readContract.mockResolvedValue(100n * 10n ** 18n);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (String(url) === "/api/uniswap/quote") {
+          const payload = ++quotes >= failedQuote ? apiQuote("198999999", "198999999") : apiQuote();
+          // A gross output above the floor must not hide a recipient output below it.
+          payload.quote.output.amount = "201000000";
+          return Response.json(payload);
+        }
+        return Response.json({
+          approval: {
+            to: deployment.contracts.weth,
+            from: walletAddress,
+            chainId: 4663,
+            data: "0xaaaa",
+          },
+        });
+      });
+      await unsupported(deployment.contracts.weth);
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled()
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
+      expect(fetchSpy.mock.calls.some(([url]) => url === "/api/uniswap/swap")).toBe(false);
+      expect(mocks.execute).toHaveBeenCalledTimes(failedQuote - 2);
+      expect(screen.queryByRole("button", { name: "Confirm swap" })).not.toBeInTheDocument();
+    }
+  );
+
+  it("returns to the refreshed quote for review if the pinned API route cannot be simulated", async () => {
+    let quotes = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url) === "/api/uniswap/swap")
+        return Response.json(
+          { detail: "The reviewed route could not be simulated." },
+          { status: 422 }
+        );
+      return Response.json(++quotes === 1 ? apiQuote() : apiQuote("198990050", "199990000"));
+    });
+    await unsupported();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be simulated");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Confirm swap" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "You receive amount" })).toHaveValue("199.99");
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    expect(screen.getByRole("button", { name: "Confirm swap" })).toBeEnabled();
+  });
+
+  it("does not execute an API quote without its reviewed executable minimum", async () => {
+    const payload = apiQuote();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      Response.json({
+        quote: {
+          ...payload.quote,
+          aggregatedOutputs: [{ amount: "200000000", token: usd }],
+        },
+      })
+    );
+    await unsupported();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("reviewed minimum");
+    expect(fetchSpy.mock.calls.some(([url]) => url === "/api/uniswap/swap")).toBe(false);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("discards an API build failure after the wallet changes networks", async () => {
+    let finish!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url) === "/api/uniswap/swap") return new Promise((resolve) => (finish = resolve));
+      return Response.json(apiQuote());
+    });
+    const view = await unsupported();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    view.changeChain(42_161);
+    await screen.findByRole("button", { name: "Switch to Robinhood Chain" });
+    await act(async () => finish(Response.json({ detail: "Old route failed." }, { status: 422 })));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "wallet, network, or swap inputs changed"
+    );
+    expect(screen.getByRole("textbox", { name: "You receive amount" })).toHaveValue("");
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("aborts obsolete API requests and discards responses even when the transport ignores cancellation", async () => {
     let finish!: (response: Response) => void;

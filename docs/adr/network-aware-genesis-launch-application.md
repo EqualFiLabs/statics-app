@@ -65,6 +65,11 @@ tab or pool selector. Quotes retain the 350 ms debounce and do not run deploymen
 The dedicated Swap page does not show bridge or Solana controls.
 
 The Portal retains its existing funding network selection and broader funding experience.
+For API swaps, review pins the complete quote, including its recipient minimum and fee
+outputs. Refreshes before and after approvals compare the recipient's expected output
+with that reviewed minimum. The transaction builder receives the reviewed quote unchanged
+and simulates its route before signing; a failed build returns to review with the fresh
+quote. Small price changes within the reviewed tolerance do not reset the slippage floor.
 
 NFT mode is the Genesis Vault conversion surface:
 
