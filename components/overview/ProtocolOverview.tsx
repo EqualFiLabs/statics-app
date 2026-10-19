@@ -791,7 +791,12 @@ export function ProtocolOverview({
         <section className={styles.card} aria-labelledby="overview-activity">
           <div className={styles.cardHeading}>
             <h2 id="overview-activity">
-              {t("activity.title")} <span className={styles.up}>● {tDex("live")}</span>
+              {t("activity.title")}{" "}
+              {!dex.trades.isError &&
+                !protocol.activity.isError &&
+                (dex.trades.data || protocol.activity.data) && (
+                  <span className={styles.up}>● {tDex("live")}</span>
+                )}
             </h2>
             <div className={styles.filters} role="group" aria-label={t("activity.filter")}>
               {ACTIVITY_FILTERS.map((value) => (
@@ -833,7 +838,9 @@ export function ProtocolOverview({
             <p className={styles.secondary}>
               {dex.trades.isLoading || protocol.activity.isLoading
                 ? tDex("loading")
-                : t("activity.empty")}
+                : dex.trades.isError || protocol.activity.isError
+                  ? t("dataUnavailable")
+                  : t("activity.empty")}
             </p>
           )}
           <Link href="/app/markets">{t("activity.all")} ›</Link>

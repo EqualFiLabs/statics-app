@@ -811,6 +811,19 @@ describe("protocol overview", () => {
     expect(await screen.findByText("1 STATICS gauge reward credited")).toBeInTheDocument();
   });
 
+  it("does not describe failed activity reads as an empty live feed", async () => {
+    mocks.protocolActivity.mockRejectedValue(new Error("Activity unavailable"));
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      if (endpoint === "trades") throw new Error("Trades unavailable");
+      return dexFixture(phaseOne, quote)[endpoint as keyof ReturnType<typeof dexFixture>];
+    });
+    withPhaseOne(<DeploymentOverview />);
+    const activity = await screen.findByRole("region", { name: /Protocol activity/ });
+    expect(await within(activity).findByText("Unavailable")).toBeInTheDocument();
+    expect(within(activity).queryByText("No activity yet.")).not.toBeInTheDocument();
+    expect(within(activity).queryByText(/Live/)).not.toBeInTheDocument();
+  });
+
   it("mixes trades with protocol events and filters them by kind", async () => {
     withPhaseOne(<DeploymentOverview />);
     const activity = await screen.findByRole("region", { name: /Protocol activity/ });
