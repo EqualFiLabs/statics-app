@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import {
@@ -67,7 +67,13 @@ function describeGenesisError(error: unknown, copy: GenesisErrorCopy): string {
 
 type ActionTab = "activate" | "rewards" | "credit";
 
-export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
+export function StandaloneGenesisPage({
+  deployment,
+  controls,
+}: {
+  deployment: LaunchDeployment;
+  controls?: ReactNode;
+}) {
   const t = useTranslations("operators");
   const tShell = useTranslations("shell");
   const errorCopy: GenesisErrorCopy = {
@@ -307,6 +313,12 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         {t("recoverOperatorCredit")} <span aria-hidden="true">→</span>
       </Link>
     ) : null;
+  const pageActions = (
+    <>
+      {recoveriesLink}
+      {controls}
+    </>
+  );
 
   if (!wallet) {
     const action =
@@ -324,7 +336,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           : undefined;
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("connectTitle")}
           description={t("connectDescription")}
@@ -333,11 +345,17 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
       </div>
     );
   }
-  if (owned.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
+  if (owned.isLoading)
+    return (
+      <div className="genesis-page">
+        {pageActions}
+        <p className="dapp-loading">{t("loading")}</p>
+      </div>
+    );
   if (owned.error) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           tone="error"
           title={t("unavailable")}
@@ -354,7 +372,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length && owned.data?.stale) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("syncingTitle")}
           description={t("syncing")}
@@ -370,7 +388,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("emptyTitle")}
           description={
@@ -448,7 +466,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
   return (
     <div className="genesis-page">
-      {recoveriesLink}
+      {pageActions}
       {owned.data?.stale && (
         <p className="genesis-note is-warning" role="status">
           {t("syncing")}

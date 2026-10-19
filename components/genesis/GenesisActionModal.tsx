@@ -26,10 +26,12 @@ const BatchModalContext = createContext<{
 /** Keep wallet settings reachable independently of portfolio loading or holdings. */
 export function GenesisActionModal({
   canConfigureCalibur,
+  enabled = true,
   children,
 }: {
   canConfigureCalibur: boolean;
-  children: ReactNode;
+  enabled?: boolean;
+  children: ReactNode | ((controls: ReactNode) => ReactNode);
 }) {
   const t = useTranslations("operators.bulk");
   const [open, setOpen] = useState(false);
@@ -38,38 +40,47 @@ export function GenesisActionModal({
   const [target, setTarget] = useState<HTMLDivElement | null>(null);
   const context = useMemo(() => ({ target, setBusy, setAvailable }), [target]);
 
+  const controls =
+    enabled && (canConfigureCalibur || available) ? (
+      <div className="genesis-tools">
+        <button
+          type="button"
+          className="ui-button ui-button--secondary ui-button--sm"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          {t("title")}
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
+        {open && (
+          <ReviewDrawer
+            title={t("title")}
+            variant="modal"
+            className="genesis-action-modal"
+            busy={busy}
+            headerActions={
+              canConfigureCalibur ? <BrowserCaliburActivationPanel disabled={busy} /> : null
+            }
+            onClose={() => setOpen(false)}
+          >
+            {!available && <p className="genesis-note">{t("minimumOperators")}</p>}
+            <div ref={setTarget} className="genesis-modal-content" />
+          </ReviewDrawer>
+        )}
+      </div>
+    ) : null;
+
   return (
     <BatchModalContext.Provider value={context}>
-      {(canConfigureCalibur || available) && (
-        <div className="genesis-tools">
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--sm"
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
-          >
-            {t("title")}
-            <ChevronDown size={14} aria-hidden="true" />
-          </button>
-          {open && (
-            <ReviewDrawer
-              title={t("title")}
-              variant="modal"
-              className="genesis-action-modal"
-              busy={busy}
-              headerActions={
-                canConfigureCalibur ? <BrowserCaliburActivationPanel disabled={busy} /> : null
-              }
-              onClose={() => setOpen(false)}
-            >
-              {!available && <p className="genesis-note">{t("minimumOperators")}</p>}
-              <div ref={setTarget} className="genesis-modal-content" />
-            </ReviewDrawer>
-          )}
-        </div>
+      {typeof children === "function" ? (
+        children(controls)
+      ) : (
+        <>
+          {controls}
+          {children}
+        </>
       )}
-      {children}
     </BatchModalContext.Provider>
   );
 }

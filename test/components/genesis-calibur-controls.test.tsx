@@ -306,9 +306,18 @@ describe.each([
     await waitFor(() => expect(screen.getByText(/No Operators/)).toBeInTheDocument());
   });
 
+  if (option.launch) {
+    it("places batch management directly below the recovery entry point", () => {
+      renderPage(option, 2);
+      const recover = screen.getByRole("link", { name: "Recover matured Operator credit" });
+      const manage = screen.getByRole("button", { name: "Manage Operators together" });
+      expect(recover.nextElementSibling).toContainElement(manage);
+    });
+  }
+
   it("keeps the controls hidden for external wallets", async () => {
     renderPage(option, 2, { ...connectedWallet, walletKind: "external" });
-    await openBatchModal();
+    expect(screen.queryByRole("button", { name: "Manage Operators together" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
   });
 

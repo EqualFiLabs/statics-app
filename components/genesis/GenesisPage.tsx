@@ -65,12 +65,20 @@ export function GenesisPage() {
   );
   if (!active.launch && !active.protocol) return <UnconfiguredSurface subject="Genesis" />;
   return (
-    <GenesisActionModal canConfigureCalibur={canConfigureCalibur}>
-      {active.launch ? (
-        <StandaloneGenesisPage deployment={active.launch} />
-      ) : (
-        <ProtocolGenesisPage deployment={active.protocol!.protocol} />
-      )}
+    <GenesisActionModal
+      canConfigureCalibur={canConfigureCalibur}
+      enabled={wallet.status === "ready" && wallet.walletKind === "embedded"}
+    >
+      {(controls) =>
+        active.launch ? (
+          <StandaloneGenesisPage deployment={active.launch} controls={controls} />
+        ) : (
+          <>
+            {controls}
+            <ProtocolGenesisPage deployment={active.protocol!.protocol} />
+          </>
+        )
+      }
     </GenesisActionModal>
   );
 }
