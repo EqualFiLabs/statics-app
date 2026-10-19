@@ -50,7 +50,7 @@ export function GenesisPage() {
   const { active } = useDeployment();
   const wallet = useWalletState();
   const supportsCalibur = active.launch
-    ? active.launch.source !== "development-fixture" && active.launch.descriptor.chainId === 4663
+    ? active.launch.descriptor.chainId === 4663
     : Boolean(
         active.protocol?.protocol.genesis &&
         active.protocol.protocol.source !== "development-environment" &&

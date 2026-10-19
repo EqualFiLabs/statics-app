@@ -68,6 +68,19 @@ const launchOption: DeploymentOption = {
   launch,
   protocol: null,
 };
+const localForkLaunch = parseLaunchDeploymentManifest(
+  {
+    ...launchDeploymentManifests["robinhood-genesis"],
+    deploymentId: "local-anvil-genesis",
+    network: "Robinhood mainnet fork",
+  },
+  "development-fixture"
+);
+const localForkOption: DeploymentOption = {
+  ...launchOption,
+  descriptor: localForkLaunch.descriptor,
+  launch: localForkLaunch,
+};
 const protocolOption: DeploymentOption = {
   ...launchOption,
   launch: null,
@@ -84,7 +97,8 @@ const connectedWallet: WalletState = {
   isTargetChain: true,
 };
 
-function seedOperators(client: QueryClient, count: number) {
+function seedOperators(client: QueryClient, count: number, option = launchOption) {
+  const deploymentId = option.launch?.descriptor.deploymentId ?? launch.descriptor.deploymentId;
   const items: OwnedGenesis[] = Array.from({ length: count }, (_, index) => ({
     id: BigInt(index + 1),
     tier: 0,
@@ -97,12 +111,12 @@ function seedOperators(client: QueryClient, count: number) {
     creditPrincipal: 0n,
     creditMaturity: 0,
   }));
-  client.setQueryData(ownedGenesisQueryKey(launch.descriptor.deploymentId, wallet), {
+  client.setQueryData(ownedGenesisQueryKey(deploymentId, wallet), {
     ...EMPTY_GENESIS_PORTFOLIO,
     items,
     tierCosts: [0n, 0n, 0n, 0n, 0n],
   });
-  client.setQueryData(["genesis-vault-epoch", launch.descriptor.deploymentId], {
+  client.setQueryData(["genesis-vault-epoch", deploymentId], {
     epochActive: false,
     maximumSupply: 5555n,
     circulatingGenesis: BigInt(count),
@@ -124,7 +138,7 @@ function renderPage(option: DeploymentOption, count: number, walletState = conne
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  seedOperators(client, count);
+  seedOperators(client, count, option);
   render(
     <QueryClientProvider client={client}>
       <DeploymentContext.Provider
@@ -162,6 +176,7 @@ beforeEach(() => {
 
 describe.each([
   ["launch", launchOption],
+  ["local mainnet fork", localForkOption],
   ["full protocol", protocolOption],
 ] as const)("%s Calibur wallet controls", (_name, option) => {
   it.each([0, 1, 2])(
@@ -176,7 +191,7 @@ describe.each([
     const client = renderPage(option, 2);
     await expectWalletControls();
     for (const count of [1, 0]) {
-      act(() => seedOperators(client, count));
+      act(() => seedOperators(client, count, option));
       await expectWalletControls();
     }
     await waitFor(() => expect(screen.getByText(/No Operators/)).toBeInTheDocument());
@@ -189,19 +204,48 @@ describe.each([
     ).toBeNull();
   });
 
-  it("keeps the controls hidden for development deployments", () => {
-    const development: DeploymentOption = option.launch
-      ? { ...option, launch: { ...option.launch, source: "development-fixture" } }
+  it("offers activation for an undelegated embedded wallet with no Operators", async () => {
+    mocks.getCode.mockResolvedValue("0x");
+    renderPage(option, 0);
+    expect(await screen.findByRole("button", { name: "Review Calibur activation" })).toBeEnabled();
+    expect(mocks.signAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("keeps the controls hidden on other chains", () => {
+    const otherChain: DeploymentOption = option.launch
+      ? {
+          ...option,
+          launch: {
+            ...option.launch,
+            descriptor: { ...option.launch.descriptor, chainId: 31337 },
+          },
+        }
       : {
           ...option,
           protocol: {
             ...option.protocol!,
-            protocol: { ...protocol, source: "development-environment" },
+            protocol: { ...protocol, chainId: 31337 },
           },
         };
-    renderPage(development, 2);
+    renderPage(otherChain, 2);
     expect(
       screen.queryByRole("region", { name: "Activate atomic batches for this Privy wallet" })
     ).toBeNull();
   });
+});
+
+it("keeps full-protocol development deployments without verified Calibur support hidden", () => {
+  renderPage(
+    {
+      ...protocolOption,
+      protocol: {
+        ...protocolOption.protocol!,
+        protocol: { ...protocol, source: "development-environment" },
+      },
+    },
+    2
+  );
+  expect(
+    screen.queryByRole("region", { name: "Activate atomic batches for this Privy wallet" })
+  ).toBeNull();
 });
