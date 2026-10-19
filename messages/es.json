@@ -398,6 +398,7 @@
         "belowRefundCost": "El saldo del relayer es inferior al coste actual de gas del reembolso."
       },
       "title": "Gestionar Operators juntos",
+      "minimumOperators": "Necesitas al menos dos Operators para usar las acciones en lote.",
       "launchDescription": "Selecciona Operators y revisa una transacción atómica desde la billetera propietaria.",
       "protocolDescription": "Revisa los Operators, los puntos de control de recompensas y una operación atómica.",
       "action": "Acción",

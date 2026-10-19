@@ -398,6 +398,7 @@
         "belowRefundCost": "The relayer balance is below the current refund gas cost."
       },
       "title": "Manage Operators together",
+      "minimumOperators": "Hold at least two Operators to use bulk actions.",
       "launchDescription": "Select Operators and review one atomic transaction from their owner wallet.",
       "protocolDescription": "Review the affected Operators, reward checkpoints, and one atomic wallet operation.",
       "action": "Action",

@@ -4,6 +4,7 @@ import { getAddress, zeroHash } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenesisPage } from "@/components/genesis/GenesisPage";
+import { GenesisActionModal, GenesisBatchContent } from "@/components/genesis/GenesisActionModal";
 import { launchDeploymentManifests } from "@/deployments/launch-manifests";
 import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
 import type { DeploymentOption } from "@/lib/deployments/types";
@@ -153,8 +154,15 @@ function renderPage(option: DeploymentOption, count: number, walletState = conne
   return client;
 }
 
+async function openBatchModal() {
+  if (!screen.queryByRole("dialog", { name: "Manage Operators together" })) {
+    fireEvent.click(screen.getByRole("button", { name: "Manage Operators together" }));
+  }
+}
+
 async function expectWalletControls() {
   if (!screen.queryByRole("dialog", { name: "Calibur settings" })) {
+    await openBatchModal();
     fireEvent.click(screen.getByRole("button", { name: "Calibur settings" }));
   }
   expect(
@@ -188,26 +196,30 @@ describe.each([
     }
   );
 
-  it("keeps wallet and bulk controls behind separate dialogs and preserves selection", async () => {
+  it("opens settings from the batch header and returns to the selected batch", async () => {
     renderPage(option, 2);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Review Calibur delegation removal" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    const settings = screen.getByRole("button", { name: "Calibur settings" });
-    settings.focus();
-    fireEvent.click(settings);
-    await expectWalletControls();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(settings).toHaveFocus();
-    expect(settings).toHaveAttribute("aria-expanded", "false");
-
     const manage = screen.getByRole("button", { name: "Manage Operators together" });
     manage.focus();
     fireEvent.click(manage);
     const dialog = screen.getByRole("dialog", { name: "Manage Operators together" });
     const selection = within(dialog).getAllByRole("checkbox")[0];
     fireEvent.click(selection);
+    expect(selection).toBeChecked();
+    const settings = within(dialog).getByRole("button", { name: "Calibur settings" });
+    expect(settings.closest("header")).toContainElement(
+      within(dialog).getByRole("button", { name: "Close" })
+    );
+    settings.focus();
+    fireEvent.click(settings);
+    await expectWalletControls();
+    expect(dialog.parentElement).toHaveProperty("inert", true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Calibur settings" })).toBeNull();
+    expect((dialog.parentElement as HTMLElement).inert).toBeFalsy();
+    expect(settings).toHaveFocus();
     expect(selection).toBeChecked();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -227,20 +239,22 @@ describe.each([
     await waitFor(() => expect(screen.getByText(/No Operators/)).toBeInTheDocument());
   });
 
-  it("keeps the controls hidden for external wallets", () => {
+  it("keeps the controls hidden for external wallets", async () => {
     renderPage(option, 2, { ...connectedWallet, walletKind: "external" });
+    await openBatchModal();
     expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
   });
 
   it("offers activation for an undelegated embedded wallet with no Operators", async () => {
     mocks.getCode.mockResolvedValue("0x");
     renderPage(option, 0);
+    await openBatchModal();
     fireEvent.click(screen.getByRole("button", { name: "Calibur settings" }));
     expect(await screen.findByRole("button", { name: "Review Calibur activation" })).toBeEnabled();
     expect(mocks.signAuthorization).not.toHaveBeenCalled();
   });
 
-  it("keeps the controls hidden on other chains", () => {
+  it("keeps the controls hidden on other chains", async () => {
     const otherChain: DeploymentOption = option.launch
       ? {
           ...option,
@@ -257,11 +271,12 @@ describe.each([
           },
         };
     renderPage(otherChain, 2);
+    await openBatchModal();
     expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
   });
 });
 
-it("keeps full-protocol development deployments without verified Calibur support hidden", () => {
+it("keeps full-protocol development deployments without verified Calibur support hidden", async () => {
   renderPage(
     {
       ...protocolOption,
@@ -272,5 +287,27 @@ it("keeps full-protocol development deployments without verified Calibur support
     },
     2
   );
+  await openBatchModal();
   expect(screen.queryByRole("button", { name: "Calibur settings" })).toBeNull();
+});
+
+it("blocks settings and dismissal while a portaled batch action is pending", () => {
+  const content = (busy: boolean) => (
+    <GenesisActionModal canConfigureCalibur>
+      <GenesisBatchContent busy={busy}>
+        <button disabled={busy}>Confirm batch</button>
+      </GenesisBatchContent>
+    </GenesisActionModal>
+  );
+  const { rerender } = render(content(false));
+  fireEvent.click(screen.getByRole("button", { name: "Manage Operators together" }));
+  expect(screen.getByRole("button", { name: "Calibur settings" })).toBeEnabled();
+  rerender(content(true));
+  expect(screen.getByRole("button", { name: "Calibur settings" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.getByRole("dialog", { name: "Manage Operators together" })).toBeInTheDocument();
+  rerender(content(false));
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

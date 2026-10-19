@@ -17,7 +17,7 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
-import { BrowserCaliburActivationPanel } from "@/components/genesis/BrowserCaliburActivationPanel";
+import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
 import { ProtocolGenesisBatchPanel } from "@/components/genesis/ProtocolGenesisBatchPanel";
 import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { loadWalletGenesis } from "@/lib/indexer/statics";
@@ -57,29 +57,21 @@ export function GenesisPage() {
         active.protocol.protocol.chainId === 4663
       );
   // Delegation and relay funds belong to the wallet, even after its last Operator leaves.
-  const walletControls =
+  const canConfigureCalibur = Boolean(
     supportsCalibur &&
     wallet.status === "ready" &&
     wallet.address &&
-    wallet.walletKind === "embedded" ? (
-      <BrowserCaliburActivationPanel />
-    ) : null;
-  if (active.launch) {
-    return (
-      <>
-        {walletControls}
-        <StandaloneGenesisPage deployment={active.launch} />
-      </>
-    );
-  }
-  if (!active.protocol) {
-    return <UnconfiguredSurface subject="Genesis" />;
-  }
+    wallet.walletKind === "embedded"
+  );
+  if (!active.launch && !active.protocol) return <UnconfiguredSurface subject="Genesis" />;
   return (
-    <>
-      {walletControls}
-      <ProtocolGenesisPage deployment={active.protocol.protocol} />
-    </>
+    <GenesisActionModal canConfigureCalibur={canConfigureCalibur}>
+      {active.launch ? (
+        <StandaloneGenesisPage deployment={active.launch} />
+      ) : (
+        <ProtocolGenesisPage deployment={active.protocol!.protocol} />
+      )}
+    </GenesisActionModal>
   );
 }
 

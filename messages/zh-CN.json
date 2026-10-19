@@ -398,6 +398,7 @@
         "belowRefundCost": "中继账户余额低于当前退款 Gas 费用。"
       },
       "title": "批量管理 Operator",
+      "minimumOperators": "至少持有两个 Operator 才能使用批量操作。",
       "launchDescription": "选择 Operator，并预览由持有人钱包发起的一笔原子交易。",
       "protocolDescription": "预览受影响的 Operator、奖励检查点和一次原子钱包操作。",
       "action": "操作",

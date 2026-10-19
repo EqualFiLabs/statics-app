@@ -21,13 +21,15 @@ import {
 import { delegationFromCode } from "@/lib/genesis/atomic-batch";
 import { REVOCABLE_ROBINHOOD_CALIBUR_DELEGATES, ROBINHOOD_CALIBUR } from "@/lib/genesis/calibur";
 import { useWalletState } from "@/providers/wallet-context";
-import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
+import { ReviewDrawer } from "@/components/rewards/ReviewDrawer";
+import { Settings } from "lucide-react";
 
 type Review =
   | { action: "activate"; quote: BrowserRelayQuote }
   | { action: "revoke"; quote: BrowserRelayRevocationQuote };
 
-export function BrowserCaliburActivationPanel() {
+export function BrowserCaliburActivationPanel({ disabled = false }: { disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
   const t = useTranslations("operators.bulk.activation");
   const walletState = useWalletState();
   const publicClient = usePublicClient({ chainId: 4663 });
@@ -213,103 +215,129 @@ export function BrowserCaliburActivationPanel() {
   };
 
   return (
-    <GenesisActionModal label={t("settings")} busy={busy}>
-      <p>{t("description")}</p>
-      {delegation === "fresh" && (
-        <button
-          className="ui-button ui-button--secondary"
-          type="button"
-          disabled={busy || !ready}
-          onClick={() => void check("activate")}
+    <>
+      <button
+        type="button"
+        className="ui-button ui-button--ghost"
+        aria-label={t("settings")}
+        title={t("settings")}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        <Settings size={18} aria-hidden="true" />
+      </button>
+      {open && (
+        <ReviewDrawer
+          title={t("settings")}
+          variant="modal"
+          className="genesis-action-modal"
+          busy={busy}
+          onClose={() => setOpen(false)}
         >
-          {busy ? t("checking") : t("review")}
-        </button>
+          <div className="genesis-modal-content">
+            <p>{t("description")}</p>
+            {delegation === "fresh" && (
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                disabled={busy || !ready}
+                onClick={() => void check("activate")}
+              >
+                {busy ? t("checking") : t("review")}
+              </button>
+            )}
+            {delegation === "calibur" && (
+              <>
+                <p>{t("alreadyActive")}</p>
+                <button
+                  className="ui-button ui-button--secondary"
+                  type="button"
+                  disabled={busy || !ready}
+                  onClick={() => void check("revoke")}
+                >
+                  {busy ? t("checking") : t("reviewRevocation")}
+                </button>
+              </>
+            )}
+            {delegation === "other" && <p>{t("otherDelegate")}</p>}
+            {relayAddress && (
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => void recover()}
+              >
+                {t("recover")}
+              </button>
+            )}
+            {activeReview && (
+              <div className="genesis-batch-review" role="status">
+                {activeReview.action === "revoke" && <p>{t("revocationWarning")}</p>}
+                <p>
+                  {t("delegate", {
+                    address:
+                      activeReview.action === "revoke"
+                        ? activeReview.quote.delegate
+                        : ROBINHOOD_CALIBUR,
+                  })}
+                </p>
+                <p>{t("relayer", { address: activeReview.quote.relayer })}</p>
+                <p>
+                  {t("funding", {
+                    amount: formatEther(activeReview.quote.fundingAmount),
+                    balance: formatEther(activeReview.quote.existingBalance),
+                  })}
+                </p>
+                <p>
+                  {t(activeReview.action === "revoke" ? "maximumRemovalFee" : "maximumFee", {
+                    amount: formatEther(activeReview.quote.maximumActivationFee),
+                  })}
+                </p>
+                <button
+                  className="ui-button ui-button--primary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void (activeReview.action === "revoke" ? revoke() : activate())}
+                >
+                  {busy
+                    ? t(activeReview.action === "revoke" ? "revoking" : "activating")
+                    : t(activeReview.action === "revoke" ? "fundAndRevoke" : "fundAndSign")}
+                </button>
+                <button
+                  className="ui-button ui-button--secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setReview(null)}
+                >
+                  {t("cancel")}
+                </button>
+              </div>
+            )}
+            {result?.action === "activate" && (
+              <p role="status">
+                {t("result", {
+                  activation: result.value.activationHash,
+                  refund: result.value.refundHash ?? t("notConfirmed"),
+                  balance: formatEther(result.value.remainingBalance),
+                })}
+              </p>
+            )}
+            {result?.action === "revoke" && (
+              <p role="status">
+                {t("revocationResult", {
+                  removal: result.value.revocationHash,
+                  refund: result.value.refundHash ?? t("notConfirmed"),
+                  balance: formatEther(result.value.remainingBalance),
+                })}
+              </p>
+            )}
+            {message && <p role="status">{message}</p>}
+            {error && <p role="alert">{error}</p>}
+          </div>
+        </ReviewDrawer>
       )}
-      {delegation === "calibur" && (
-        <>
-          <p>{t("alreadyActive")}</p>
-          <button
-            className="ui-button ui-button--secondary"
-            type="button"
-            disabled={busy || !ready}
-            onClick={() => void check("revoke")}
-          >
-            {busy ? t("checking") : t("reviewRevocation")}
-          </button>
-        </>
-      )}
-      {delegation === "other" && <p>{t("otherDelegate")}</p>}
-      {relayAddress && (
-        <button
-          className="ui-button ui-button--secondary"
-          type="button"
-          disabled={busy}
-          onClick={() => void recover()}
-        >
-          {t("recover")}
-        </button>
-      )}
-      {activeReview && (
-        <div className="genesis-batch-review" role="status">
-          {activeReview.action === "revoke" && <p>{t("revocationWarning")}</p>}
-          <p>
-            {t("delegate", {
-              address:
-                activeReview.action === "revoke" ? activeReview.quote.delegate : ROBINHOOD_CALIBUR,
-            })}
-          </p>
-          <p>{t("relayer", { address: activeReview.quote.relayer })}</p>
-          <p>
-            {t("funding", {
-              amount: formatEther(activeReview.quote.fundingAmount),
-              balance: formatEther(activeReview.quote.existingBalance),
-            })}
-          </p>
-          <p>
-            {t(activeReview.action === "revoke" ? "maximumRemovalFee" : "maximumFee", {
-              amount: formatEther(activeReview.quote.maximumActivationFee),
-            })}
-          </p>
-          <button
-            className="ui-button ui-button--primary"
-            type="button"
-            disabled={busy}
-            onClick={() => void (activeReview.action === "revoke" ? revoke() : activate())}
-          >
-            {busy
-              ? t(activeReview.action === "revoke" ? "revoking" : "activating")
-              : t(activeReview.action === "revoke" ? "fundAndRevoke" : "fundAndSign")}
-          </button>
-          <button
-            className="ui-button ui-button--secondary"
-            type="button"
-            disabled={busy}
-            onClick={() => setReview(null)}
-          >
-            {t("cancel")}
-          </button>
-        </div>
-      )}
-      {result?.action === "activate" && (
-        <p role="status">
-          {t("result", {
-            activation: result.value.activationHash,
-            refund: result.value.refundHash ?? t("notConfirmed"),
-            balance: formatEther(result.value.remainingBalance),
-          })}
-        </p>
-      )}
-      {result?.action === "revoke" && (
-        <p role="status">
-          {t("revocationResult", {
-            removal: result.value.revocationHash,
-            refund: result.value.refundHash ?? t("notConfirmed"),
-            balance: formatEther(result.value.remainingBalance),
-          })}
-        </p>
-      )}
-      {message && <p role="status">{message}</p>}
-      {error && <p role="alert">{error}</p>}
-    </GenesisActionModal>
+    </>
   );
 }
