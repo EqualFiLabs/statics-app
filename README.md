@@ -30,7 +30,9 @@ audits. The existing full-protocol Dollar deployment validation remains separate
 
 ## Routes
 
-- `/app` — launch and portfolio overview.
+- `/app` — protocol totals, wallet holdings, staking, gauges and recent activity on Phase 1;
+  includes Operators when Genesis is configured. Launch-only networks keep the launch overview.
+- `/app/markets` — Phase 1 pool, token and trade discovery with volume, fees and emissions.
 - `/app/swap` — canonical ETH/WETH/STATICS swaps and Genesis Vault acquisition/redemption.
 - `/app/wallet` — EVM and Solana assets, transfers, Portal access, and testnet fixture controls.
 - `/app/wallet?modal=portal` — Uniswap EVM swaps, Jupiter Solana swaps, Across funding, and the

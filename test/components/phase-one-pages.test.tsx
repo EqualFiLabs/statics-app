@@ -634,7 +634,8 @@ describe("protocol overview", () => {
   it("says weekly emissions have not started while the gauge reserve is inactive", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
-      if (endpoint === "emissions") return { ...sample.emissions, period: null, pools: [], othersBps: 10000 };
+      if (endpoint === "emissions")
+        return { ...sample.emissions, period: null, pools: [], othersBps: 10000 };
       return sample[endpoint as keyof typeof sample];
     });
     withPhaseOne(<DeploymentOverview />);
