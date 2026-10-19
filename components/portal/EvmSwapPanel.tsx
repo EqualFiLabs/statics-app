@@ -273,6 +273,7 @@ export function EvmSwapPanel({
   const [review, setReview] = useState<{
     identity: string;
     minimum: bigint;
+    quote: NonNullable<QuotePayload["quote"]>;
     path?: readonly PathHop[];
   } | null>(null);
   useEffect(() => {
@@ -650,12 +651,20 @@ export function EvmSwapPanel({
       assertCurrent();
       const fresh = await requestQuote(undefined, accepted.path);
       assertCurrent();
-      const freshMinimum = fresh.quote?.aggregatedOutputs?.[0]?.minAmount;
-      const executableMinimum = route.kind === "direct" ? fresh.quote?.output.amount : freshMinimum;
+      // A refreshed API minimum can fall even within the reviewed price tolerance.
+      // Check the recipient's expected output instead; execution uses the reviewed
+      // quote unchanged so its original minimum and fee outputs remain enforced.
+      const expectedOutput =
+        route.kind === "direct"
+          ? fresh.quote?.output.amount
+          : fresh.quote?.aggregatedOutputs?.[0]?.amount;
+      const reviewedApiMinimum = accepted.quote.aggregatedOutputs?.[0]?.minAmount;
       if (
         fresh.routeId !== route.id ||
-        !executableMinimum ||
-        BigInt(executableMinimum) < accepted.minimum
+        !expectedOutput ||
+        BigInt(expectedOutput) < accepted.minimum ||
+        (route.kind === "uniswap" &&
+          (!reviewedApiMinimum || BigInt(reviewedApiMinimum) < accepted.minimum))
       ) {
         setQuote(fresh);
         setReviewing(false);
@@ -847,8 +856,8 @@ export function EvmSwapPanel({
             );
         }
         const fresh = await refreshQuote();
-        // The API's quote is opaque. Only accept its unchanged executable minimum
-        // when it still protects the floor the user reviewed, including fee outputs.
+        // Build and simulate the exact reviewed route and minimum, not the refreshed
+        // quote's newly calculated slippage floor. Never edit the opaque API quote.
         const provider = await wallet.getEthereumProvider();
         const network = getFundingNetwork(selectedChainId);
         if (!provider || !network) throw new Error("The selected wallet is unavailable.");
@@ -868,12 +877,18 @@ export function EvmSwapPanel({
         const response = await fetch("/api/uniswap/swap", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ quote: fresh.quote, deadline }),
+          body: JSON.stringify({ quote: accepted.quote, deadline }),
         });
         const swap = (await readJson(response)) as { swap?: unknown };
-        if (!response.ok || !swap.swap)
-          throw new Error(uniswapError(swap, "Uniswap could not build the swap transaction."));
         assertCurrent();
+        if (!response.ok || !swap.swap) {
+          // The reviewed route may no longer be executable even if another route
+          // still quotes above the floor. Offer that fresh quote for a new review.
+          setQuote(fresh);
+          setReviewing(false);
+          setReview(null);
+          throw new Error(uniswapError(swap, "Uniswap could not build the swap transaction."));
+        }
         await sendTransaction(
           swap.swap,
           "swap",
@@ -907,6 +922,7 @@ export function EvmSwapPanel({
       setReview({
         identity,
         minimum: BigInt(minimumRaw),
+        quote: quote.quote,
         path: quote.path?.map((hop) => Object.freeze({ ...hop })),
       });
       setReviewing(true);
