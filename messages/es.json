@@ -3162,7 +3162,6 @@
     },
     "note": "Los precios proceden de pools de Statics y se ponderan durante 30 minutos cuando hay historial suficiente; de lo contrario se usa el último precio observado. El valor en Statics suma liquidez, respaldo de Operators y STATICS en staking al precio de STATICS. Los rendimientos son estimaciones, no promesas.",
     "dataUnavailable": "No disponible",
-    "partialTotals": "Algunos datos de pools están incompletos. Los totales afectados no están disponibles.",
     "incentives": {
       "title": "Incentivos de pools — próximos 7 días",
       "description": "Recompensas para LP y asignadores, por pool y token. Cualquiera puede financiarlas.",

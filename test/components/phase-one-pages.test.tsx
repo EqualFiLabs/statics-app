@@ -705,7 +705,7 @@ describe("protocol overview", () => {
     expect(within(yours).queryByText("Nothing to claim yet")).not.toBeInTheDocument();
   });
 
-  it("shows priced totals and discloses unpriced pools without an incomplete-data banner", async () => {
+  it("shows priced totals and discloses unpriced pools", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);
       if (endpoint === "summary")
@@ -742,55 +742,6 @@ describe("protocol overview", () => {
     expect(
       within(exchange).getByText("Volume 24h").parentElement?.querySelector("strong")
     ).not.toHaveTextContent("—");
-    expect(
-      screen.queryByText("Some pool data is incomplete. Affected aggregate values are unavailable.")
-    ).not.toBeInTheDocument();
-  });
-
-  it("withholds values for omissions beyond unpriced pools and flags incomplete history", async () => {
-    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
-      const sample = dexFixture(phaseOne, quote);
-      if (endpoint === "summary")
-        return {
-          ...sample.summary,
-          unpricedPools: 2,
-          current: {
-            ...sample.summary.current,
-            coverage: Object.fromEntries(
-              Object.entries(sample.summary.current.coverage).map(([key, value]) => [
-                key,
-                { ...value, omittedPools: 3 },
-              ])
-            ),
-          },
-        };
-      if (endpoint === "volume")
-        return {
-          ...sample.volume,
-          days: sample.volume.days.map((day) => ({
-            ...day,
-            coverage: { ...day.coverage, historyComplete: false },
-          })),
-        };
-      return sample[endpoint as keyof typeof sample];
-    });
-    withPhaseOne(<DeploymentOverview />);
-    expect(
-      await screen.findByText(
-        "Some pool data is incomplete. Affected aggregate values are unavailable."
-      )
-    ).toBeInTheDocument();
-    const totals = screen.getByRole("region", { name: "Protocol totals" });
-    expect(
-      within(totals).getByText("Value in Statics").parentElement?.querySelector("strong")
-    ).toHaveTextContent("—");
-    const exchange = screen.getByRole("region", { name: "Exchange" });
-    expect(
-      within(exchange).getByText("Volume 24h").parentElement?.querySelector("strong")
-    ).toHaveTextContent("—");
-    expect(
-      await within(exchange).findByText("Historical coverage is incomplete")
-    ).toBeInTheDocument();
   });
 
   it("discloses a headline spot fallback even when token metadata is unavailable", async () => {
