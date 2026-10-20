@@ -20,6 +20,7 @@ import type { PhaseOneProtocolActivity } from "@/lib/indexer/phase-one";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
 import { compactNumber, quoteAmount } from "./format";
+import { OverviewIncentives } from "./OverviewIncentives";
 import styles from "./protocol.module.css";
 
 const WAD = 10n ** 18n;
@@ -741,6 +742,12 @@ export function ProtocolOverview({
           </section>
         )}
       </div>
+
+      <OverviewIncentives
+        data={dex.emissions.data}
+        loading={dex.emissions.isLoading}
+        failed={dex.emissions.isError}
+      />
 
       <div className={styles.split}>
         <section className={styles.card} aria-labelledby="overview-activity">

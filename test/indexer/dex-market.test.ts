@@ -31,6 +31,38 @@ const deployment = {
 } as unknown as PhaseOneDeployment;
 
 describe("DEX market responses", () => {
+  it("validates weekly incentive amounts, window, unique tokens and pause state", () => {
+    const sample = dexFixture(deployment, "usdg").emissions;
+    const from = BigInt(sample.indexedAtTimestamp);
+    const row = {
+      poolId: deployment.supportedPools[0]!.poolId,
+      token0: token(2, "WETH"),
+      token1: token(5, "STATICS"),
+      lp: [{ token: token(5, "STATICS"), amount: "700", quoteValue: null }],
+      allocator: [{ token: token(5, "STATICS"), amount: "300", quoteValue: "30" }],
+      lpPaused: false,
+      allocatorPaused: false,
+    };
+    const weekly = { from: String(from), until: String(from + 604800n), pools: [row] };
+    const parse = (weeklyIncentives: unknown) =>
+      parseDexEmissions({ ...sample, weeklyIncentives }, "dex-fixture");
+    expect(parse(weekly).weeklyIncentives!.pools[0]!.lp[0]!.amount).toBe(700n);
+    expect(parse(null).weeklyIncentives).toBeNull();
+    expect(
+      parseDexEmissions({ ...sample, weeklyIncentives: undefined }, "dex-fixture").weeklyIncentives
+    ).toBeNull();
+    expect(() => parse({ ...weekly, until: String(from + 604801n) })).toThrow(/incentive window/);
+    expect(() => parse({ ...weekly, pools: [row, row] })).toThrow(/duplicate incentive pools/);
+    expect(() => parse({ ...weekly, pools: [{ ...row, lp: [...row.lp, ...row.lp] }] })).toThrow(
+      /duplicate incentive assets/
+    );
+    expect(() => parse({ ...weekly, pools: [{ ...row, lpPaused: true }] })).toThrow(
+      /paused incentives/
+    );
+    expect(() =>
+      parse({ ...weekly, pools: [{ ...row, lp: [{ ...row.lp[0], amount: "-1" }] }] })
+    ).toThrow(/incentive amount/);
+  });
   it("parses every endpoint's sample response in both quote currencies", () => {
     for (const quote of ["usdg", "weth"] as const) {
       const sample = dexFixture(deployment, quote);

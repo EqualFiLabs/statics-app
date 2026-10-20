@@ -16,6 +16,7 @@ import type {
   AccrualSegment,
 } from "./dex-domain";
 import type { PricePoint } from "./dex-pricing";
+import type { AllocatorSchedule } from "./dex-incentives";
 export type Metric = {
   poolId: string;
   bucket: string;
@@ -70,6 +71,7 @@ export type DexSnapshot = {
     weight: string;
     incentiveStreamCount: number;
     eligible: boolean;
+    allocatorStreams?: AllocatorSchedule[];
   }[];
   wallets: { current: string; previous: string };
 };
@@ -117,7 +119,7 @@ export function marketSnapshotSql(deployment: string) {
     'trades',coalesce((SELECT json_agg(d || jsonb_build_object('timestamp',time::text,'blockNumber',block::text,'logIndex',log) ORDER BY block DESC,log DESC) FROM recent),'[]'::json),
     'tokens',coalesce((SELECT json_agg(json_build_object('address',${allocationToken.address},'name',${allocationToken.name},'symbol',${allocationToken.symbol},'decimals',${allocationToken.decimals})) FROM ${allocationToken} WHERE ${allocationToken.chainId} = ${Number(process.env.PONDER_CHAIN_ID ?? "4663")}),'[]'::json),
     'reserve',(SELECT json_build_object('activated',${gaugeReserveState.activated},'periodBudget',${gaugeReserveState.periodBudget}::text,'periodStart',${gaugeReserveState.periodStart}::text,'periodFinish',${gaugeReserveState.periodFinish}::text,'periodAccounted',${gaugeReserveState.periodAccounted}::text,'totalAllocatedWeight',${gaugeReserveState.totalAllocatedWeight}::text,'updatedAtBlock',${gaugeReserveState.updatedAtBlock}::text,'updatedAtTimestamp',${gaugeReserveState.updatedAtTimestamp}::text) FROM ${gaugeReserveState} WHERE ${gaugeReserveState.deploymentId} = ${deployment}),
-    'allocations',coalesce((SELECT json_agg(json_build_object('poolId',${allocationDirectoryPool.poolId},'weight',${allocationDirectoryPool.weight}::text,'eligible',${allocationDirectoryPool.eligible},'incentiveStreamCount',${allocationDirectoryPool.incentiveStreamCount})) FROM ${allocationDirectoryPool} WHERE ${allocationDirectoryPool.deploymentId} = ${deployment}),'[]'::json),
+    'allocations',coalesce((SELECT json_agg(json_build_object('poolId',${allocationDirectoryPool.poolId},'weight',${allocationDirectoryPool.weight}::text,'eligible',${allocationDirectoryPool.eligible},'incentiveStreamCount',${allocationDirectoryPool.incentiveStreamCount},'allocatorStreams',${allocationDirectoryPool.detailsJson}::jsonb->'allocatorStreams')) FROM ${allocationDirectoryPool} WHERE ${allocationDirectoryPool.deploymentId} = ${deployment}),'[]'::json),
     'wallets',json_build_object('current',(SELECT count(DISTINCT lower(d->>'transactionSender'))::text FROM windowed WHERE bucket='current'),'previous',(SELECT count(DISTINCT lower(d->>'transactionSender'))::text FROM windowed WHERE bucket='previous'))
   ) AS payload`;
 }

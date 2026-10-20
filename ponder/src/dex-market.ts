@@ -8,6 +8,7 @@ import {
   type DexMetadata,
 } from "./dex-domain";
 import { projectLpRewards } from "./dex-lp-projection";
+import { INCENTIVE_WEEK, weeklyPoolIncentives } from "./dex-incentives";
 import { checkpointObservation } from "./dex-checkpoint";
 import type { DexSnapshot, Metric } from "./dex-snapshot";
 import {
@@ -428,7 +429,41 @@ export function buildMarket(
     },
     tokens: { ...observed, items: tokens },
     volume: { ...observed, days },
-    emissions: { ...observed, period, pools: distribution, othersBps: 10000 - shares },
+    emissions: {
+      ...observed,
+      period,
+      pools: distribution,
+      othersBps: 10000 - shares,
+      weeklyIncentives: s.allocations.some((a) => !Array.isArray(a.allocatorStreams))
+        ? null
+        : {
+            from: now,
+            until: now + INCENTIVE_WEEK,
+            pools: s.pools.flatMap((pool) => {
+              const allocation = s.allocations.find((a) => a.poolId === pool.poolId);
+              const projected = weeklyPoolIncentives(pool, allocation, now);
+              const amounts = (values: Map<string, bigint>) =>
+                [...values].map(([asset, amount]) => ({
+                  token: metadata(asset),
+                  amount,
+                  quoteValue: pricedValue(asset, amount),
+                }));
+              return projected.lp.size || projected.allocator.size
+                ? [
+                    {
+                      poolId: pool.poolId,
+                      token0: pool.token0,
+                      token1: pool.token1,
+                      lp: amounts(projected.lp),
+                      allocator: amounts(projected.allocator),
+                      lpPaused: projected.lpPaused,
+                      allocatorPaused: projected.allocatorPaused,
+                    },
+                  ]
+                : [];
+            }),
+          },
+    },
     trades: { ...observed, items: trades },
   };
 }
