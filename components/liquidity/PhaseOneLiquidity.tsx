@@ -98,6 +98,7 @@ export function PhaseOneLiquidity({
   const ux = useTranslations("liquidityUx");
   const createCopy = useTranslations("createPool");
   const creatorCopy = useTranslations("creatorPools");
+  const routeCopy = useTranslations("routes");
   // Pools registered after the manifest was reviewed join the list, marked unreviewed.
   const discovery = usePhaseOnePools(reviewedDeployment);
   // Pools created in this session are usable before the indexer reports them.
@@ -335,7 +336,10 @@ export function PhaseOneLiquidity({
                 setView(view === "deposit" ? "pool" : "list");
               }}
             >
-              ← {ux(view === "deposit" ? "choosePool" : "yourLiquidity")}
+              ←{" "}
+              {view === "newPool"
+                ? routeCopy("liquidity.label")
+                : ux(view === "deposit" ? "choosePool" : "yourLiquidity")}
             </button>
           )}
           <h2>
