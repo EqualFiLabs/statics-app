@@ -1,3 +1,4 @@
+import { launchManifestIdentity } from "@/lib/deployments/launch-identity";
 import { getAddress, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
 }));
 
-vi.mock("@/lib/deployments/registry", () => ({ deploymentRegistry: mocks.registry }));
+vi.mock("@/lib/server/deployment-manifests", () => ({ serverDeploymentRegistry: mocks.registry }));
 vi.mock("@/lib/server/launch-verification", () => ({
   verifyLaunchDeploymentOnServer: mocks.verify,
 }));
@@ -79,6 +80,46 @@ describe("launch verification route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("x-statics-verification-cache")).toBe("miss");
     await expect(response.json()).resolves.toMatchObject({ verified: true });
+  });
+
+  it("verifies the current runtime release", async () => {
+    mocks.registry.mockReturnValue([
+      { ...option, launch: { ...deployment, source: "runtime-manifest" } },
+    ]);
+    const response = await POST(
+      request({
+        chainId: 4663,
+        deploymentId: "robinhood-genesis",
+        manifestIdentity: launchManifestIdentity(deployment),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.verify).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "runtime-manifest" })
+    );
+  });
+
+  it("rejects a stale runtime browser snapshot without verification RPC work", async () => {
+    const updated = { ...deployment, source: "runtime-manifest", protocolCommit: "changed" };
+    mocks.registry.mockReturnValue([{ ...option, launch: updated }]);
+    const response = await POST(
+      request({
+        chainId: 4663,
+        deploymentId: "robinhood-genesis",
+        manifestIdentity: launchManifestIdentity(deployment),
+      })
+    );
+    expect(response.status).toBe(409);
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when runtime configuration cannot be read", async () => {
+    mocks.registry.mockImplementation(() => {
+      throw new Error("Public deployment configuration is unavailable.");
+    });
+    const response = await POST(request({ chainId: 4663, deploymentId: "robinhood-genesis" }));
+    expect(response.status).toBe(503);
+    expect(mocks.verify).not.toHaveBeenCalled();
   });
 
   it("rejects unknown deployments without calling the RPC", async () => {

@@ -51,23 +51,24 @@ export function readPublicEnvironment(
   return { appEnvironment, siteUrl } as const;
 }
 
+export const DOCS_URL = "https://docs.staticsprotocol.com";
+const GITHUB_URL = "https://github.com/EqualFiLabs/statics";
+
 export const primaryNavigation: readonly SiteNavigationItem[] = [
-  { label: "Protocol", messageKey: "protocol", kind: "anchor", href: "#protocol" },
-  { label: "Baskets", messageKey: "baskets", kind: "anchor", href: "#baskets" },
-  { label: "Dollar", messageKey: "dollar", kind: "anchor", href: "#dollar" },
-  { label: "Liquidity", messageKey: "liquidity", kind: "anchor", href: "#liquidity" },
-  {
-    label: "Docs",
-    messageKey: "docs",
-    kind: "route",
-    href: "https://docs.staticsprotocol.com",
-  },
-  {
-    label: "Dev",
-    messageKey: "dev",
-    kind: "route",
-    href: "https://github.com/EqualFiLabs/statics",
-  },
+  { label: "Operators", messageKey: "operators", kind: "route", href: "/app/genesis" },
+  { label: "Markets", messageKey: "markets", kind: "route", href: "/app/markets" },
+  { label: "Swap", messageKey: "swap", kind: "route", href: "/app/swap" },
+  { label: "Liquidity", messageKey: "liquidity", kind: "route", href: "/app/liquidity" },
+  { label: "Docs", messageKey: "docs", kind: "route", href: DOCS_URL },
+  { label: "Dev", messageKey: "dev", kind: "route", href: GITHUB_URL },
+] as const;
+
+/** Footer project links; Docs and GitHub match the header's Docs and Dev. */
+export const projectLinks = [
+  { messageKey: "docs", href: DOCS_URL },
+  { messageKey: "github", href: GITHUB_URL },
+  { messageKey: "telegram", href: "https://t.me/EqualFi" },
+  { messageKey: "twitter", href: "https://x.com/staticsprotocol" },
 ] as const;
 
 export const protocolStatus = {
@@ -125,6 +126,13 @@ export const appNavigationGroups: readonly AppNavigationGroup[] = [
         enabled: true,
         href: "/app",
         capability: "overview",
+      },
+      {
+        label: "Markets",
+        messageKey: "markets",
+        enabled: true,
+        href: "/app/markets",
+        capability: "public-market-discovery",
       },
       {
         label: "Swap",
@@ -258,6 +266,9 @@ export const appNavigation: readonly AppNavigationItem[] = appNavigationGroups.f
 export const appTabNavigation: readonly AppNavigationItem[] = appNavigation.filter(
   (item) => typeof item.tabLabel === "string"
 );
+const phaseOneTabNavigation: readonly AppNavigationItem[] = appNavigation.filter((item) =>
+  ["/app", "/app/markets", "/app/swap", "/app/rewards"].includes(item.href)
+);
 /** The only product capabilities promoted by a launch deployment. */
 export const launchPrimaryCapabilities: readonly DeploymentCapability[] = [
   "overview",
@@ -285,10 +296,54 @@ export function appNavigationGroupsForStage(stage: DeploymentStage): readonly Ap
 
 export function appTabNavigationForStage(stage: DeploymentStage): readonly AppNavigationItem[] {
   if (stage === "full-protocol") return appTabNavigation;
+  if (stage === "phase-one") return phaseOneTabNavigation;
   const launchTabCapabilities: readonly DeploymentCapability[] = [
     "canonical-statics-market",
     "genesis-vault",
     "wallet",
   ];
   return appNavigation.filter((item) => launchTabCapabilities.includes(item.capability));
+}
+
+export function isNavigationItemAvailable(
+  item: AppNavigationItem,
+  capabilities: readonly DeploymentCapability[]
+): boolean {
+  if (capabilities.includes(item.capability)) return true;
+  if (item.capability === "canonical-statics-market") {
+    return capabilities.includes("public-direct-swaps");
+  }
+  if (item.capability === "protocol-liquidity") {
+    return capabilities.includes("public-lp-positions");
+  }
+  if (item.capability === "positions") {
+    return capabilities.includes("position-staking");
+  }
+  if (item.capability === "protocol-rewards") {
+    return (
+      capabilities.includes("global-rewards") ||
+      capabilities.includes("lp-rewards") ||
+      capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
+}
+
+export function appNavigationGroupsForCapabilities(
+  capabilities: readonly DeploymentCapability[]
+): readonly AppNavigationGroup[] {
+  return appNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isNavigationItemAvailable(item, capabilities)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function appTabNavigationForCapabilities(
+  capabilities: readonly DeploymentCapability[],
+  stage: DeploymentStage
+): readonly AppNavigationItem[] {
+  const tabs = stage === "phase-one" ? phaseOneTabNavigation : appTabNavigation;
+  return tabs.filter((item) => isNavigationItemAvailable(item, capabilities));
 }

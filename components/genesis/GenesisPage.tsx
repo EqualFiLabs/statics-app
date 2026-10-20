@@ -17,6 +17,8 @@ import {
 import { EmptyState, UnconfiguredSurface } from "@/components/common/EmptyState";
 import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import { NftArtwork } from "@/components/wallet/NftArtwork";
+import { GenesisActionModal } from "@/components/genesis/GenesisActionModal";
+import { ProtocolGenesisBatchPanel } from "@/components/genesis/ProtocolGenesisBatchPanel";
 import { verifyDollarDeployment, type DollarDeployment } from "@/lib/dollar/deployment";
 import { loadWalletGenesis } from "@/lib/indexer/statics";
 import { loadPositionCatalog } from "@/lib/positions/positions";
@@ -35,8 +37,7 @@ function describeGenesisError(error: unknown): string {
   if (message.includes("GenesisLinkedOnTransfer"))
     return "Unlink this Operator NFT before transferring it.";
   if (message.includes("GenesisAlreadyLinked")) return "This Operator NFT is already linked.";
-  if (message.includes("PositionAlreadyLinked"))
-    return "That Position already has an Operator NFT.";
+  if (message.includes("PositionAlreadyLinked")) return "That account already has an Operator NFT.";
   if (message.includes("InvalidActivationTier")) return "Choose a higher activation tier.";
   if (message.includes("ERC20InsufficientAllowance"))
     return "Approve STATICS before activating this tier.";
@@ -47,13 +48,39 @@ function describeGenesisError(error: unknown): string {
 
 export function GenesisPage() {
   const { active } = useDeployment();
-  if (active.launch) {
-    return <StandaloneGenesisPage deployment={active.launch} />;
-  }
-  if (!active.protocol) {
-    return <UnconfiguredSurface subject="Genesis" />;
-  }
-  return <ProtocolGenesisPage deployment={active.protocol.protocol} />;
+  const wallet = useWalletState();
+  const supportsCalibur = active.launch
+    ? active.launch.descriptor.chainId === 4663
+    : Boolean(
+        active.protocol?.protocol.genesis &&
+        active.protocol.protocol.source !== "development-environment" &&
+        active.protocol.protocol.chainId === 4663
+      );
+  // Delegation and relay funds belong to the wallet, even after its last Operator leaves.
+  const canConfigureCalibur = Boolean(
+    supportsCalibur &&
+    wallet.status === "ready" &&
+    wallet.address &&
+    wallet.walletKind === "embedded"
+  );
+  if (!active.launch && !active.protocol) return <UnconfiguredSurface subject="Genesis" />;
+  return (
+    <GenesisActionModal
+      canConfigureCalibur={canConfigureCalibur}
+      enabled={wallet.status === "ready" && wallet.walletKind === "embedded"}
+    >
+      {(controls) =>
+        active.launch ? (
+          <StandaloneGenesisPage deployment={active.launch} controls={controls} />
+        ) : (
+          <>
+            {controls}
+            <ProtocolGenesisPage deployment={active.protocol!.protocol} />
+          </>
+        )
+      }
+    </GenesisActionModal>
+  );
 }
 
 function ProtocolGenesisPage({ deployment }: { deployment: DollarDeployment }) {
@@ -247,6 +274,14 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
           {error}
         </div>
       )}
+      <ProtocolGenesisBatchPanel
+        deployment={deployment}
+        operators={portfolio.data.genesis}
+        positions={availablePositions}
+        onConfirmed={async () => {
+          await portfolio.refetch();
+        }}
+      />
       <div className="genesis-grid">
         {portfolio.data.genesis.map(({ id, state }) => {
           const currentTier = Number(state.tier);
@@ -416,7 +451,7 @@ function GenesisRuntime({ deployment }: { deployment: DollarDeployment }) {
                       ? "Linking…"
                       : currentTier === 0
                         ? "Activate before linking"
-                        : "Link to Position"}
+                        : "Link to account"}
                   </button>
                 </div>
               )}

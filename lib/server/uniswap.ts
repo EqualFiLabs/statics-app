@@ -65,7 +65,11 @@ async function readPayload(response: Response): Promise<unknown> {
   }
 }
 
-export async function callUniswapApi(pathname: string, body: unknown): Promise<UniswapApiResult> {
+export async function callUniswapApi(
+  pathname: string,
+  body: unknown,
+  signal?: AbortSignal
+): Promise<UniswapApiResult> {
   let apiKey: string;
   try {
     apiKey = await resolveUniswapApiKey();
@@ -93,6 +97,7 @@ export async function callUniswapApi(pathname: string, body: unknown): Promise<U
       },
       body: JSON.stringify(body),
       cache: "no-store",
+      signal,
     });
   } catch (error) {
     return {

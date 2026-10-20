@@ -1,8 +1,13 @@
+import {
+  deploymentScopedCache,
+  withDeploymentSnapshot,
+  serverDeploymentRegistry,
+} from "@/lib/server/deployment-manifests";
 import { createPublicClient, http, parseAbi, type PublicClient } from "viem";
 
 import { dopplerStaticsTokenAbi, v4QuoterAbi } from "@statics-protocol/sdk";
 
-import { deploymentRegistry, ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
+import { ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import {
@@ -96,17 +101,19 @@ type FundamentalsCache = Readonly<{
   fetchedAt: number;
 }>;
 
-let snapshotCache: Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null = null;
-let snapshotInFlight: Promise<StaticsMarketOverview> | null = null;
-let spotSnapshotCache: Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null = null;
-let spotSnapshotInFlight: Promise<StaticsMarketOverview> | null = null;
-let fundamentalsCache: FundamentalsCache | null = null;
-let fundamentalsInFlight: Promise<FundamentalsCache> | null = null;
-let depthCache: DepthCache | null = null;
-let depthInFlight: Promise<DepthCache | null> | null = null;
+const cache = deploymentScopedCache(() => ({
+  snapshotCache: null as Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null,
+  snapshotInFlight: null as Promise<StaticsMarketOverview> | null,
+  spotSnapshotCache: null as Readonly<{ value: StaticsMarketOverview; fetchedAt: number }> | null,
+  spotSnapshotInFlight: null as Promise<StaticsMarketOverview> | null,
+  fundamentalsCache: null as FundamentalsCache | null,
+  fundamentalsInFlight: null as Promise<FundamentalsCache> | null,
+  depthCache: null as DepthCache | null,
+  depthInFlight: null as Promise<DepthCache | null> | null,
+}));
 
 function mainnetLaunch(): LaunchDeployment {
-  const deployment = deploymentRegistry().find(
+  const deployment = serverDeploymentRegistry().find(
     (option) => option.descriptor.deploymentId === ROBINHOOD_GENESIS_DEPLOYMENT_ID
   )?.launch;
   if (!deployment?.analytics) {
@@ -351,11 +358,12 @@ async function loadDepth(
   blockNumber: bigint,
   now: number
 ): Promise<DepthCache | null> {
-  if (depthCache && now - depthCache.fetchedAt <= DEPTH_TTL_MS) {
-    return { ...depthCache, stale: false };
+  const state = cache();
+  if (state.depthCache && now - state.depthCache.fetchedAt <= DEPTH_TTL_MS) {
+    return { ...state.depthCache, stale: false };
   }
-  if (!depthInFlight) {
-    depthInFlight = calculateDepth(
+  if (!state.depthInFlight) {
+    state.depthInFlight = calculateDepth(
       client,
       deployment,
       prices,
@@ -366,19 +374,19 @@ async function loadDepth(
       blockNumber
     )
       .then((value) => {
-        depthCache = { value, fetchedAt: now, stale: false };
-        return depthCache;
+        state.depthCache = { value, fetchedAt: now, stale: false };
+        return state.depthCache;
       })
       .catch(() =>
-        depthCache && now - depthCache.fetchedAt <= DEPTH_MAX_STALE_MS
-          ? { ...depthCache, stale: true }
+        state.depthCache && now - state.depthCache.fetchedAt <= DEPTH_MAX_STALE_MS
+          ? { ...state.depthCache, stale: true }
           : null
       )
       .finally(() => {
-        depthInFlight = null;
+        state.depthInFlight = null;
       });
   }
-  return depthInFlight;
+  return state.depthInFlight;
 }
 
 async function refreshFundamentals(now: number): Promise<FundamentalsCache> {
@@ -453,34 +461,37 @@ async function refreshFundamentals(now: number): Promise<FundamentalsCache> {
 }
 
 async function loadFundamentals(now: number, allowStale: boolean): Promise<FundamentalsCache> {
-  if (fundamentalsCache && now - fundamentalsCache.fetchedAt <= SNAPSHOT_TTL_MS) {
-    return fundamentalsCache;
+  const state = cache();
+  if (state.fundamentalsCache && now - state.fundamentalsCache.fetchedAt <= SNAPSHOT_TTL_MS) {
+    return state.fundamentalsCache;
   }
-  if (!fundamentalsInFlight) {
-    fundamentalsInFlight = refreshFundamentals(now)
+  if (!state.fundamentalsInFlight) {
+    state.fundamentalsInFlight = refreshFundamentals(now)
       .then((value) => {
-        fundamentalsCache = value;
+        state.fundamentalsCache = value;
         return value;
       })
       .finally(() => {
-        fundamentalsInFlight = null;
+        state.fundamentalsInFlight = null;
       });
   }
   try {
-    return await fundamentalsInFlight;
+    return await state.fundamentalsInFlight;
   } catch (error) {
     if (
       allowStale &&
-      fundamentalsCache &&
-      now - fundamentalsCache.fetchedAt <= SUPPLY_MAX_STALE_MS
+      state.fundamentalsCache &&
+      now - state.fundamentalsCache.fetchedAt <= SUPPLY_MAX_STALE_MS
     ) {
-      return fundamentalsCache;
+      return state.fundamentalsCache;
     }
     throw error;
   }
 }
 
-export async function loadMarketSupplySnapshot(now = Date.now()): Promise<MarketSupplySnapshot> {
+async function loadMarketSupplySnapshotForSnapshot(
+  now = Date.now()
+): Promise<MarketSupplySnapshot> {
   const fundamentals = await loadFundamentals(now, true);
   const { value } = fundamentals;
   return {
@@ -611,45 +622,67 @@ async function refreshOverview(now: number, includeDepth: boolean): Promise<Stat
   };
 }
 
-export async function loadMarketOverview(now = Date.now()): Promise<StaticsMarketOverview> {
-  if (snapshotCache && now - snapshotCache.fetchedAt <= SNAPSHOT_TTL_MS) return snapshotCache.value;
-  if (!snapshotInFlight) {
-    snapshotInFlight = refreshOverview(now, true)
+async function loadMarketOverviewForSnapshot(now = Date.now()): Promise<StaticsMarketOverview> {
+  const state = cache();
+  if (state.snapshotCache && now - state.snapshotCache.fetchedAt <= SNAPSHOT_TTL_MS)
+    return state.snapshotCache.value;
+  if (!state.snapshotInFlight) {
+    state.snapshotInFlight = refreshOverview(now, true)
       .then((value) => {
-        snapshotCache = { value, fetchedAt: now };
+        state.snapshotCache = { value, fetchedAt: now };
         return value;
       })
       .finally(() => {
-        snapshotInFlight = null;
+        state.snapshotInFlight = null;
       });
   }
-  return snapshotInFlight;
+  return state.snapshotInFlight;
 }
 
-export async function loadMarketSpotOverview(now = Date.now()): Promise<StaticsMarketOverview> {
-  if (spotSnapshotCache && now - spotSnapshotCache.fetchedAt <= SNAPSHOT_TTL_MS) {
-    return spotSnapshotCache.value;
+async function loadMarketSpotOverviewForSnapshot(now = Date.now()): Promise<StaticsMarketOverview> {
+  const state = cache();
+  if (state.spotSnapshotCache && now - state.spotSnapshotCache.fetchedAt <= SNAPSHOT_TTL_MS) {
+    return state.spotSnapshotCache.value;
   }
-  if (!spotSnapshotInFlight) {
-    spotSnapshotInFlight = refreshOverview(now, false)
+  if (!state.spotSnapshotInFlight) {
+    state.spotSnapshotInFlight = refreshOverview(now, false)
       .then((value) => {
-        spotSnapshotCache = { value, fetchedAt: now };
+        state.spotSnapshotCache = { value, fetchedAt: now };
         return value;
       })
       .finally(() => {
-        spotSnapshotInFlight = null;
+        state.spotSnapshotInFlight = null;
       });
   }
-  return spotSnapshotInFlight;
+  return state.spotSnapshotInFlight;
 }
 
 export function resetMarketOverviewCacheForTest(): void {
-  snapshotCache = null;
-  snapshotInFlight = null;
-  spotSnapshotCache = null;
-  spotSnapshotInFlight = null;
-  fundamentalsCache = null;
-  fundamentalsInFlight = null;
-  depthCache = null;
-  depthInFlight = null;
+  const state = cache();
+  state.snapshotCache = null;
+  state.snapshotInFlight = null;
+  state.spotSnapshotCache = null;
+  state.spotSnapshotInFlight = null;
+  state.fundamentalsCache = null;
+  state.fundamentalsInFlight = null;
+  state.depthCache = null;
+  state.depthInFlight = null;
+}
+
+export async function loadMarketOverview(
+  ...args: Parameters<typeof loadMarketOverviewForSnapshot>
+): ReturnType<typeof loadMarketOverviewForSnapshot> {
+  return withDeploymentSnapshot(() => loadMarketOverviewForSnapshot(...args));
+}
+
+export async function loadMarketSpotOverview(
+  ...args: Parameters<typeof loadMarketSpotOverviewForSnapshot>
+): ReturnType<typeof loadMarketSpotOverviewForSnapshot> {
+  return withDeploymentSnapshot(() => loadMarketSpotOverviewForSnapshot(...args));
+}
+
+export async function loadMarketSupplySnapshot(
+  ...args: Parameters<typeof loadMarketSupplySnapshotForSnapshot>
+): ReturnType<typeof loadMarketSupplySnapshotForSnapshot> {
+  return withDeploymentSnapshot(() => loadMarketSupplySnapshotForSnapshot(...args));
 }

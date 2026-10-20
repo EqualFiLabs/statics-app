@@ -51,7 +51,14 @@ describe("DApp wallet shell", () => {
       network: "Robinhood Chain",
       chainId: 4_663,
       stage: "launch",
-      capabilities: [],
+      capabilities: [
+        "overview",
+        "canonical-statics-market",
+        "genesis-vault",
+        "wallet",
+        "activity",
+        "approval-tools",
+      ],
       available: true,
     } as const;
     const active = {
@@ -70,6 +77,49 @@ describe("DApp wallet shell", () => {
       within(screen.getByLabelText("DApp navigation")).getByRole("link", { name: "Wallet" })
     ).toHaveAttribute("href", "/app/wallet");
     expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
+    expect(
+      screen.getByRole("button", { name: "Application menu. Current route: Overview" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows Overview, Markets and Swap in the Phase 1 mobile tabs", () => {
+    const descriptor = {
+      deploymentId: "phase-one-fixture",
+      label: "Phase 1",
+      network: "Robinhood Chain",
+      chainId: 4_663,
+      stage: "phase-one",
+      capabilities: [
+        "overview",
+        "public-market-discovery",
+        "public-direct-swaps",
+        "global-rewards",
+        "wallet",
+      ],
+      available: true,
+    } as const;
+    const active = {
+      networkId: "robinhood",
+      descriptor,
+      launch: null,
+      protocol: null,
+    } satisfies DeploymentOption;
+    renderWithWallet(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <AppShell>Overview</AppShell>
+      </DeploymentContext.Provider>
+    );
+
+    const tabs = within(screen.getByRole("navigation", { name: "Primary" }));
+    expect(tabs.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Overview",
+      "Markets",
+      "Swap",
+      "Earn",
+    ]);
+    expect(
+      tabs.getByRole("button", { name: "Application menu. Current route: Overview" })
+    ).toBeInTheDocument();
   });
 
   it("offers independent Privy sign-in and external wallet connection", () => {

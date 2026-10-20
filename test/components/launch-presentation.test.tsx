@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, renderWithLocale, screen, waitFor, within } from "@/test/render";
 import { getAddress, parseEther, zeroAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GenesisRecoveriesPage } from "@/components/genesis/GenesisRecoveriesPage";
 import { GenesisCreditPanel } from "@/components/genesis/GenesisCreditPanel";
 import { StandaloneGenesisPage } from "@/components/genesis/StandaloneGenesisPage";
 import {
@@ -143,9 +145,9 @@ function renderWithProviders(
   ui: React.ReactElement,
   signedIn = true,
   locale = "en",
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   walletOverrides: Partial<typeof defaultWalletState> = {}
 ) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const tree = (
     <QueryClientProvider client={queryClient}>
       <DeploymentContext.Provider
@@ -341,11 +343,17 @@ describe("Genesis credit presentation", () => {
   ])("requests a network switch before %s credit", async (_action, buttonName, active) => {
     creditReads(false, false, active);
     const switchNetwork = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<GenesisCreditPanel deployment={deployment} genesisId={1n} />, true, "en", {
-      chainId: 1,
-      isTargetChain: false,
-      switchNetwork,
-    });
+    renderWithProviders(
+      <GenesisCreditPanel deployment={deployment} genesisId={1n} />,
+      true,
+      "en",
+      undefined,
+      {
+        chainId: 1,
+        isTargetChain: false,
+        switchNetwork,
+      }
+    );
 
     if (!active) {
       fireEvent.change(await screen.findByLabelText("Or enter an exact amount"), {
@@ -425,6 +433,59 @@ describe("Genesis credit presentation", () => {
 });
 
 describe("Genesis recovery navigation", () => {
+  function RecoveryNavigation({ initialRecoveries = false }: { initialRecoveries?: boolean }) {
+    const [recoveries, setRecoveries] = useState(initialRecoveries);
+    return (
+      <>
+        <button onClick={() => setRecoveries((current) => !current)}>Navigate</button>
+        {recoveries ? <GenesisRecoveriesPage /> : <StandaloneGenesisPage deployment={deployment} />}
+      </>
+    );
+  }
+
+  it("uses cached post-Epoch accounting when navigating to recoveries and back", async () => {
+    readContract.mockResolvedValue(vaultAccounting(false));
+    getBlock.mockResolvedValue({ timestamp: 2_100_000_000n });
+    loadRecoverableGenesisCredits.mockResolvedValue([]);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    renderWithProviders(<RecoveryNavigation />, false, "en", client);
+    expect(await screen.findByRole("link", { name: /Recover matured/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Navigate" }));
+    expect(await screen.findByText("No recoverable Operator credits")).toBeInTheDocument();
+    expect(screen.queryByText("Recovery opens after the Genesis Epoch")).not.toBeInTheDocument();
+    expect(loadRecoverableGenesisCredits).toHaveBeenCalled();
+    expect(client.getQueryData(["genesis-vault-epoch", descriptor.deploymentId])).toMatchObject({
+      epochActive: false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Navigate" }));
+    expect(await screen.findByRole("link", { name: /Recover matured/ })).toBeInTheDocument();
+  });
+
+  it("keeps the shared accounting shape when recoveries is opened first", async () => {
+    readContract.mockResolvedValue(vaultAccounting(false));
+    getBlock.mockResolvedValue({ timestamp: 2_100_000_000n });
+    loadRecoverableGenesisCredits.mockResolvedValue([]);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    renderWithProviders(<RecoveryNavigation initialRecoveries />, false, "en", client);
+    expect(await screen.findByText("No recoverable Operator credits")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Navigate" }));
+    expect(await screen.findByRole("link", { name: /Recover matured/ })).toBeInTheDocument();
+    expect(client.getQueryData(["genesis-vault-epoch", descriptor.deploymentId])).toMatchObject({
+      epochActive: false,
+    });
+  });
+
+  it("continues to block recovery during a confirmed active Epoch", async () => {
+    readContract.mockResolvedValue(vaultAccounting(true));
+    renderWithProviders(<GenesisRecoveriesPage />, false);
+    expect(await screen.findByText("Recovery opens after the Genesis Epoch")).toBeInTheDocument();
+    expect(loadRecoverableGenesisCredits).not.toHaveBeenCalled();
+  });
+
   it("does not expose Recoveries during the Genesis Epoch", async () => {
     readContract.mockResolvedValue(vaultAccounting(true));
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />, false);

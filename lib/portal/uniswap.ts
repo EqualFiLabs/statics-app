@@ -8,6 +8,8 @@ export type EvmSwapToken = Readonly<{
   kind: "native" | "erc20";
   name: string;
   symbol: string;
+  /** False for a token known only from a discovered, unreviewed pool: shown with a warning. */
+  reviewed?: boolean;
 }>;
 
 export type UniswapTransaction = Readonly<{

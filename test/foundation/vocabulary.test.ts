@@ -12,7 +12,7 @@ describe("vocabulary", () => {
   });
 
   it("falls back to a naive plural only when no explicit plural is given", () => {
-    expect(termPlural("position")).toBe("Positions");
+    expect(termPlural("position")).toBe("Accounts");
     expect(termPlural("basket")).toBe("Baskets");
     // Mass nouns opt out, so we never render "Collaterals" or "Liquiditys".
     expect(termPlural("collateral")).toBe("Collateral");

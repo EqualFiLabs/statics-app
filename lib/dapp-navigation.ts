@@ -5,6 +5,7 @@ export type DappRouteCapability = DeploymentCapability;
 /** Exact runtime route policy; unknown paths intentionally return null. */
 export function getDappRouteCapability(pathname: string): DappRouteCapability | null {
   if (pathname === "/app" || pathname === "/app/") return "overview";
+  if (pathname === "/app/markets") return "public-market-discovery";
   if (pathname === "/app/swap") return "canonical-statics-market";
   if (pathname === "/app/genesis" || pathname === "/app/genesis/recoveries") return "genesis-vault";
   if (pathname === "/app/wallet" || pathname === "/app/portal") return "wallet";
@@ -16,7 +17,8 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
   if (pathname === "/app/positions" || pathname.startsWith("/app/positions/")) return "positions";
   if (pathname === "/app/loans") return "loans";
   if (pathname === "/app/rewards") return "protocol-rewards";
-  if (pathname === "/app/liquidity") return "protocol-liquidity";
+  if (pathname === "/app/liquidity" || pathname === "/app/liquidity/creator")
+    return "protocol-liquidity";
   if (pathname === "/app/faucet") return "faucet";
   return null;
 }
@@ -24,15 +26,24 @@ export function getDappRouteCapability(pathname: string): DappRouteCapability | 
 export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescriptor): boolean {
   const capability = getDappRouteCapability(pathname);
   if (capability === null) return true;
-  if (descriptor.stage === "full-protocol") return true;
-  return (
-    capability === "overview" ||
-    capability === "canonical-statics-market" ||
-    capability === "genesis-vault" ||
-    capability === "wallet" ||
-    capability === "activity" ||
-    capability === "approval-tools"
-  );
+  if (descriptor.capabilities.includes(capability)) return true;
+  if (pathname === "/app/swap") {
+    return descriptor.capabilities.includes("public-direct-swaps");
+  }
+  if (pathname === "/app/liquidity" || pathname === "/app/liquidity/creator") {
+    return descriptor.capabilities.includes("public-lp-positions");
+  }
+  if (capability === "positions") {
+    return descriptor.capabilities.includes("position-staking");
+  }
+  if (pathname === "/app/rewards") {
+    return (
+      descriptor.capabilities.includes("global-rewards") ||
+      descriptor.capabilities.includes("lp-rewards") ||
+      descriptor.capabilities.includes("allocator-rewards")
+    );
+  }
+  return false;
 }
 export type DappRoutePresentation = {
   label: string;
@@ -58,7 +69,13 @@ const routePresentations = {
     status: "Portfolio",
     title: "Your portfolio",
     description:
-      "Everything you hold in one place: your Dollar balance, positions, collateral, and rewards waiting to be claimed.",
+      "Everything you hold in one place: your assets, accounts, and rewards waiting to be claimed.",
+  },
+  markets: {
+    label: "Markets",
+    status: "Markets",
+    title: "Markets",
+    description: "Every pool, its volume and fees, and where STATICS emissions go this period.",
   },
   swap: {
     label: "Swap",
@@ -92,8 +109,7 @@ const routePresentations = {
     label: "Add funds",
     status: "Add funds",
     title: "Add funds to Statics",
-    description:
-      "Bring money in from another network or another token. Swap, bridge, or convert to Statics Dollar.",
+    description: "Bring funds in from another network or token using swaps and bridges.",
   },
   baskets: {
     label: "Baskets",
@@ -103,11 +119,11 @@ const routePresentations = {
       "Mint or redeem a fixed bundle of assets as one unit. You will see exactly what a basket holds before you mint.",
   },
   positions: {
-    label: "Position NFT",
-    status: "Position NFT",
-    title: "Your Position NFTs",
+    label: "Accounts",
+    status: "Accounts",
+    title: "Your accounts",
     description:
-      "Each position holds your baskets, loans, and Dollar together. Manage collateral, staking, and rewards from here.",
+      "Each account is a Position NFT. Open one to see its balances, history and controls.",
   },
   loans: {
     label: "Loans",
@@ -117,18 +133,17 @@ const routePresentations = {
       "Money you have borrowed against locked collateral. Review what you owe, what is locked, and when each loan is due.",
   },
   rewards: {
-    label: "Rewards",
-    status: "Rewards",
-    title: "Your rewards",
-    description:
-      "Stake a position to earn a share of protocol fees. Pick which assets to earn in and claim what you have built up.",
+    label: "Earn",
+    status: "Earn",
+    title: "Earn",
+    description: "Stake STATICS, choose your reward assets, and collect rewards.",
   },
   genesis: {
     label: "Operator NFT",
     status: "Operator NFT",
     title: "Manage your Operators NFTs",
     description:
-      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to a Position for additional reward weight.",
+      "Activate an Operator NFT with a STATICS treasury payment, manage secured credit, and later link it to an account for additional reward weight.",
   },
   genesisRecoveries: {
     label: "Recoveries",
@@ -143,6 +158,13 @@ const routePresentations = {
     title: "Provide liquidity",
     description:
       "Supply assets so other people can trade, and earn a share of the trading fees. Review your pools and what they have earned.",
+  },
+  liquidityCreator: {
+    label: "Your pools",
+    status: "Your pools",
+    title: "Your pools",
+    description:
+      "Pools you created. Creators earn 5% of the Statics fee on every swap. Settle and claim it, fund incentives and manage each pool.",
   },
   create: {
     label: "Create basket",
@@ -169,6 +191,7 @@ const routePresentations = {
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/markets")) return "markets";
   if (pathname.startsWith("/app/swap")) return "swap";
   if (pathname.startsWith("/app/wallet")) return "wallet";
   if (pathname.startsWith("/app/faucet")) return "faucet";
@@ -182,6 +205,8 @@ export function getDappRouteId(pathname: string): DappRouteId {
   // Ordered before the /app/genesis prefix, which would otherwise swallow it.
   if (pathname.startsWith("/app/genesis/recoveries")) return "genesisRecoveries";
   if (pathname.startsWith("/app/genesis")) return "genesis";
+  // Ordered before the /app/liquidity prefix, which would otherwise swallow it.
+  if (pathname.startsWith("/app/liquidity/creator")) return "liquidityCreator";
   if (pathname.startsWith("/app/liquidity")) return "liquidity";
   if (pathname.startsWith("/app/activity")) return "activity";
   if (pathname.startsWith("/app/tools")) return "tools";

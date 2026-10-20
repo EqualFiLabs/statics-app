@@ -13,7 +13,7 @@ describe("Term", () => {
       </NextIntlClientProvider>
     );
 
-    expect(screen.getByTitle(/Statics/)).toHaveTextContent("头寸");
+    expect(screen.getByTitle(/Statics/)).toHaveTextContent("账户");
     expect(screen.getByText(/\(PositionNFT\)/)).toBeInTheDocument();
   });
 });

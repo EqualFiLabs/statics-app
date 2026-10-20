@@ -5,6 +5,7 @@ import {
   getAddressExplorerUrlForChain,
   getTransactionExplorerUrl,
   readWalletEnvironment,
+  createWalletTransports,
 } from "@/lib/wallet-config";
 
 describe("wallet environment", () => {
@@ -96,6 +97,42 @@ describe("wallet environment", () => {
 
     expect(environment.defaultChain.id).toBe(4_663);
     expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630]);
+  });
+
+  it("uses the loopback RPC for reads and Privy on a chain-4663 mainnet fork", () => {
+    const environment = readWalletEnvironment({
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
+      NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663",
+      NEXT_PUBLIC_ANVIL_RPC_URL: "http://127.0.0.1:8663",
+    });
+    expect(environment.defaultChain.id).toBe(4_663);
+    expect(environment.defaultChain.name).toBe("Robinhood mainnet fork");
+    expect(environment.defaultChain.blockExplorers).toBeUndefined();
+    expect(environment.supportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630]);
+    expect(environment.privySupportedChains.map((chain) => chain.id)).toEqual([4_663, 46_630]);
+    expect(environment.privyDefaultChain.rpcUrls.privyWalletOverride?.http).toEqual([
+      "http://127.0.0.1:8663/",
+    ]);
+    expect(createWalletTransports(environment)[4_663]({}).value?.url).toBe(
+      "http://127.0.0.1:8663/"
+    );
+  });
+
+  it("requires a mainnet fork to be selected explicitly in development", () => {
+    expect(() => readWalletEnvironment({ NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663" })).toThrow(
+      "requires development"
+    );
+    expect(() => readWalletEnvironment({ NEXT_PUBLIC_ANVIL_CHAIN_ID: "999" })).toThrow(
+      "must be 31337 or 4663"
+    );
+    expect(() =>
+      readWalletEnvironment({
+        NEXT_PUBLIC_APP_ENV: "production",
+        NEXT_PUBLIC_PRIVY_APP_ID: "app-id",
+        NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663",
+      })
+    ).toThrow("requires development");
   });
 
   it("fails closed outside development when Privy is absent", () => {

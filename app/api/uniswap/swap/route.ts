@@ -18,8 +18,13 @@ export async function POST(request: Request) {
   if (serialized.length > 500_000 || Object.keys(quote).length === 0) {
     return NextResponse.json({ error: "Uniswap swap quote is invalid." }, { status: 400 });
   }
+  const deadline = isRecord(body) ? body.deadline : undefined;
+  if (deadline !== undefined && (!Number.isSafeInteger(deadline) || Number(deadline) <= 0)) {
+    return NextResponse.json({ error: "Invalid swap deadline." }, { status: 400 });
+  }
   const result = await callUniswapApi("/swap", {
     quote,
+    ...(deadline === undefined ? {} : { deadline }),
     refreshGasPrice: true,
     simulateTransaction: true,
     safetyMode: "SAFE",

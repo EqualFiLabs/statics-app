@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "assetBasePath": "/assets/token-logos/robinhood",
+  "sourceDigest": "sha256:c0bbe030404e96d0ce8b04d346d8ac581c45b8f87e90e19c1faded4a2eeefec0",
+  "contentDigest": "sha256:29fc0ce9ac8e57ec36399c20ad0e8cc2ecdf93fd3ca5ee8ba91d9dc9e9c477a9",
+  "logos": {
+    "4663:0x0bd7d308f8e1639fab988df18a8011f41eacad73": "/assets/token-logos/v1/50f4b6e6c1c21e57c36401ef2139fa38c3e51b8e87977c4e295b031248f0d219.webp",
+    "4663:0x2d8d6f4a93acd7a916a5a654ec8b690ba3b3eadd": "/assets/token-logos/robinhood/b83a61004b6d85659beb4e51fea426e4d4640af6a9ae6f0cc6725239dd3bf76f.webp",
+    "4663:0x5fc5360d0400a0fd4f2af552add042d716f1d168": "/assets/token-logos/v1/c5870aadf90d614c75754ec1377798fe5dc11caf98e35023eecdada5177a882c.webp"
+  }
+}

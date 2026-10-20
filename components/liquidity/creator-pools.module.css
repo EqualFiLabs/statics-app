@@ -1,0 +1,486 @@
+/* Your pools: creator revenue, incentives and pool controls. */
+.page {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+.list {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 340px;
+  min-width: 0;
+}
+.main {
+  display: flex;
+  flex: 999 1 560px;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.muted {
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.note {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+.good {
+  color: var(--accent);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.warn {
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.mono {
+  color: var(--app-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.pill,
+.goodPill,
+.warnPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.goodPill {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.warnPill {
+  align-self: flex-start;
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Pool list */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tile:hover {
+  border-color: var(--app-border-strong);
+}
+.tile[aria-current="page"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--app-surface));
+}
+.tileHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+}
+.empty h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.paste {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--radius-lg);
+}
+.paste label {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.paste > div,
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.paste input,
+.addressInput {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: var(--text-sm) var(--font-mono);
+  outline: none;
+}
+.paste input:focus-visible,
+.addressInput:focus-visible,
+.shareCell input:focus-visible,
+.amountBox input:focus-visible {
+  border-color: var(--accent);
+}
+
+/* Cards */
+.poolHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.poolHead > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.titleRow h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.card h3,
+.card h4 {
+  margin: 0;
+}
+.card h3 {
+  font-size: var(--text-lg);
+}
+.card h4 {
+  font-size: var(--text-base);
+}
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 1rem;
+}
+.handover {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+.facts {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.facts dt {
+  color: var(--app-text-muted);
+}
+.facts dd {
+  margin: 0;
+}
+
+/* Revenue */
+.revenue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 0.75rem;
+}
+.revenueSide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--app-border);
+  font-variant-numeric: tabular-nums;
+}
+.row > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+/* Incentives */
+.tableBox {
+  overflow-x: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+}
+.table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.table th {
+  padding: 0.6rem 0.85rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-align: left;
+}
+.table td {
+  padding: 0.7rem 0.85rem;
+  border-top: 1px solid var(--app-border);
+}
+.end {
+  text-align: right;
+}
+.shareCell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.shareCell input {
+  width: 4.5rem;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 0.6rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: 600 var(--text-sm) var(--font-sans);
+  outline: none;
+}
+.shareCell :global(.ui-button) {
+  min-height: 36px;
+  padding: 0 0.75rem;
+}
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.addToken {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.label {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.chips,
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.chips button,
+.segmented button {
+  min-height: 40px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--app-text-secondary);
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.chips button[aria-pressed="true"],
+.segmented button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--app-text);
+}
+
+/* Pool page card and funding dialog (the dialog renders in a portal outside the shell). */
+.poolCard {
+  display: grid;
+  gap: 0.75rem;
+}
+.poolCard h3 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.streamList {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.streamList div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.streamList dt {
+  font-weight: 600;
+}
+.streamList dt span {
+  color: var(--app-text-muted);
+  font-weight: 500;
+}
+.streamList dd {
+  margin: 0;
+  color: var(--app-text-secondary);
+}
+/* One track pinned to the dialog width: the amount input's intrinsic width must not widen it. */
+.fund {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
+  /* The modal body clips its content; scroll here if a short screen needs it. */
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The inline review sits flat in the dialog, not as a second card inside it. */
+.fund :global(.position-panel) {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.fund :global(.position-panel) h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.back {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--app-text-secondary);
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.back:hover {
+  color: var(--app-text);
+}
+.amountBox {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--app-raised);
+}
+.amountBox > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.amountBox input {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-text);
+  font: 600 var(--text-2xl) var(--font-sans);
+  outline: none;
+}
+.tokenChip {
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--app-sunken);
+  font-weight: 700;
+}
+.amountMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+.amountMeta button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.split {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.split div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.split dt {
+  color: var(--app-text-muted);
+}
+.split dd {
+  margin: 0;
+}
+.fund :global(.dollar-submit) {
+  min-height: 48px;
+  margin-top: 0;
+}
+@media (width < 720px) {
+  .list {
+    max-width: none;
+  }
+}

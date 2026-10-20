@@ -122,22 +122,20 @@ function RecoveryTimeline({
         </span>
         <span
           className="genesis-timeline-segment is-grace"
+          aria-hidden="true"
           style={{
             left: `${pct(openedAt, maturity)}%`,
             width: `${pct(maturity, recoverableAt)}%`,
           }}
-        >
-          {t("grace")}
-        </span>
+        />
         <span
           className="genesis-timeline-segment is-danger"
+          aria-hidden="true"
           style={{
             left: `${pct(openedAt, recoverableAt)}%`,
             width: `${100 - pct(openedAt, recoverableAt)}%`,
           }}
-        >
-          {t("recoverable")}
-        </span>
+        />
         {nowPct !== null && (
           <span
             className="genesis-timeline-now"
@@ -146,6 +144,11 @@ function RecoveryTimeline({
           />
         )}
       </div>
+      {/* The grace hour is a sliver at this scale, so the short segments are named in a key. */}
+      <ul className="genesis-timeline-key">
+        <li className="is-grace">{t("grace")}</li>
+        <li className="is-danger">{t("recoverable")}</li>
+      </ul>
       <div className="genesis-timeline-marks">
         <span>{now === null ? t("today") : t("opened")}</span>
         <span>

@@ -1,10 +1,12 @@
 import { render, screen } from "@/test/render";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Hex } from "viem";
 
 import { ActivityPage } from "@/components/dollar/ActivityPage";
 import { writeDollarActivity } from "@/lib/dollar/activity";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
+import { DeploymentContext } from "@/providers/deployment-context";
+import type { DeploymentOption } from "@/lib/deployments/types";
 
 const wallet = "0x0000000000000000000000000000000000000001";
 const originalHash: Hex = `0x${"11".repeat(32)}`;
@@ -29,7 +31,46 @@ function renderActivity(chainId: number) {
   );
 }
 
-describe("Dollar activity page", () => {
+describe("activity page", () => {
+  it.each([false, true])("offers only supported empty-state actions (Dollar: %s)", (dollar) => {
+    window.localStorage.clear();
+    const active: DeploymentOption = {
+      networkId: "anvil",
+      launch: null,
+      protocol: null,
+      descriptor: {
+        deploymentId: "fixture",
+        label: "fixture",
+        network: "Anvil",
+        chainId: 31337,
+        stage: dollar ? "full-protocol" : "phase-one",
+        capabilities: dollar ? ["wallet", "activity", "dollar"] : ["wallet", "activity"],
+        available: true,
+      },
+    };
+    render(
+      <DeploymentContext.Provider value={{ active, options: [active], selectNetwork: vi.fn() }}>
+        <WalletContext.Provider
+          value={{
+            ...defaultWalletState,
+            status: "ready",
+            address: wallet,
+            chainId: 31337,
+            isTargetChain: true,
+          }}
+        >
+          <ActivityPage />
+        </WalletContext.Provider>
+      </DeploymentContext.Provider>
+    );
+    expect(screen.getByRole("link", { name: "Add funds" })).toHaveAttribute("href", "/app/portal");
+    if (dollar)
+      expect(screen.getByRole("link", { name: "Get Statics Dollar" })).toHaveAttribute(
+        "href",
+        "/app/dollar"
+      );
+    else expect(screen.queryByRole("link", { name: "Get Statics Dollar" })).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     window.localStorage.clear();
   });

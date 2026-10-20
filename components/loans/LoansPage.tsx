@@ -1338,7 +1338,7 @@ function BorrowFields({
       </label>
       <div className="remaining-form-grid">
         <label className="basket-field">
-          <span>Position</span>
+          <span>Account</span>
           <select value={positionId} onChange={(event) => onPosition(event.target.value)}>
             {(catalog?.positions ?? [])
               .filter((item) => item.collateral.length > 0)

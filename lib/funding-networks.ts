@@ -42,10 +42,17 @@ export type FundingNetwork = Readonly<{
  * fail in a way that looks like a bug in the app.
  */
 const walletEnvironment = readWalletEnvironment();
-const configuredAnvil = walletEnvironment.supportedChains.find((chain) => chain.id === 31_337);
+const configuredAnvil = walletEnvironment.anvilChain;
 const developmentFundingNetworks: readonly FundingNetwork[] =
   walletEnvironment.appEnvironment === "development" && configuredAnvil
-    ? [{ key: "anvil", label: "Local Anvil", chain: configuredAnvil, supportsUniswap: false }]
+    ? [
+        {
+          key: "anvil",
+          label: configuredAnvil.name,
+          chain: configuredAnvil,
+          supportsUniswap: false,
+        },
+      ]
     : [];
 
 export const fundingNetworks: readonly FundingNetwork[] = [
@@ -75,7 +82,10 @@ export const fundingNetworks: readonly FundingNetwork[] = [
   { key: "linea", label: "Linea", chain: linea, supportsUniswap: true },
   { key: "blast", label: "Blast", chain: blast, supportsUniswap: true },
   { key: "zora", label: "Zora", chain: zora, supportsUniswap: true },
-] as const;
+].filter(
+  (network, index, networks) =>
+    networks.findIndex((candidate) => candidate.chain.id === network.chain.id) === index
+);
 
 const fundingNetworksById = new Map(fundingNetworks.map((network) => [network.chain.id, network]));
 

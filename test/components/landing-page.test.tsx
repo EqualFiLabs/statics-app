@@ -47,7 +47,7 @@ describe("landing page", () => {
     const { container } = await renderLanding();
 
     expect(
-      screen.getByRole("heading", { name: /static assets.*dynamic markets/i })
+      screen.getByRole("heading", { name: /create markets.*grow liquidity/i })
     ).toBeInTheDocument();
     const readout = screen.getByLabelText("System status");
     expect(within(readout).getByText(/system status:/i)).toHaveTextContent("Mainnet");
@@ -56,7 +56,7 @@ describe("landing page", () => {
     expect(within(readout).queryByText(/network:/i)).not.toBeInTheDocument();
     expect(within(readout).queryByText(/deployment:/i)).not.toBeInTheDocument();
     const hero = screen.getByRole("region", {
-      name: /static assets.*dynamic markets/i,
+      name: /create markets.*grow liquidity/i,
     });
     expect(hero).not.toHaveTextContent("Statics protocol");
     expect(hero).not.toHaveTextContent("Public testnet beta");
@@ -74,12 +74,19 @@ describe("landing page", () => {
   // The panel states protocol properties, which are true before any deployment
   // exists. Metrics would have to read "--" five times over, which says nothing
   // and reads as a dead page.
-  it("states fixed protocol properties rather than empty metrics", async () => {
+  it("states Phase 1 mechanics rather than empty metrics", async () => {
     await renderLanding();
 
-    expect(screen.getByRole("heading", { name: /what's fixed/i })).toBeInTheDocument();
-    expect(screen.getByText("In kind")).toBeInTheDocument();
-    expect(screen.getByText("Never")).toBeInTheDocument();
+    const mechanics = screen.getByRole("heading", { name: /the mechanics/i });
+    expect(mechanics).toBeInTheDocument();
+    expect(mechanics).toHaveTextContent("// The Mechanics");
+    expect(within(mechanics).queryByRole("link")).not.toBeInTheDocument();
+    for (const link of screen.getAllByRole("link", { name: /the docs/i }))
+      expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");
+    expect(spanish.landing.theMechanics).toBe("La mecánica");
+    expect(chinese.landing.theMechanics).toBe("运作机制");
+    expect(screen.getByText("5%")).toBeInTheDocument();
+    expect(screen.getByText("16")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(screen.queryByText(/total value locked/i)).not.toBeInTheDocument();
   });
@@ -87,8 +94,8 @@ describe("landing page", () => {
   it("keeps the front-page reward limit and tagline normalized across locales", async () => {
     await renderLanding();
 
-    expect(screen.getByText("Up to 12")).toBeInTheDocument();
-    expect(screen.getByText(/opt into up to 12 reward assets/i)).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText(/select up to 12 fee assets/i)).toBeInTheDocument();
     expect(screen.getByText("Markets that work for you.")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/up to 64 reward assets/i);
 
@@ -121,16 +128,23 @@ describe("landing page", () => {
     expect(launchLinks).toHaveLength(2);
     for (const link of launchLinks) expect(link).toHaveAttribute("href", "/app");
 
-    expect(screen.getByRole("link", { name: "Docs" })).toHaveAttribute(
-      "href",
-      "https://docs.staticsprotocol.com"
-    );
     expect(screen.getByRole("link", { name: "Dev" })).toHaveAttribute(
       "href",
       "https://github.com/EqualFiLabs/statics"
     );
-    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
-    expect(screen.getByText("GitHub")).toHaveAttribute("aria-disabled", "true");
+    for (const [name, href] of [
+      ["Operators", "/app/genesis"],
+      ["Markets", "/app/markets"],
+      ["Swap", "/app/swap"],
+      ["Liquidity", "/app/liquidity"],
+      // The footer's Docs and GitHub match the header's Docs and Dev.
+      ["GitHub", "https://github.com/EqualFiLabs/statics"],
+      ["Telegram", "https://t.me/EqualFi"],
+      ["X / Twitter", "https://x.com/staticsprotocol"],
+    ])
+      expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
+    for (const link of screen.getAllByRole("link", { name: "Docs" }))
+      expect(link).toHaveAttribute("href", "https://docs.staticsprotocol.com");
   });
 
   it("opens and closes mobile navigation with accurate accessible state", async () => {
@@ -146,7 +160,7 @@ describe("landing page", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(nav).toHaveClass("open");
 
-    await user.click(screen.getByRole("link", { name: "Baskets" }));
+    await user.click(screen.getByRole("link", { name: "Markets" }));
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(nav).not.toHaveClass("open");
   });

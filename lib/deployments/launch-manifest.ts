@@ -69,6 +69,29 @@ export function parseLaunchDeploymentManifest(
   if (!Number.isSafeInteger(manifest.chainId) || manifest.chainId <= 0) {
     throw new Error("Launch chainId must be a positive integer.");
   }
+  const requiredContracts: readonly LaunchContractName[] = [
+    "statics",
+    "genesis",
+    "vault",
+    "activationRegistry",
+    "feeReceiver",
+    "launchDistributor",
+    "weth",
+    "poolManager",
+    "stateView",
+    "quoter",
+    "universalRouter",
+    "permit2",
+  ];
+  if (
+    !manifest.contracts ||
+    requiredContracts.some((name) => !manifest.contracts[name]) ||
+    Object.keys(manifest.contracts).some(
+      (name) => !requiredContracts.includes(name as LaunchContractName)
+    )
+  ) {
+    throw new Error("Launch manifest requires the complete supported contract set.");
+  }
   const deploymentStartBlock = BigInt(manifest.deploymentStartBlock);
   const contracts = Object.fromEntries(
     Object.entries(manifest.contracts).map(([name, contract]) => [
@@ -85,7 +108,7 @@ export function parseLaunchDeploymentManifest(
       ])
   ) as Partial<Record<LaunchContractName, Hex>>;
   if (
-    source === "checked-in-manifest" &&
+    source !== "development-fixture" &&
     Object.keys(runtimeCodeHashes).length !== Object.keys(manifest.contracts).length
   ) {
     throw new Error("Every checked-in launch contract requires a reviewed runtime code hash.");

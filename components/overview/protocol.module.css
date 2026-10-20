@@ -1,0 +1,465 @@
+/* The Phase 1 protocol overview: STATICS, every live module and activity. */
+.page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  max-width: 1200px;
+}
+.headerTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.sample {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.segmented,
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-pill);
+}
+.segmented button,
+.filters button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--app-text-muted);
+  font: 600 var(--text-xs) var(--font-sans);
+  cursor: pointer;
+}
+.filters button {
+  padding: 0 12px;
+}
+.segmented button[aria-pressed="true"],
+.filters button[aria-pressed="true"] {
+  background: var(--app-raised);
+  color: var(--app-text);
+}
+.live {
+  margin: -8px 0 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+.notice {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.label {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.muted {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.secondary {
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+}
+.up {
+  color: var(--positive);
+  font-weight: 600;
+}
+
+/* ---- Totals ---------------------------------------------------------------------------- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.tile {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+.tile strong {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.tile strong small,
+.stats strong small {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.tile > span:not(.label) {
+  color: var(--app-text-muted);
+  font-size: var(--text-xs);
+}
+.tile > span[data-tone="up"] {
+  color: var(--positive);
+}
+.tile > span[data-tone="down"] {
+  color: var(--negative);
+}
+
+/* ---- Your Statics ---------------------------------------------------------------------- */
+.yours {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--app-raised);
+}
+.yours h2,
+.card h2 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.headingGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.warningPill {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+}
+.facts > div,
+.stats > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+}
+.facts strong {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.facts span:last-child:not(.label) {
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+.stack {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ---- Module cards ---------------------------------------------------------------------- */
+.modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-lg);
+  background: var(--app-surface);
+}
+.cardHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cardHeading > a,
+.card > a {
+  color: var(--app-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.cardHeading > a:hover,
+.card > a:hover {
+  color: var(--app-text);
+}
+.moduleTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.moduleTitle::before {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--module-color, var(--app-text-muted));
+  content: "";
+}
+.moduleTitle[data-module="exchange"] {
+  --module-color: var(--token-badge-2);
+}
+.moduleTitle[data-module="staking"] {
+  --module-color: var(--token-badge-4);
+}
+.moduleTitle[data-module="gauges"] {
+  --module-color: var(--warning);
+}
+.moduleTitle[data-module="operators"] {
+  --module-color: var(--token-badge-5);
+}
+.badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.stats strong {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.stats span:last-child:not(.label) {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 72px;
+}
+.bars span {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: color-mix(in srgb, var(--token-badge-2) 38%, transparent);
+}
+.bars span[data-latest] {
+  background: var(--token-badge-2);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* Share bars: gauge emissions, Operator supply. */
+.share {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+.share span,
+.legend i {
+  background: var(--app-overlay);
+}
+.share [data-index="0"],
+.legend [data-index="0"] {
+  background: var(--warning);
+}
+.share [data-index="1"],
+.legend [data-index="1"] {
+  background: var(--token-badge-2);
+}
+.share [data-index="2"],
+.legend [data-index="2"] {
+  background: var(--token-badge-4);
+}
+.share [data-index="3"],
+.legend [data-index="3"] {
+  background: var(--token-badge-9);
+}
+.share [data-index="held"],
+.legend [data-index="held"] {
+  background: var(--token-badge-5);
+}
+.share [data-index="treasury"],
+.legend [data-index="treasury"] {
+  background: var(--token-badge-9);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  color: var(--app-text-secondary);
+  font-size: var(--text-xs);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+/* ---- Activity and pools ---------------------------------------------------------------- */
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.activity {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.activity li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--app-border);
+}
+.tag {
+  flex: none;
+  width: 72px;
+  padding: 3px 0;
+  border-radius: var(--radius-pill);
+  background: var(--app-raised);
+  color: var(--app-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-align: center;
+}
+.tag[data-tag="swap"] {
+  color: var(--token-badge-2);
+}
+.tag[data-tag="claim"] {
+  color: var(--token-badge-7);
+}
+.tag[data-tag="gauge"] {
+  color: var(--warning);
+}
+.tag[data-tag="fees"] {
+  color: var(--token-badge-4);
+}
+.activityText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.activityText strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.hash {
+  color: var(--app-text-muted);
+  font: var(--text-caption) var(--font-mono);
+}
+.tableFrame {
+  min-width: 0;
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.table th,
+.table td {
+  padding: 12px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+.table thead th {
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.table tbody tr {
+  border-top: 1px solid var(--app-border);
+}
+.table tbody th {
+  font-weight: 500;
+}
+.footnote {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: var(--text-caption);
+}
+
+@media (width < 1100px) {
+  .tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (width < 900px) {
+  .modules,
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (width < 600px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

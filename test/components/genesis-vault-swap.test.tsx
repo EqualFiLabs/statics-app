@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@/test/render";
-import { getAddress, parseEther, zeroAddress } from "viem";
+import { encodeErrorResult, getAddress, maxUint256, parseEther, zeroAddress } from "viem";
+import { genesisVaultRecoveryErrors } from "@/lib/genesis/vault-errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenesisVaultSwapPanel } from "@/components/genesis/GenesisVaultSwapPanel";
@@ -10,11 +11,12 @@ import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 const readContract = vi.fn();
 const getBalance = vi.fn();
+const call = vi.fn();
 const discoverNextAvailableGenesisId = vi.fn();
 const discoverWalletGenesisSnapshot = vi.fn();
 
 vi.mock("wagmi", () => ({
-  usePublicClient: () => ({ readContract, getBalance }),
+  usePublicClient: () => ({ readContract, getBalance, call }),
 }));
 vi.mock("@/lib/deployments/verify-launch", () => ({
   verifyLaunchDeployment: vi.fn().mockResolvedValue(undefined),
@@ -48,8 +50,8 @@ const deployment = {
   contracts: {
     statics,
     weth,
-    genesis: zeroAddress,
-    vault: zeroAddress,
+    genesis: getAddress("0x3333333333333333333333333333333333333333"),
+    vault: getAddress("0x4444444444444444444444444444444444444444"),
     activationRegistry: zeroAddress,
     feeReceiver: zeroAddress,
     launchDistributor: zeroAddress,
@@ -150,6 +152,7 @@ function renderPanel() {
 
 beforeEach(() => {
   readContract.mockReset();
+  call.mockReset();
   getBalance.mockReset();
   discoverNextAvailableGenesisId.mockReset();
   discoverWalletGenesisSnapshot.mockReset();
@@ -208,6 +211,95 @@ describe("Genesis Vault trade card", () => {
       await screen.findByRole("button", { name: "Acquire Operators #4913" })
     ).not.toBeDisabled();
   });
+
+  it("refreshes inventory after another buyer acquires the cached Operator", async () => {
+    reads();
+    const original = readContract.getMockImplementation()!;
+    readContract.mockImplementation(async (input) => {
+      if (input.functionName === "balanceOf") return parseEther("264120.55");
+      if (input.functionName === "allowance") return maxUint256;
+      if (input.functionName === "isVaultInventory") return false;
+      return original(input);
+    });
+    discoverNextAvailableGenesisId.mockResolvedValueOnce(4913n).mockResolvedValue(4914n);
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Acquire Operators #4913" }));
+    expect(
+      await screen.findByRole("button", { name: "Acquire Operators #4914" })
+    ).toBeInTheDocument();
+    expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes inventory after an encoded competing-acquisition revert", async () => {
+    reads();
+    const original = readContract.getMockImplementation()!;
+    readContract.mockImplementation(
+      async (input: { functionName: string; args?: readonly unknown[] }) => {
+        if (input.functionName === "balanceOf") return parseEther("264120.55");
+        if (input.functionName === "allowance") return maxUint256;
+        if (input.functionName === "isVaultInventory")
+          throw Object.assign(new Error("CallExecutionError"), {
+            cause: {
+              data: encodeErrorResult({
+                abi: genesisVaultRecoveryErrors,
+                errorName: "GenesisNotInVault",
+                args: [4913n],
+              }),
+            },
+          });
+        return original(input);
+      }
+    );
+    discoverNextAvailableGenesisId.mockResolvedValueOnce(4913n).mockResolvedValue(4914n);
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Acquire Operators #4913" }));
+    expect(
+      await screen.findByRole("button", { name: "Acquire Operators #4914" })
+    ).toBeInTheDocument();
+    expect(discoverNextAvailableGenesisId).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["before approval", "after approval"])(
+    "refreshes ownership when an Operator transfers %s",
+    async (timing) => {
+      reads();
+      const original = readContract.getMockImplementation()!;
+      readContract.mockImplementation(async (input) =>
+        input.functionName === "getApproved"
+          ? timing === "before approval"
+            ? statics
+            : deployment.contracts.vault
+          : original(input)
+      );
+      const encoded =
+        timing === "before approval"
+          ? encodeErrorResult({
+              abi: genesisVaultRecoveryErrors,
+              errorName: "ERC721InvalidApprover",
+              args: [wallet],
+            })
+          : encodeErrorResult({
+              abi: genesisVaultRecoveryErrors,
+              errorName: "NotGenesisOwner",
+              args: [1204n, wallet, statics],
+            });
+      call.mockRejectedValue(new Error("CallExecutionError", { cause: { data: encoded } }));
+      const snapshot = { indexed: [], indexedBlock: 1n, chainHead: 1n, stale: false };
+      discoverWalletGenesisSnapshot
+        .mockResolvedValueOnce({ ...snapshot, ids: [1204n] })
+        .mockResolvedValue({ ...snapshot, ids: [] });
+      renderPanel();
+      fireEvent.click(await screen.findByRole("tab", { name: "Redeem" }));
+      fireEvent.click(await screen.findByRole("radio", { name: /1204/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Redeem Operator #1204" }));
+      await screen.findByText("No Operators NFTs to redeem");
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(call.mock.calls[0][0].to).toBe(
+        timing === "before approval" ? deployment.contracts.genesis : deployment.contracts.vault
+      );
+      expect(discoverWalletGenesisSnapshot).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it("marks a credit-locked Genesis before it can be chosen to redeem", async () => {
     reads({ credits: new Map([["4419", true]]) });

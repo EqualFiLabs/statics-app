@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { encodeFunctionData, formatEther, getAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import {
@@ -21,6 +21,7 @@ import {
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { GenesisCarousel } from "@/components/genesis/GenesisCarousel";
+import { GenesisBatchPanel } from "@/components/genesis/GenesisBatchPanel";
 import { GenesisCreditPanel } from "@/components/genesis/GenesisCreditPanel";
 import { GenesisIdentityPanel } from "@/components/genesis/GenesisIdentityPanel";
 import {
@@ -32,7 +33,7 @@ import { AddressDisplay } from "@/components/protocol/AddressDisplay";
 import type { LaunchDeployment } from "@/lib/deployments/types";
 import { verifyLaunchDeployment } from "@/lib/deployments/verify-launch";
 import { genesisActivationCost, oneIndexedGenesisTierCosts } from "@/lib/genesis/activation-costs";
-import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
+import { genesisVaultEpochQuery } from "@/lib/genesis/vault-epoch-query";
 import {
   EMPTY_GENESIS_PORTFOLIO,
   batchGenesisIds,
@@ -44,7 +45,7 @@ import {
 } from "@/lib/genesis/owned";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import { executeProtocolTransaction } from "@/lib/protocol/transactions";
-import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
+import { formatRewardAmount, formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import { useWalletState } from "@/providers/wallet-context";
 
 type GenesisErrorCopy = Readonly<{
@@ -66,8 +67,15 @@ function describeGenesisError(error: unknown, copy: GenesisErrorCopy): string {
 
 type ActionTab = "activate" | "rewards" | "credit";
 
-export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeployment }) {
+export function StandaloneGenesisPage({
+  deployment,
+  controls,
+}: {
+  deployment: LaunchDeployment;
+  controls?: ReactNode;
+}) {
   const t = useTranslations("operators");
+  const tShell = useTranslations("shell");
   const errorCopy: GenesisErrorCopy = {
     walletRejected: t("walletRejected"),
     notOwner: t("notOwner"),
@@ -89,25 +97,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   const [error, setError] = useState<string | null>(null);
   const [claimProgress, setClaimProgress] = useState<string | null>(null);
 
-  const vault = useQuery({
-    queryKey: ["genesis-vault-epoch", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient),
-    queryFn: async () => {
-      if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      const accounting = await publicClient.readContract({
-        address: deployment.contracts.vault,
-        abi: currentGenesisVaultAbi,
-        functionName: "vaultAccounting",
-      });
-      return {
-        epochActive: accounting.epochActive,
-        genesisEpochEnd: Number(accounting.genesisEpochEnd),
-        vaultPrice: accounting.vaultPrice,
-        maximumSupply: accounting.maximumSupply,
-        circulatingGenesis: accounting.circulatingGenesis,
-      };
-    },
-  });
+  const vault = useQuery(genesisVaultEpochQuery(publicClient, deployment));
 
   // Shared with the Overview: same key, same fetcher, one walk of the wallet.
   const owned = useQuery({
@@ -305,20 +295,49 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         {t("recoverOperatorCredit")} <span aria-hidden="true">→</span>
       </Link>
     ) : null;
+  const pageActions = (
+    <>
+      {recoveriesLink}
+      {controls}
+    </>
+  );
 
   if (!wallet) {
+    const action =
+      walletState.status === "signed-out" || walletState.status === "error"
+        ? {
+            label: tShell(walletState.status === "error" ? "retrySignIn" : "signIn"),
+            onClick: walletState.login,
+          }
+        : walletState.status === "wallet-missing"
+          ? {
+              label: tShell("createWallet"),
+              onClick: () => void walletState.createWallet(),
+              disabled: walletState.busyAction !== null,
+            }
+          : undefined;
     return (
       <div className="genesis-page">
-        {recoveriesLink}
-        <EmptyState title={t("connectTitle")} description={t("connectDescription")} />
+        {pageActions}
+        <EmptyState
+          title={t("connectTitle")}
+          description={t("connectDescription")}
+          action={action}
+        />
       </div>
     );
   }
-  if (owned.isLoading) return <p className="dapp-loading">{t("loading")}</p>;
+  if (owned.isLoading)
+    return (
+      <div className="genesis-page">
+        {pageActions}
+        <p className="dapp-loading">{t("loading")}</p>
+      </div>
+    );
   if (owned.error) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           tone="error"
           title={t("unavailable")}
@@ -335,7 +354,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length && owned.data?.stale) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("syncingTitle")}
           description={t("syncing")}
@@ -351,7 +370,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
   if (!items.length) {
     return (
       <div className="genesis-page">
-        {recoveriesLink}
+        {pageActions}
         <EmptyState
           title={t("emptyTitle")}
           description={
@@ -378,14 +397,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
               {(
                 [
                   [deployment.contracts.statics, "STATICS", summary.ownerStatics, 2],
-                  [deployment.contracts.weth, "WETH", summary.ownerWeth, 4],
+                  [deployment.contracts.weth, "WETH", summary.ownerWeth, 8],
                 ] as const
               ).map(([asset, symbol, amount, digits]) => (
                 <li key={asset}>
                   <div>
                     <span>{symbol}</span>
                     <strong className={amount === 0n ? "is-muted" : undefined}>
-                      {formatTokenAmountGrouped(amount, 18, digits)}
+                      {formatRewardAmount(amount, 18, digits)}
                     </strong>
                   </div>
                   <button
@@ -429,7 +448,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
 
   return (
     <div className="genesis-page">
-      {recoveriesLink}
+      {pageActions}
       {owned.data?.stale && (
         <p className="genesis-note is-warning" role="status">
           {t("syncing")}
@@ -465,10 +484,10 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
         <div className="ui-stat">
           <span className="ui-stat__label">{t("claimableNow")}</span>
           <strong className="ui-stat__value is-accent">
-            {formatTokenAmountGrouped(summary.claimableStatics, 18, 2)} STATICS
+            {formatRewardAmount(summary.claimableStatics, 18, 2)} STATICS
           </strong>
           <small>
-            {formatTokenAmountGrouped(summary.claimableWeth, 18, 4)} WETH
+            {formatRewardAmount(summary.claimableWeth, 18, 8)} WETH
             {summary.ownerStatics > 0n || summary.ownerWeth > 0n ? t("includesPast") : ""}
           </small>
         </div>
@@ -508,6 +527,8 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
           {error}
         </p>
       )}
+
+      <GenesisBatchPanel deployment={deployment} items={items} onConfirmed={refresh} />
 
       <GenesisCarousel
         items={items.map((item) => ({
@@ -571,7 +592,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                   {!selected.registered
                     ? t("notRegistered")
                     : t("pendingAmount", {
-                        amount: formatTokenAmountGrouped(selected.pendingStatics, 18, 2),
+                        amount: formatRewardAmount(selected.pendingStatics, 18, 2),
                       })}
                 </small>
               </button>
@@ -725,14 +746,14 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                       {(
                         [
                           [deployment.contracts.statics, "STATICS", selected.pendingStatics, 2],
-                          [deployment.contracts.weth, "WETH", selected.pendingWeth, 4],
+                          [deployment.contracts.weth, "WETH", selected.pendingWeth, 8],
                         ] as const
                       ).map(([asset, symbol, amount, digits]) => (
                         <li key={asset}>
                           <div>
                             <span>{t("pendingAsset", { asset: symbol })}</span>
                             <strong className={amount === 0n ? "is-muted" : undefined}>
-                              {formatTokenAmountGrouped(amount, 18, digits)}
+                              {formatRewardAmount(amount, 18, digits)}
                             </strong>
                           </div>
                           <button
@@ -763,7 +784,7 @@ export function StandaloneGenesisPage({ deployment }: { deployment: LaunchDeploy
                           <div>
                             <span>{t("previousOperators")}</span>
                             <strong>
-                              {formatTokenAmountGrouped(summary.ownerStatics, 18, 2)} STATICS
+                              {formatRewardAmount(summary.ownerStatics, 18, 2)} STATICS
                             </strong>
                           </div>
                           <button

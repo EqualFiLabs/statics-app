@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { BasketDetailPage } from "@/components/baskets/BasketDetailPage";
@@ -7,10 +8,10 @@ import {
   readBasketPositionFocus,
 } from "@/lib/baskets/conversion-navigation";
 
-export const metadata: Metadata = {
-  title: "Basket details | Statics",
-  description: "Inspect, mint, and redeem a current Statics basket.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.basket");
+  return { title: t("title"), description: t("description") };
+}
 
 export default async function BasketDetailRoute({
   params,

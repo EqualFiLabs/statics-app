@@ -5,11 +5,13 @@ import {
   getDappRoutePresentation,
   isDappRouteAllowed,
 } from "@/lib/dapp-navigation";
+import type { DeploymentDescriptor } from "@/lib/deployments/types";
 import {
   appNavigation,
   appNavigationGroups,
   appNavigationGroupsForStage,
   appTabNavigation,
+  appTabNavigationForCapabilities,
   appTabNavigationForStage,
 } from "@/lib/site-config";
 import english from "@/messages/en.json";
@@ -92,10 +94,17 @@ describe("stage-aware dapp navigation", () => {
     label: "Operators launch",
     network: "Robinhood Chain",
     chainId: 4663,
-    stage: "launch" as const,
-    capabilities: [],
+    stage: "launch",
+    capabilities: [
+      "overview",
+      "canonical-statics-market",
+      "genesis-vault",
+      "wallet",
+      "activity",
+      "approval-tools",
+    ],
     available: true,
-  };
+  } as const satisfies DeploymentDescriptor;
 
   it("selects the launch product plus Wallet in the sidebar and three product tabs", () => {
     const groups = appNavigationGroupsForStage("launch");
@@ -128,13 +137,43 @@ describe("stage-aware dapp navigation", () => {
     expect(appNavigationGroupsForStage("full-protocol")).toBe(appNavigationGroups);
     expect(appTabNavigationForStage("full-protocol")).toBe(appTabNavigation);
   });
+
+  it("promotes Overview, Markets and Swap on Phase 1 mobile navigation", () => {
+    expect(appTabNavigationForStage("phase-one").map((item) => item.href)).toEqual([
+      "/app",
+      "/app/markets",
+      "/app/swap",
+      "/app/rewards",
+    ]);
+    expect(
+      appTabNavigationForCapabilities(
+        ["overview", "public-market-discovery", "public-direct-swaps", "global-rewards", "wallet"],
+        "phase-one"
+      ).map((item) => item.href)
+    ).toEqual(["/app", "/app/markets", "/app/swap", "/app/rewards"]);
+    expect(
+      appTabNavigationForCapabilities(launch.capabilities, "launch").map((item) => item.href)
+    ).toEqual(["/app/wallet"]);
+  });
+
+  it("maps Phase 1 product capabilities onto shared routes and position details", () => {
+    const phaseOne = {
+      ...launch,
+      stage: "phase-one",
+      capabilities: ["overview", "position-staking", "public-lp-positions", "global-rewards"],
+    } as const satisfies DeploymentDescriptor;
+    expect(isDappRouteAllowed("/app/positions", phaseOne)).toBe(true);
+    expect(isDappRouteAllowed("/app/positions/1042", phaseOne)).toBe(true);
+    expect(isDappRouteAllowed("/app/liquidity", phaseOne)).toBe(true);
+    expect(isDappRouteAllowed("/app/rewards", phaseOne)).toBe(true);
+  });
 });
 
 describe("dapp navigation grouping", () => {
   it("groups every route under a heading, except the home link", () => {
     const [first, ...rest] = appNavigationGroups;
     expect(first.label).toBeNull();
-    expect(first.items.map((item) => item.href)).toEqual(["/app", "/app/swap"]);
+    expect(first.items.map((item) => item.href)).toEqual(["/app", "/app/markets", "/app/swap"]);
     for (const group of rest) {
       expect(group.label, JSON.stringify(group.items)).toBeTruthy();
       expect(group.items.length).toBeGreaterThan(0);
@@ -149,7 +188,7 @@ describe("dapp navigation grouping", () => {
     // Regrouping must not silently drop or duplicate a destination.
     const hrefs = appNavigationGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs).toHaveLength(14);
+    expect(hrefs).toHaveLength(15);
   });
 
   it("keeps the flattened list in step with the groups", () => {
@@ -173,6 +212,7 @@ describe("sidebar completeness", () => {
   it("keeps the primary menu focused on destination surfaces", () => {
     expect(appNavigation.map((item) => item.label)).toEqual([
       "Overview",
+      "Markets",
       "Swap",
       "Earn",
       "Liquidity",
@@ -199,8 +239,11 @@ describe("sidebar completeness", () => {
   });
 
   it("uses the exact NFT product labels in every locale", () => {
+    // Position NFTs are presented as accounts; the NFT name stays on each account's page.
+    expect(english.navigation.items.positions).toBe("Accounts");
+    expect(spanish.navigation.items.positions).toBe("Cuentas");
+    expect(chinese.navigation.items.positions).toBe("账户");
     for (const messages of [english, spanish, chinese]) {
-      expect(messages.navigation.items.positions).toBe("Position NFT");
       expect(messages.navigation.items.genesis).toBe("Operator NFT");
     }
   });

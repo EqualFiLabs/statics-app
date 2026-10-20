@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { BasketListPage } from "@/components/baskets/BasketListPage";
 
-export const metadata: Metadata = {
-  title: "Baskets | Statics",
-  description: "Discover and inspect current Statics basket state.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("pageMetadata.baskets");
+  return { title: t("title"), description: t("description") };
+}
 
 export default function BasketsRoute() {
   return <BasketListPage />;

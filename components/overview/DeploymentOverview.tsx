@@ -2,29 +2,21 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useQuery } from "@tanstack/react-query";
-import { formatUnits, getAddress, type Address } from "viem";
-import { usePublicClient } from "wagmi";
+import { formatUnits, type Address } from "viem";
 
-import { dopplerStaticsTokenAbi, v4StateViewReadAbi } from "@statics-protocol/sdk";
 import { GENESIS_MAX_CREDIT_PRINCIPAL } from "@statics-protocol/sdk/genesis-credit";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { DollarOverview } from "@/components/dollar/DollarPage";
+import { DexOverview } from "@/components/overview/DexOverview";
 import { EpochBanner, type EpochQuotes } from "@/components/overview/EpochBanner";
+import { ProtocolOverview } from "@/components/overview/ProtocolOverview";
 import { VaultSolvency } from "@/components/overview/VaultSolvency";
+import { useLaunchOverview } from "@/hooks/useLaunchOverview";
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { verifyLaunchDeploymentForRead } from "@/lib/deployments/verify-launch-read";
-import { currentGenesisVaultAbi } from "@/lib/genesis/current-vault";
 import { genesisAcquisitionCost, genesisBackingInNumeraire } from "@/lib/genesis/market-value";
-import {
-  EMPTY_GENESIS_PORTFOLIO,
-  loadOwnedGenesis,
-  ownedGenesisQueryKey,
-  summariseGenesisRewards,
-} from "@/lib/genesis/owned";
-import { formatTokenAmountGrouped } from "@/lib/protocol/ux";
-import { loadMarketOverview } from "@/lib/market/client";
+import { EMPTY_GENESIS_PORTFOLIO, summariseGenesisRewards } from "@/lib/genesis/owned";
+import { formatRewardAmount, formatTokenAmountGrouped } from "@/lib/protocol/ux";
 import type { StaticsMarketOverview } from "@/lib/market/types";
 import { ROBINHOOD_GENESIS_DEPLOYMENT_ID } from "@/lib/deployments/registry";
 import { useDeployment } from "@/providers/deployment-context";
@@ -232,9 +224,33 @@ export function formatCanonicalMarketPrice(
   };
 }
 
+/** /app/markets: every Phase 1 pool, token and trade. Only Phase 1 deployments route here. */
+export function MarketsOverview() {
+  const t = useTranslations("launchOverview");
+  const { active } = useDeployment();
+  if (!active.phaseOne)
+    return (
+      <EmptyState
+        title={t("mainnetPreparing")}
+        description={active.descriptor.unavailableReason ?? t("noReviewedDeployment")}
+      />
+    );
+  return <DexOverview key={active.phaseOne.descriptor.deploymentId} deployment={active.phaseOne} />;
+}
+
 export function DeploymentOverview() {
   const t = useTranslations("launchOverview");
   const { active } = useDeployment();
+  // Phase 1 deployments open on the protocol overview, with Genesis alongside when both are
+  // live; the DEX dashboard moved to /app/markets. Launch-only networks keep the launch dashboard.
+  if (active.phaseOne)
+    return (
+      <ProtocolOverview
+        key={active.phaseOne.descriptor.deploymentId}
+        deployment={active.phaseOne}
+        launch={active.launch}
+      />
+    );
   if (active.protocol) return <DollarOverview deployment={active.protocol.protocol} />;
   if (!active.launch) {
     return (
@@ -256,84 +272,9 @@ export function DeploymentOverview() {
 
 function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
   const t = useTranslations("launchOverview");
-  const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
   const walletState = useWalletState();
-  const wallet =
-    walletState.status === "ready" && walletState.address ? getAddress(walletState.address) : null;
-
-  const metrics = useQuery({
-    queryKey: ["launch-overview", deployment.descriptor.deploymentId],
-    enabled: Boolean(publicClient),
-    queryFn: async () => {
-      if (!publicClient) throw new Error("The deployment RPC is unavailable.");
-      await verifyLaunchDeploymentForRead(publicClient, deployment);
-      const [vault, purchase, redemption, slot0, liquidity] = await Promise.all([
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: currentGenesisVaultAbi,
-          functionName: "vaultAccounting",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: currentGenesisVaultAbi,
-          functionName: "quoteGenesisPurchase",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.vault,
-          abi: currentGenesisVaultAbi,
-          functionName: "quoteGenesisRedemption",
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.stateView,
-          abi: v4StateViewReadAbi,
-          functionName: "getSlot0",
-          args: [deployment.market.poolId],
-        }),
-        publicClient.readContract({
-          address: deployment.contracts.stateView,
-          abi: v4StateViewReadAbi,
-          functionName: "getLiquidity",
-          args: [deployment.market.poolId],
-        }),
-      ]);
-      return { vault, purchase, redemption, sqrtPriceX96: slot0[0], liquidity };
-    },
-  });
-
-  const staticsBalance = useQuery({
-    queryKey: ["launch-overview-balance", deployment.descriptor.deploymentId, wallet],
-    enabled: Boolean(publicClient && wallet),
-    queryFn: async () => {
-      if (!publicClient || !wallet) return 0n;
-      return publicClient.readContract({
-        address: deployment.contracts.statics,
-        abi: dopplerStaticsTokenAbi,
-        functionName: "balanceOf",
-        args: [wallet],
-      });
-    },
-  });
-
-  // Same key and fetcher My Operators mounts, so the two surfaces share one walk
-  // of the wallet rather than each paying for it.
-  const portfolio = useQuery({
-    queryKey: ownedGenesisQueryKey(deployment.descriptor.deploymentId, wallet),
-    enabled: Boolean(publicClient && wallet),
-    retry: false,
-    queryFn: async () => {
-      if (!publicClient || !wallet) return EMPTY_GENESIS_PORTFOLIO;
-      return loadOwnedGenesis(publicClient, deployment, wallet);
-    },
-  });
-
-  const marketAnalytics = useQuery({
-    queryKey: ["market-overview", deployment.descriptor.deploymentId],
-    enabled: deployment.descriptor.deploymentId === ROBINHOOD_GENESIS_DEPLOYMENT_ID,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-    retry: 1,
-    queryFn: ({ signal }) => loadMarketOverview(signal),
-  });
+  const { wallet, metrics, staticsBalance, portfolio, marketAnalytics } =
+    useLaunchOverview(deployment);
 
   const vault = metrics.data?.vault ?? null;
   const rewards = summariseGenesisRewards(portfolio.data ?? EMPTY_GENESIS_PORTFOLIO);
@@ -449,9 +390,9 @@ function LaunchOverview({ deployment }: { deployment: LaunchDeployment }) {
           <div className="ui-stat">
             <span className="ui-stat__label">{t("claimable")}</span>
             <strong className="ui-stat__value is-accent">
-              {formatTokenAmountGrouped(rewards.claimableStatics, 18, 2)} STATICS
+              {formatRewardAmount(rewards.claimableStatics, 18, 2)} STATICS
             </strong>
-            <small>{formatTokenAmountGrouped(rewards.claimableWeth, 18, 4)} WETH</small>
+            <small>{formatRewardAmount(rewards.claimableWeth, 18, 8)} WETH</small>
           </div>
           {/* Names its destination, not an action: claiming is one transaction
               per NFT and asset, and My Operators is where that sequence is priced
