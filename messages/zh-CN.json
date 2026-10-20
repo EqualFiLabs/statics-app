@@ -2761,9 +2761,9 @@
     "column": {
       "pool": "池",
       "pairPrice": "交易对价格",
-      "change": "24 小时",
+      "change": "24 小时价格变化",
       "volume": "24 小时交易量",
-      "fees": "估算LP手续费",
+      "fees": "预估 LP 手续费（24 小时）",
       "valueLocked": "锁定价值",
       "yield": "过去 7 天收益率",
       "actions": "操作",
