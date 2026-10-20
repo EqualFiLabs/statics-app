@@ -48,7 +48,9 @@ describe("DEX market responses", () => {
       parseDexEmissions({ ...sample, weeklyIncentives }, "dex-fixture");
     expect(parse(weekly).weeklyIncentives!.pools[0]!.lp[0]!.amount).toBe(700n);
     expect(parse(null).weeklyIncentives).toBeNull();
-    expect(parseDexEmissions(sample, "dex-fixture").weeklyIncentives).toBeNull();
+    expect(
+      parseDexEmissions({ ...sample, weeklyIncentives: undefined }, "dex-fixture").weeklyIncentives
+    ).toBeNull();
     expect(() => parse({ ...weekly, until: String(from + 604801n) })).toThrow(/incentive window/);
     expect(() => parse({ ...weekly, pools: [row, row] })).toThrow(/duplicate incentive pools/);
     expect(() => parse({ ...weekly, pools: [{ ...row, lp: [...row.lp, ...row.lp] }] })).toThrow(

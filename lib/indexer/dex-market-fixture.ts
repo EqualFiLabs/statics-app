@@ -56,6 +56,10 @@ export function dexFixture(
     decimals: t.decimals,
     name: t.name ?? null,
   });
+  const incentiveToken =
+    pools
+      .flatMap((pool) => [pool.token0, pool.token1])
+      .find((token) => token.symbol === "STATICS") ?? pools[0]?.token1;
   // Deterministic, decreasing sample sizes so tables sort sensibly.
   const poolItems = pools.map((pool, index) => {
     const volume = 437_000 / (1 + index * 0.55);
@@ -230,6 +234,35 @@ export function dexFixture(
     },
     emissions: {
       ...base,
+      weeklyIncentives: {
+        from: base.indexedAtTimestamp,
+        until: String(BigInt(base.indexedAtTimestamp) + 604800n),
+        pools: incentiveToken
+          ? pools.slice(0, 3).map((pool, index) => ({
+              poolId: pool.poolId,
+              token0: tokenOf(pool.token0),
+              token1: tokenOf(pool.token1),
+              lp: [
+                {
+                  token: tokenOf(incentiveToken),
+                  amount: String(
+                    index === 2 ? 0n : BigInt(7000 + index * 3500) * scale(incentiveToken.decimals)
+                  ),
+                  quoteValue: index === 2 ? "0" : usd(70 + index * 35),
+                },
+              ],
+              allocator: [
+                {
+                  token: tokenOf(incentiveToken),
+                  amount: String(BigInt(3000 + index * 1500) * scale(incentiveToken.decimals)),
+                  quoteValue: usd(30 + index * 15),
+                },
+              ],
+              lpPaused: index === 2,
+              allocatorPaused: false,
+            }))
+          : [],
+      },
       period: {
         budget: String(1_200_000n * 10n ** 18n),
         start: String(now - 4 * 86_400),
