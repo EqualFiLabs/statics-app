@@ -3162,6 +3162,24 @@
     },
     "note": "价格仅来自 Statics 池；历史数据充足时采用 30 分钟时间加权价格，否则使用最新观察价格。Statics 总价值按 STATICS 价格合计池流动性、Operator 支持资产和质押的 STATICS。收益率为估计值，并非承诺。",
     "dataUnavailable": "暂不可用",
-    "partialTotals": "部分池数据不完整。受影响的汇总值暂不可用。"
+    "partialTotals": "部分池数据不完整。受影响的汇总值暂不可用。",
+    "incentives": {
+      "title": "池激励 — 未来 7 天",
+      "description": "按池和代币显示由创建者资助的 LP 和分配者奖励。",
+      "open": "查看分配",
+      "pool": "池",
+      "lp": "LP 奖励",
+      "allocator": "分配者奖励",
+      "none": "未资助",
+      "paused": "已暂停",
+      "loading": "正在加载池激励…",
+      "unavailable": "每周激励数据暂不可用。",
+      "empty": "暂无创建者资助的激励计划。",
+      "help": "按当前流动性和分配权重估算，且不超过各已资助奖励流的结束时间。暂停的奖励流在恢复前不产生奖励。协议 STATICS 排放单独显示在上方。这些是池的总额，并非您的个人收益。",
+      "asOf": "索引快照：{time} UTC",
+      "refreshFailed": "无法刷新激励，正在显示上次索引快照。",
+      "unknownToken": "未知代币",
+      "unknownAmount": "金额不可用"
+    }
   }
 }

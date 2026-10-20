@@ -114,6 +114,20 @@ export type DexVolume = Observed &
   }>;
 export type DexEmissions = Observed &
   Readonly<{
+    /** Absent on older indexers. Creator-funded LP and allocator rewards, excluding slot 0. */
+    weeklyIncentives: Readonly<{
+      from: bigint;
+      until: bigint;
+      pools: readonly Readonly<{
+        poolId: Hex;
+        token0: DexToken;
+        token1: DexToken;
+        lp: readonly DexIncentiveAmount[];
+        allocator: readonly DexIncentiveAmount[];
+        lpPaused: boolean;
+        allocatorPaused: boolean;
+      }>[];
+    }> | null;
     period: Readonly<{
       budget: bigint;
       start: bigint;
@@ -133,6 +147,11 @@ export type DexEmissions = Observed &
     }>[];
     othersBps: number;
   }>;
+export type DexIncentiveAmount = Readonly<{
+  token: DexToken;
+  amount: bigint;
+  quoteValue: bigint | null;
+}>;
 export type DexTrade = Readonly<{
   poolId: Hex;
   tokenIn: DexToken;
@@ -437,6 +456,27 @@ export function parseDexVolume(value: unknown, deploymentId: string): DexVolume 
 
 export function parseDexEmissions(value: unknown, deploymentId: string): DexEmissions {
   const o = observed(value, deploymentId);
+  const weekly =
+    o.body.weeklyIncentives == null ? null : object(o.body.weeklyIncentives, "weekly incentives");
+  if (
+    weekly &&
+    (uint(weekly.from, "incentive start") !== o.indexedAtTimestamp ||
+      uint(weekly.until, "incentive end") !== o.indexedAtTimestamp + 604800n)
+  )
+    fail("incentive window");
+  const amounts = (raw: unknown) =>
+    unique(
+      list(raw, "incentive amounts").map((entry) => {
+        const a = object(entry, "incentive amount");
+        return {
+          token: token(a.token),
+          amount: uint(a.amount, "incentive amount"),
+          quoteValue: optionalUint(a.quoteValue, "incentive value"),
+        };
+      }),
+      (a) => a.token.address.toLowerCase(),
+      "duplicate incentive assets"
+    );
   const period = o.body.period === null ? null : object(o.body.period, "period");
   const shares = list(o.body.pools, "emission pools").map((raw) => {
     const p = object(raw, "emission pool");
@@ -471,6 +511,35 @@ export function parseDexEmissions(value: unknown, deploymentId: string): DexEmis
     },
     pools: shares,
     othersBps: others,
+    weeklyIncentives: weekly && {
+      from: uint(weekly.from, "incentive start"),
+      until: uint(weekly.until, "incentive end"),
+      pools: unique(
+        list(weekly.pools, "incentive pools").map((entry) => {
+          const p = object(entry, "incentive pool");
+          const lp = amounts(p.lp),
+            allocator = amounts(p.allocator);
+          const lpPaused = boolean(p.lpPaused, "LP pause"),
+            allocatorPaused = boolean(p.allocatorPaused, "allocator pause");
+          if (
+            (lpPaused && lp.some((a) => a.amount > 0n)) ||
+            (allocatorPaused && allocator.some((a) => a.amount > 0n))
+          )
+            fail("paused incentives");
+          return {
+            poolId: hash(p.poolId, "incentive pool ID"),
+            token0: token(p.token0),
+            token1: token(p.token1),
+            lp,
+            allocator,
+            lpPaused,
+            allocatorPaused,
+          };
+        }),
+        (p) => p.poolId.toLowerCase(),
+        "duplicate incentive pools"
+      ),
+    },
   };
 }
 

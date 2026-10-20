@@ -82,6 +82,62 @@ beforeEach(async () => {
   }
 });
 describe("DEX endpoints with real SQL and bounded snapshots", () => {
+  it("reads existing directory schedules and returns funded LP and allocator amounts without RPC", async () => {
+    const p = pool(1);
+    p.legs = [{ positionId: "1", tickLower: -10, tickUpper: 10, liquidity: "100" }];
+    p.streams = [
+      {
+        slot: 1,
+        asset: p.token1.address,
+        start: "200000",
+        last: "200000",
+        finish: "804800",
+        budget: "7000000",
+        emitted: "0",
+      },
+    ];
+    await client.query("UPDATE dex_pool SET details=$1 WHERE key='1'", [JSON.stringify(p)]);
+    await database.insert(schema.allocationDirectoryPool).values({
+      key: "1",
+      deploymentId: "selected",
+      poolId: p.poolId as `0x${string}`,
+      eligible: true,
+      weight: 100n,
+      incentiveStreamCount: 1,
+      createdAtBlock: 1n,
+      searchText: "",
+      detailsJson: JSON.stringify({
+        allocatorStreams: [
+          {
+            asset: p.token1,
+            lastUpdate: "200000",
+            periodFinish: "804800",
+            periodBudget: "3000000",
+            periodEmitted: "0",
+            funded: true,
+            terminated: false,
+            invalidated: false,
+          },
+        ],
+      }),
+    });
+    const response = await app.request("/phase-one/market/emissions");
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.weeklyIncentives).toMatchObject({
+      from: "200000",
+      until: "804800",
+      pools: [
+        {
+          poolId: p.poolId,
+          lp: [{ amount: "7000000" }],
+          allocator: [{ amount: "3000000" }],
+          lpPaused: false,
+          allocatorPaused: false,
+        },
+      ],
+    });
+  });
   it("invalidates pages when a reserve/directory-only event is reorganized", async () => {
     await database.insert(schema.dexHistory).values({
       key: "directory-event",
