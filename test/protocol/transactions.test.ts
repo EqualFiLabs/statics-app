@@ -1,4 +1,11 @@
-import type { Address, Hex, PublicClient } from "viem";
+import {
+  encodeFunctionData,
+  maxUint160,
+  parseAbi,
+  type Address,
+  type Hex,
+  type PublicClient,
+} from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readProtocolActivity } from "@/lib/dollar/activity";
@@ -160,6 +167,47 @@ describe("protocol transaction execution", () => {
       buttonText: "Approve unlimited spending",
       description: expect.stringContaining("unlimited token spending"),
     });
+  });
+
+  it("describes a bounded Permit2 approval with its expiry", () => {
+    const expiration = 1_800_000_000;
+    const data = encodeFunctionData({
+      abi: parseAbi([
+        "function approve(address token,address spender,uint160 amount,uint48 expiration)",
+      ]),
+      functionName: "approve",
+      args: [wallet, target, 10_000_000n, expiration],
+    });
+    expect(
+      defaultProtocolPresentation({
+        kind: "approve-permit2",
+        label: "Authorize USDG swaps",
+        amount: "10 USDG",
+        data,
+      })
+    ).toMatchObject({
+      buttonText: "Approve reviewed amount",
+      description: expect.stringContaining("10 USDG"),
+    });
+  });
+
+  it("does not describe maximum or revoked Permit2 allowances as reviewed amounts", () => {
+    const abi = parseAbi([
+      "function approve(address token,address spender,uint160 amount,uint48 expiration)",
+    ]);
+    const presentation = (amount: bigint, expiration: number) =>
+      defaultProtocolPresentation({
+        kind: "approve-permit2",
+        label: "Authorize swaps",
+        amount: "10 USDG",
+        data: encodeFunctionData({
+          abi,
+          functionName: "approve",
+          args: [wallet, target, amount, expiration],
+        }),
+      });
+    expect(presentation(maxUint160, 1_800_000_000).buttonText).toBe("Approve maximum allowance");
+    expect(presentation(0n, 0).buttonText).toBe("Reset Permit2 approval");
   });
 
   it("does not request a signature when simulation validation fails", async () => {

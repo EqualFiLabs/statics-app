@@ -1,4 +1,13 @@
-import { getAddress, isAddress, zeroAddress, type Address, type Hex } from "viem";
+import {
+  decodeFunctionData,
+  encodeFunctionData,
+  getAddress,
+  isAddress,
+  parseAbi,
+  zeroAddress,
+  type Address,
+  type Hex,
+} from "viem";
 
 import { getFundingNetwork } from "@/lib/funding-networks";
 
@@ -19,6 +28,7 @@ export type UniswapTransaction = Readonly<{
 }>;
 
 type RawTransaction = Record<string, unknown>;
+const erc20ApproveAbi = parseAbi(["function approve(address spender,uint256 amount)"]);
 
 const STABLE_TOKENS: Readonly<Record<number, Omit<EvmSwapToken, "kind">>> = {
   1: {
@@ -132,6 +142,7 @@ export function getDefaultEvmSwapTokens(chainId: number): EvmSwapToken[] {
 
 function quantity(value: unknown, label: string): bigint {
   if (value === undefined || value === null || value === "") return 0n;
+  if (typeof value === "bigint" && value >= 0n) return value;
   if (
     (typeof value === "string" && (/^[0-9]+$/.test(value) || /^0x[0-9a-fA-F]+$/.test(value))) ||
     (typeof value === "number" && Number.isSafeInteger(value) && value >= 0)
@@ -170,6 +181,31 @@ export function normalizeUniswapTransaction(
     to: getAddress(tx.to),
     data: tx.data as Hex,
     value: quantity(tx.value, "transaction value"),
+  };
+}
+
+export function exactUniswapApproval(
+  value: unknown,
+  expected: { chainId: number; wallet: Address; token: Address; amount: bigint }
+): UniswapTransaction {
+  const tx = normalizeUniswapTransaction(value, expected);
+  if (tx.to !== getAddress(expected.token) || tx.value !== 0n) {
+    throw new Error("Uniswap returned an approval for an unexpected token or value.");
+  }
+  let spender: Address;
+  try {
+    const decoded = decodeFunctionData({ abi: erc20ApproveAbi, data: tx.data });
+    spender = decoded.args[0];
+  } catch {
+    throw new Error("Uniswap returned an invalid token approval.");
+  }
+  return {
+    ...tx,
+    data: encodeFunctionData({
+      abi: erc20ApproveAbi,
+      functionName: "approve",
+      args: [spender, expected.amount],
+    }),
   };
 }
 

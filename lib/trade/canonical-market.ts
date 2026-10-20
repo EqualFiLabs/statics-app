@@ -3,7 +3,6 @@ import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { dopplerStaticsTokenAbi, type V4PoolKey } from "@statics-protocol/sdk";
 
 import type { LaunchDeployment } from "@/lib/deployments/types";
-import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 
 export type TradeAsset = "eth" | "weth" | "statics";
 export type TradeDirection = Readonly<{ input: TradeAsset; output: TradeAsset }>;
@@ -86,11 +85,11 @@ export function settlementForTrade(
   return { input: "erc20", output: "erc20" };
 }
 
-export function maximumTokenApproval(spender: Address): Hex {
+export function tokenApproval(spender: Address, amount: bigint): Hex {
   return encodeFunctionData({
     abi: dopplerStaticsTokenAbi,
     functionName: "approve",
-    args: [getAddress(spender), MAX_ERC20_ALLOWANCE],
+    args: [getAddress(spender), amount],
   });
 }
 

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@/test/render";
 import {
   decodeFunctionData,
   decodeAbiParameters,
+  encodeFunctionData,
   parseAbiParameters,
   parseAbi,
   encodeFunctionResult,
@@ -71,6 +72,7 @@ import { DeploymentContext } from "@/providers/deployment-context";
 import { WalletContext, defaultWalletState } from "@/providers/wallet-context";
 
 const walletAddress = getAddress("0x2222222222222222222222222222222222222222");
+const approvalAbi = parseAbi(["function approve(address spender,uint256 amount)"]);
 const descriptor = {
   deploymentId: "launch-fixture",
   label: "Statics Operators",
@@ -375,7 +377,16 @@ describe("integrated swap execution", () => {
           return Response.json({ quote: ++quotes === 1 ? reviewedQuote : freshQuote });
         if (String(url) === "/api/uniswap/check-approval")
           return Response.json({
-            approval: { to: weth, from: walletAddress, chainId: 4663, data: "0xaaaa" },
+            approval: {
+              to: weth,
+              from: walletAddress,
+              chainId: 4663,
+              data: encodeFunctionData({
+                abi: approvalAbi,
+                functionName: "approve",
+                args: [usd, maxUint256],
+              }),
+            },
           });
         return Response.json({
           swap: { to: usd, from: walletAddress, chainId: 4663, data: "0xbbbb" },
@@ -392,6 +403,9 @@ describe("integrated swap execution", () => {
       const swap = fetchSpy.mock.calls.find(([url]) => url === "/api/uniswap/swap");
       expect(JSON.parse(swap![1]!.body as string).quote).toEqual(reviewedQuote);
       expect(mocks.execute.mock.calls.map(([tx]) => tx.kind)).toEqual(["approve-swap", "swap"]);
+      expect(
+        decodeFunctionData({ abi: approvalAbi, data: mocks.execute.mock.calls[0]![0].data }).args
+      ).toEqual([usd, 5n * 10n ** 17n]);
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     }
   );
@@ -413,7 +427,11 @@ describe("integrated swap execution", () => {
             to: deployment.contracts.weth,
             from: walletAddress,
             chainId: 4663,
-            data: "0xaaaa",
+            data: encodeFunctionData({
+              abi: approvalAbi,
+              functionName: "approve",
+              args: [usd, maxUint256],
+            }),
           },
         });
       });
@@ -607,6 +625,85 @@ describe("integrated swap execution", () => {
       "approve-permit2",
       "swap",
     ]);
+  });
+
+  it("approves exactly 10 USDG for a direct swap through ERC-20 and Permit2", async () => {
+    const usdg = getAddress("0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168");
+    const phaseOne = {
+      descriptor: { ...descriptor, deploymentId: "usdg-pool" },
+      contracts: deployment.contracts,
+      supportedPools: [
+        {
+          poolId: `0x${"3".repeat(64)}`,
+          poolKey: {
+            currency0: deployment.contracts.statics,
+            currency1: usdg,
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: zeroAddress,
+          },
+          enabled: true,
+          token0: {
+            address: deployment.contracts.statics,
+            symbol: "STATICS",
+            name: "Statics",
+            decimals: 18,
+            metadataSource: "reviewed-manifest",
+          },
+          token1: {
+            address: usdg,
+            symbol: "USDG",
+            name: "Global Dollar",
+            decimals: 6,
+            metadataSource: "reviewed-manifest",
+          },
+        },
+      ],
+    } as unknown as PhaseOneDeployment;
+    mocks.readContract.mockImplementation((input) =>
+      Promise.resolve(
+        input.functionName === "balanceOf"
+          ? 100n * 10n ** 18n
+          : input.address === deployment.contracts.permit2
+            ? [0n, 0, 0]
+            : input.functionName === "allowance"
+              ? 0n
+              : maxUint256
+      )
+    );
+    renderCanonicalTrade(descriptor.chainId, true, { ...option, phaseOne });
+    fireEvent.change(await screen.findByRole("combobox", { name: "You pay asset" }), {
+      target: { value: usdg },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
+      target: { value: "10" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review swap" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(3));
+    expect(mocks.execute.mock.calls.map(([tx]) => tx.kind)).toEqual([
+      "approve-swap",
+      "approve-permit2",
+      "phase-one-swap",
+    ]);
+    expect(
+      decodeFunctionData({ abi: approvalAbi, data: mocks.execute.mock.calls[0]![0].data }).args
+    ).toEqual([deployment.contracts.permit2, 10_000_000n]);
+    const permit = decodeFunctionData({
+      abi: parseAbi([
+        "function approve(address token,address spender,uint160 amount,uint48 expiration)",
+      ]),
+      data: mocks.execute.mock.calls[1]![0].data,
+    });
+    expect(permit.args?.slice(0, 3)).toEqual([
+      usdg,
+      deployment.contracts.universalRouter,
+      10_000_000n,
+    ]);
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    expect(BigInt(permit.args![3])).toBeGreaterThan(now + 1200n);
+    expect(BigInt(permit.args![3])).toBeLessThanOrEqual(now + 3605n);
   });
 
   it("discards a pending quote when the wallet changes networks", async () => {

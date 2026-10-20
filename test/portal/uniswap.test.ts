@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { decodeFunctionData, encodeFunctionData, maxUint256, parseAbi } from "viem";
 
-import { getDefaultEvmSwapTokens, normalizeUniswapTransaction } from "@/lib/portal/uniswap";
+import {
+  exactUniswapApproval,
+  getDefaultEvmSwapTokens,
+  normalizeUniswapTransaction,
+} from "@/lib/portal/uniswap";
 import {
   getUniswapUniversalRouterVersion,
   readUniswapIntegratorFee,
@@ -44,5 +49,45 @@ describe("Uniswap integration", () => {
         { chainId: 8_453, wallet }
       )
     ).toThrow(/different network/i);
+  });
+
+  it("bounds API ERC-20 approval calldata and rejects unexpected targets", () => {
+    const abi = parseAbi(["function approve(address spender,uint256 amount)"]);
+    const spender = "0x0000000000000000000000000000000000000003";
+    const raw = {
+      to: wallet,
+      from: wallet,
+      chainId: 4663,
+      data: encodeFunctionData({ abi, functionName: "approve", args: [spender, maxUint256] }),
+    };
+    const exact = exactUniswapApproval(raw, {
+      chainId: 4663,
+      wallet,
+      token: wallet,
+      amount: 10_000_000n,
+    });
+    expect(decodeFunctionData({ abi, data: exact.data }).args).toEqual([spender, 10_000_000n]);
+    expect(() =>
+      exactUniswapApproval(
+        { ...raw, to: spender },
+        {
+          chainId: 4663,
+          wallet,
+          token: wallet,
+          amount: 10_000_000n,
+        }
+      )
+    ).toThrow(/unexpected token/i);
+    expect(() =>
+      exactUniswapApproval(
+        { ...raw, data: "0xaaaa" },
+        {
+          chainId: 4663,
+          wallet,
+          token: wallet,
+          amount: 10_000_000n,
+        }
+      )
+    ).toThrow(/invalid token approval/i);
   });
 });

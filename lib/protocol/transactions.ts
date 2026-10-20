@@ -18,7 +18,11 @@ import {
   type ProtocolReplacementReason,
 } from "@/lib/dollar/activity";
 import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
-import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
+import {
+  MAX_ERC20_ALLOWANCE,
+  MAX_PERMIT2_ALLOWANCE,
+  MAX_PERMIT2_EXPIRATION,
+} from "@/lib/protocol/approvals";
 import {
   announceProtocolTransactionConfirmed,
   retryConfirmationVerification,
@@ -157,6 +161,46 @@ export function defaultProtocolPresentation(
     };
   }
   if (isPermit2Approval) {
+    const permit2Amount = request.data.startsWith(permit2ApproveSelector)
+      ? calldataUint(request.data, 2)
+      : null;
+    const permit2Expiration = request.data.startsWith(permit2ApproveSelector)
+      ? calldataUint(request.data, 3)
+      : null;
+    if (permit2Amount === 0n) {
+      return {
+        action: request.label,
+        description: `${request.label}. This removes the Permit2 allowance.${spenderCopy}`,
+        buttonText: "Reset Permit2 approval",
+        contractName: "Permit2",
+      };
+    }
+    if (
+      permit2Amount !== null &&
+      permit2Expiration !== null &&
+      (permit2Amount !== MAX_PERMIT2_ALLOWANCE ||
+        permit2Expiration !== BigInt(MAX_PERMIT2_EXPIRATION))
+    ) {
+      const expiry =
+        permit2Expiration === BigInt(MAX_PERMIT2_EXPIRATION)
+          ? "with no practical expiry"
+          : permit2Expiration <= 8_640_000_000_000n
+            ? `until ${new Date(Number(permit2Expiration) * 1000).toISOString()}`
+            : `until Unix timestamp ${permit2Expiration}`;
+      const scope =
+        permit2Amount === MAX_PERMIT2_ALLOWANCE
+          ? "the maximum Permit2 allowance"
+          : `an allowance bounded to the reviewed route amount: ${request.amount}`;
+      return {
+        action: request.label,
+        description: `${request.label}. This grants ${scope} ${expiry}.${spenderCopy}`,
+        buttonText:
+          permit2Amount === MAX_PERMIT2_ALLOWANCE
+            ? "Approve maximum allowance"
+            : "Approve reviewed amount",
+        contractName: "Permit2",
+      };
+    }
     return {
       action: request.label,
       description: `${request.label}. This grants the maximum Permit2 allowance with no practical expiry; it remains active until revoked.${spenderCopy} You can review or revoke it from Approval Tools.`,

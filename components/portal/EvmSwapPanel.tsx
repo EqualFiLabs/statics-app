@@ -10,6 +10,7 @@ import {
   formatUnits,
   getAddress,
   isAddress,
+  maxUint160,
   zeroAddress,
   type Address,
   type Hex,
@@ -19,6 +20,7 @@ import { dopplerStaticsTokenAbi, permit2AllowanceAbi } from "@statics-protocol/s
 
 import {
   getDefaultEvmSwapTokens,
+  exactUniswapApproval,
   normalizeUniswapTransaction,
   uniswapError,
   type EvmSwapToken,
@@ -39,12 +41,8 @@ import { useWalletState, walletRecoveryAction } from "@/providers/wallet-context
 import { useAppLocale } from "@/i18n/client";
 import { parseLocalizedUnits } from "@/lib/i18n/amounts";
 import { minimumWithSlippage } from "@/lib/baskets/baskets";
-import { maximumTokenApproval, swapDeadlineBase } from "@/lib/trade/canonical-market";
-import {
-  MAX_PERMIT2_ALLOWANCE,
-  MAX_PERMIT2_EXPIRATION,
-  hasUsablePermit2Allowance,
-} from "@/lib/protocol/approvals";
+import { tokenApproval, swapDeadlineBase } from "@/lib/trade/canonical-market";
+import { hasUsablePermit2Allowance } from "@/lib/protocol/approvals";
 import { slippagePercentToBps } from "@/lib/portal/slippage";
 import { isUniswapSwapChainId } from "@/lib/portal/uniswap";
 import { buildV4ExactInputSingleSwap } from "@/lib/trade/v4-execution";
@@ -53,6 +51,7 @@ import { priceImpactPercent, readPricedHops, routeHops } from "@/lib/trade/quote
 import { buildV4ExactInputPathSwap, type PathHop } from "@/lib/trade/v4-path";
 
 const PERMIT_TTL = 20n * 60n;
+const PERMIT2_APPROVAL_TTL = 60n * 60n;
 
 const erc20BalanceAbi = [
   {
@@ -414,7 +413,12 @@ export function EvmSwapPanel({
         ]);
         if (
           token < parsedAmount ||
-          !hasUsablePermit2Allowance(permit[0], permit[1], parsedAmount, Number(block.timestamp))
+          !hasUsablePermit2Allowance(
+            permit[0],
+            permit[1],
+            parsedAmount,
+            Number(block.timestamp + PERMIT_TTL)
+          )
         )
           return { gasAfterApproval: true };
       }
@@ -710,6 +714,8 @@ export function EvmSwapPanel({
           });
         };
         if (source.kind !== "native") {
+          if (parsedAmount > maxUint160)
+            throw new Error("The swap amount exceeds the Permit2 approval limit.");
           const key = [
             "direct-swap-allowances",
             route.deploymentId,
@@ -745,7 +751,7 @@ export function EvmSwapPanel({
           if (allowance.token < parsedAmount) {
             await send({
               to: route.inputToken,
-              data: maximumTokenApproval(route.permit2),
+              data: tokenApproval(route.permit2, parsedAmount),
               kind: "approve-swap",
               label: `Enable ${source.symbol} swaps`,
             });
@@ -763,7 +769,12 @@ export function EvmSwapPanel({
             )
           );
           if (
-            !hasUsablePermit2Allowance(allowance.permit[0], allowance.permit[1], parsedAmount, now)
+            !hasUsablePermit2Allowance(
+              allowance.permit[0],
+              allowance.permit[1],
+              parsedAmount,
+              now + Number(PERMIT_TTL)
+            )
           ) {
             await send({
               to: route.permit2,
@@ -773,8 +784,8 @@ export function EvmSwapPanel({
                 args: [
                   route.inputToken,
                   route.router,
-                  MAX_PERMIT2_ALLOWANCE,
-                  MAX_PERMIT2_EXPIRATION,
+                  parsedAmount,
+                  now + Number(PERMIT2_APPROVAL_TTL),
                 ],
               }),
               kind: "approve-permit2",
@@ -841,7 +852,12 @@ export function EvmSwapPanel({
           assertCurrent();
           if (approval.cancel)
             await sendTransaction(
-              approval.cancel,
+              exactUniswapApproval(approval.cancel, {
+                chainId: selectedChainId,
+                wallet: getAddress(wallet.address),
+                token: source.address,
+                amount: 0n,
+              }),
               "approve-swap",
               "Reset swap approval",
               assertCurrent
@@ -849,7 +865,12 @@ export function EvmSwapPanel({
           assertCurrent();
           if (approval.approval)
             await sendTransaction(
-              approval.approval,
+              exactUniswapApproval(approval.approval, {
+                chainId: selectedChainId,
+                wallet: getAddress(wallet.address),
+                token: source.address,
+                amount: parsedAmount,
+              }),
               "approve-swap",
               `Approve ${source.symbol}`,
               assertCurrent
