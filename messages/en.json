@@ -2751,7 +2751,8 @@
     "poolsTitle": "Pools",
     "searchPools": "Search pools",
     "searchPlaceholder": "Search pair or token",
-    "sortLabel": "Sort pools",
+    "sortLabel": "Sort pools by",
+    "sortByColumn": "Sort by {column}",
     "sort": {
       "volume": "Volume",
       "valueLocked": "Value locked",

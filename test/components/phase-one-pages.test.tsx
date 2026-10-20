@@ -479,15 +479,26 @@ describe("Markets", () => {
     expect(within(totals).getByText("612 wallets")).toBeInTheDocument();
     const pools = screen.getByRole("region", { name: "Pools" });
     const row = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
-    expect(
-      within(pools).getByRole("columnheader", { name: "Projected LP APR" })
-    ).toBeInTheDocument();
+    const volumeHeader = within(pools).getByRole("columnheader", { name: "Volume 24h" });
+    const aprHeader = within(pools).getByRole("columnheader", {
+      name: "Projected LP APR",
+    });
+    expect(volumeHeader).toHaveAttribute("aria-sort", "descending");
     expect(
       within(pools).getByRole("columnheader", { name: "Trailing 7-day yield" })
     ).toBeInTheDocument();
     expect(within(row).getByText("3.2%")).toHaveAttribute("data-label", "Projected LP APR");
     expect(within(row).getByText("41.8%")).toHaveAttribute("data-label", "Trailing 7-day yield");
-    fireEvent.click(within(pools).getByRole("button", { name: "LP reward APR" }));
+    fireEvent.click(within(aprHeader).getByRole("button", { name: "Sort by Projected LP APR" }));
+    expect(aprHeader).toHaveAttribute("aria-sort", "descending");
+    expect(volumeHeader).not.toHaveAttribute("aria-sort");
+    const mobileSort = within(pools).getByLabelText("Sort pools by");
+    expect(mobileSort).toHaveValue("apr");
+    fireEvent.change(mobileSort, { target: { value: "valueLocked" } });
+    expect(within(pools).getByRole("columnheader", { name: "Value locked" })).toHaveAttribute(
+      "aria-sort",
+      "descending"
+    );
     expect(
       within(row).getByRole("link", { name: "Add liquidity to STATICS / WETH" })
     ).toHaveAttribute("href", `/app/liquidity?poolId=${hash("1")}`);

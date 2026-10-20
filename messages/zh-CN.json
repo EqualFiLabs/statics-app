@@ -2751,7 +2751,8 @@
     "poolsTitle": "池",
     "searchPools": "搜索池",
     "searchPlaceholder": "搜索交易对或代币",
-    "sortLabel": "池排序",
+    "sortLabel": "池排序方式",
+    "sortByColumn": "按{column}排序",
     "sort": {
       "volume": "交易量",
       "valueLocked": "锁定价值",
