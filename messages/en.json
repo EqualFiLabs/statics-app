@@ -3162,7 +3162,6 @@
     },
     "note": "Prices come from Statics pools only, time-weighted over 30 minutes where history is available; otherwise the latest observed price is used. Value in Statics adds pool liquidity, Operator backing and staked STATICS at the STATICS price. Yields are estimates, not promises.",
     "dataUnavailable": "Unavailable",
-    "partialTotals": "Some pool data is incomplete. Affected aggregate values are unavailable.",
     "incentives": {
       "title": "Pool incentives — next 7 days",
       "description": "Rewards for LPs and allocators, by pool and token. Anyone can fund them.",

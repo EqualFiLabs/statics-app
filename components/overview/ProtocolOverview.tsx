@@ -15,7 +15,7 @@ import { useAppLocale } from "@/i18n/client";
 import type { LaunchDeployment, PhaseOneDeployment } from "@/lib/deployments/types";
 import { getFundingNetwork } from "@/lib/funding-networks";
 import { EMPTY_GENESIS_PORTFOLIO, summariseGenesisRewards } from "@/lib/genesis/owned";
-import type { DexQuote, DexToken, DexTotals } from "@/lib/indexer/dex-market";
+import type { DexQuote, DexToken } from "@/lib/indexer/dex-market";
 import type { PhaseOneProtocolActivity } from "@/lib/indexer/phase-one";
 import { getTransactionExplorerUrl } from "@/lib/wallet-config";
 import { useWalletState } from "@/providers/wallet-context";
@@ -132,15 +132,7 @@ export function ProtocolOverview({
   const staking = protocol.staking.data;
   const vault = genesis.metrics.data?.vault ?? null;
   const analytics = genesis.marketAnalytics.data ?? null;
-  const metricComplete = (metric: keyof DexTotals["coverage"]) => {
-    const coverage = summary?.current.coverage[metric];
-    return Boolean(
-      coverage &&
-      coverage.omittedPools <= (summary?.unpricedPools ?? 0) &&
-      (metric === "valueLocked" || coverage.historyComplete)
-    );
-  };
-  const poolsValue = metricComplete("valueLocked") ? (summary?.current.valueLocked ?? null) : null;
+  const poolsValue = summary?.current.valueLocked ?? null;
   const poolValueNote = summary
     ? summary.unpricedPools
       ? tDex("excludesUnpriced", { count: summary.unpricedPools })
@@ -148,7 +140,6 @@ export function ProtocolOverview({
     : "";
   const stakedValue = valueOf(staking?.totalStaked, price);
   const vaultValue = vault ? valueOf(vault.tokenBacking, price) : null;
-  // Known unpriced pools are disclosed; other missing parts still withhold the total.
   const totalValue =
     poolsValue === null || stakedValue === null || (launch && vaultValue === null)
       ? null
@@ -284,11 +275,6 @@ export function ProtocolOverview({
   const partialHistory = bars.some(
     (day) => !day.coverage.historyComplete || day.coverage.omittedPools > 0
   );
-  const partialTotals =
-    summary &&
-    Object.keys(summary.current.coverage).some(
-      (metric) => !metricComplete(metric as keyof DexTotals["coverage"])
-    );
   const fallbackPrices =
     summary?.statics.priceFallback ||
     dex.tokens.data?.items.some((token) => token.priceFallback) ||
@@ -348,11 +334,6 @@ export function ProtocolOverview({
         </p>
       )}
 
-      {partialTotals && (
-        <p className={styles.notice} role="status">
-          {t("partialTotals")}
-        </p>
-      )}
       {fallbackPrices && (
         <p className={styles.notice} role="status">
           {tDex("fallbackPrices")}
@@ -517,15 +498,13 @@ export function ProtocolOverview({
           <div className={styles.stats}>
             <div>
               <span className={styles.label}>{tDex("tile.volume")}</span>
-              <strong>{money(metricComplete("volume") ? summary?.current.volume : null)}</strong>
+              <strong>{money(summary?.current.volume)}</strong>
             </div>
             <div>
               <span className={styles.label}>{tDex("tile.fees")}</span>
               <strong>
                 {money(
                   summary &&
-                    metricComplete("lpFees") &&
-                    metricComplete("protocolFees") &&
                     summary.current.lpFees !== null &&
                     summary.current.protocolFees !== null
                     ? summary.current.lpFees + summary.current.protocolFees

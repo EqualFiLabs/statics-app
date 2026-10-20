@@ -3162,7 +3162,6 @@
     },
     "note": "价格仅来自 Statics 池；历史数据充足时采用 30 分钟时间加权价格，否则使用最新观察价格。Statics 总价值按 STATICS 价格合计池流动性、Operator 支持资产和质押的 STATICS。收益率为估计值，并非承诺。",
     "dataUnavailable": "暂不可用",
-    "partialTotals": "部分池数据不完整。受影响的汇总值暂不可用。",
     "incentives": {
       "title": "池激励 — 未来 7 天",
       "description": "按池和代币显示 LP 和分配者奖励。任何人都可以提供奖励资金。",
