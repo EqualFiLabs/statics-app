@@ -143,11 +143,6 @@ export function EarnPage({
     });
   return (
     <div className={styles.page}>
-      {view !== "overview" && (
-        <Link className={styles.breadcrumb} href="/app/rewards">
-          ← {t("title")}
-        </Link>
-      )}
       <AppPageHeader
         feature="rewards"
         title={heading}
