@@ -114,7 +114,7 @@ export type DexVolume = Observed &
   }>;
 export type DexEmissions = Observed &
   Readonly<{
-    /** Absent on older indexers. Creator-funded LP and allocator rewards, excluding slot 0. */
+    /** Absent on older indexers. Externally funded LP and allocator rewards, excluding slot 0. */
     weeklyIncentives: Readonly<{
       from: bigint;
       until: bigint;

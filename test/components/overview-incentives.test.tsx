@@ -80,9 +80,7 @@ it("does not present an older indexer's missing field as no incentives", () => {
     />
   );
   expect(screen.getByText("Weekly incentive data is unavailable.")).toBeInTheDocument();
-  expect(
-    screen.queryByText("No creator-funded incentive streams are scheduled.")
-  ).not.toBeInTheDocument();
+  expect(screen.queryByText("No funded incentive streams are scheduled.")).not.toBeInTheDocument();
 });
 it("keeps the last good snapshot visible and labels failed refreshes", () => {
   render(<OverviewIncentives data={data()} loading={false} failed />);
@@ -92,7 +90,5 @@ it("keeps the last good snapshot visible and labels failed refreshes", () => {
 it("shows empty funding separately from loading", () => {
   const d = { ...data(), weeklyIncentives: { ...data().weeklyIncentives!, pools: [] } };
   render(<OverviewIncentives data={d} loading={false} failed={false} />);
-  expect(
-    screen.getByText("No creator-funded incentive streams are scheduled.")
-  ).toBeInTheDocument();
+  expect(screen.getByText("No funded incentive streams are scheduled.")).toBeInTheDocument();
 });
