@@ -2911,6 +2911,7 @@
   color: var(--negative);
   font-size: var(--text-sm);
   line-height: 1.5;
+  overflow-wrap: anywhere;
   border-radius: var(--radius-lg);
 }
 
