@@ -29,6 +29,14 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
   const [sort, setSort] = useState<(typeof SORTS)[number]>("volume");
   const [search, setSearch] = useState("");
   const [days, setDays] = useState(30);
+  const [invertedPrices, setInvertedPrices] = useState<Set<string>>(() => new Set());
+  const togglePairPrice = (poolId: string) =>
+    setInvertedPrices((current) => {
+      const next = new Set(current);
+      if (next.has(poolId)) next.delete(poolId);
+      else next.add(poolId);
+      return next;
+    });
   // Native currency (address zero) has no ERC-20 metadata; name it from the chain configuration.
   const native = getFundingNetwork(deployment.descriptor.chainId)?.chain.nativeCurrency;
   const withNative = (token: DexToken): DexToken =>
@@ -350,6 +358,23 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
             <tbody>
               {(dex.pools.data?.items ?? []).map((pool) => {
                 const moved = change(pool.change24hBps);
+                const pairPrice = pool.pairPrice === null ? null : Number(pool.pairPrice);
+                const canInvert =
+                  pairPrice !== null &&
+                  pairPrice > 0 &&
+                  Number.isFinite(pairPrice) &&
+                  Number.isFinite(1 / pairPrice);
+                const inverted = canInvert && invertedPrices.has(pool.poolId);
+                const displayedPrice =
+                  pairPrice === null ? null : inverted ? 1 / pairPrice : pairPrice;
+                const pairPriceText =
+                  displayedPrice === null
+                    ? "—"
+                    : t("pairPrice", {
+                        token0: symbolOf(inverted ? pool.token1 : pool.token0),
+                        price: number(displayedPrice, 4),
+                        token1: symbolOf(inverted ? pool.token0 : pool.token1),
+                      });
                 const noLiquidity =
                   pool.liquidityComplete && pool.amount0 === 0n && pool.amount1 === 0n;
                 return (
@@ -371,13 +396,22 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                       </span>
                     </th>
                     <td className={styles.pairPrice} data-label={t("column.pairPrice")}>
-                      {pool.pairPrice === null
-                        ? "—"
-                        : t("pairPrice", {
-                            token0: symbolOf(pool.token0),
-                            price: number(Number(pool.pairPrice), 4),
-                            token1: symbolOf(pool.token1),
+                      {canInvert ? (
+                        <button
+                          className={styles.pairPriceButton}
+                          type="button"
+                          aria-label={t("invertPairPriceFor", {
+                            pool: pairOf(pool),
+                            price: pairPriceText,
                           })}
+                          aria-pressed={inverted}
+                          onClick={() => togglePairPrice(pool.poolId)}
+                        >
+                          {pairPriceText}
+                        </button>
+                      ) : (
+                        pairPriceText
+                      )}
                     </td>
                     <td data-label={t("column.change")} data-tone={moved.tone}>
                       {moved.text}

@@ -2775,6 +2775,7 @@
     "unpriced": "未定价：仅显示交易对价格",
     "noLiquidity": "暂无流动性",
     "pairPrice": "1 {token0} = {price} {token1}",
+    "invertPairPriceFor": "反转 {pool} 的交易对价格：{price}",
     "streams": "{count, plural, other {# 个激励流}}",
     "swap": "兑换",
     "addLiquidity": "添加流动性",
