@@ -71,6 +71,17 @@ describe("landing page", () => {
     expect(screen.queryByText("Online")).not.toBeInTheDocument();
   });
 
+  it("shows one UTC clock and no repeated principles near the footer", async () => {
+    const { container } = await renderLanding();
+    const launch = screen.getByRole("region", { name: "Markets that work for you." });
+
+    expect(container.querySelectorAll("time")).toHaveLength(1);
+    expect(launch.querySelector("time")).toBeNull();
+    expect(launch).not.toHaveTextContent("Pool creators earn 5% of hook fees.");
+    expect(launch).not.toHaveTextContent("LPs earn in-range rewards.");
+    expect(launch).toHaveTextContent("Markets that work for you.");
+  });
+
   // The panel states protocol properties, which are true before any deployment
   // exists. Metrics would have to read "--" five times over, which says nothing
   // and reads as a dead page.

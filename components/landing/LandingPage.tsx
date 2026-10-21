@@ -221,15 +221,6 @@ export async function LandingPage() {
               />
               <p id="launch-title">{t("tagline")}</p>
             </div>
-            <div className="terminal" aria-label={t("principles")} tabIndex={0}>
-              {(
-                ["creatorPrinciple", "staticsPrinciple", "lpPrinciple", "marketPrinciple"] as const
-              ).map((key) => (
-                <p key={key}>
-                  <UtcClock /> <span>&gt;</span> {t(key)}
-                </p>
-              ))}
-            </div>
           </section>
         </main>
 
