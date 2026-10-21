@@ -176,7 +176,9 @@ Anvil can keep Robinhood's mainnet chain ID while serving the app entirely on lo
 Phase 1 swap routing supports native ETH PoolKeys (`currency0 = address(0)`) directly.
 For an ETH pair it prefers an enabled native pool, then an enabled WETH pool; WETH trades
 continue to use WETH. Native pools settle ETH directly through the Universal Router, while
-WETH pools retain wrapping/unwrapping. Genesis keeps precedence for its canonical pair.
+WETH pools retain wrapping/unwrapping. An open native ETH/STATICS pool takes precedence over
+the Genesis market for ETH buys and sells. Explicit WETH/STATICS trades keep the Genesis
+route, which also remains the fallback when no native ETH/STATICS pool is available.
 Discovery resolves native currency metadata from the selected chain configuration without
 ERC-20 RPC calls. A failed selected quote remains an error rather than switching pools.
 
