@@ -1,14 +1,17 @@
+import { candidatePoolId, candidatePoolKey } from "@/lib/phase-one/pool-creation";
+import { useEffect } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@/test/render";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { CreatePoolStep } from "@/components/liquidity/CreatePoolStep";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
-import type { CreatePoolDraft } from "@/components/liquidity/NewPositionPair";
+import { NewPositionPair, type CreatePoolDraft } from "@/components/liquidity/NewPositionPair";
 
-const mocks = vi.hoisted(() => ({ tokens: vi.fn() }));
+const mocks = vi.hoisted(() => ({ tokens: vi.fn(), pools: vi.fn() }));
 vi.mock("@/lib/indexer/dex-market", async (original) => ({
   ...(await original<typeof import("@/lib/indexer/dex-market")>()),
   loadDexTokens: mocks.tokens,
+  loadDexPools: mocks.pools,
 }));
 vi.mock("@/hooks/usePhaseOneAction", () => ({
   usePhaseOneAction: () => ({
@@ -21,6 +24,7 @@ vi.mock("@/hooks/usePhaseOneAction", () => ({
     },
   }),
 }));
+vi.mock("wagmi", () => ({ usePublicClient: () => null }));
 vi.mock("@/components/phase-one/ActionReview", () => ({ ActionReview: () => null }));
 const token = (n: number) => ({
   address: `0x${String(n).repeat(40)}` as const,
@@ -41,7 +45,10 @@ const draft: CreatePoolDraft = {
 };
 let client: QueryClient;
 function Subject() {
-  client = useQueryClient();
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    client = queryClient;
+  }, [queryClient]);
   return (
     <CreatePoolStep deployment={deployment} draft={draft} onCreated={vi.fn()} onBack={vi.fn()} />
   );
@@ -95,3 +102,43 @@ it.each([{ stale: true }, { halted: true }, { expiresAt: 0 }])(
     expect(screen.getByLabelText("Starting price")).toHaveValue("");
   }
 );
+
+it("labels stale and halted TVL in fee-tier creation previews", async () => {
+  const poolId = candidatePoolId(
+    draft.tokenA.address,
+    draft.tokenB.address,
+    draft.tier,
+    deployment.contracts.publicHook
+  );
+  const pool = {
+    poolId,
+    poolKey: candidatePoolKey(
+      draft.tokenA.address,
+      draft.tokenB.address,
+      draft.tier,
+      deployment.contracts.publicHook
+    ),
+    token0: draft.tokenA,
+    token1: draft.tokenB,
+    enabled: true,
+  };
+  const d = { ...deployment, supportedPools: [pool] } as PhaseOneDeployment;
+  const r = response({ stale: true, halted: true });
+  mocks.pools.mockResolvedValue({
+    quote: r.quote,
+    references: r.items[0]!.references,
+    items: [{ poolId, valueLocked: 10n ** 18n }],
+  });
+  render(
+    <NewPositionPair
+      deployment={d}
+      initialPoolId={poolId}
+      canDeposit={() => true}
+      onExisting={vi.fn()}
+      onCreate={vi.fn()}
+    />
+  );
+  expect(await screen.findByText(/Trading halted/)).toBeInTheDocument();
+  expect(screen.getByText(/Stale reference/)).toBeInTheDocument();
+  expect(screen.getByText(/\$1/)).toBeInTheDocument();
+});

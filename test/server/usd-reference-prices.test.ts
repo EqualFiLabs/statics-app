@@ -132,3 +132,62 @@ describe("USD reference adapters", () => {
     expect(timeout).toHaveBeenCalledWith(4000);
   });
 });
+
+it("bounds network concurrency across separate simultaneous market requests", async () => {
+  const assets = Array.from({ length: 12 }, (_, i) => ({
+    tokenSymbol: `T${i}`,
+    currentMultiplier: "1",
+    deployments: [
+      { chainId: 4663, contractAddress: `0x${(i + 100).toString(16).padStart(40, "0")}` },
+    ],
+  }));
+  let active = 0,
+    peak = 0;
+  fetchMock.mockImplementation(async (url: Parameters<typeof fetch>[0]) => {
+    if (String(url).endsWith("assets")) return new Response(JSON.stringify({ assets }));
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    active--;
+    const symbol = String(url).split("/").at(-1)!;
+    const asset = assets.find((a) => a.tokenSymbol === symbol)!;
+    return new Response(
+      JSON.stringify({
+        quotes: [{ ...quote, tokenSymbol: symbol, deployments: asset.deployments }],
+      })
+    );
+  });
+  const tokens = assets.map((a) => ({ address: a.deployments[0]!.contractAddress, decimals: 18 }));
+  const results = await Promise.all([
+    loadUsdReferences({ ...input, tokens: tokens.slice(0, 6) }, now),
+    loadUsdReferences({ ...input, tokens: tokens.slice(6) }, now),
+  ]);
+  expect(peak).toBeLessThanOrEqual(4);
+  expect(results.flatMap((r) => r.prices)).toHaveLength(12);
+});
+it("handles actual timeout rejection without losing independently available prices", async () => {
+  vi.useFakeTimers();
+  const original = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    if (String(url).includes("prices/"))
+      return new Promise<Response>((_, reject) =>
+        init!.signal!.addEventListener("abort", () => reject(new Error("timeout")), { once: true })
+      );
+    return original(url, init);
+  });
+  // Simulate the timeout signal deterministically; the native helper uses real timers.
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+  });
+  try {
+    const pending = loadUsdReferences(input, now);
+    await vi.advanceTimersByTimeAsync(4001);
+    const r = await pending;
+    expect(r.prices.map((p) => p.address)).toEqual([weth, usdg]);
+    expect(r.restricted).toContain(stock);
+  } finally {
+    vi.useRealTimers();
+  }
+});

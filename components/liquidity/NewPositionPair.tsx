@@ -1,5 +1,6 @@
 "use client";
 
+import { ReferenceStatus } from "@/components/overview/ReferenceStatus";
 import { useReferenceClock, referencesExpired } from "@/hooks/useReferenceClock";
 import { defaultMarketQuote } from "@/lib/market/reference-prices";
 
@@ -115,7 +116,8 @@ export function NewPositionPair({
   });
   const tvl = useQuery({
     queryKey: [dexRoot, deployment.descriptor.deploymentId, "pools", currency, "creation"],
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
     retry: false,
     queryFn: async () => {
       const page = await loadDexPools(deployment.descriptor.deploymentId, currency, { limit: 100 });
@@ -273,6 +275,7 @@ export function NewPositionPair({
         })}
       </div>
 
+      {currency === "usd" && <ReferenceStatus references={tvl.data?.references} />}
       <details
         className={styles.advanced}
         open={advanced}

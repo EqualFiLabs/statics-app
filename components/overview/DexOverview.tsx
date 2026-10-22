@@ -299,7 +299,8 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                 !day.coverage.historyComplete || day.coverage.omittedPools > 0 || undefined
               }
               style={{
-                height: `${day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                height: `${quote === "usd" && day.volume === null ? 0 : day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                visibility: quote === "usd" && day.volume === null ? "hidden" : undefined,
               }}
               title={`${day.day}: ${money(day.volume, false, dex.volume.data?.quote)}${!day.coverage.historyComplete || day.coverage.omittedPools > 0 ? ` · ${t("incompleteHistory")}` : ""}`}
             />

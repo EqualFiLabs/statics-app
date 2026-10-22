@@ -540,7 +540,8 @@ export function ProtocolOverview({
                 key={day.day}
                 data-latest={index === bars.length - 1 || undefined}
                 style={{
-                  height: `${day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                  height: `${quote === "usd" && day.volume === null ? 0 : day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                  visibility: quote === "usd" && day.volume === null ? "hidden" : undefined,
                 }}
                 title={`${day.day}: ${money(day.volume)}${!day.coverage.historyComplete || day.coverage.omittedPools > 0 ? ` · ${tDex("incompleteHistory")}` : ""}`}
               />
