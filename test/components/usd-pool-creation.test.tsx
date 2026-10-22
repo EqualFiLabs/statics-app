@@ -121,8 +121,13 @@ it("labels stale and halted TVL in fee-tier creation previews", async () => {
     token0: draft.tokenA,
     token1: draft.tokenB,
     enabled: true,
+    provenance: {
+      deploymentId: "robinhood-phase-one",
+      protocolCommit: "fixture",
+      registrationBlock: 1n,
+    },
   };
-  const d = { ...deployment, supportedPools: [pool] } as PhaseOneDeployment;
+  const d: PhaseOneDeployment = { ...deployment, supportedPools: [pool] };
   const r = response({ stale: true, halted: true });
   mocks.pools.mockResolvedValue({
     quote: r.quote,
