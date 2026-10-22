@@ -531,6 +531,66 @@ describe("Markets", () => {
       `/app/swap?in=${tokens[0].address}&out=${tokens[2].address}`
     );
   });
+  it("inverts each pool's pair price independently and restores the original direction", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) => ({
+          ...pool,
+          pairPrice: index === 0 ? "0.0104" : "2",
+        })),
+      };
+    });
+    withPhaseOne(<MarketsOverview />);
+    const pools = await screen.findByRole("region", { name: "Pools" });
+    const first = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
+    const second = within(pools).getByText("STATICS / TOKEN").closest("tr")!;
+    const firstPrice = within(first).getByRole("button", {
+      name: "Invert pair price for STATICS / WETH: 1 STATICS = 0.0104 WETH",
+    });
+    const secondPrice = within(second).getByRole("button", {
+      name: "Invert pair price for STATICS / TOKEN: 1 STATICS = 2 TOKEN",
+    });
+
+    expect(firstPrice).toHaveTextContent("1 STATICS = 0.0104 WETH");
+    expect(firstPrice).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(firstPrice);
+    expect(firstPrice).toHaveTextContent("1 WETH = 96.1538 STATICS");
+    expect(firstPrice).toHaveAccessibleName(
+      "Invert pair price for STATICS / WETH: 1 WETH = 96.1538 STATICS"
+    );
+    expect(firstPrice).toHaveAttribute("aria-pressed", "true");
+    expect(secondPrice).toHaveTextContent("1 STATICS = 2 TOKEN");
+    fireEvent.click(secondPrice);
+    expect(secondPrice).toHaveTextContent("1 TOKEN = 0.5 STATICS");
+    expect(firstPrice).toHaveTextContent("1 WETH = 96.1538 STATICS");
+    fireEvent.click(firstPrice);
+    expect(firstPrice).toHaveTextContent("1 STATICS = 0.0104 WETH");
+    expect(firstPrice).toHaveAttribute("aria-pressed", "false");
+  });
+  it("leaves zero and missing pair prices noninteractive", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) => ({
+          ...pool,
+          pairPrice: index === 0 ? "0" : null,
+        })),
+      };
+    });
+    withPhaseOne(<MarketsOverview />);
+    const pools = await screen.findByRole("region", { name: "Pools" });
+    const zero = (await within(pools).findByText("STATICS / WETH")).closest("tr")!;
+    const missing = within(pools).getByText("STATICS / TOKEN").closest("tr")!;
+    expect(within(zero).getByText("1 STATICS = 0 WETH")).toBeInTheDocument();
+    expect(within(missing).getByText("—")).toBeInTheDocument();
+    expect(within(zero).queryByRole("button", { name: /pair price/i })).toBeNull();
+    expect(within(missing).queryByRole("button", { name: /pair price/i })).toBeNull();
+  });
   it("shows an unpriced pool with its pair price and says the totals exclude it", async () => {
     mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
       const sample = dexFixture(phaseOne, quote);

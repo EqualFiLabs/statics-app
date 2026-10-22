@@ -2776,6 +2776,7 @@
     "unpriced": "Sin precio: solo precio del par",
     "noLiquidity": "Aún sin liquidez",
     "pairPrice": "1 {token0} = {price} {token1}",
+    "invertPairPriceFor": "Invertir el precio del par {pool}: {price}",
     "streams": "{count, plural, one {# flujo} other {# flujos}}",
     "swap": "Swap",
     "addLiquidity": "Añadir liquidez",
