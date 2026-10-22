@@ -550,6 +550,7 @@ html:has(.landing-page) {
 
 .landing-page .dollar-modes {
   justify-content: space-between;
+  align-items: stretch;
   gap: 1rem;
 }
 
