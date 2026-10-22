@@ -178,11 +178,18 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-it("reviews and executes a discovered native ETH pool without wrapping or approvals", async () => {
-  const usd = getAddress("0x8888888888888888888888888888888888888888");
+it.each([
+  {
+    address: getAddress("0x8888888888888888888888888888888888888888"),
+    symbol: "USD",
+    name: "Dollar",
+    decimals: 6,
+  },
+  { address: deployment.contracts.statics, symbol: "STATICS", name: "Statics", decimals: 18 },
+])("reviews and executes discovered ETH/$symbol without wrapping or approvals", async (output) => {
   const poolKey = {
     currency0: zeroAddress,
-    currency1: usd,
+    currency1: output.address,
     fee: 3000,
     tickSpacing: 60,
     hooks: zeroAddress,
@@ -206,10 +213,7 @@ it("reviews and executes a discovered native ETH pool without wrapping or approv
         metadataSource: "reviewed-manifest",
       },
       token1: {
-        address: usd,
-        symbol: "USD",
-        name: "Dollar",
-        decimals: 6,
+        ...output,
         metadataSource: "reviewed-manifest",
       },
     },
@@ -225,7 +229,7 @@ it("reviews and executes a discovered native ETH pool without wrapping or approv
   try {
     renderCanonicalTrade(descriptor.chainId, true, { ...option, phaseOne });
     fireEvent.change(await screen.findByRole("combobox", { name: "You receive asset" }), {
-      target: { value: usd },
+      target: { value: output.address },
     });
     fireEvent.change(screen.getByRole("textbox", { name: "You pay amount" }), {
       target: { value: "0.001" },
@@ -706,10 +710,98 @@ describe("route precedence", () => {
     contracts: deployment.contracts,
     supportedPools: [pool],
   } as unknown as PhaseOneDeployment;
-  it("prefers Genesis when both deployments support the canonical pair", () => {
+  const nativePool = {
+    ...pool,
+    poolId: `0x${"5".repeat(64)}` as const,
+    poolKey: { ...pool.poolKey, currency0: zeroAddress, currency1: statics.address },
+    token0: { ...native, metadataSource: "reviewed-manifest" as const },
+    token1: { ...statics, metadataSource: "reviewed-manifest" as const },
+    swappable: true,
+  };
+  it.each(["manifest", "discovered"])(
+    "prefers the %s native ETH/STATICS pool over Genesis in both directions",
+    (source) => {
+      const active = {
+        ...option,
+        phaseOne: { ...phaseOne, supportedPools: source === "manifest" ? [nativePool] : [] },
+      };
+      const pools = source === "discovered" ? [nativePool] : undefined;
+      const buy = selectSwapRoute(active, descriptor.chainId, native, statics, true, pools);
+      expect(buy).toMatchObject({
+        kind: "direct",
+        phaseOne: true,
+        id: `phase-one:${nativePool.poolId}`,
+        inputToken: zeroAddress,
+        zeroForOne: true,
+        settlement: { input: "native", output: "erc20" },
+      });
+      expect(buy.kind === "direct" && buy.settlement).not.toHaveProperty("wrappedNative");
+      const sell = selectSwapRoute(active, descriptor.chainId, statics, native, true, pools);
+      expect(sell).toMatchObject({
+        kind: "direct",
+        phaseOne: true,
+        id: `phase-one:${nativePool.poolId}`,
+        inputToken: statics.address,
+        zeroForOne: false,
+        settlement: { input: "erc20", output: "native" },
+      });
+      expect(sell.kind === "direct" && sell.settlement).not.toHaveProperty("wrappedNative");
+    }
+  );
+  it("keeps Genesis when Phase 1 only offers the wrapped canonical pair", () => {
     expect(
       selectSwapRoute({ ...option, phaseOne }, descriptor.chainId, native, statics)
     ).toMatchObject({ kind: "direct", phaseOne: false });
+  });
+  it("keeps explicit WETH buys and sells on Genesis when native pools exist", () => {
+    const weth = { ...native, address: deployment.contracts.weth, kind: "erc20" as const };
+    const active = { ...option, phaseOne: { ...phaseOne, supportedPools: [nativePool] } };
+    for (const [input, output] of [
+      [weth, statics],
+      [statics, weth],
+    ] as const) {
+      expect(selectSwapRoute(active, descriptor.chainId, input, output)).toMatchObject({
+        kind: "direct",
+        phaseOne: false,
+        poolKey: deployment.market.poolKey,
+        settlement: { input: "erc20", output: "erc20" },
+      });
+    }
+  });
+  it("falls back to Genesis for closed, absent or out-of-scope native pools", () => {
+    const active = { ...option, phaseOne: { ...phaseOne, supportedPools: [nativePool] } };
+    const cases = [
+      { active, include: true, pools: [{ ...nativePool, swappable: false }] },
+      { active, include: true, pools: [] },
+      {
+        active: {
+          ...active,
+          phaseOne: { ...phaseOne, supportedPools: [{ ...nativePool, enabled: false }] },
+        },
+        include: true,
+        pools: undefined,
+      },
+      { active, include: false, pools: [nativePool] },
+      { active: { ...active, phaseOne: null }, include: true, pools: [nativePool] },
+      {
+        active: {
+          ...active,
+          phaseOne: { ...active.phaseOne, descriptor: { ...descriptor, chainId: 8453 } },
+        },
+        include: true,
+        pools: [nativePool],
+      },
+    ];
+    for (const item of cases) {
+      for (const [input, output] of [
+        [native, statics],
+        [statics, native],
+      ] as const) {
+        expect(
+          selectSwapRoute(item.active, descriptor.chainId, input, output, item.include, item.pools)
+        ).toMatchObject({ kind: "direct", phaseOne: false, poolKey: deployment.market.poolKey });
+      }
+    }
   });
   it("selects the first enabled exact Phase 1 pair and uses API only for unsupported pairs", () => {
     const publicPool = { ...pool, poolKey: { ...pool.poolKey, currency0: other.address } };

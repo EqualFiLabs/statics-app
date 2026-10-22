@@ -65,7 +65,30 @@ export function selectSwapRoute(
 ): SwapRoute {
   const launch = active.launch?.descriptor.chainId === chainId ? active.launch : null;
   const direction = canonicalTradeDirection(launch, source, destination);
-  if (launch && direction) {
+  const phaseOne =
+    includePhaseOne && active.phaseOne?.descriptor.chainId === chainId ? active.phaseOne : null;
+  const candidates = phaseOne
+    ? (pools ?? phaseOne.supportedPools.map((pool) => ({ ...pool, swappable: pool.enabled })))
+    : [];
+  const actual = {
+    input: getAddress(source.kind === "native" ? zeroAddress : source.address),
+    output: getAddress(destination.kind === "native" ? zeroAddress : destination.address),
+  };
+  const matchingPool = (input: Address, output: Address) =>
+    candidates.find(
+      (candidate) =>
+        candidate.swappable &&
+        ((getAddress(candidate.poolKey.currency0) === input &&
+          getAddress(candidate.poolKey.currency1) === output) ||
+          (getAddress(candidate.poolKey.currency1) === input &&
+            getAddress(candidate.poolKey.currency0) === output))
+    );
+  const nativePool =
+    (source.kind === "native" || destination.kind === "native") &&
+    matchingPool(actual.input, actual.output);
+  // An open native pair takes precedence over wrapping through the Genesis market.
+  // Explicit WETH trades and pairs without a native pool retain the launch route.
+  if (launch && direction && !nativePool) {
     return {
       kind: "direct",
       id: `${launch.descriptor.deploymentId}:${launch.market.poolId}`,
@@ -81,15 +104,7 @@ export function selectSwapRoute(
       settlement: settlementForTrade(launch, direction),
     };
   }
-  const phaseOne =
-    includePhaseOne && active.phaseOne?.descriptor.chainId === chainId ? active.phaseOne : null;
   if (phaseOne) {
-    const candidates =
-      pools ?? phaseOne.supportedPools.map((pool) => ({ ...pool, swappable: pool.enabled }));
-    const actual = {
-      input: getAddress(source.kind === "native" ? zeroAddress : source.address),
-      output: getAddress(destination.kind === "native" ? zeroAddress : destination.address),
-    };
     const wrapped = {
       input: getAddress(source.kind === "native" ? phaseOne.contracts.weth : source.address),
       output: getAddress(
@@ -116,14 +131,7 @@ export function selectSwapRoute(
           : { input: "erc20", output: "erc20" };
     // Prefer an exact native pair, then its wrapped equivalent. Never switch on quote failure.
     for (const { input, output } of pairs) {
-      const pool = candidates.find(
-        (candidate) =>
-          candidate.swappable &&
-          ((getAddress(candidate.poolKey.currency0) === input &&
-            getAddress(candidate.poolKey.currency1) === output) ||
-            (getAddress(candidate.poolKey.currency1) === input &&
-              getAddress(candidate.poolKey.currency0) === output))
-      );
+      const pool = matchingPool(input, output);
       if (pool)
         return {
           kind: "direct",

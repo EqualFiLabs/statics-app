@@ -56,10 +56,13 @@ The application has one dedicated Swap page with a two-option selector:
 Token | NFT
 ```
 
-Token mode reuses the Portal EVM swap card on the selected Statics network. It selects the
-Genesis canonical pair first, then the first enabled Phase 1 pool matching the pair, then the
-Uniswap API for unsupported pairs. A direct quote error does not change routes. Native ETH
-settlement wraps or unwraps WETH internally. The card preserves token selection, balances,
+Token mode reuses the Portal EVM swap card on the selected Statics network. ETH/STATICS buys
+and sells prefer the first open native Phase 1 pool matching the pair. Explicit WETH/STATICS
+trades keep the Genesis canonical pool, which also remains the fallback when no native
+ETH/STATICS pool is available. Other pairs use the first enabled Phase 1 pool matching the
+pair, supported multi-pool paths, then the Uniswap API for unsupported pairs. A direct quote
+error does not change routes. Native pools settle ETH directly; WETH pools wrap or unwrap
+ETH internally when needed. The card preserves token selection, balances,
 slippage, review, approval, wallet, error, and confirmation behavior. Routing has no separate
 tab or pool selector. Quotes retain the 350 ms debounce and do not run deployment audits.
 The dedicated Swap page does not show bridge or Solana controls.
