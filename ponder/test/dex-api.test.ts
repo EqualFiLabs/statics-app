@@ -307,3 +307,67 @@ it("pins USD references through pagination and expires the cursor at the freshne
     (await app.request(`/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`)).status
   ).toBe(409);
 });
+
+it("returns completed-day USD volume from indexed USDG quantities without a current reference", async () => {
+  const prior = {
+    address: process.env.PONDER_PRICING_QUOTE_USDG,
+    decimals: process.env.PONDER_PRICING_DECIMALS_USDG,
+    floor: process.env.PONDER_PRICING_MIN_LIQUIDITY_USDG,
+  };
+  process.env.PONDER_PRICING_QUOTE_USDG = pool().token1.address;
+  process.env.PONDER_PRICING_DECIMALS_USDG = "6";
+  process.env.PONDER_PRICING_MIN_LIQUIDITY_USDG = "0";
+  usdReferences.mockResolvedValue({ asOf: now, prices: [], restricted: [], allowDerived: false });
+  const p = pool(1);
+  p.token1.decimals = 6;
+  await client.query("UPDATE dex_pool SET details=$1 WHERE key='1'", [JSON.stringify(p)]);
+  await database.insert(schema.dexHistory).values({
+    key: "daily-usdg",
+    deploymentId: "selected",
+    poolId: p.poolId as `0x${string}`,
+    kind: "swap",
+    timestamp: 100000n,
+    blockNumber: 2n,
+    blockHash: `0x${"02".repeat(32)}`,
+    logIndex: 1,
+    details: JSON.stringify({
+      poolId: p.poolId,
+      amountIn: "2500001",
+      amountOut: "0",
+      sender: "0x1234",
+      transactionHash: `0x${"03".repeat(32)}`,
+      settlement: "wallet",
+      sqrtPriceX96: p.sqrtPriceX96,
+      tick: 0,
+      complete: true,
+      internal: false,
+      input0: false,
+      coreAmount0: "0",
+      coreAmount1: "2500001",
+      lpFee: 0,
+      fee0: "0",
+      fee1: "0",
+      transactionSender: "0x1234",
+    }),
+  });
+  try {
+    const response = await app.request("/phase-one/market/volume?quote=usd&days=3");
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.quote).toMatchObject({ kind: "usd", address: null, decimals: 18 });
+    expect(body.days.at(-2)).toMatchObject({
+      volume: String(2500001n * 10n ** 12n),
+      swaps: "1",
+      provisional: false,
+    });
+  } finally {
+    for (const [name, value] of Object.entries({
+      PONDER_PRICING_QUOTE_USDG: prior.address,
+      PONDER_PRICING_DECIMALS_USDG: prior.decimals,
+      PONDER_PRICING_MIN_LIQUIDITY_USDG: prior.floor,
+    })) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

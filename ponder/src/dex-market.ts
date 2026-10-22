@@ -51,6 +51,8 @@ export function pricingConfig(
   const wrapped = env.PONDER_PRICING_WRAPPED_NATIVE ?? null;
   if (wrapped !== null && !/^0x[\da-fA-F]{40}$/.test(wrapped))
     throw new Error("Invalid wrapped-native pricing configuration");
+  const historical =
+    kind === "usd" && env.PONDER_PRICING_QUOTE_USDG ? pricingConfig("usdg", env) : null;
   return {
     kind,
     address: kind === "usd" ? null : address!.toLowerCase(),
@@ -58,6 +60,15 @@ export function pricingConfig(
     symbol: kind.toUpperCase(),
     floor: BigInt(whole!) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0"),
     wrappedNative: wrapped,
+    ...(historical
+      ? {
+          historyUsdG: {
+            address: historical.address!,
+            decimals: historical.decimals,
+            floor: historical.floor,
+          },
+        }
+      : {}),
   };
 }
 export function historicalRanges(s: DexSnapshot, at: bigint) {
@@ -370,23 +381,38 @@ export function buildMarket(
     };
   });
   const statics = tokens.find((t) => t.token.address.toLowerCase() === staticsAsset?.toLowerCase());
+  // Daily history retains the existing indexed USDG aggregation, at one USD per USDG.
+  // This is independent of today's reference quotes and uses each day's historical routes.
+  const historyConfig: PricingConfig | null =
+    config.kind === "usd"
+      ? config.historyUsdG
+        ? {
+            ...config,
+            ...config.historyUsdG,
+            kind: "usdg",
+            symbol: "USDG",
+            floor: config.historyUsdG.floor === 0n ? 1n : config.historyUsdG.floor,
+          }
+        : null
+      : config;
   const days = Array.from({ length: 90 }, (_, i) => {
     const d = day - BigInt(89 - i),
       end = d === day ? now : (d + 1n) * 86400n - 1n;
-    const historical =
-      config.kind === "usd"
-        ? d === day
-          ? prices
-          : new Map<string, import("./dex-pricing").TokenPrice>()
-        : priceGraph(s.pools, historicalRanges(s, end), s.prices, end, config).prices;
+    const historical = historyConfig
+      ? priceGraph(s.pools, historicalRanges(s, end), s.prices, end, historyConfig).prices
+      : new Map<string, import("./dex-pricing").TokenPrice>();
     const rows = s.daily.filter((m) => BigInt(m.bucket) === d),
       values = rows.map((m) => {
         const p = s.pools.find((p) => p.poolId === m.poolId);
         return p ? aggregate(p, m, historical).volume : null;
       });
+    const total = historyConfig ? sumAvailable(values) : null;
     return {
       day: new Date(Number(d) * 86400000).toISOString().slice(0, 10),
-      volume: config.kind === "usd" && d !== day ? null : sumAvailable(values),
+      volume:
+        total !== null && config.kind === "usd"
+          ? (total * 10n ** BigInt(config.decimals)) / 10n ** BigInt(historyConfig!.decimals)
+          : total,
       swaps: rows.reduce((n, m) => n + BigInt(m.swaps), 0n),
       provisional: d === day,
       coverage: {

@@ -417,3 +417,67 @@ describe("USD reference valuation", () => {
     });
   });
 });
+
+describe("USD daily volume at USDG parity", () => {
+  it("restores completed days with six-decimal USDG precision, independently of current quotes", () => {
+    const s = snapshot();
+    s.pools[0]!.token1.decimals = 6;
+    const usd = pricingConfig("usd", {
+      PONDER_PRICING_QUOTE_USDG: s.pools[0]!.token1.address,
+      PONDER_PRICING_DECIMALS_USDG: "6",
+      PONDER_PRICING_MIN_LIQUIDITY_USDG: "0",
+    });
+    s.daily = ["10", "11"].map((bucket) => metric({ bucket, volume0: "0", volume1: "2500001" }));
+    const data = buildMarket(s, "mainnet", usd, null);
+    expect(data.volume.days.slice(-2).map((d) => d.volume)).toEqual([
+      2500001n * 10n ** 12n,
+      2500001n * 10n ** 12n,
+    ]);
+    expect(data.volume.days.at(-2)!.provisional).toBe(false);
+    expect(data.volume.days.at(-1)!.provisional).toBe(true);
+    expect(data.summary.statics.price).toBeNull();
+    expect(data.volume.days.at(-2)!.coverage).toMatchObject({ includedPools: 1, omittedPools: 0 });
+    const refs = {
+      asOf: 0,
+      allowDerived: true,
+      restricted: [],
+      prices: [
+        {
+          address: s.pools[0]!.token1.address,
+          decimals: 6,
+          valueWad: 8n * 10n ** 17n,
+          reference: {
+            source: "kraken" as const,
+            asset: s.pools[0]!.token1.address,
+            observedAt: 0,
+            fetchedAt: 0,
+            expiresAt: 900000,
+            stale: false,
+            halted: false,
+          },
+        },
+      ],
+    };
+    const depegged = buildMarket(s, "mainnet", usd, null, refs);
+    expect(depegged.tokens.items[1]!.price).toBe(8n * 10n ** 17n);
+    expect(depegged.volume.days).toEqual(data.volume.days);
+  });
+  it("matches the existing historical pool graph and preserves missing-route coverage", () => {
+    const s = snapshot();
+    s.daily = [metric({ bucket: "10" })];
+    const env = {
+      PONDER_PRICING_QUOTE_USDG: s.pools[0]!.token1.address,
+      PONDER_PRICING_DECIMALS_USDG: "18",
+      PONDER_PRICING_MIN_LIQUIDITY_USDG: "0.000000000000000001",
+    };
+    const usd = pricingConfig("usd", env),
+      usdg = pricingConfig("usdg", env);
+    expect(buildMarket(s, "mainnet", usd, null).volume.days).toEqual(
+      buildMarket(s, "mainnet", usdg, null).volume.days
+    );
+    const thin = { ...usd, historyUsdG: { ...usd.historyUsdG!, floor: 10n ** 40n } };
+    const day = buildMarket(s, "mainnet", thin, null).volume.days.at(-2)!;
+    expect(day.volume).toBeNull();
+    expect(day.coverage.omittedPools).toBe(1);
+  });
+});

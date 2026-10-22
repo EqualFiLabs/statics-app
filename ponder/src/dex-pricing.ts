@@ -72,6 +72,7 @@ export type PricingConfig = {
   symbol: string;
   floor: bigint;
   wrappedNative: string | null;
+  historyUsdG?: { address: string; decimals: number; floor: bigint };
 };
 export type TokenPrice = {
   price: Ratio;
