@@ -1,6 +1,7 @@
 import { loadEthUsd } from "./eth-usd";
 import {
   midpoint,
+  REFERENCE_FRESH_MS,
   positiveDecimal,
   USD_SCALE,
   type PriceReference,
@@ -223,13 +224,13 @@ export async function loadUsdReferences(
         fetchedAt: q.at,
         expiresAt,
         freshUntil: Math.min(
-          q.at + (source === "coinbase" ? 60_000 : 30_000),
-          q.value.observedAt + (source === "coinbase" ? 60_000 : 30_000),
-          source === "robinhood" ? registry!.at + 60_000 : Infinity
+          q.at + REFERENCE_FRESH_MS,
+          q.value.observedAt + REFERENCE_FRESH_MS,
+          source === "robinhood" ? registry!.at + REFERENCE_FRESH_MS : Infinity
         ),
         stale:
           q.stale ||
-          now - q.value.observedAt >= (source === "coinbase" ? 60_000 : 30_000) ||
+          now - q.value.observedAt >= REFERENCE_FRESH_MS ||
           (source === "robinhood" && registry!.stale),
         halted: q.value.halted,
       };
