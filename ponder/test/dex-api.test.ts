@@ -279,7 +279,7 @@ it("pins USD references through pagination and expires the cursor at the freshne
       reference: {
         source: "robinhood",
         asset: n === 1 ? pool().token0.address : pool().token1.address,
-        observedAt: now,
+        observedAt: now - 45_000,
         fetchedAt: now,
         expiresAt: now + 900000,
         stale: false,
@@ -292,8 +292,8 @@ it("pins USD references through pagination and expires the cursor at the freshne
   expect(first.status).toBe(200);
   const a = await first.json();
   expect(a.quote).toEqual({ kind: "usd", address: null, decimals: 18, symbol: "USD" });
-  expect(a.items[0].references[0]).toMatchObject({ halted: true, observedAt: now });
-  expect(a.snapshot.expiresAt).toBe(now + 30000);
+  expect(a.items[0].references[0]).toMatchObject({ halted: true, observedAt: now - 45_000 });
+  expect(a.snapshot.expiresAt).toBe(now + 75_000);
   refs.prices[0]!.valueWad = 999n * 10n ** 18n;
   const next = await app.request(
     `/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`
@@ -302,7 +302,11 @@ it("pins USD references through pagination and expires the cursor at the freshne
   const b = await next.json();
   expect(b.snapshot.id).toBe(a.snapshot.id);
   expect(b.items[0].valueLocked).toBe(a.items[0].valueLocked);
-  now += 30000;
+  now += 31_000;
+  expect(
+    (await app.request(`/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`)).status
+  ).toBe(200);
+  now += 44_000;
   expect(
     (await app.request(`/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`)).status
   ).toBe(409);
