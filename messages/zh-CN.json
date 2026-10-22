@@ -2815,7 +2815,7 @@
     "usdPricingNote": "美元估值采用当前参考价格及满足流动性门槛的池路径。历史活动以当前价格估值；缺少历史价格时，不显示历史美元图表及代币涨跌幅。",
     "referenceCurrent": "按当前美元参考价格估值。",
     "referenceHistory": "暂不提供历史美元图表及代币涨跌幅。",
-    "referenceStale": "参考价格已过时",
+    "referenceStale": "已过时",
     "referenceHalted": "交易暂停",
     "referenceExpired": "参考价格已失效",
     "referenceObserved": "报价观测于 {time}（并非标的最近成交时间）。",

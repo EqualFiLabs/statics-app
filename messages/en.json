@@ -2815,7 +2815,7 @@
     "usdPricingNote": "USD valuations use current reference prices and liquidity-qualified pool routes. Activity is valued at current prices, not historical prices. USD token changes and completed-day USD charts require historical prices and are unavailable.",
     "referenceCurrent": "Valued at current USD reference prices.",
     "referenceHistory": "Historical USD charts and token changes are unavailable.",
-    "referenceStale": "Stale reference",
+    "referenceStale": "Stale",
     "referenceHalted": "Trading halted",
     "referenceExpired": "Reference expired",
     "referenceObserved": "Quote observed {time} (not the underlying’s last trade).",

@@ -2815,7 +2815,7 @@
     "usdPricingNote": "Las valoraciones en USD usan referencias actuales y rutas con liquidez suficiente. La actividad se valora a precios actuales. Los gráficos históricos y cambios en USD no están disponibles sin precios históricos.",
     "referenceCurrent": "Valores calculados con precios de referencia actuales en USD.",
     "referenceHistory": "Los gráficos históricos y cambios de tokens en USD no están disponibles.",
-    "referenceStale": "Referencia desactualizada",
+    "referenceStale": "Desactualizado",
     "referenceHalted": "Negociación suspendida",
     "referenceExpired": "Referencia caducada",
     "referenceObserved": "Cotización observada {time} (no es la última operación del subyacente).",

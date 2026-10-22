@@ -144,6 +144,6 @@ it("labels stale and halted TVL in fee-tier creation previews", async () => {
     />
   );
   expect(await screen.findByText(/Trading halted/)).toBeInTheDocument();
-  expect(screen.getByText(/Stale reference/)).toBeInTheDocument();
+  expect(screen.getByText("Stale")).toHaveClass("ui-pill");
   expect(screen.getByText(/\$1/)).toBeInTheDocument();
 });

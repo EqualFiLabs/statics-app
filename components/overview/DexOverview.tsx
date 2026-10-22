@@ -380,7 +380,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                           <span className={styles.pill}>{t("spotFallback")}</span>
                         )}
                         {!pool.priced && <span className={styles.pill}>{t("unpriced")}</span>}
-                        <ReferenceStatus references={pool.references} compact />
+                        <ReferenceStatus references={pool.references} />
                         {noLiquidity && <span className={styles.pill}>{t("noLiquidity")}</span>}
                       </span>
                     </th>
