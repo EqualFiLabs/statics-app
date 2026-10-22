@@ -8,27 +8,6 @@ type UniswapApiResult =
   | { ok: true; status: number; payload: unknown }
   | { ok: false; status: number; payload: { errorCode: string; detail: string } | unknown };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function inputChainId(body: unknown): number | null {
-  if (!isRecord(body)) return null;
-  const direct = body.tokenInChainId ?? body.chainId;
-  const value =
-    typeof direct === "number"
-      ? direct
-      : typeof direct === "string" && /^[0-9]+$/.test(direct)
-        ? Number(direct)
-        : null;
-  if (value && Number.isSafeInteger(value)) return value;
-  return isRecord(body.quote) ? inputChainId(body.quote) : null;
-}
-
-export function getUniswapUniversalRouterVersion(body: unknown): "2.0" | "2.1.1" {
-  return inputChainId(body) === 4_663 ? "2.1.1" : "2.0";
-}
-
 export async function resolveUniswapApiKey(
   environment: ServerEnvironment = process.env
 ): Promise<string> {
@@ -88,12 +67,12 @@ export async function callUniswapApi(
   try {
     response = await fetch(`${UNISWAP_API_BASE}${pathname}`, {
       method: "POST",
+      // Omit the router version: the API defaults to 2.1.2 where deployed and 2.0 on zkSync.
       headers: {
         accept: "application/json",
         "content-type": "application/json",
         "x-api-key": apiKey,
         "x-permit2-disabled": "true",
-        "x-universal-router-version": getUniswapUniversalRouterVersion(body),
       },
       body: JSON.stringify(body),
       cache: "no-store",
