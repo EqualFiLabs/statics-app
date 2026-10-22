@@ -3164,7 +3164,11 @@
     },
     "pools": {
       "title": "Top pools",
-      "meta": "by 24h volume",
+      "meta": "by 24h USDG volume",
+      "metaFallback": "by 24h WETH volume",
+      "metaUsdFallback": "by 24h USD volume",
+      "yieldFromWeth": "Estimated using WETH prices",
+      "converted": "Converted from USDG using the indexed WETH price",
       "all": "View {count, plural, one {# pool} other {# pools}} in Markets"
     },
     "note": "Prices come from Statics pools only, time-weighted over 30 minutes where history is available; otherwise the latest observed price is used. Value in Statics adds pool liquidity, Operator backing and staked STATICS at the STATICS price. Yields are estimates, not promises.",

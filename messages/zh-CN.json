@@ -3164,7 +3164,11 @@
     },
     "pools": {
       "title": "热门资金池",
-      "meta": "按 24 小时交易量",
+      "meta": "按 USDG 计价的 24 小时交易量",
+      "metaFallback": "按 WETH 计价的 24 小时交易量",
+      "metaUsdFallback": "按 USD 计价的 24 小时交易量",
+      "yieldFromWeth": "按 WETH 价格估算",
+      "converted": "按已索引的 WETH 价格由 USDG 换算",
       "all": "在市场中查看 {count, plural, other {# 个资金池}}"
     },
     "note": "价格仅来自 Statics 池；历史数据充足时采用 30 分钟时间加权价格，否则使用最新观察价格。Statics 总价值按 STATICS 价格合计池流动性、Operator 支持资产和质押的 STATICS。收益率为估计值，并非承诺。",

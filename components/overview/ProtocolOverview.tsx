@@ -73,7 +73,12 @@ export function ProtocolOverview({
   );
   const [filter, setFilter] = useState<ActivityFilter>("all");
 
-  const dex = useDexOverview(deployment, quote, { sort: "volume", search: "" }, 30);
+  const dex = useDexOverview(
+    deployment,
+    quote,
+    { sort: "volume", search: "", limit: 100, compareQuotes: true },
+    30
+  );
   const protocol = useProtocolOverview(deployment);
   const genesis = useLaunchOverview(launch);
   const accounts = useAccounts(deployment);
@@ -288,7 +293,77 @@ export function ProtocolOverview({
     (max, day) => (day.volume !== null && day.volume > max ? day.volume : max),
     0n
   );
-  const topPools = (dex.pools.data?.items ?? []).slice(0, 5);
+  const selectedPools = dex.pools.data?.items;
+  const otherPools = dex.comparisonPools.data?.items;
+  const wethPools = quote === "weth" ? selectedPools : quote === "usdg" ? otherPools : undefined;
+  const usdgPools = quote === "usdg" ? selectedPools : otherPools;
+  const selectedById = new Map(selectedPools?.map((pool) => [pool.poolId, pool]));
+  const otherById = new Map(otherPools?.map((pool) => [pool.poolId, pool]));
+  const wethById = new Map(wethPools?.map((pool) => [pool.poolId, pool]));
+  const samePoolSnapshot =
+    dex.pools.data &&
+    dex.comparisonPools.data &&
+    dex.pools.data.indexedAtBlock === dex.comparisonPools.data.indexedAtBlock;
+  const usdgQuote = (quote === "weth" ? dex.comparisonPools.data : dex.pools.data)?.quote;
+  const usdgInWeth = dex.tokens.data?.items.find(
+    (item) => item.token.address.toLowerCase() === usdgQuote?.address?.toLowerCase()
+  );
+  const bridgeReady =
+    quote === "weth" &&
+    samePoolSnapshot &&
+    summary?.quote.kind === "weth" &&
+    usdgQuote?.kind === "usdg" &&
+    dex.tokens.data?.indexedAtBlock === dex.pools.data?.indexedAtBlock &&
+    dex.tokens.data?.quote.kind === "weth" &&
+    usdgQuote?.decimals !== null &&
+    usdgQuote?.decimals !== undefined &&
+    usdgInWeth?.priceNumerator !== null &&
+    usdgInWeth?.priceNumerator !== undefined &&
+    usdgInWeth.priceNumerator > 0n &&
+    usdgInWeth?.priceDenominator !== null &&
+    usdgInWeth?.priceDenominator !== undefined &&
+    usdgInWeth.priceDenominator > 0n;
+  // Fix ranking and yield independently of the display quote. A missing selected-quote
+  // row must not remove a ranked pool; its monetary values are unavailable instead.
+  const topPools = (
+    otherPools || dex.comparisonPools.isError ? (usdgPools ?? selectedPools ?? []) : []
+  )
+    .map((usdgPool) => {
+      const selected = selectedById.get(usdgPool.poolId);
+      const other = otherById.get(usdgPool.poolId);
+      const wethPool = wethById.get(usdgPool.poolId);
+      const amount = (key: "valueLocked" | "volume24h") => {
+        const value = selected?.[key] ?? null;
+        const comparisonAmount = other?.[key] ?? null;
+        // Convert only an implausible same-block zero. Keep tiny values and
+        // missing prices distinct from a verified zero.
+        if (quote !== "weth" || !samePoolSnapshot || value !== 0n || comparisonAmount === null)
+          return { value, converted: false };
+        if (usdgQuote?.decimals == null) return { value: null, converted: false };
+        if (comparisonAmount < 10n ** BigInt(usdgQuote.decimals))
+          return { value, converted: false };
+        if (!bridgeReady) return { value: null, converted: false };
+        const converted =
+          (comparisonAmount * usdgInWeth!.priceNumerator!) /
+          (10n ** BigInt(usdgQuote.decimals) * usdgInWeth!.priceDenominator!);
+        return converted > 0n
+          ? { value: converted, converted: true }
+          : { value: null, converted: false };
+      };
+      const locked = amount("valueLocked");
+      const volume = amount("volume24h");
+      return {
+        ...(selected ?? usdgPool),
+        priced: selected?.priced ?? false,
+        valueLocked: locked.value,
+        volume24h: volume.value,
+        convertedValueLocked: locked.converted,
+        convertedVolume24h: volume.converted,
+        estimatedYieldBps: usdgPool.estimatedYieldBps ?? wethPool?.estimatedYieldBps ?? null,
+        yieldFromWeth: usdgPool.estimatedYieldBps === null && wethPool?.estimatedYieldBps != null,
+      };
+    })
+    .slice(0, 5);
   const unavailable =
     dex.summary.isError ||
     protocol.staking.isError ||
@@ -297,6 +372,7 @@ export function ProtocolOverview({
     dex.emissions.isError ||
     dex.trades.isError ||
     dex.pools.isError ||
+    dex.comparisonPools.isError ||
     dex.tokens.isError ||
     dex.volume.isError ||
     (signedIn && (protocol.walletStatics.isError || accounts.unavailable)) ||
@@ -803,7 +879,15 @@ export function ProtocolOverview({
         <section className={styles.card} aria-labelledby="overview-pools">
           <div className={styles.cardHeading}>
             <h2 id="overview-pools">{t("pools.title")}</h2>
-            <span className={styles.secondary}>{t("pools.meta")}</span>
+            <span className={styles.secondary}>
+              {dex.comparisonPools.isError
+                ? quote === "weth"
+                  ? t("pools.metaFallback")
+                  : quote === "usd"
+                    ? t("pools.metaUsdFallback")
+                    : t("pools.meta")
+                : t("pools.meta")}
+            </span>
           </div>
           <div className={styles.tableFrame}>
             <table className={styles.table}>
@@ -819,9 +903,18 @@ export function ProtocolOverview({
                 {topPools.map((pool) => (
                   <tr key={pool.poolId}>
                     <th scope="row">{pairOf(pool)}</th>
-                    <td>{pool.priced ? money(pool.valueLocked) : "—"}</td>
-                    <td>{money(pool.volume24h)}</td>
-                    <td className={styles.up}>
+                    <td title={pool.convertedValueLocked ? t("pools.converted") : undefined}>
+                      {pool.priced || pool.convertedValueLocked
+                        ? `${pool.convertedValueLocked ? "≈ " : ""}${money(pool.valueLocked)}`
+                        : "—"}
+                    </td>
+                    <td title={pool.convertedVolume24h ? t("pools.converted") : undefined}>
+                      {`${pool.convertedVolume24h ? "≈ " : ""}${money(pool.volume24h)}`}
+                    </td>
+                    <td
+                      className={styles.up}
+                      title={pool.yieldFromWeth ? t("pools.yieldFromWeth") : undefined}
+                    >
                       {pool.estimatedYieldBps === null
                         ? "—"
                         : `${(pool.estimatedYieldBps / 100).toFixed(1)}%`}
@@ -831,9 +924,9 @@ export function ProtocolOverview({
               </tbody>
             </table>
           </div>
-          {dex.pools.data && topPools.length === 0 && (
-            <p className={styles.secondary}>{tDex("noPools")}</p>
-          )}
+          {dex.pools.data &&
+            (dex.comparisonPools.data || dex.comparisonPools.isError) &&
+            topPools.length === 0 && <p className={styles.secondary}>{tDex("noPools")}</p>}
           <Link href="/app/markets">
             {t("pools.all", { count: dex.pools.data?.total ?? topPools.length })} ›
           </Link>
