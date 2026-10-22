@@ -34,6 +34,8 @@ import { PositionListPage } from "@/components/positions/PositionListPage";
 import { PositionDetailPage } from "@/components/positions/PositionDetailPage";
 import { DeploymentOverview, MarketsOverview } from "@/components/overview/DeploymentOverview";
 import { dexFixture } from "@/lib/indexer/dex-market-fixture";
+import { DexOverview } from "@/components/overview/DexOverview";
+import type { DexQuote } from "@/lib/indexer/dex-market";
 import { ProtocolOverview } from "@/components/overview/ProtocolOverview";
 import { EMPTY_GENESIS_PORTFOLIO } from "@/lib/genesis/owned";
 import { RewardsPage } from "@/components/rewards/RewardsPage";
@@ -3615,4 +3617,42 @@ describe("compact Earn positions", () => {
     );
     expect(screen.getByRole("checkbox", { name: "Select all shown accounts" })).toBeDisabled();
   });
+});
+
+it("defaults Mainnet Markets to USD and retains USDG/WETH switching and reference labels", async () => {
+  const mainnet = {
+    ...phaseOne,
+    descriptor: { ...phaseOne.descriptor, deploymentId: "robinhood-phase-one", chainId: 4663 },
+  } as PhaseOneDeployment;
+  mocks.dex.mockImplementation(async (endpoint: string, quote: DexQuote) => {
+    const sample = dexFixture(mainnet, quote);
+    const data = sample[endpoint as keyof typeof sample];
+    return {
+      ...data,
+      observation: {
+        referenceAsOf: Date.now(),
+        referencePrices: [
+          {
+            source: "robinhood",
+            asset: tokens[0].address,
+            observedAt: Date.now() - 61000,
+            fetchedAt: Date.now() - 61000,
+            expiresAt: Date.now() + 800000,
+            stale: true,
+            halted: true,
+          },
+        ],
+      },
+    };
+  });
+  withPhaseOne(<DexOverview deployment={mainnet} />, mainnet);
+  expect(screen.getByRole("button", { name: "USD" })).toHaveAttribute("aria-pressed", "true");
+  expect(await screen.findByText(/Trading halted/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/Historical USD charts and token changes are unavailable/)
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /USDG/ }));
+  await waitFor(() => expect(mocks.dex).toHaveBeenCalledWith("summary", "usdg"));
+  fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+  await waitFor(() => expect(mocks.dex).toHaveBeenCalledWith("summary", "weth"));
 });

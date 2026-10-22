@@ -83,3 +83,38 @@ describe("liquidity market context", () => {
     expect(screen.queryByText("≈ $0.00")).not.toBeInTheDocument();
   });
 });
+
+it("renders USD currency statistics and marks stale reference provenance", () => {
+  const stats = {
+    valueLocked: 10n ** 18n,
+    volume24h: 2n * 10n ** 18n,
+    lpFees24h: 3n * 10n ** 18n,
+    estimatedYieldBps: null,
+    yieldComponents: { complete: true },
+    references: [
+      {
+        source: "robinhood",
+        asset: token,
+        observedAt: Date.now() - 61000,
+        fetchedAt: Date.now() - 61000,
+        expiresAt: Date.now() + 800000,
+        stale: true,
+        halted: false,
+      },
+    ],
+  };
+  render(
+    <PoolSummary
+      pair="SPY / NVDA"
+      fee="0.3%"
+      current={1}
+      unit="SPY/NVDA"
+      series={null}
+      stats={stats as never}
+      quote={{ kind: "usd", address: null, decimals: 18, symbol: "USD" }}
+    />
+  );
+  expect(screen.getByText("$1.00")).toBeInTheDocument();
+  expect(screen.getByText(/Stale reference/)).toBeInTheDocument();
+  expect(screen.getByText(/Valued at current USD reference prices/)).toBeInTheDocument();
+});

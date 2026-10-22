@@ -64,7 +64,7 @@ describe("DEX market responses", () => {
     ).toThrow(/incentive amount/);
   });
   it("parses every endpoint's sample response in both quote currencies", () => {
-    for (const quote of ["usdg", "weth"] as const) {
+    for (const quote of ["usd", "usdg", "weth"] as const) {
       const sample = dexFixture(deployment, quote);
       const summary = parseDexSummary(sample.summary, "dex-fixture");
       expect(summary.quote.kind).toBe(quote);
@@ -299,4 +299,30 @@ describe("LP reward projections", () => {
     pools.items[0]!.projectedLpAprBps = 999;
     expect(() => parseDexPools(pools, "dex-fixture")).toThrow("projected LP APR");
   });
+});
+
+it("requires USD to be an 18-decimal currency without an address and parses provenance", () => {
+  const sample = dexFixture(deployment, "usd");
+  const ref = {
+    source: "robinhood",
+    asset: token(2, "WETH").address,
+    observedAt: 1,
+    fetchedAt: 2,
+    expiresAt: 900001,
+    stale: true,
+    halted: true,
+  };
+  const summary = { ...sample.summary, observation: { referencePrices: [ref], referenceAsOf: 2 } };
+  expect(parseDexSummary(summary, "dex-fixture").references).toEqual([ref]);
+  expect(parseDexSummary(summary, "dex-fixture").quote.address).toBeNull();
+  for (const quote of [
+    { ...summary.quote, address: token(2, "WETH").address },
+    { ...summary.quote, decimals: 6 },
+  ])
+    expect(() => parseDexSummary({ ...summary, quote }, "dex-fixture")).toThrow(/USD currency/);
+  expect(
+    parseDexVolume(sample.volume, "dex-fixture")
+      .days.slice(0, -1)
+      .every((d) => d.volume === null)
+  ).toBe(true);
 });

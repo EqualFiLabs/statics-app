@@ -1,5 +1,8 @@
 "use client";
 
+import { useReferenceClock, referencesExpired } from "./useReferenceClock";
+import { defaultMarketQuote } from "@/lib/market/reference-prices";
+
 import { useQuery } from "@tanstack/react-query";
 import type { Address, Hex } from "viem";
 import { loadDexDepth, loadDexPools, loadDexTokens, quoteValue } from "@/lib/indexer/dex-market";
@@ -24,12 +27,14 @@ export function usePoolMarket(
   decimals: readonly [number, number],
   period: ChartPeriod
 ) {
-  const common = { retry: false, staleTime: 30_000 } as const;
+  const now = useReferenceClock();
+  const currency = defaultMarketQuote(deploymentId);
+  const common = { retry: false, staleTime: 15_000, refetchInterval: 15_000 } as const;
   const stats = useQuery({
     ...common,
-    queryKey: [dexRoot, deploymentId, "pool", poolId],
+    queryKey: [dexRoot, deploymentId, "pool", poolId, currency],
     queryFn: async () => {
-      const page = await loadDexPools(deploymentId, "usdg", { search: poolId, limit: 1 });
+      const page = await loadDexPools(deploymentId, currency, { search: poolId, limit: 1 });
       return {
         pool: page.items.find((pool) => pool.poolId.toLowerCase() === poolId.toLowerCase()) ?? null,
         quote: page.quote,
@@ -39,8 +44,8 @@ export function usePoolMarket(
   });
   const tokens = useQuery({
     ...common,
-    queryKey: [dexRoot, deploymentId, "tokens", "usdg"],
-    queryFn: () => loadDexTokens(deploymentId, "usdg"),
+    queryKey: [dexRoot, deploymentId, "tokens", currency],
+    queryFn: () => loadDexTokens(deploymentId, currency),
   });
   const depth = useQuery({
     ...common,
@@ -84,16 +89,22 @@ export function usePoolMarket(
   /** ≈ $ value of a raw token amount, or null when the token has no indexed price. */
   const usd = (token: Address, amount: bigint, tokenDecimals: number): number | null => {
     const quote = tokens.data;
-    if (quote?.quote.kind !== "usdg") return null;
+    if (quote?.quote.kind !== "usd" && quote?.quote.kind !== "usdg") return null;
     const entry = quote?.items.find(
       (item) => item.token.address.toLowerCase() === token.toLowerCase()
     );
-    return quote && entry && quote.quote.decimals !== null
+    return quote &&
+      entry &&
+      !referencesExpired(entry.references, now) &&
+      quote.quote.decimals !== null
       ? quoteValue(entry, amount, tokenDecimals, quote.quote.decimals)
       : null;
   };
   return {
-    stats: stats.data?.pool ?? null,
+    stats:
+      currency === "usd" && referencesExpired(stats.data?.pool?.references, now)
+        ? null
+        : (stats.data?.pool ?? null),
     statsQuote: stats.data?.quote ?? null,
     depth: depth.data ?? null,
     candles: candles.data ?? null,

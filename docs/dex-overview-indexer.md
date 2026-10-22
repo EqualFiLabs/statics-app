@@ -19,7 +19,7 @@ Configure addresses from reviewed deployment manifests, never guessed token symb
 
 This schema adds `dex_pool`, `dex_range`, `dex_history`, and `dex_state`. Replay into a **new** `PONDER_DATABASE_DIRECTORY` (PGlite) or PostgreSQL schema, with both Genesis and Phase 1 sources configured. Do not share a live PGlite directory between processes. Keep the current database and endpoints running until the new process reports `/ready` and `/status` reaches the desired chain head. A local mainnet fork must use its historical relay for pre-snapshot reads; Anvil alone cannot reconstruct inherited logs. Do not reset the active database or infer missing liquidity when replay prerequisites are absent.
 
-The Ponder source imports `lib/indexer/statement-movements.ts` through a relative path. A copied rehearsal project must retain that relative shared module as well as the vendored SDK dependencies. Ponder 0.17.4's committed `_ponder_checkpoint` and build identity are read in the same database snapshot as source rows; tests pin the checkpoint encoding. `/status` remains the public source of freshness. Last market-event time is not a checkpoint.
+The Ponder source imports `lib/indexer/statement-movements.ts` and the USD adapters under `lib/server` and `lib/market` through relative paths. A copied rehearsal project must retain that relative shared module as well as the vendored SDK dependencies. Ponder 0.17.4's committed `_ponder_checkpoint` and build identity are read in the same database snapshot as source rows; tests pin the checkpoint encoding. `/status` remains the public source of freshness. Last market-event time is not a checkpoint.
 
 ## Accounting
 
@@ -55,7 +55,7 @@ LP schedules are projected to the checkpoint before projecting the following sev
 
 ## Endpoints and pagination
 
-Every endpoint accepts `quote=usdg|weth` and returns deployment, committed block/time and actual quote metadata. Amounts are decimal strings. Null means unavailable; totals sum available contributions and include per-metric coverage, so a partial total is not presented as complete.
+Every endpoint accepts `quote=usd|usdg|weth` (omitting it still requests USDG) and returns deployment, committed block/time and actual quote metadata. Amounts are decimal strings. Null means unavailable; totals sum available contributions and include per-metric coverage, so a partial total is not presented as complete.
 
 | Route                         | Parameters and response                                                                |
 | ----------------------------- | -------------------------------------------------------------------------------------- |
@@ -66,7 +66,7 @@ Every endpoint accepts `quote=usdg|weth` and returns deployment, committed block
 | `/phase-one/market/emissions` | Observed period and allocation weight distribution                                     |
 | `/phase-one/market/trades`    | `limit` default 8, range 1–50; latest external trades, settlement/source and log index |
 
-Pool ordering is numeric, null-last, with ascending PoolId ties. A traversal pins an immutable in-memory five-minute snapshot and binds its cursor to deployment, quote, search, sorting and page size. New trading cannot change those pages. Malformed/mismatched cursors return 400; expiry, replay/reorganization or bounded-cache eviction returns 409 `MARKET_SNAPSHOT_CHANGED`. Restart from the first page. Database results are shared across endpoints for 15 seconds, with a 50 MiB / 16-snapshot cache bound. The API does not submit transactions or make RPC calls.
+Pool ordering is numeric, null-last, with ascending PoolId ties. A traversal pins an immutable in-memory snapshot for up to five minutes, shortened to the required reference prices’ freshness/expiry boundary in USD mode and binds its cursor to deployment, quote, search, sorting and page size. New trading cannot change those pages. Malformed/mismatched cursors return 400; expiry, replay/reorganization or bounded-cache eviction returns 409 `MARKET_SNAPSHOT_CHANGED`. Restart from the first page. Database results are shared across endpoints for 15 seconds, with a 50 MiB / 16-snapshot cache bound. The API does not submit transactions or make RPC calls. USD requests fetch/cache reference prices server-side, outside indexing handlers. Responses use `Cache-Control: no-store` so their status cannot outlive pinned prices.
 
 The client uses strict parsers, reads subsequent pages, retains section-specific quote formatting, labels estimates/fallback/coverage, and shows incomplete account holdings explicitly. Development fixtures obey filtering, pagination, empty deployments, day ranges and emission normalization. `NEXT_PUBLIC_DEX_OVERVIEW_FIXTURES` is ignored in production.
 
@@ -89,7 +89,7 @@ indexed active liquidity, the spot tick/price, tick spacing, observation block/t
 `liquidityComplete`. It uses the same committed market snapshot and performs no RPC reads.
 The liquidity screen hides depth bars when inherited range coverage is incomplete. History
 windows use the indexed clock, including on time-warped forks, and do not extend chart history
-before the first available candle. Pool statistics retain the response's USDG or WETH quote;
+before the first available candle. Mainnet liquidity statistics and creation previews request USD. Other deployments retain USDG defaults. Pool statistics retain the response's USD, USDG or WETH quote;
 WETH values are never formatted as dollars. Empty or failed market responses leave onchain
 liquidity management available.
 
@@ -118,3 +118,19 @@ transactions and public protocol data refreshes every 30 seconds.
 The Operator supply chart shows current vault inventory and circulation without assuming
 that the initial treasury allocation is still held. Expired activated gauge periods are
 separate from reserves that have never been activated and from unavailable emissions data.
+
+## Current USD reference prices
+
+Robinhood Mainnet (`robinhood-phase-one`, chain 4663) defaults to USD in Markets, Overview and liquidity screens, with USDG/WETH selectors retained on dashboards. The API omitted-quote default remains USDG for older clients. USD is a currency, `{kind: "usd", address: null, symbol: "USD", decimals: 18}`; amounts and exact price ratios use 18-decimal USD units, never an ETH placeholder address.
+
+Server-side adapters use Robinhood’s [asset registry and price API](https://docs.robinhood.com/chain/stock-token-apis/), the existing Coinbase ETH/USD adapter, and [Kraken’s USDG/USD bid/ask ticker](https://docs.kraken.com/api-reference/market-data/get-ticker-information). Match Stock Tokens by both chain ID and contract address before requesting their symbol. Prefer already adjusted `tokenBid`/`tokenAsk`; otherwise multiply the raw bid/ask midpoint by the registry’s `currentMultiplier` exactly once. Reject malformed, crossed, nonpositive or mismatched quotes. Decimal parsing and valuation use integer/rational arithmetic. USDG uses its actual midpoint, including deviations from one dollar. ETH/native equivalence requires the reviewed `PONDER_PRICING_WRAPPED_NATIVE` setting, which also identifies the Coinbase-priced WETH. USDG uses the configured USDG address and decimals.
+
+Reference prices seed the existing deterministic, liquidity-qualified graph and take precedence over pool prices. The USD floor is 2500 USD by default (`PONDER_PRICING_MIN_LIQUIDITY_USD`), with 18 decimals; route depth, hop and pool-ID tie rules remain unchanged. Mapped stocks without a valid reference are blocked from pool fallback. If registry identity cannot be established, derived USD prices fail closed; independently available ETH/USDG references still display. Mainnet mappings are never applied on another chain.
+
+Stock/USDG quotes cache for 30 seconds, registry metadata for 60 seconds, and ETH retains its 60-second cache. Requests coalesce, use four-second timeouts, and share a four-request concurrency bound. Failed refreshes have a 30-second retry cooldown. Last valid prices are retained for at most 15 minutes (also bounded by stock quote observation and registry age), marked stale; after that they are unavailable. Kraken and Coinbase observation time denotes local quote retrieval, not the underlying’s last trade. Robinhood observation time is `generatedAt`, also distinct from last trade time.
+
+`observation.referencePrices` contains `{source, asset, observedAt, fetchedAt, freshUntil, expiresAt, stale, halted}`; all times are Unix milliseconds. `referenceAsOf` identifies the immutable calculation snapshot; indexed checkpoint times remain chain timestamps in seconds. Tokens, pools, trades and incentive values carry their contributing `references`, including downstream derived-price provenance. Pool metadata includes references used for rewards as well as principal. The UI displays provider observation times and stale/halt status. Stale or halted references may value current holdings, but cannot provide automatic pool starting-price suggestions. Suggestions also require non-fallback pool routes and never replace a typed price on refresh.
+
+TVL, 24-hour activity, reward values, projected LP APR and trailing yield all use the pinned current USD prices, preserving existing indexed quantities and reward formulas. Activity is explicitly labeled **current reference prices**, including previous-window comparisons. Completed-day USD volumes and USD token/STATICS changes remain null: current quotes are never backdated. The current day may show a provisional current-price valuation. Pool pair-price history and candles are unaffected. Totals keep their existing included/omitted pool coverage and display partial values when pricing is incomplete.
+
+This release requires no contract changes, database migration or replay. Historical USD persistence/backfill is excluded. Production rollout is separate: deploy the compatible indexer API before the frontend, retaining production’s existing optimized snapshot queries and daily netting.

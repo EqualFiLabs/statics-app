@@ -1,5 +1,6 @@
 "use client";
 
+import { ReferenceStatus } from "@/components/overview/ReferenceStatus";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/i18n/client";
 import type { DexPool, DexPoolPage } from "@/lib/indexer/dex-market";
@@ -33,7 +34,7 @@ export function PoolSummary({
       ? "—"
       : quote.kind === "weth"
         ? `${new Intl.NumberFormat(locale, { maximumSignificantDigits: 6 }).format(Number(value) / 10 ** quote.decimals)} ${quote.symbol ?? "WETH"}`
-        : `≈ ${new Intl.NumberFormat(locale, {
+        : `${quote.kind === "usdg" ? "≈ " : ""}${new Intl.NumberFormat(locale, {
             style: "currency",
             currency: "USD",
             notation: "compact",
@@ -114,6 +115,7 @@ export function PoolSummary({
           </div>
         </dl>
       )}
+      {quote?.kind === "usd" && <ReferenceStatus references={stats?.references} historical />}
       {children}
     </section>
   );

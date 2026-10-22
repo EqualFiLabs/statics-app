@@ -2718,7 +2718,8 @@
     "quoteLabel": "Mostrar valores en",
     "quote": {
       "usdg": "≈ $ (USDG)",
-      "weth": "WETH"
+      "weth": "WETH",
+      "usd": "USD"
     },
     "unavailable": "Los datos de mercado aún no están disponibles. Aparecerán cuando el indexador los sirva.",
     "loading": "Cargando…",
@@ -2810,7 +2811,15 @@
     "projectedAprHelp": "Estimación media del pool con precios actuales de las recompensas y valor de LP gestionada elegible. Los depósitos adicionales diluyen la APR. Tu rendimiento depende de tu rango y del tiempo dentro de él.",
     "projectedAprNote": "La APR proyectada anualiza la tasa actual de recompensas LP sobre la liquidez gestionada elegible a precios actuales, usando 52 semanas sin capitalización. Excluye recompensas de asignadores y comisiones de negociación; los LP conservan sus comisiones nativas además de estas recompensas. La tasa se aplica mientras haya fondos; las aportaciones, los precios y la liquidez pueden cambiarla.",
     "rewardsPaused": "Recompensas pausadas: sin LP en rango",
-    "eligibleLpValue": "Valor LP gestionado elegible: {value}"
+    "eligibleLpValue": "Valor LP gestionado elegible: {value}",
+    "usdPricingNote": "Las valoraciones en USD usan referencias actuales y rutas con liquidez suficiente. La actividad se valora a precios actuales. Los gráficos históricos y cambios en USD no están disponibles sin precios históricos.",
+    "referenceCurrent": "Valores calculados con precios de referencia actuales en USD.",
+    "referenceHistory": "Los gráficos históricos y cambios de tokens en USD no están disponibles.",
+    "referenceStale": "Referencia desactualizada",
+    "referenceHalted": "Negociación suspendida",
+    "referenceExpired": "Referencia caducada",
+    "referenceObserved": "Cotización observada {time} (no es la última operación del subyacente).",
+    "referenceFresh": "Precio de referencia"
   },
   "rangeChart": {
     "description": "Precio actual {current} {unit}. Rango de {min} a {max}.",

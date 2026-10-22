@@ -1,4 +1,7 @@
 "use client";
+
+import { defaultMarketQuote } from "@/lib/market/reference-prices";
+import { ReferenceStatus } from "./ReferenceStatus";
 import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -65,7 +68,9 @@ export function ProtocolOverview({
   const tLaunch = useTranslations("launchOverview");
   const locale = useAppLocale();
   const walletState = useWalletState();
-  const [quote, setQuote] = useState<DexQuote>("usdg");
+  const [quote, setQuote] = useState<DexQuote>(
+    defaultMarketQuote(deployment.descriptor.deploymentId)
+  );
   const [filter, setFilter] = useState<ActivityFilter>("all");
 
   const dex = useDexOverview(deployment, quote, { sort: "volume", search: "" }, 30);
@@ -312,7 +317,13 @@ export function ProtocolOverview({
           <div className={styles.headerTools}>
             {dex.fixtures && <span className={styles.sample}>{tDex("sample")}</span>}
             <div className={styles.segmented} role="group" aria-label={tDex("quoteLabel")}>
-              {(["usdg", "weth"] as const).map((value) => (
+              {(
+                [
+                  ...(deployment.descriptor.chainId === 4663 ? ["usd" as const] : []),
+                  "usdg",
+                  "weth",
+                ] as const
+              ).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -328,6 +339,7 @@ export function ProtocolOverview({
       />
       <p className={styles.live}>{launch ? t("liveGenesis") : t("livePhaseOne")}</p>
 
+      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} historical />}
       {unavailable && (
         <p className={styles.notice} role="alert">
           {t("unavailable")}

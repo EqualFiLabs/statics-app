@@ -2718,7 +2718,8 @@
     "quoteLabel": "数值显示为",
     "quote": {
       "usdg": "≈ $（USDG）",
-      "weth": "WETH"
+      "weth": "WETH",
+      "usd": "USD"
     },
     "unavailable": "市场数据暂不可用。索引器提供后即会显示。",
     "loading": "加载中…",
@@ -2810,7 +2811,15 @@
     "projectedAprHelp": "按当前奖励价格和符合条件的托管 LP 价值估算的池平均值。新增存款会稀释年化收益率。个人回报取决于价格区间及处于区间内的时间。",
     "projectedAprNote": "预计 LP 年化收益率按当前价格，以当前 LP 奖励速率除以符合条件的托管流动性价值，再按 52 周计算，不计复利。不含分配者奖励和交易手续费；LP 额外保留原生手续费。该速率仅在资金持续期间适用，追加奖励、价格和流动性变化均会改变结果。",
     "rewardsPaused": "奖励已暂停：没有区间内 LP",
-    "eligibleLpValue": "符合条件的托管 LP 价值：{value}"
+    "eligibleLpValue": "符合条件的托管 LP 价值：{value}",
+    "usdPricingNote": "美元估值采用当前参考价格及满足流动性门槛的池路径。历史活动以当前价格估值；缺少历史价格时，不显示历史美元图表及代币涨跌幅。",
+    "referenceCurrent": "按当前美元参考价格估值。",
+    "referenceHistory": "暂不提供历史美元图表及代币涨跌幅。",
+    "referenceStale": "参考价格已过时",
+    "referenceHalted": "交易暂停",
+    "referenceExpired": "参考价格已失效",
+    "referenceObserved": "报价观测于 {time}（并非标的最近成交时间）。",
+    "referenceFresh": "参考价格"
   },
   "rangeChart": {
     "description": "当前价格 {current} {unit}。区间 {min} 至 {max}。",

@@ -1,7 +1,7 @@
 import { formatUnits } from "viem";
-import type { DexToken, DexQuote } from "@/lib/indexer/dex-market";
+import type { DexQuoteCurrency } from "@/lib/indexer/dex-market";
 
-export type QuoteToken = DexToken & Readonly<{ kind: DexQuote }>;
+export type QuoteToken = DexQuoteCurrency;
 
 /** A compact count or amount; tiny positive values switch to scientific rather than show 0. */
 export function compactNumber(locale: string, value: number, digits = 2): string {
@@ -28,8 +28,8 @@ export function quoteAmount(
   const amount = Number(formatUnits(value, q.decimals ?? 18));
   const fraction =
     price && amount > 0 && amount < 1 ? Math.min(12, Math.ceil(-Math.log10(amount)) + 3) : 2;
-  if (q.kind === "usdg")
-    return `≈ ${new Intl.NumberFormat(locale, {
+  if (q.kind === "usdg" || q.kind === "usd")
+    return `${q.kind === "usdg" ? "≈ " : ""}${new Intl.NumberFormat(locale, {
       style: "currency",
       currency: "USD",
       notation: price ? "standard" : "compact",
