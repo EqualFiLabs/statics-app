@@ -4,6 +4,7 @@ import {
   absoluteAmount,
   aggregateMarketCandles,
   candleBucket,
+  isZeroForOneSwap,
   marketSwapMetrics,
   marketCandleKey,
   readMarketResolution,
@@ -33,6 +34,11 @@ describe("canonical market candles", () => {
     expect(absoluteAmount(-42n)).toBe(42n);
     expect(candleBucket(179n)).toBe(120n);
     expect(marketCandleKey("launch", `0x${"12".repeat(32)}`, 179n)).toContain(":120");
+  });
+
+  it("reads swap direction from the swapper's v4 balance delta", () => {
+    expect(isZeroForOneSwap(-100n)).toBe(true);
+    expect(isZeroForOneSwap(100n)).toBe(false);
   });
 
   it("derives absolute volumes and token1-per-token0 execution price", () => {
