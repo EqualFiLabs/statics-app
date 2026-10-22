@@ -1,5 +1,9 @@
 "use client";
 
+import { ReferenceStatus } from "@/components/overview/ReferenceStatus";
+import { useReferenceClock, referencesExpired } from "@/hooks/useReferenceClock";
+import { defaultMarketQuote } from "@/lib/market/reference-prices";
+
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -51,6 +55,8 @@ export function NewPositionPair({
   onExisting: (poolId: Hex) => void;
   onCreate: (draft: CreatePoolDraft) => void;
 }) {
+  const now = useReferenceClock();
+  const currency = defaultMarketQuote(deployment.descriptor.deploymentId);
   const t = useTranslations("createPool");
   const ux = useTranslations("liquidityUx");
   const publicClient = usePublicClient({ chainId: deployment.descriptor.chainId });
@@ -109,13 +115,15 @@ export function NewPositionPair({
     },
   });
   const tvl = useQuery({
-    queryKey: [dexRoot, deployment.descriptor.deploymentId, "pools", "usdg", "creation"],
-    staleTime: 60_000,
+    queryKey: [dexRoot, deployment.descriptor.deploymentId, "pools", currency, "creation"],
+    staleTime: 15_000,
+    refetchInterval: 15_000,
     retry: false,
     queryFn: async () => {
-      const page = await loadDexPools(deployment.descriptor.deploymentId, "usdg", { limit: 100 });
+      const page = await loadDexPools(deployment.descriptor.deploymentId, currency, { limit: 100 });
       return {
         quote: page.quote,
+        references: page.references,
         byPool: new Map(page.items.map((pool) => [pool.poolId.toLowerCase(), pool.valueLocked])),
       };
     },
@@ -178,9 +186,15 @@ export function NewPositionPair({
   })();
 
   const money = (value: bigint | null | undefined) => {
-    if (value == null || !tvl.data || tvl.data.quote.decimals === null) return null;
+    if (
+      value == null ||
+      !tvl.data ||
+      tvl.data.quote.decimals === null ||
+      (currency === "usd" && referencesExpired(tvl.data.references, now))
+    )
+      return null;
     const amount = Number(value) / 10 ** tvl.data.quote.decimals;
-    return tvl.data.quote.kind === "usdg"
+    return tvl.data.quote.kind === "usd" || tvl.data.quote.kind === "usdg"
       ? new Intl.NumberFormat(undefined, {
           style: "currency",
           currency: "USD",
@@ -261,6 +275,7 @@ export function NewPositionPair({
         })}
       </div>
 
+      {currency === "usd" && <ReferenceStatus references={tvl.data?.references} />}
       <details
         className={styles.advanced}
         open={advanced}

@@ -1,4 +1,5 @@
 "use client";
+import { useReferenceClock, referencesExpired } from "./useReferenceClock";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { PhaseOneDeployment } from "@/lib/deployments/types";
 import {
@@ -30,6 +31,12 @@ export function useDexOverview(
   pools: Readonly<{ sort: string; search: string }>,
   days: number
 ) {
+  const now = useReferenceClock();
+  const current = <
+    T extends { references?: readonly import("@/lib/market/reference-prices").PriceReference[] },
+  >(
+    data: T | undefined
+  ) => (quote === "usd" && referencesExpired(data?.references, now) ? undefined : data);
   const id = deployment.descriptor.deploymentId;
   const fixtures = dexOverviewFixturesEnabled();
   const sample = (options: Parameters<typeof dexFixture>[2] = {}) =>
@@ -57,7 +64,7 @@ export function useDexOverview(
   });
   const volume = useQuery({
     ...common,
-    refetchInterval: false,
+    refetchInterval: quote === "usd" ? LIVE_MS : false,
     queryKey: [dexRoot, id, "volume", quote, days],
     queryFn: () =>
       fixtures ? parseDexVolume(sample({ days }).volume, id) : loadDexVolume(id, quote, days),
@@ -75,17 +82,18 @@ export function useDexOverview(
   });
   const hookFees = usePoolFeeRates(id, !fixtures);
   return {
-    summary,
+    summary: { ...summary, data: current(summary.data) },
     pools: {
       ...poolPage,
-      data: poolPage.data
-        ? { ...poolPage.data.pages[0]!, items: poolPage.data.pages.flatMap((page) => page.items) }
-        : undefined,
+      data:
+        poolPage.data && current(poolPage.data.pages[0])
+          ? { ...poolPage.data.pages[0]!, items: poolPage.data.pages.flatMap((page) => page.items) }
+          : undefined,
     },
-    tokens,
-    volume,
-    emissions,
-    trades,
+    tokens: { ...tokens, data: current(tokens.data) },
+    volume: { ...volume, data: current(volume.data) },
+    emissions: { ...emissions, data: current(emissions.data) },
+    trades: { ...trades, data: current(trades.data) },
     hookFees: hookFees.data ?? null,
     fixtures,
   };

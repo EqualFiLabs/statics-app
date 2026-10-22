@@ -32,14 +32,19 @@ export function dexFixture(
   const quoteDecimals = quote === "usdg" ? 6 : 18;
   const quoteToken = {
     kind: quote,
-    address: quote === "usdg" ? "0x0000000000000000000000000000000000000d01" : weth,
-    symbol: quote === "usdg" ? "USDG" : "WETH",
+    address:
+      quote === "usd"
+        ? null
+        : quote === "usdg"
+          ? "0x0000000000000000000000000000000000000d01"
+          : weth,
+    symbol: quote.toUpperCase(),
     decimals: quoteDecimals,
   };
   /** A dollar figure in quote units. */
   const usd = (dollars: number) => {
     const cents = BigInt(Math.round(dollars * 100));
-    return quote === "usdg"
+    return quote !== "weth"
       ? String((cents * scale(quoteDecimals)) / 100n)
       : String((cents * scale(18)) / 100n / ETH_USD);
   };
@@ -119,7 +124,7 @@ export function dexFixture(
   const tokenItems = tokens.slice(0, 10).map((t, index) => ({
     token: tokenOf(t),
     price: usd(t.address.toLowerCase() === weth.toLowerCase() ? 2601 : 0.0115 + index * 31.7),
-    change24hBps: ((index * 97) % 500) - 150,
+    change24hBps: quote === "usd" ? null : ((index * 97) % 500) - 150,
     volume24h: usd(285_000 / (1 + index)),
     priceNumerator: usd(
       t.address.toLowerCase() === weth.toLowerCase() ? 2601 : 0.0115 + index * 31.7
@@ -210,7 +215,11 @@ export function dexFixture(
       },
       activePools: pools.length,
       unpricedPools: poolItems.filter((pool) => !pool.priced).length,
-      statics: { price: usd(0.01149), change24hBps: 310, priceFallback: false },
+      statics: {
+        price: usd(0.01149),
+        change24hBps: quote === "usd" ? null : 310,
+        priceFallback: false,
+      },
     },
     pools: {
       ...base,
@@ -226,7 +235,7 @@ export function dexFixture(
         index,
       })).map(({ value, index }, _, shown) => ({
         day: day(shown.length - 1 - index),
-        volume: usd(value * 2601),
+        volume: quote === "usd" && index !== shown.length - 1 ? null : usd(value * 2601),
         swaps: String(value * 8),
         provisional: index === (options.days ?? 30) - 1,
         coverage: { includedPools: pools.length, omittedPools: 0, historyComplete: true },

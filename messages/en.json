@@ -2718,7 +2718,8 @@
     "quoteLabel": "Show values in",
     "quote": {
       "usdg": "≈ $ (USDG)",
-      "weth": "WETH"
+      "weth": "WETH",
+      "usd": "USD"
     },
     "unavailable": "Market data is not available yet. Figures will appear once the indexer serves them.",
     "loading": "Loading…",
@@ -2810,7 +2811,15 @@
     "projectedAprHelp": "Pool-average estimate at current reward prices and eligible managed LP value. Additional deposits dilute APR. Your return depends on your range and time in range.",
     "projectedAprNote": "Projected LP APR annualises the current LP reward rate over eligible managed liquidity at current prices, using 52 weeks without compounding. Allocator rewards and trading fees are excluded; LPs retain their native fees on top. This rate applies while funding lasts; top-ups, prices and liquidity can change it.",
     "rewardsPaused": "Rewards paused: no in-range LPs",
-    "eligibleLpValue": "Eligible managed LP value: {value}"
+    "eligibleLpValue": "Eligible managed LP value: {value}",
+    "usdPricingNote": "USD valuations use current reference prices and liquidity-qualified pool routes. Activity is valued at current prices, not historical prices. USD token changes and completed-day USD charts require historical prices and are unavailable.",
+    "referenceCurrent": "Valued at current USD reference prices.",
+    "referenceHistory": "Historical USD charts and token changes are unavailable.",
+    "referenceStale": "Stale",
+    "referenceHalted": "Trading halted",
+    "referenceExpired": "Reference expired",
+    "referenceObserved": "Quote observed {time} (not the underlying’s last trade).",
+    "referenceFresh": "Reference price"
   },
   "rangeChart": {
     "description": "Current price {current} {unit}. Range {min} to {max}.",

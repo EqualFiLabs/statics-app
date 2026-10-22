@@ -1,5 +1,8 @@
 "use client";
 
+import { useReferenceClock } from "@/hooks/useReferenceClock";
+import { defaultMarketQuote, referenceUsable } from "@/lib/market/reference-prices";
+
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -36,6 +39,7 @@ export function CreatePoolStep({
   onCreated: (pool: SupportedPublicPool) => void;
   onBack: () => void;
 }) {
+  const currency = defaultMarketQuote(deployment.descriptor.deploymentId);
   const t = useTranslations("createPool");
   const ux = useTranslations("liquidityUx");
   const action = usePhaseOneAction(
@@ -43,6 +47,7 @@ export function CreatePoolStep({
     `create:${draft.tokenA.address}:${draft.tokenB.address}`
   );
   const [inverted, setInverted] = useState(false);
+  const referenceNow = useReferenceClock();
   const [price, setPrice] = useState<string | null>(null);
   const [activatePol, setActivatePol] = useState(false);
   const { tokenA, tokenB, tier, staticsFee } = draft;
@@ -77,16 +82,20 @@ export function CreatePoolStep({
   });
   // Suggest a starting price from indexed USDG prices when both tokens have one.
   const market = useQuery({
-    queryKey: [dexRoot, deployment.descriptor.deploymentId, "tokens", "usdg"],
-    staleTime: 30_000,
+    queryKey: [dexRoot, deployment.descriptor.deploymentId, "tokens", currency],
+    staleTime: 15_000,
+    refetchInterval: 15_000,
     retry: false,
-    queryFn: () => loadDexTokens(deployment.descriptor.deploymentId, "usdg"),
+    queryFn: () => loadDexTokens(deployment.descriptor.deploymentId, currency),
   });
   const usd = (token: typeof tokenA) => {
     const entry = market.data?.items.find(
       (item) => item.token.address.toLowerCase() === token.address.toLowerCase()
     );
-    return entry && market.data?.quote.decimals != null
+    return entry &&
+      referenceUsable(entry.references, referenceNow) &&
+      (currency !== "usd" || (entry.references?.length && !entry.priceFallback)) &&
+      market.data?.quote.decimals != null
       ? quoteValue(entry, 10n ** BigInt(token.decimals), token.decimals, market.data.quote.decimals)
       : null;
   };

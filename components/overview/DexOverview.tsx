@@ -1,4 +1,7 @@
 "use client";
+
+import { defaultMarketQuote } from "@/lib/market/reference-prices";
+import { ReferenceStatus } from "./ReferenceStatus";
 import { PoolSwapFee } from "@/components/common/PoolSwapFee";
 import Link from "next/link";
 import { AppPageHeader } from "@/components/app-shell/AppPageHeader";
@@ -25,7 +28,9 @@ const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) {
   const t = useTranslations("dexOverview");
   const locale = useAppLocale();
-  const [quote, setQuote] = useState<DexQuote>("usdg");
+  const [quote, setQuote] = useState<DexQuote>(
+    defaultMarketQuote(deployment.descriptor.deploymentId)
+  );
   const [sort, setSort] = useState<(typeof SORTS)[number]>("volume");
   const [search, setSearch] = useState("");
   const [days, setDays] = useState(30);
@@ -177,7 +182,13 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
           <div className={styles.headerTools}>
             {dex.fixtures && <span className={styles.sample}>{t("sample")}</span>}
             <div className={styles.segmented} role="group" aria-label={t("quoteLabel")}>
-              {(["usdg", "weth"] as const).map((value) => (
+              {(
+                [
+                  ...(deployment.descriptor.chainId === 4663 ? ["usd" as const] : []),
+                  "usdg",
+                  "weth",
+                ] as const
+              ).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -198,6 +209,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
       {quoteToken?.kind !== quote && quoteToken && (
         <p className={styles.notice}>{t("quoteFallback")}</p>
       )}
+      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} historical />}
       {unavailable && (
         <p className={styles.notice} role="alert">
           {t("unavailable")}
@@ -287,7 +299,8 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                 !day.coverage.historyComplete || day.coverage.omittedPools > 0 || undefined
               }
               style={{
-                height: `${day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                height: `${quote === "usd" && day.volume === null ? 0 : day.volume === null || maxBar === 0n ? 2 : Math.max(2, Number((day.volume * 100n) / maxBar))}%`,
+                visibility: quote === "usd" && day.volume === null ? "hidden" : undefined,
               }}
               title={`${day.day}: ${money(day.volume, false, dex.volume.data?.quote)}${!day.coverage.historyComplete || day.coverage.omittedPools > 0 ? ` · ${t("incompleteHistory")}` : ""}`}
             />
@@ -367,6 +380,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                           <span className={styles.pill}>{t("spotFallback")}</span>
                         )}
                         {!pool.priced && <span className={styles.pill}>{t("unpriced")}</span>}
+                        <ReferenceStatus references={pool.references} />
                         {noLiquidity && <span className={styles.pill}>{t("noLiquidity")}</span>}
                       </span>
                     </th>
@@ -638,7 +652,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
         </section>
       )}
 
-      <p className={styles.footnote}>{t("pricingNote")}</p>
+      <p className={styles.footnote}>{t(quote === "usd" ? "usdPricingNote" : "pricingNote")}</p>
     </div>
   );
 }

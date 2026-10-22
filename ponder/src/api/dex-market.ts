@@ -1,3 +1,4 @@
+import { loadUsdReferences } from "../../../lib/server/usd-reference-prices";
 import { createHash } from "node:crypto";
 import { db } from "ponder:api";
 import { Hono } from "hono";
@@ -14,6 +15,7 @@ type Stored = {
   data: BuiltMarket;
   snapshot: DexSnapshot;
   config: string;
+  created: number;
 };
 export function marketQuery(params: URLSearchParams) {
   const quote = params.get("quote") ?? "usdg",
@@ -27,7 +29,7 @@ export function marketQuery(params: URLSearchParams) {
   const limit = integer("limit", 25, 100),
     days = integer("days", 30, 90);
   if (
-    !["usdg", "weth"].includes(quote) ||
+    !["usd", "usdg", "weth"].includes(quote) ||
     !["volume", "valueLocked", "fees", "yield", "apr", "created"].includes(sort) ||
     !["asc", "desc"].includes(direction) ||
     search.length > 256 ||
@@ -35,7 +37,7 @@ export function marketQuery(params: URLSearchParams) {
     days === null
   )
     return null;
-  return { quote: quote as "usdg" | "weth", sort, direction, search, limit, days };
+  return { quote: quote as "usd" | "usdg" | "weth", sort, direction, search, limit, days };
 }
 type Query = NonNullable<ReturnType<typeof marketQuery>>;
 const scope = (deployment: string, q: Query) =>
@@ -85,26 +87,51 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
     cache = new Map<string, Stored>();
   const send = (_context: unknown, body: unknown) =>
     new Response(wire(body), {
-      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=5" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   const trim = () => {
     for (const [id, s] of cache) if (s.expires <= clock()) cache.delete(id);
   };
-  async function current(quote: "usdg" | "weth") {
+  async function current(quote: "usd" | "usdg" | "weth") {
     trim();
     const config = pricingConfig(quote),
       configKey = wire(config);
     const recently = [...cache.values()].find(
-      (s) => s.config === configKey && s.expires - clock() > TTL - 15_000
+      (s) => s.config === configKey && clock() - s.created < 15_000
     );
     if (recently && (await valid(recently))) return recently;
     const result = await db.execute(marketSnapshotSql(deployment));
     const snapshot = (result.rows[0] as { payload: DexSnapshot }).payload;
+    const references =
+      quote === "usd"
+        ? await loadUsdReferences(
+            {
+              chainId: Number(process.env.PONDER_CHAIN_ID),
+              tokens: [
+                ...snapshot.tokens,
+                ...snapshot.pools.flatMap((p) => [p.token0, p.token1]),
+                ...(config.wrappedNative ? [{ address: config.wrappedNative, decimals: 18 }] : []),
+                ...(process.env.PONDER_PRICING_QUOTE_USDG
+                  ? [
+                      {
+                        address: process.env.PONDER_PRICING_QUOTE_USDG,
+                        decimals: Number(process.env.PONDER_PRICING_DECIMALS_USDG ?? 6),
+                      },
+                    ]
+                  : []),
+              ],
+              weth: config.wrappedNative,
+              usdg: process.env.PONDER_PRICING_QUOTE_USDG ?? null,
+            },
+            clock()
+          )
+        : undefined;
     const data = buildMarket(
       snapshot,
       deployment,
       config,
-      process.env.PONDER_STATICS_TOKEN_ADDRESS ?? null
+      process.env.PONDER_STATICS_TOKEN_ADDRESS ?? null,
+      references
     );
     const id = createHash("sha256")
       .update(
@@ -129,7 +156,27 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
       if (!first) break;
       cache.delete(first);
     }
-    const stored = { id, expires: clock() + TTL, size, data, snapshot, config: configKey };
+    // Fresh flags must not survive the quote TTL; stale snapshots cannot outlive last-good prices.
+    const priceExpiry =
+      references?.prices.map((p) =>
+        p.reference.stale
+          ? p.reference.expiresAt
+          : Math.min(
+              p.reference.freshUntil ?? Infinity,
+              p.reference.expiresAt,
+              p.reference.fetchedAt + (p.reference.source === "coinbase" ? 60_000 : 30_000),
+              p.reference.observedAt + (p.reference.source === "coinbase" ? 60_000 : 30_000)
+            )
+      ) ?? [];
+    const stored = {
+      id,
+      created: clock(),
+      expires: Math.min(clock() + TTL, ...priceExpiry),
+      size,
+      data,
+      snapshot,
+      config: configKey,
+    };
     cache.set(id, stored);
     return stored;
   }
