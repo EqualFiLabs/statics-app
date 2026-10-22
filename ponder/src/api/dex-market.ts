@@ -1,3 +1,4 @@
+import { REFERENCE_FRESH_MS } from "../../../lib/market/reference-prices";
 import { loadUsdReferences } from "../../../lib/server/usd-reference-prices";
 import { createHash } from "node:crypto";
 import { db } from "ponder:api";
@@ -156,7 +157,7 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
       if (!first) break;
       cache.delete(first);
     }
-    // Fresh flags must not survive the quote TTL; stale snapshots cannot outlive last-good prices.
+    // Fresh flags cannot outlive the shared freshness deadline; stale snapshots expire with last-good prices.
     const priceExpiry =
       references?.prices.map((p) =>
         p.reference.stale
@@ -164,8 +165,8 @@ export function dexMarketRoutes(deployment: string, clock: () => number = Date.n
           : Math.min(
               p.reference.freshUntil ?? Infinity,
               p.reference.expiresAt,
-              p.reference.fetchedAt + (p.reference.source === "coinbase" ? 60_000 : 30_000),
-              p.reference.observedAt + (p.reference.source === "coinbase" ? 60_000 : 30_000)
+              p.reference.fetchedAt + REFERENCE_FRESH_MS,
+              p.reference.observedAt + REFERENCE_FRESH_MS
             )
       ) ?? [];
     const stored = {

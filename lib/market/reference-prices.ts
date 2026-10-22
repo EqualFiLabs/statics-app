@@ -21,6 +21,15 @@ export type UsdReferenceSnapshot = Readonly<{
   restricted: readonly string[];
   allowDerived: boolean;
 }>;
+// Provider cache refreshes are more frequent than the user-facing stale deadline.
+export const REFERENCE_FRESH_MS = 120_000;
+export function referenceStale(r: PriceReference, now = Date.now()) {
+  return (
+    r.stale ||
+    now >=
+      Math.min(r.freshUntil ?? Infinity, Math.min(r.fetchedAt, r.observedAt) + REFERENCE_FRESH_MS)
+  );
+}
 export const USD_SCALE = 10n ** 18n;
 export function positiveDecimal(value: unknown): bigint {
   if (typeof value !== "string" || !/^\d+(\.\d{1,18})?$/.test(value))
@@ -45,14 +54,7 @@ export function referenceUsable(
   references: readonly PriceReference[] | undefined,
   now = Date.now()
 ) {
-  return !references?.some(
-    (r) =>
-      r.stale ||
-      r.halted ||
-      r.expiresAt <= now ||
-      (r.freshUntil !== undefined && r.freshUntil <= now) ||
-      now - Math.min(r.fetchedAt, r.observedAt) >= (r.source === "coinbase" ? 60_000 : 30_000)
-  );
+  return !references?.some((r) => referenceStale(r, now) || r.halted || r.expiresAt <= now);
 }
 export function defaultMarketQuote(deploymentId: string): "usd" | "usdg" {
   return deploymentId === "robinhood-phase-one" ? "usd" : "usdg";

@@ -116,5 +116,5 @@ it("renders USD currency statistics and marks stale reference provenance", () =>
   );
   expect(screen.getByText("$1.00")).toBeInTheDocument();
   expect(screen.getByText("Stale")).toHaveClass("ui-pill");
-  expect(screen.getByText(/Valued at current USD reference prices/)).toBeInTheDocument();
+  expect(screen.queryByText(/Valued at current USD reference prices/)).not.toBeInTheDocument();
 });

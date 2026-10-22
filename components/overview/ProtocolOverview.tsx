@@ -339,7 +339,7 @@ export function ProtocolOverview({
       />
       <p className={styles.live}>{launch ? t("liveGenesis") : t("livePhaseOne")}</p>
 
-      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} historical />}
+      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} />}
       {unavailable && (
         <p className={styles.notice} role="alert">
           {t("unavailable")}

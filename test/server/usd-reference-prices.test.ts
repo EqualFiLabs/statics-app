@@ -52,6 +52,19 @@ beforeEach(() => {
     );
 });
 describe("USD reference adapters", () => {
+  it("separates the 30-second refresh cache from the two-minute freshness deadline", async () => {
+    const first = await loadUsdReferences(input, now);
+    expect(first.prices.every((p) => p.reference.freshUntil === now + 120_000)).toBe(true);
+    await loadUsdReferences(input, now + 29_000);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const next = await loadUsdReferences(input, now + 31_000);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(next.prices.every((p) => !p.reference.stale)).toBe(true);
+    expect(next.prices.find((p) => p.address === stock)?.reference.freshUntil).toBe(now + 120_000);
+    const old = await loadUsdReferences(input, now + 120_000);
+    expect(old.prices.find((p) => p.address === stock)?.reference.stale).toBe(true);
+  });
+
   it("normalizes raw stock quotes once, uses a real USDG rate, and coalesces requests", async () => {
     const [a, b] = await Promise.all([
       loadUsdReferences(input, now),
