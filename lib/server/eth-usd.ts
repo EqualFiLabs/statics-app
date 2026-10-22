@@ -1,4 +1,4 @@
-import { decimalToWad } from "@/lib/market/analytics";
+import { decimalToWad } from "../market/analytics";
 
 const COINBASE_TICKER = "https://api.exchange.coinbase.com/products/ETH-USD/ticker";
 const FRESH_MS = 60_000;
@@ -8,6 +8,7 @@ type Price = Readonly<{ valueWad: bigint; fetchedAt: number; stale: boolean }>;
 
 let lastGood: Price | null = null;
 let inFlight: Promise<Price | null> | null = null;
+let retryAt = 0;
 
 function validPayload(value: unknown): value is { price: string } {
   return Boolean(
@@ -32,6 +33,7 @@ async function refresh(now: number): Promise<Price | null> {
     lastGood = { valueWad, fetchedAt: now, stale: false };
     return lastGood;
   } catch {
+    retryAt = now + 30_000;
     return lastGood && now - lastGood.fetchedAt <= MAX_STALE_MS
       ? { ...lastGood, stale: true }
       : null;
@@ -40,6 +42,10 @@ async function refresh(now: number): Promise<Price | null> {
 
 export async function loadEthUsd(now = Date.now()): Promise<Price | null> {
   if (lastGood && now - lastGood.fetchedAt <= FRESH_MS) return { ...lastGood, stale: false };
+  if (now < retryAt)
+    return lastGood && now - lastGood.fetchedAt <= MAX_STALE_MS
+      ? { ...lastGood, stale: true }
+      : null;
   if (!inFlight) {
     inFlight = refresh(now).finally(() => {
       inFlight = null;
@@ -51,4 +57,5 @@ export async function loadEthUsd(now = Date.now()): Promise<Price | null> {
 export function resetEthUsdCacheForTest(): void {
   lastGood = null;
   inFlight = null;
+  retryAt = 0;
 }

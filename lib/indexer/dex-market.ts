@@ -1,12 +1,16 @@
+import type { PriceReference } from "../market/reference-prices";
 import { getAddress, isHash, type Address, type Hex } from "viem";
 import { configuredIndexerUrlForDeployment, fetchIndexer } from "@/lib/indexer/statics";
 
 /**
  * The DEX overview's market data (docs/dex-overview-indexer.md). Every value is priced from
- * Statics pools in a quote currency, USDG ("≈ $") or WETH. Values are integers in the quote
- * token's decimals; null means unpriced, never zero.
+ * current USD references and qualified pool routes, or the compatible USDG/WETH graph.
+ * USD amounts use 18 decimals without a token address; null means unavailable, never zero.
  */
-export type DexQuote = "usdg" | "weth";
+export type DexQuote = "usd" | "usdg" | "weth";
+export type DexQuoteCurrency =
+  | (DexToken & Readonly<{ kind: "usdg" | "weth" }>)
+  | Readonly<{ kind: "usd"; address: null; symbol: "USD"; decimals: 18 }>;
 export type DexToken = Readonly<{
   address: Address;
   symbol: string | null;
@@ -17,7 +21,9 @@ type Observed = Readonly<{
   deploymentId: string;
   indexedAtBlock: bigint;
   indexedAtTimestamp: bigint;
-  quote: DexToken & Readonly<{ kind: DexQuote }>;
+  quote: DexQuoteCurrency;
+  references?: readonly PriceReference[];
+  referenceAsOf?: number | null;
 }>;
 export type DexTotals = Readonly<{
   volume: bigint | null;
@@ -46,6 +52,7 @@ export type DexSummary = Observed &
     }>;
   }>;
 export type DexPool = Readonly<{
+  references?: readonly PriceReference[];
   poolId: Hex;
   token0: DexToken;
   token1: DexToken;
@@ -92,6 +99,7 @@ export type DexPool = Readonly<{
 export type DexPoolPage = Observed &
   Readonly<{ items: readonly DexPool[]; nextCursor: string | null; total: number }>;
 export type DexTokenPrice = Readonly<{
+  references?: readonly PriceReference[];
   token: DexToken;
   price: bigint | null;
   change24hBps: number | null;
@@ -148,11 +156,13 @@ export type DexEmissions = Observed &
     othersBps: number;
   }>;
 export type DexIncentiveAmount = Readonly<{
+  references?: readonly PriceReference[];
   token: DexToken;
   amount: bigint;
   quoteValue: bigint | null;
 }>;
 export type DexTrade = Readonly<{
+  references?: readonly PriceReference[];
   poolId: Hex;
   tokenIn: DexToken;
   tokenOut: DexToken;
@@ -215,6 +225,28 @@ const token = (v: unknown): DexToken => {
     decimals: t.decimals === null ? null : int(t.decimals, "token decimals", 0, 255),
   };
 };
+function references(raw: unknown): PriceReference[] {
+  if (raw === undefined) return [];
+  return list(raw, "price references").map((item) => {
+    const r = object(item, "price reference");
+    const source =
+      r.source === "robinhood" || r.source === "coinbase" || r.source === "kraken"
+        ? r.source
+        : fail("reference source");
+    return {
+      source,
+      asset: address(r.asset, "reference asset"),
+      observedAt: int(r.observedAt, "reference time", 0),
+      fetchedAt: int(r.fetchedAt, "reference fetch time", 0),
+      expiresAt: int(r.expiresAt, "reference expiry", 0),
+      ...(r.freshUntil === undefined
+        ? {}
+        : { freshUntil: int(r.freshUntil, "reference fresh until", 0) }),
+      stale: boolean(r.stale, "reference stale"),
+      halted: boolean(r.halted, "reference halted"),
+    };
+  });
+}
 function observed(
   value: unknown,
   deploymentId: string
@@ -222,14 +254,28 @@ function observed(
   const body = object(value, "market response");
   if (body.deploymentId !== deploymentId) fail("deployment");
   const quote = object(body.quote, "quote");
-  const kind = quote.kind === "usdg" || quote.kind === "weth" ? quote.kind : fail("quote kind");
+  const kind =
+    quote.kind === "usd" || quote.kind === "usdg" || quote.kind === "weth"
+      ? quote.kind
+      : fail("quote kind");
+  if (kind === "usd" && (quote.address !== null || quote.decimals !== 18 || quote.symbol !== "USD"))
+    fail("USD currency metadata");
+  const observation = body.observation === undefined ? {} : object(body.observation, "observation");
   if (quote.decimals === null || quote.symbol === null) fail("quote metadata");
   return {
     body,
     deploymentId,
     indexedAtBlock: uint(body.indexedAtBlock, "indexed block"),
     indexedAtTimestamp: uint(body.indexedAtTimestamp, "indexed time"),
-    quote: { ...token(quote), kind },
+    quote:
+      kind === "usd"
+        ? { kind, address: null, symbol: "USD", decimals: 18 }
+        : { ...token(quote), kind },
+    references: references(observation.referencePrices),
+    referenceAsOf:
+      observation.referenceAsOf == null
+        ? null
+        : int(observation.referenceAsOf, "reference snapshot time", 0),
   };
 }
 const strip = <T extends { body: unknown }>(value: T): Omit<T, "body"> => {
@@ -342,6 +388,7 @@ export function parseDexPools(value: unknown, deploymentId: string): DexPoolPage
     )
       fail("projected LP APR");
     return {
+      references: references(p.references),
       poolId: hash(p.poolId, "pool ID"),
       token0: token(p.token0),
       token1: token(p.token1),
@@ -405,6 +452,7 @@ export function parseDexTokens(value: unknown, deploymentId: string): DexTokens 
         )
           fail("exact price");
         return {
+          references: references(t.references),
           token: token(t.token),
           price: optionalUint(t.price, "token price"),
           change24hBps: optionalInt(t.change24hBps, "token change"),
@@ -469,6 +517,7 @@ export function parseDexEmissions(value: unknown, deploymentId: string): DexEmis
       list(raw, "incentive amounts").map((entry) => {
         const a = object(entry, "incentive amount");
         return {
+          references: references(a.references),
           token: token(a.token),
           amount: uint(a.amount, "incentive amount"),
           quoteValue: optionalUint(a.quoteValue, "incentive value"),
@@ -552,6 +601,7 @@ export function parseDexTrades(value: unknown, deploymentId: string): DexTrades 
       if (boolean(t.priced, "trade priced") !== (t.value !== null)) fail("trade valuation");
       return {
         poolId: hash(t.poolId, "trade pool"),
+        references: references(t.references),
         tokenIn: token(t.tokenIn),
         tokenOut: token(t.tokenOut),
         amountIn: uint(t.amountIn, "amount in"),
