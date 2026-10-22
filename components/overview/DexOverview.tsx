@@ -329,18 +329,19 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                 onChange={(event) => setSearch(event.target.value)}
               />
             </label>
-            <div className={styles.segmented} role="group" aria-label={t("sortLabel")}>
-              {SORTS.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={sort === value}
-                  onClick={() => setSort(value)}
-                >
-                  {t(`sort.${value}`)}
-                </button>
-              ))}
-            </div>
+            <label className={styles.mobileSort}>
+              <span>{t("sortLabel")}</span>
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value as (typeof SORTS)[number])}
+              >
+                {SORTS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`sort.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
         <div className={styles.tableFrame}>
@@ -350,10 +351,37 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
                 <th scope="col">{t("column.pool")}</th>
                 <th scope="col">{t("column.pairPrice")}</th>
                 <th scope="col">{t("column.change")}</th>
-                <th scope="col">{t("column.volume")}</th>
+                <th scope="col" aria-sort={sort === "volume" ? "descending" : undefined}>
+                  <button
+                    className={styles.sortHeaderButton}
+                    type="button"
+                    aria-label={t("sortByColumn", { column: t("column.volume") })}
+                    onClick={() => setSort("volume")}
+                  >
+                    {t("column.volume")}
+                  </button>
+                </th>
                 <th scope="col">{t("column.fees")}</th>
-                <th scope="col">{t("column.valueLocked")}</th>
-                <th scope="col">{t("column.projectedApr")}</th>
+                <th scope="col" aria-sort={sort === "valueLocked" ? "descending" : undefined}>
+                  <button
+                    className={styles.sortHeaderButton}
+                    type="button"
+                    aria-label={t("sortByColumn", { column: t("column.valueLocked") })}
+                    onClick={() => setSort("valueLocked")}
+                  >
+                    {t("column.valueLocked")}
+                  </button>
+                </th>
+                <th scope="col" aria-sort={sort === "apr" ? "descending" : undefined}>
+                  <button
+                    className={styles.sortHeaderButton}
+                    type="button"
+                    aria-label={t("sortByColumn", { column: t("column.projectedApr") })}
+                    onClick={() => setSort("apr")}
+                  >
+                    {t("column.projectedApr")}
+                  </button>
+                </th>
                 <th scope="col">{t("column.yield")}</th>
                 <th scope="col">
                   <span className={styles.srOnly}>{t("column.actions")}</span>

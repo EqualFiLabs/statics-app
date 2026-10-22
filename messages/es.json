@@ -2752,7 +2752,8 @@
     "poolsTitle": "Pools",
     "searchPools": "Buscar pools",
     "searchPlaceholder": "Buscar par o token",
-    "sortLabel": "Ordenar pools",
+    "sortLabel": "Ordenar pools por",
+    "sortByColumn": "Ordenar por {column}",
     "sort": {
       "volume": "Volumen",
       "valueLocked": "Valor bloqueado",
