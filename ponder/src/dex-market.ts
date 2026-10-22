@@ -1,3 +1,4 @@
+import { combineReferences, type UsdReferenceSnapshot } from "../../lib/market/reference-prices";
 import {
   advanceStreams,
   segmentAmount,
@@ -25,19 +26,25 @@ import {
 } from "./dex-pricing";
 
 export function pricingConfig(
-  requested: "usdg" | "weth",
+  requested: "usd" | "usdg" | "weth",
   env: NodeJS.ProcessEnv = process.env
 ): PricingConfig {
   const kind = requested === "usdg" && !env.PONDER_PRICING_QUOTE_USDG ? "weth" : requested;
   const address = env[`PONDER_PRICING_QUOTE_${kind.toUpperCase()}`];
-  if (!address || !/^0x[\da-fA-F]{40}$/.test(address))
+  if (kind !== "usd" && (!address || !/^0x[\da-fA-F]{40}$/.test(address)))
     throw new Error(`Configure PONDER_PRICING_QUOTE_${kind.toUpperCase()}`);
   const decimals = Number(
-    env[`PONDER_PRICING_DECIMALS_${kind.toUpperCase()}`] ?? (kind === "weth" ? "18" : "6")
+    env[`PONDER_PRICING_DECIMALS_${kind.toUpperCase()}`] ?? (kind === "usdg" ? "6" : "18")
   );
   const floor =
     env[`PONDER_PRICING_MIN_LIQUIDITY_${kind.toUpperCase()}`] ?? (kind === "weth" ? "1" : "2500");
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255 || !/^\d+(\.\d+)?$/.test(floor))
+  if (
+    (kind === "usd" && decimals !== 18) ||
+    !Number.isInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 255 ||
+    !/^\d+(\.\d+)?$/.test(floor)
+  )
     throw new Error("Invalid pricing decimals or floor");
   const [whole, fraction = ""] = floor.split(".");
   if (fraction.length > decimals) throw new Error("Pricing floor exceeds quote precision");
@@ -46,9 +53,9 @@ export function pricingConfig(
     throw new Error("Invalid wrapped-native pricing configuration");
   return {
     kind,
-    address: address.toLowerCase(),
+    address: kind === "usd" ? null : address!.toLowerCase(),
     decimals,
-    symbol: kind === "usdg" ? "USDG" : "WETH",
+    symbol: kind.toUpperCase(),
     floor: BigInt(whole!) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0"),
     wrappedNative: wrapped,
   };
@@ -85,11 +92,12 @@ export function buildMarket(
   s: DexSnapshot,
   deploymentId: string,
   config: PricingConfig,
-  staticsAsset: string | null
+  staticsAsset: string | null,
+  references?: UsdReferenceSnapshot
 ) {
   const { time: now, block } = checkpointObservation(s.checkpoint),
     day = now / 86400n;
-  const graph = priceGraph(s.pools, s.ranges, s.prices, now, config);
+  const graph = priceGraph(s.pools, s.ranges, s.prices, now, config, references);
   const prices = graph.prices;
   const price = (asset: string) => prices.get(currency(asset, config));
   const metadata = (asset: string): DexMetadata =>
@@ -101,6 +109,8 @@ export function buildMarket(
     };
   const pricedValue = (asset: string, amount: bigint) =>
     amount === 0n ? 0n : price(asset) ? value(amount, price(asset)!.price) : null;
+  const poolReferences = (assets: readonly string[]) =>
+    combineReferences(...assets.map((asset) => price(asset)?.references));
   const observed = {
     deploymentId,
     indexedAtBlock: String(block),
@@ -112,6 +122,12 @@ export function buildMarket(
       decimals: config.decimals,
     },
     observation: {
+      referencePrices:
+        config.kind === "usd"
+          ? combineReferences(...[...prices.values()].map((p) => p.references))
+          : [],
+      referenceAsOf: references?.asOf ?? null,
+      activityValuation: config.kind === "usd" ? "current-reference-prices" : "current-pool-prices",
       checkpoint: s.checkpoint,
       pricingWindowSeconds: 1800,
       lpFeesEstimated: true,
@@ -259,6 +275,13 @@ export function buildMarket(
         windowSeconds >= 86400n && earnings !== null && locked !== null && locked > 0n
           ? numberBps((earnings * YEAR_SECONDS * 10000n) / (windowSeconds * locked))
           : null,
+      references: poolReferences([
+        p.token0.address,
+        p.token1.address,
+        ...bribes.keys(),
+        ...(staticsAsset ? [staticsAsset] : []),
+        ...p.streams.map((i) => i.asset),
+      ]),
       priced: !!price(p.token0.address) && !!price(p.token1.address),
       source: p.source,
       sourceDeploymentId: p.sourceDeploymentId,
@@ -332,7 +355,7 @@ export function buildMarket(
       priceNumerator: exact?.n ?? null,
       priceDenominator: exact?.d ?? null,
       change24hBps:
-        p && !p.fallback
+        config.kind !== "usd" && p && !p.fallback
           ? priceChange(
               p.price,
               routePrice(token.address, p.route, s.pools, s.prices, now - 86400n, config)
@@ -341,6 +364,7 @@ export function buildMarket(
       volume24h: p
         ? sumAvailable(relevant.map((pool) => aggregate(pool, metric(pool, "current")).volume))
         : null,
+      references: p?.references ?? [],
       route: p?.route ?? [],
       priceFallback: p?.fallback ?? false,
     };
@@ -349,7 +373,12 @@ export function buildMarket(
   const days = Array.from({ length: 90 }, (_, i) => {
     const d = day - BigInt(89 - i),
       end = d === day ? now : (d + 1n) * 86400n - 1n;
-    const historical = priceGraph(s.pools, historicalRanges(s, end), s.prices, end, config).prices;
+    const historical =
+      config.kind === "usd"
+        ? d === day
+          ? prices
+          : new Map<string, import("./dex-pricing").TokenPrice>()
+        : priceGraph(s.pools, historicalRanges(s, end), s.prices, end, config).prices;
     const rows = s.daily.filter((m) => BigInt(m.bucket) === d),
       values = rows.map((m) => {
         const p = s.pools.find((p) => p.poolId === m.poolId);
@@ -357,7 +386,7 @@ export function buildMarket(
       });
     return {
       day: new Date(Number(d) * 86400000).toISOString().slice(0, 10),
-      volume: sumAvailable(values),
+      volume: config.kind === "usd" && d !== day ? null : sumAvailable(values),
       swaps: rows.reduce((n, m) => n + BigInt(m.swaps), 0n),
       provisional: d === day,
       coverage: {
@@ -406,6 +435,7 @@ export function buildMarket(
       amountIn: BigInt(t.amountIn),
       amountOut: BigInt(t.amountOut),
       value: v,
+      references: poolReferences([tokenIn.address]),
       sender: t.transactionSender,
       priced: v !== null,
       timestamp: BigInt(t.timestamp),
@@ -447,6 +477,7 @@ export function buildMarket(
                   token: metadata(asset),
                   amount,
                   quoteValue: pricedValue(asset, amount),
+                  references: poolReferences([asset]),
                 }));
               return projected.lp.size || projected.allocator.size
                 ? [

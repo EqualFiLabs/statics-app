@@ -1,3 +1,4 @@
+import type { PriceReference, UsdReferenceSnapshot } from "../../lib/market/reference-prices";
 import { getSqrtPriceAtTick } from "@statics-protocol/sdk/phase-one";
 import { Q96, rangeAmounts, type MarketPool, type MarketRange } from "./dex-domain";
 
@@ -65,14 +66,20 @@ export function poolPrice(
   };
 }
 export type PricingConfig = {
-  kind: "usdg" | "weth";
-  address: string;
+  kind: "usd" | "usdg" | "weth";
+  address: string | null;
   decimals: number;
   symbol: string;
   floor: bigint;
   wrappedNative: string | null;
 };
-export type TokenPrice = { price: Ratio; route: string[]; fallback: boolean; depth: bigint };
+export type TokenPrice = {
+  price: Ratio;
+  route: string[];
+  fallback: boolean;
+  depth: bigint;
+  references?: readonly PriceReference[];
+};
 const native = "0x0000000000000000000000000000000000000000";
 export const currency = (asset: string, config: PricingConfig) =>
   asset.toLowerCase() === native && config.wrappedNative
@@ -83,10 +90,34 @@ export function priceGraph(
   ranges: readonly MarketRange[],
   points: readonly PricePoint[],
   at: bigint,
-  config: PricingConfig
+  config: PricingConfig,
+  references?: UsdReferenceSnapshot
 ) {
   const unit = 10n ** BigInt(config.decimals);
-  const quote = currency(config.address, config);
+  const quote = config.address === null ? "" : currency(config.address, config);
+  const seeds = new Map<string, TokenPrice>(
+    config.kind === "usd"
+      ? (references?.prices ?? [])
+          .filter((p) => p.reference.expiresAt > references!.asOf)
+          .map((p) => [
+            currency(p.address, config),
+            {
+              price: ratio(p.valueWad, 10n ** BigInt(p.decimals)),
+              route: [],
+              fallback: false,
+              depth: 1n << 512n,
+              references: [p.reference],
+            },
+          ])
+      : [[quote, { price: ratio(1n), route: [], fallback: false, depth: 1n << 512n }]]
+  );
+  const blocked = new Set(
+    config.kind === "usd"
+      ? references?.restricted
+          .filter((a) => !seeds.has(currency(a, config)))
+          .map((a) => currency(a, config))
+      : []
+  );
   const edges = pools.flatMap((pool) => {
     const p = poolPrice(pool, points, at);
     if (
@@ -97,7 +128,13 @@ export function priceGraph(
     )
       return [];
     const [a, b] = [currency(pool.token0.address, config), currency(pool.token1.address, config)];
-    if (a === b) return [];
+    if (
+      a === b ||
+      blocked.has(a) ||
+      blocked.has(b) ||
+      (config.kind === "usd" && !references?.allowDerived)
+    )
+      return [];
     const inventory = ranges
       .filter(
         (r) => r.poolId === pool.poolId && r.tickLower <= p.spotTick && p.spotTick < r.tickUpper
@@ -122,9 +159,7 @@ export function priceGraph(
     ];
   });
   // Ratios here price a base unit, not a whole token. Decimal normalization occurs at display boundaries.
-  const anchored = new Map<string, TokenPrice>([
-    [quote, { price: ratio(1n), route: [], fallback: false, depth: 1n << 512n }],
-  ]);
+  const anchored = new Map(seeds);
   const admitted: typeof edges = [];
   const pending = [...edges];
   while (pending.length) {
@@ -155,6 +190,7 @@ export function priceGraph(
         price: pa,
         route: [...b!.route, e.id],
         fallback: b!.fallback || e.fallback,
+        references: b!.references,
         depth,
       });
     if (!b)
@@ -162,14 +198,13 @@ export function priceGraph(
         price: pb,
         route: [...a!.route, e.id],
         fallback: a!.fallback || e.fallback,
+        references: a!.references,
         depth,
       });
     pending.splice(pending.indexOf(e), 1);
   }
   // Freeze admitted depths, then select widest simple routes with deterministic ties.
-  const selected = new Map<string, TokenPrice>([
-    [quote, { price: ratio(1n), route: [], fallback: false, depth: 1n << 512n }],
-  ]);
+  const selected = new Map(seeds);
   const finalized = new Set<string>();
   const better = (a: TokenPrice, b: TokenPrice) =>
     a.depth > b.depth ||
@@ -187,12 +222,13 @@ export function priceGraph(
     finalized.add(asset);
     for (const e of admitted) {
       const to = e.a === asset ? e.b : e.b === asset ? e.a : null;
-      if (!to || finalized.has(to)) continue;
+      if (!to || finalized.has(to) || seeds.has(to)) continue;
       const candidate = {
         price: multiply(p.price, e.a === asset ? invert(e.ratio) : e.ratio),
         route: [...p.route, e.id],
         depth: p.depth < e.depth ? p.depth : e.depth,
         fallback: p.fallback || e.fallback,
+        references: p.references,
       };
       if (!selected.has(to) || better(candidate, selected.get(to)!)) selected.set(to, candidate);
     }
@@ -201,10 +237,20 @@ export function priceGraph(
   // Resolve hop/tie preferences per destination after its widest depth is known.
   const resolved = new Map<string, TokenPrice>();
   for (const [target, widest] of selected) {
-    const queue = [{ asset: quote, price: ratio(1n), route: [] as string[], fallback: false }];
-    const seen = new Set([quote]);
-    for (let i = 0; i < queue.length; i++) {
-      const current = queue[i]!;
+    const queue = [...seeds]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([asset, seed]) => ({ asset, ...seed }));
+    const seen = new Set<string>();
+    while (queue.length) {
+      queue.sort(
+        (a, b) =>
+          a.route.length - b.route.length ||
+          a.route.join(":").localeCompare(b.route.join(":")) ||
+          a.asset.localeCompare(b.asset)
+      );
+      const current = queue.shift()!;
+      if (seen.has(current.asset)) continue;
+      seen.add(current.asset);
       if (current.asset === target) {
         resolved.set(target, { ...current, depth: widest.depth });
         break;
@@ -213,13 +259,14 @@ export function priceGraph(
         .filter((e) => e.depth >= widest.depth)
         .sort((a, b) => a.id.localeCompare(b.id))) {
         const to = e.a === current.asset ? e.b : e.b === current.asset ? e.a : null;
-        if (!to || seen.has(to)) continue;
-        seen.add(to);
+        if (!to || seen.has(to) || seeds.has(to)) continue;
         queue.push({
           asset: to,
           price: multiply(current.price, e.a === current.asset ? invert(e.ratio) : e.ratio),
           route: [...current.route, e.id],
           fallback: current.fallback || e.fallback,
+          references: current.references,
+          depth: widest.depth,
         });
       }
     }
@@ -234,6 +281,7 @@ export function routePrice(
   at: bigint,
   config: PricingConfig
 ): Ratio | null {
+  if (config.kind === "usd" || config.address === null) return null;
   let current = currency(config.address, config),
     result = ratio(1n);
   for (const id of route) {

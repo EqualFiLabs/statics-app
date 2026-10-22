@@ -356,3 +356,64 @@ it("values mixed-decimal LP reward assets at current prices without including th
     5200
   );
 });
+
+describe("USD reference valuation", () => {
+  const usdConfig = pricingConfig("usd", {});
+  const referenceSnapshot = (s: DexSnapshot, values = [700n, 200n]) => ({
+    asOf: 1_000_000_000,
+    allowDerived: true,
+    restricted: s.pools.flatMap((p) => [p.token0.address, p.token1.address]),
+    prices: [s.pools[0]!.token0, s.pools[0]!.token1].map((t, i) => ({
+      address: t.address,
+      decimals: t.decimals!,
+      valueWad: values[i]! * 10n ** 18n,
+      reference: {
+        source: "robinhood" as const,
+        asset: t.address,
+        observedAt: 1_000_000_000,
+        fetchedAt: 1_000_000_000,
+        expiresAt: 1_000_900_000,
+        stale: false,
+        halted: false,
+      },
+    })),
+  });
+  it("values disconnected SPY/NVDA using independent references and preserves pair history", () => {
+    const s = snapshot();
+    s.metrics = [metric()];
+    const refs = referenceSnapshot(s);
+    const b = buildMarket(s, "mainnet", usdConfig, null, refs);
+    expect(b.observed.quote).toEqual({ kind: "usd", address: null, symbol: "USD", decimals: 18 });
+    expect(b.tokens.items.map((t) => t.price)).toEqual([700n * 10n ** 18n, 200n * 10n ** 18n]);
+    expect(b.pools[0]!.valueLocked).toBeGreaterThan(0n);
+    expect(b.pools[0]!.pairPrice).toBe("1");
+    expect(b.pools[0]!.references).toHaveLength(2);
+    expect(b.summary.current.volume).toBe(700n * 10n ** 18n);
+    expect(b.tokens.items.every((t) => t.change24hBps === null)).toBe(true);
+    expect(b.volume.days.slice(0, -1).every((d) => d.volume === null)).toBe(true);
+  });
+  it("propagates depegged USDG, but preserves the liquidity floor for unrelated assets", () => {
+    const s = snapshot();
+    const refs = referenceSnapshot(s);
+    refs.prices = [{ ...refs.prices[1]!, valueWad: 8n * 10n ** 17n }];
+    refs.restricted = [];
+    const b = buildMarket(s, "mainnet", { ...usdConfig, floor: 1n }, null, refs);
+    expect(b.tokens.items[0]!.price).toBe(8n * 10n ** 17n);
+    expect(b.tokens.items[0]!.references).toEqual([refs.prices[0]!.reference]);
+    const thin = buildMarket(s, "mainnet", { ...usdConfig, floor: 10n ** 40n }, null, refs);
+    expect(thin.tokens.items[0]!.price).toBeNull();
+    expect(thin.tokens.items[1]!.price).toBe(8n * 10n ** 17n);
+  });
+  it("never pool-prices expired mapped stocks and reports partial totals", () => {
+    const s = snapshot();
+    const refs = referenceSnapshot(s);
+    refs.prices[0]!.reference.expiresAt = refs.asOf;
+    const b = buildMarket(s, "mainnet", { ...usdConfig, floor: 1n }, null, refs);
+    expect(b.tokens.items[0]!.price).toBeNull();
+    expect(b.pools[0]!.valueLocked).toBeNull();
+    expect(b.summary.current.coverage.valueLocked).toMatchObject({
+      includedPools: 0,
+      omittedPools: 1,
+    });
+  });
+});

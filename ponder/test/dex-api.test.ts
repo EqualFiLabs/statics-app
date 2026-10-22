@@ -3,7 +3,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "../ponder.schema";
-const { execute } = vi.hoisted(() => ({ execute: vi.fn() }));
+const { execute, usdReferences } = vi.hoisted(() => ({ execute: vi.fn(), usdReferences: vi.fn() }));
+vi.mock("../../lib/server/usd-reference-prices", () => ({ loadUsdReferences: usdReferences }));
 vi.mock("ponder:api", () => ({ db: { execute } }));
 vi.mock("ponder:schema", () => schema);
 import { dexMarketRoutes, marketPoolPage, marketQuery } from "../src/api/dex-market";
@@ -264,4 +265,45 @@ it("sorts projected APR independently of trailing yield, with nulls last and sta
   expect(marketPoolPage(data, { ...query, sort: "yield" }, 0).items[0]!.poolId).toBe(
     pool(1).poolId
   );
+});
+
+it("pins USD references through pagination and expires the cursor at the freshness boundary", async () => {
+  const refs = {
+    asOf: now,
+    allowDerived: true,
+    restricted: [],
+    prices: [1, 2].map((n) => ({
+      address: n === 1 ? pool().token0.address : pool().token1.address,
+      decimals: 18,
+      valueWad: BigInt(n) * 10n ** 18n,
+      reference: {
+        source: "robinhood",
+        asset: n === 1 ? pool().token0.address : pool().token1.address,
+        observedAt: now,
+        fetchedAt: now,
+        expiresAt: now + 900000,
+        stale: false,
+        halted: true,
+      },
+    })),
+  };
+  usdReferences.mockResolvedValue(refs);
+  const first = await app.request("/phase-one/market/pools?quote=usd&limit=1");
+  expect(first.status).toBe(200);
+  const a = await first.json();
+  expect(a.quote).toEqual({ kind: "usd", address: null, decimals: 18, symbol: "USD" });
+  expect(a.items[0].references[0]).toMatchObject({ halted: true, observedAt: now });
+  expect(a.snapshot.expiresAt).toBe(now + 30000);
+  refs.prices[0]!.valueWad = 999n * 10n ** 18n;
+  const next = await app.request(
+    `/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`
+  );
+  expect(next.status).toBe(200);
+  const b = await next.json();
+  expect(b.snapshot.id).toBe(a.snapshot.id);
+  expect(b.items[0].valueLocked).toBe(a.items[0].valueLocked);
+  now += 30000;
+  expect(
+    (await app.request(`/phase-one/market/pools?quote=usd&limit=1&cursor=${a.nextCursor}`)).status
+  ).toBe(409);
 });
