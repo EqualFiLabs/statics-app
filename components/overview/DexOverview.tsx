@@ -209,7 +209,7 @@ export function DexOverview({ deployment }: { deployment: PhaseOneDeployment }) 
       {quoteToken?.kind !== quote && quoteToken && (
         <p className={styles.notice}>{t("quoteFallback")}</p>
       )}
-      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} historical />}
+      {quote === "usd" && <ReferenceStatus references={dex.summary.data?.references} />}
       {unavailable && (
         <p className={styles.notice} role="alert">
           {t("unavailable")}

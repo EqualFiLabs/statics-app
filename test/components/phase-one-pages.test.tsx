@@ -3649,8 +3649,8 @@ it("defaults Mainnet Markets to USD and retains USDG/WETH switching and referenc
   expect(screen.getByRole("button", { name: "USD" })).toHaveAttribute("aria-pressed", "true");
   expect(await screen.findByText(/Trading halted/)).toBeInTheDocument();
   expect(
-    screen.getByText(/Historical USD charts and token changes are unavailable/)
-  ).toBeInTheDocument();
+    screen.queryByText(/Valued at current USD reference prices|Historical USD charts/)
+  ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /USDG/ }));
   await waitFor(() => expect(mocks.dex).toHaveBeenCalledWith("summary", "usdg"));
   fireEvent.click(screen.getByRole("button", { name: "WETH" }));

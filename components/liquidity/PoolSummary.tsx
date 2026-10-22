@@ -115,7 +115,7 @@ export function PoolSummary({
           </div>
         </dl>
       )}
-      {quote?.kind === "usd" && <ReferenceStatus references={stats?.references} historical />}
+      {quote?.kind === "usd" && <ReferenceStatus references={stats?.references} />}
       {children}
     </section>
   );
