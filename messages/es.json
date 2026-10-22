@@ -2762,9 +2762,9 @@
     "column": {
       "pool": "Pool",
       "pairPrice": "Precio del par",
-      "change": "24h",
+      "change": "Variación del precio (24 h)",
       "volume": "Volumen 24h",
-      "fees": "Comisiones LP estimadas",
+      "fees": "Comisiones LP estimadas (24 h)",
       "valueLocked": "Valor bloqueado",
       "yield": "Rendimiento de los últimos 7 días",
       "actions": "Acciones",

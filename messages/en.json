@@ -2762,9 +2762,9 @@
     "column": {
       "pool": "Pool",
       "pairPrice": "Pair price",
-      "change": "24h",
+      "change": "Price change (24h)",
       "volume": "Volume 24h",
-      "fees": "Est. LP fees",
+      "fees": "Est. LP fees (24h)",
       "valueLocked": "Value locked",
       "yield": "Trailing 7-day yield",
       "actions": "Actions",
