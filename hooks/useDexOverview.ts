@@ -28,7 +28,7 @@ const LIVE_MS = 30_000;
 export function useDexOverview(
   deployment: PhaseOneDeployment,
   quote: DexQuote,
-  pools: Readonly<{ sort: string; search: string }>,
+  pools: Readonly<{ sort: string; search: string; limit?: number; compareQuotes?: boolean }>,
   days: number
 ) {
   const now = useReferenceClock();
@@ -49,13 +49,43 @@ export function useDexOverview(
   });
   const poolPage = useInfiniteQuery({
     ...common,
-    queryKey: [dexRoot, id, "pools", quote, pools.sort, pools.search],
+    queryKey: [dexRoot, id, "pools", quote, pools.sort, pools.search, pools.limit ?? 25],
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: DexPoolPage) => last.nextCursor ?? undefined,
     queryFn: ({ pageParam }) =>
       fixtures
-        ? parseDexPools(sample({ ...pools, limit: 25, cursor: pageParam }).pools, id)
-        : loadDexPools(id, quote, { ...pools, limit: 25, cursor: pageParam }),
+        ? parseDexPools(
+            sample({
+              sort: pools.sort,
+              search: pools.search,
+              limit: pools.limit ?? 25,
+              cursor: pageParam,
+            }).pools,
+            id
+          )
+        : loadDexPools(id, quote, {
+            sort: pools.sort,
+            search: pools.search,
+            limit: pools.limit ?? 25,
+            cursor: pageParam,
+          }),
+  });
+  const otherQuote: DexQuote = quote === "usdg" ? "weth" : "usdg";
+  const comparisonPools = useQuery({
+    ...common,
+    enabled: pools.compareQuotes === true,
+    queryKey: [dexRoot, id, "comparison-pools", otherQuote, pools.sort, pools.search],
+    queryFn: () =>
+      fixtures
+        ? parseDexPools(
+            dexFixture(deployment, otherQuote, {
+              sort: pools.sort,
+              search: pools.search,
+              limit: 100,
+            }).pools,
+            id
+          )
+        : loadDexPools(id, otherQuote, { sort: pools.sort, search: pools.search, limit: 100 }),
   });
   const tokens = useQuery({
     ...common,
@@ -90,6 +120,7 @@ export function useDexOverview(
           ? { ...poolPage.data.pages[0]!, items: poolPage.data.pages.flatMap((page) => page.items) }
           : undefined,
     },
+    comparisonPools,
     tokens: { ...tokens, data: current(tokens.data) },
     volume: { ...volume, data: current(volume.data) },
     emissions: { ...emissions, data: current(emissions.data) },

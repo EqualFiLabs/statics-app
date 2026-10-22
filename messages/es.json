@@ -3164,7 +3164,11 @@
     },
     "pools": {
       "title": "Pools principales",
-      "meta": "por volumen 24 h",
+      "meta": "por volumen de 24 h en USDG",
+      "metaFallback": "por volumen de 24 h en WETH",
+      "metaUsdFallback": "por volumen de 24 h en USD",
+      "yieldFromWeth": "Estimado con precios en WETH",
+      "converted": "Convertido de USDG usando el precio indexado de WETH",
       "all": "Ver {count, plural, one {# pool} other {# pools}} en Mercados"
     },
     "note": "Los precios proceden de pools de Statics y se ponderan durante 30 minutos cuando hay historial suficiente; de lo contrario se usa el último precio observado. El valor en Statics suma liquidez, respaldo de Operators y STATICS en staking al precio de STATICS. Los rendimientos son estimaciones, no promesas.",

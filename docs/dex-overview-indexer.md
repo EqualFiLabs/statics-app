@@ -70,6 +70,8 @@ Pool ordering is numeric, null-last, with ascending PoolId ties. A traversal pin
 
 The client uses strict parsers, reads subsequent pages, retains section-specific quote formatting, labels estimates/fallback/coverage, and shows incomplete account holdings explicitly. Development fixtures obey filtering, pagination, empty deployments, day ranges and emission normalization. `NEXT_PUBLIC_DEX_OVERVIEW_FIXTURES` is ignored in production.
 
+The `/app` top-pools table fetches the selected quote and USDG (or WETH when USDG is selected). USDG volume fixes its ranking across the quote toggle; monetary columns use the selected quote. Its trailing yield uses the USDG estimate when available, then the WETH estimate in the USDG and WETH views if USDG pricing is incomplete. A ranked pool missing from the selected quote's page stays visible with unavailable monetary values. When the same indexed block reports at least one USDG but zero WETH for a pool metric, the table converts that USDG amount with the WETH-quoted USDG token price from the same block and marks it approximate. Without that price, it shows unavailable; smaller amounts can legitimately round to zero. If the USDG request fails, the WETH or USD view falls back to its selected-quote ranking and labels that basis. The Markets table continues to show each quote's own indexed estimates.
+
 ## Verified contract semantics
 
 Source reviewed at protocol `a50b3691c0f7d9fdb75ca6c831f7ea7ab6f522d7`:
