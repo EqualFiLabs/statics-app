@@ -459,6 +459,7 @@
     "circulationDescription": "共有 {circulating}/{supply} 个 Operator NFT 在流通，每个均由 {backing} STATICS 提供储备支持。",
     "vaultEmptyDescription": "通过金库获取有全额储备支持的 Operator NFT。",
     "acquire": "获取 Operator NFT",
+    "redeemOperator": "赎回 Operator",
     "pastRewardsAria": "过往持有期间的奖励",
     "pastRewardsTitle": "过往持有期间的奖励",
     "pastRewardsDescription": "这些奖励在你持有后来已转出的 Operator NFT 时累积，仍归你领取。",

@@ -531,6 +531,17 @@ describe("consolidated Genesis rewards surface", () => {
     ).toBeInTheDocument();
   });
 
+  it("links the selected Operator directly to redemption", async () => {
+    rewardsReads();
+    renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
+
+    const redeemLink = await screen.findByRole("link", { name: "Redeem Operator" });
+    expect(redeemLink).toHaveAttribute("href", "/app/swap?mode=nft&action=redeem&operatorId=1");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Operator #2/ }));
+    expect(redeemLink).toHaveAttribute("href", "/app/swap?mode=nft&action=redeem&operatorId=2");
+  });
+
   it("shows the activation ladder in full rather than a bare tier picker", async () => {
     rewardsReads();
     renderWithProviders(<StandaloneGenesisPage deployment={deployment} />);
