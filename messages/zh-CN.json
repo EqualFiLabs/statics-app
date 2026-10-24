@@ -740,6 +740,12 @@
       "status": "市场",
       "title": "市场",
       "description": "每个资金池的交易量与手续费，以及本期 STATICS 排放的去向。"
+    },
+    "agent": {
+      "label": "智能助手",
+      "status": "智能助手",
+      "title": "你的智能助手",
+      "description": "准备质押操作、管理授权并恢复活动。"
     }
   },
   "shell": {
@@ -2137,7 +2143,8 @@
     "creationMissing": "交易回执中没有新账户。请刷新以查看你的账户。",
     "waitingForIndexer": "已确认。正在等待新账户出现…",
     "indexerSlow": "{label} 已确认。新账户可能需要片刻才会出现。",
-    "feeChanged": "开户费已变化。请重新审核操作。"
+    "feeChanged": "开户费已变化。请重新审核操作。",
+    "agentReview": "通过助手审核此质押"
   },
   "earnAssets": {
     "help": "选择此账户用于赚取协议费用的资产。更改在钱包中确认后生效；新增资产在资格等待期后开始赚取收益。",

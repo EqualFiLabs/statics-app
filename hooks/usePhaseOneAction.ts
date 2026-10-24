@@ -52,6 +52,8 @@ export function usePhaseOneAction(deployment: PhaseOneDeployment, selection = ""
   };
   const send = async (transaction: Transaction) => {
     assertCurrent();
+    if (process.env.NEXT_PUBLIC_AGENT_ENABLED === "true" && transaction.kind === "phase-one-stake")
+      throw new Error("Review this stake through the agent activity screen.");
     if (!publicClient || !wallet) throw new Error("Connect a wallet on the selected network.");
     return executePhaseOneTransaction({
       ...transaction,

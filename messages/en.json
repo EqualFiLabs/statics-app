@@ -740,6 +740,12 @@
       "status": "Markets",
       "title": "Markets",
       "description": "Every pool, its volume and fees, and where STATICS emissions go this period."
+    },
+    "agent": {
+      "label": "Agent",
+      "status": "Agent",
+      "title": "Your agent",
+      "description": "Prepare staking actions, manage delegation, and recover activity."
     }
   },
   "shell": {
@@ -2137,7 +2143,8 @@
     "creationMissing": "The receipt did not include the new account. Refresh to check your accounts.",
     "waitingForIndexer": "Confirmed. Waiting for the new account to appear…",
     "indexerSlow": "{label} confirmed. The new account may take a moment to appear.",
-    "feeChanged": "The account opening fee changed. Review the action again."
+    "feeChanged": "The account opening fee changed. Review the action again.",
+    "agentReview": "Review this stake with the agent"
   },
   "earnAssets": {
     "help": "Choose the assets this account earns protocol fees in. Changes take effect after you confirm in your wallet; added assets start earning after the eligibility delay.",
