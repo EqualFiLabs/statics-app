@@ -740,6 +740,12 @@
       "status": "Mercados",
       "title": "Mercados",
       "description": "Cada pool, su volumen y comisiones, y adónde van las emisiones de STATICS este periodo."
+    },
+    "agent": {
+      "label": "Agente",
+      "status": "Agente",
+      "title": "Tu agente",
+      "description": "Prepara acciones de staking, gestiona la delegación y recupera la actividad."
     }
   },
   "shell": {
@@ -2137,7 +2143,8 @@
     "creationMissing": "El recibo no incluía la nueva cuenta. Actualiza para revisar tus cuentas.",
     "waitingForIndexer": "Confirmado. Esperando a que aparezca la nueva cuenta…",
     "indexerSlow": "{label} confirmado. La nueva cuenta puede tardar un momento en aparecer.",
-    "feeChanged": "La comisión de apertura de cuenta cambió. Revisa la operación de nuevo."
+    "feeChanged": "La comisión de apertura de cuenta cambió. Revisa la operación de nuevo.",
+    "agentReview": "Revisar este staking con el agente"
   },
   "earnAssets": {
     "help": "Elige los activos en los que esta cuenta gana comisiones del protocolo. Los cambios se aplican tras confirmar en tu billetera; los activos añadidos empiezan a generar tras el periodo de elegibilidad.",
