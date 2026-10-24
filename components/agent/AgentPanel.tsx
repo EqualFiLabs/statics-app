@@ -50,7 +50,7 @@ function ActionCard({ action }: { action: Workflow }) {
   };
   const pending = ["running", "reconciling"].includes(action.status);
   const grant = useQuery({
-    queryKey: ["agent-policy", wallet.address, wallet.targetChainId],
+    queryKey: ["agent-policy", agent.identityKey, wallet.address, wallet.targetChainId],
     enabled: Boolean(agent.client),
     queryFn: () => agent.client!.policy(),
   });
@@ -196,19 +196,19 @@ function AgentPanelSession({ positionId = "", amount }: { positionId?: string; a
     agent.checkContext();
   };
   const policy = useQuery({
-    queryKey: ["agent-policy", wallet.address, wallet.targetChainId],
+    queryKey: ["agent-policy", agent.identityKey, wallet.address, wallet.targetChainId],
     enabled: Boolean(agent.client),
     queryFn: () => agent.client!.policy(),
     retry: false,
   });
   useEffect(() => {
     const timer = setTimeout(() => {
-      const key = `statics:agent-conversation:${wallet.address}:${wallet.targetChainId}`;
+      const key = `statics:agent-conversation:${agent.identityKey}`;
       setConversation(window.localStorage.getItem(key));
       setChatMessages([]);
     }, 0);
     return () => clearTimeout(timer);
-  }, [wallet.address, wallet.targetChainId]);
+  }, [agent.identityKey]);
   useEffect(() => {
     let disposed = false;
     if (conversation && agent.client)
@@ -217,11 +217,17 @@ function AgentPanelSession({ positionId = "", amount }: { positionId?: string; a
         .then((items) => {
           if (!disposed) setChatMessages(items);
         })
-        .catch(() => {});
+        .catch((e: unknown) => {
+          if (disposed) return;
+          if (e instanceof Error && e.message === "conversation_not_found") {
+            window.localStorage.removeItem(`statics:agent-conversation:${agent.identityKey}`);
+            setConversation(null);
+          } else setError(explain(e));
+        });
     return () => {
       disposed = true;
     };
-  }, [conversation, agent.client]);
+  }, [conversation, agent.client, agent.identityKey]);
   const run = async (label: string, fn: () => Promise<void>) => {
     if (requestLock.current) return;
     requestLock.current = true;
@@ -292,7 +298,7 @@ function AgentPanelSession({ positionId = "", amount }: { positionId?: string; a
                 amount: String(parseEther(value)),
                 maxFeePerTransaction: String(parseEther(fee)),
               };
-              const storageKey = `statics:agent-intent:${wallet.address}:${wallet.targetChainId}`;
+              const storageKey = `statics:agent-intent:${agent.identityKey}`;
               const previous = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as {
                 key: string;
                 input: string;
@@ -498,13 +504,10 @@ function AgentPanelSession({ positionId = "", amount }: { positionId?: string; a
               if (!id) {
                 id = (await client.conversation()).id;
                 checkCurrent();
-                window.localStorage.setItem(
-                  `statics:agent-conversation:${wallet.address}:${wallet.targetChainId}`,
-                  id
-                );
+                window.localStorage.setItem(`statics:agent-conversation:${agent.identityKey}`, id);
                 setConversation(id);
               }
-              const key = `statics:agent-message:${id}`,
+              const key = `statics:agent-message:${agent.identityKey}:${id}`,
                 old = JSON.parse(window.localStorage.getItem(key) ?? "null") as {
                   key: string;
                   text: string;

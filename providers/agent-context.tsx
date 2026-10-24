@@ -21,6 +21,7 @@ import type { Address } from "viem";
 export const agentEnabled = process.env.NEXT_PUBLIC_AGENT_ENABLED === "true";
 type AgentRuntime = {
   sessionKey: string;
+  identityKey: string;
   checkContext: () => void;
   loadHistory: () => Promise<void>;
   client: AgentClient | null;
@@ -36,6 +37,7 @@ const unavailable = async () => {
 };
 const Context = createContext<AgentRuntime>({
   sessionKey: "unavailable",
+  identityKey: "unavailable",
   loadHistory: unavailable,
   checkContext: () => {
     throw new Error("Wallet context is unavailable.");
@@ -186,6 +188,7 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
     <Context.Provider
       value={{
         sessionKey: context,
+        identityKey: `${user?.id}:${wallet.address}:${wallet.targetChainId}`,
         checkContext: assertCurrent,
         client,
         workflows,

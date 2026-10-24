@@ -6,6 +6,7 @@ import type { Workflow } from "@equalfi/agent-client";
 const mocks = vi.hoisted(() => ({
   agent: {
     sessionKey: "user-one",
+    identityKey: "user-one:wallet:4663",
     loadHistory: vi.fn(),
     checkContext: vi.fn(),
     client: null as unknown,
@@ -86,6 +87,7 @@ function mount() {
 beforeEach(() => {
   window.localStorage.clear();
   mocks.agent.sessionKey = "user-one";
+  mocks.agent.identityKey = "user-one:wallet:4663";
   mocks.agent.checkContext.mockReset();
   mocks.agent.workflows = [];
   mocks.wallet.isTargetChain = true;
@@ -168,6 +170,7 @@ describe("canonical agent panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(client.chat).toHaveBeenCalledOnce());
     mocks.agent.sessionKey = "user-two";
+    mocks.agent.identityKey = "user-two:wallet:4663";
     mocks.agent.checkContext.mockImplementation(() => {
       throw new Error("context changed");
     });
@@ -187,5 +190,16 @@ describe("canonical agent panel", () => {
     await waitFor(() => expect(mocks.agent.checkContext).toHaveBeenCalled());
     expect(screen.queryByText("old private answer")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Message")).toHaveValue("");
+  });
+  it("clears an inaccessible stored conversation instead of retrying it forever", async () => {
+    const key = `statics:agent-conversation:${mocks.agent.identityKey}`;
+    window.localStorage.setItem(key, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    const client = mocks.agent.client as Record<string, unknown>;
+    client.messages = vi.fn(async () => {
+      throw new Error("conversation_not_found");
+    });
+    mount();
+    await waitFor(() => expect(client.messages).toHaveBeenCalled());
+    await waitFor(() => expect(window.localStorage.getItem(key)).toBeNull());
   });
 });
