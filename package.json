@@ -55,7 +55,7 @@
     "verify": "npm run verify:assets && npm run lint && npm run lint:css && npm run format:check && npm run typecheck && npm test && npm run test:e2e"
   },
   "dependencies": {
-    "@equalfi/agent-client": "file:vendor/equalfi-agent-client/equalfi-agent-client-0.1.1.tgz",
+    "@equalfi/agent-client": "file:vendor/equalfi-agent-client/equalfi-agent-client-0.1.2.tgz",
     "@privy-io/react-auth": "3.38.0",
     "@privy-io/wagmi": "4.0.16",
     "@solana-program/memo": "^0.10.0",

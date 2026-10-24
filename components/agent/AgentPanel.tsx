@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatEther, parseEther } from "viem";
 import type { Message, Workflow } from "@equalfi/agent-client";
@@ -151,7 +151,18 @@ function ActionCard({ action }: { action: Workflow }) {
   );
 }
 
-export function AgentPanel({ positionId = "", amount }: { positionId?: string; amount?: string }) {
+export function AgentPanel(props: { positionId?: string; amount?: string }) {
+  const agent = useAgent(),
+    wallet = useWalletState(),
+    { active } = useDeployment();
+  return (
+    <AgentPanelSession
+      key={`${agent.sessionKey}:${wallet.address}:${wallet.targetChainId}:${wallet.authenticated}:${active.descriptor.deploymentId}`}
+      {...props}
+    />
+  );
+}
+function AgentPanelSession({ positionId = "", amount }: { positionId?: string; amount?: string }) {
   const agent = useAgent(),
     wallet = useWalletState(),
     { active } = useDeployment();
@@ -172,7 +183,18 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
   const [conversation, setConversation] = useState<string | null>(null),
     [chatText, setChatText] = useState(""),
     [chatMessages, setChatMessages] = useState<Message[]>([]);
-  const requestLock = useRef(false);
+  const requestLock = useRef(false),
+    live = useRef(true);
+  useLayoutEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  const checkCurrent = () => {
+    if (!live.current) throw new Error("Wallet or deployment changed.");
+    agent.checkContext();
+  };
   const policy = useQuery({
     queryKey: ["agent-policy", wallet.address, wallet.targetChainId],
     enabled: Boolean(agent.client),
@@ -207,7 +229,9 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
     setError(null);
     setNotice(null);
     try {
+      checkCurrent();
       await fn();
+      checkCurrent();
       await agent.refresh();
       await policy.refetch();
     } catch (e) {
@@ -279,6 +303,7 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
                 previous?.input === serialized && previous.id
                   ? await client.status(previous.id)
                   : null;
+              checkCurrent();
               const intentKey =
                 previous?.input === serialized && (!oldAction || !terminal(oldAction))
                   ? previous.key
@@ -395,6 +420,7 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
                   if (!Number.isFinite(hours) || hours <= 0 || hours > 8760)
                     throw new Error("Enter a grant duration between 0 and 8760 hours.");
                   await agent.setupSigner();
+                  checkCurrent();
                   await client.setGrant({
                     wallet: wallet.address!.toLowerCase(),
                     chainId: wallet.targetChainId,
@@ -429,6 +455,7 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
                 void run("Removing all wallet signers", async () => {
                   const current = policy.data?.global?.body;
                   if (current) await client.setGlobal({ ...current, paused: true });
+                  checkCurrent();
                   await agent.removeSigner();
                   setNotice("Wallet signer access removed.");
                 })
@@ -441,7 +468,11 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
       </section>
       <section className={styles.card}>
         <h2>Ask the agent</h2>
-        <p>Specify the position, exact amount and maximum network fee when requesting a stake.</p>
+        <p>
+          For automatic execution within your grant, use: Stake 100 STATICS in position 42 with
+          maximum network fee 0.001 ETH per transaction. Other wording produces a proposal for
+          review.
+        </p>
         {chatMessages.map((message) => (
           <div key={message.id}>
             <p>{message.body.text}</p>
@@ -466,6 +497,7 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
               let id = conversation;
               if (!id) {
                 id = (await client.conversation()).id;
+                checkCurrent();
                 window.localStorage.setItem(
                   `statics:agent-conversation:${wallet.address}:${wallet.targetChainId}`,
                   id
@@ -480,6 +512,7 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
               const intent = old?.text === chatText ? old.key : crypto.randomUUID();
               window.localStorage.setItem(key, JSON.stringify({ key: intent, text: chatText }));
               await client.chat(id, intent, chatText);
+              checkCurrent();
               window.localStorage.removeItem(key);
               setChatMessages(await client.messages(id));
               setChatText("");
@@ -493,6 +526,12 @@ export function AgentPanel({ positionId = "", amount }: { positionId?: string; a
       {(error || agent.error) && <p role="alert">{error ?? explain(agent.error)}</p>}
       <section>
         <h2>Agent activity</h2>
+        <button
+          disabled={Boolean(busy)}
+          onClick={() => void run("Loading history", () => agent.loadHistory())}
+        >
+          Load older completed actions
+        </button>
         {agent.workflows
           .filter(
             (a) =>

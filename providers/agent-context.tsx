@@ -1,7 +1,15 @@
 "use client";
-import { createContext, useContext, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { AgentClient, type SignRequest, type Workflow } from "@equalfi/agent-client";
-import { getAccessToken, useSignTransaction, useSigners } from "@privy-io/react-auth";
+import { getAccessToken, useSignTransaction, useSigners, usePrivy } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import { useWalletState } from "./wallet-context";
 import {
@@ -12,6 +20,9 @@ import type { Address } from "viem";
 
 export const agentEnabled = process.env.NEXT_PUBLIC_AGENT_ENABLED === "true";
 type AgentRuntime = {
+  sessionKey: string;
+  checkContext: () => void;
+  loadHistory: () => Promise<void>;
   client: AgentClient | null;
   workflows: Workflow[];
   error: string | null;
@@ -24,6 +35,11 @@ const unavailable = async () => {
   throw new Error("Agent wallet connection is unavailable.");
 };
 const Context = createContext<AgentRuntime>({
+  sessionKey: "unavailable",
+  loadHistory: unavailable,
+  checkContext: () => {
+    throw new Error("Wallet context is unavailable.");
+  },
   client: null,
   workflows: [],
   error: null,
@@ -36,10 +52,11 @@ export const useAgent = () => useContext(Context);
 
 export function AgentRuntimeProvider({ children }: { children: React.ReactNode }) {
   const wallet = useWalletState();
+  const { user } = usePrivy();
   const { signTransaction } = useSignTransaction();
   const { addSigners, removeSigners } = useSigners();
   const current = useRef("");
-  const context = `${wallet.address}:${wallet.targetChainId}:${wallet.chainId}:${wallet.status}`;
+  const context = `${user?.id}:${wallet.authenticated}:${wallet.address}:${wallet.targetChainId}:${wallet.chainId}:${wallet.status}`;
   useLayoutEffect(() => {
     current.current = context;
     return () => {
@@ -48,7 +65,11 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
   }, [context]);
   const client = useMemo(
     () =>
-      agentEnabled && wallet.status === "ready" && wallet.authenticated && wallet.address
+      agentEnabled &&
+      user?.id &&
+      wallet.status === "ready" &&
+      wallet.authenticated &&
+      wallet.address
         ? new AgentClient({
             baseUrl: "/api/agent",
             wallet: wallet.address.toLowerCase(),
@@ -56,15 +77,28 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
             getAccessToken,
           })
         : null,
-    [wallet.address, wallet.targetChainId, wallet.status, wallet.authenticated]
+    [wallet.address, wallet.targetChainId, wallet.status, wallet.authenticated, user?.id]
   );
   const activity = useQuery({
-    queryKey: ["agent-activity", wallet.address, wallet.targetChainId],
+    queryKey: ["agent-activity", user?.id, wallet.address, wallet.targetChainId],
     enabled: Boolean(client),
     queryFn: () => client!.activity(),
     refetchInterval: 2000,
     retry: false,
   });
+  const [older, setOlder] = useState<{ context: string; items: Workflow[]; page: number }>({
+    context: "",
+    items: [],
+    page: 0,
+  });
+  const workflows = [
+    ...new Map(
+      [...(older.context === context ? older.items : []), ...(activity.data ?? [])].map((a) => [
+        a.id,
+        a,
+      ])
+    ).values(),
+  ];
   const announced = useRef(new Set<string>());
   useEffect(() => {
     for (const action of activity.data ?? []) {
@@ -123,6 +157,7 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
       return signed.signature;
     }
     const provider = await wallet.getEthereumProvider();
+    assertCurrent();
     if (!provider) throw new Error("The wallet is unavailable.");
     const hex = (value: bigint | number) => `0x${BigInt(value).toString(16)}`;
     const raw = await provider.request({
@@ -150,8 +185,22 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
   return (
     <Context.Provider
       value={{
+        sessionKey: context,
+        checkContext: assertCurrent,
         client,
-        workflows: activity.data ?? [],
+        workflows,
+        loadHistory: async () => {
+          assertCurrent();
+          if (!client) return unavailable();
+          const page = (older.context === context ? older.page : 0) + 1;
+          const items = await client.activity(page);
+          assertCurrent();
+          setOlder({
+            context,
+            page,
+            items: [...(older.context === context ? older.items : []), ...items],
+          });
+        },
         error: activity.error?.message ?? null,
         refresh: activity.refetch,
         signNext: async (action) => {
@@ -165,6 +214,7 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
           if (!client || wallet.walletKind !== "embedded")
             throw new Error("Delegation requires an embedded wallet.");
           const info = await client.capabilities();
+          assertCurrent();
           if (!info.signer) throw new Error("Delegation is unavailable.");
           if (!info.signer.installed)
             await addSigners({
@@ -173,8 +223,10 @@ export function AgentRuntimeProvider({ children }: { children: React.ReactNode }
             });
         },
         removeSigner: async () => {
+          assertCurrent();
           if (!client) return unavailable();
           await client.revoke();
+          assertCurrent();
           await removeSigners({ address: wallet.address! });
         },
       }}

@@ -5,6 +5,9 @@ import { AgentPanel } from "@/components/agent/AgentPanel";
 import type { Workflow } from "@equalfi/agent-client";
 const mocks = vi.hoisted(() => ({
   agent: {
+    sessionKey: "user-one",
+    loadHistory: vi.fn(),
+    checkContext: vi.fn(),
     client: null as unknown,
     workflows: [] as Workflow[],
     error: null,
@@ -82,6 +85,8 @@ function mount() {
 }
 beforeEach(() => {
   window.localStorage.clear();
+  mocks.agent.sessionKey = "user-one";
+  mocks.agent.checkContext.mockReset();
   mocks.agent.workflows = [];
   mocks.wallet.isTargetChain = true;
   mocks.agent.client = {
@@ -146,5 +151,41 @@ describe("canonical agent panel", () => {
     mount();
     expect(screen.getByRole("button", { name: "Switch to Robinhood" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Prepare proposal" })).not.toBeInTheDocument();
+  });
+  it("does not display a previous account's delayed conversation response", async () => {
+    let finish!: () => void;
+    const client = mocks.agent.client as Record<string, unknown>;
+    client.conversation = vi.fn(async () => ({ id: "old-private-conversation" }));
+    client.chat = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          finish = r;
+        })
+    );
+    client.messages = vi.fn(async () => []);
+    const view = mount();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "private question" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(client.chat).toHaveBeenCalledOnce());
+    mocks.agent.sessionKey = "user-two";
+    mocks.agent.checkContext.mockImplementation(() => {
+      throw new Error("context changed");
+    });
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <AgentPanel positionId="42" />
+      </QueryClientProvider>
+    );
+    client.messages = vi.fn(async () => [
+      {
+        id: "secret",
+        status: "completed",
+        body: { text: "old private question", assistant: "old private answer", actionIds: [] },
+      },
+    ]);
+    finish();
+    await waitFor(() => expect(mocks.agent.checkContext).toHaveBeenCalled());
+    expect(screen.queryByText("old private answer")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toHaveValue("");
   });
 });
