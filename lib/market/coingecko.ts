@@ -53,7 +53,8 @@ export function coinGeckoTrade(trade: IndexedMarketTrade, market: CoinGeckoSpotM
     BigInt(trade.price1Per0Wad),
     market.staticsIsCurrency0
   );
-  const type: CoinGeckoTradeSide = staticsAmount < 0n ? "buy" : "sell";
+  // v4 Swap amounts are the swapper's deltas, so a buyer receives STATICS (positive).
+  const type: CoinGeckoTradeSide = staticsAmount > 0n ? "buy" : "sell";
   return {
     trade_id: coinGeckoTradeId(BigInt(trade.blockNumber), trade.logIndex),
     price: decimalWad(price),

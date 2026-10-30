@@ -127,8 +127,8 @@ describe("CoinGecko market server adapter", () => {
           items: [
             {
               poolId: market.poolId,
-              amount0: (8n * 10n ** 12n).toString(),
-              amount1: (-2n * WAD).toString(),
+              amount0: (-8n * 10n ** 12n).toString(),
+              amount1: (2n * WAD).toString(),
               volume0: (8n * 10n ** 12n).toString(),
               volume1: (2n * WAD).toString(),
               price1Per0Wad: (250_000n * WAD).toString(),
@@ -156,7 +156,7 @@ describe("CoinGecko market server adapter", () => {
       pool: market.poolId,
       from: "10",
       to: "20",
-      amount0Sign: "positive",
+      amount0Sign: "negative",
     });
   });
 

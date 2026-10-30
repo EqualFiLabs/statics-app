@@ -456,14 +456,15 @@ app.get("/market/activity", async (context) => {
         desc(marketSwap.logIndex)
       )
       .limit(1),
-    db
-      .select({ swapCount: count() })
-      .from(marketSwap)
-      .where(and(where, gt(marketSwap.amount0, 0n))),
+    // v4 Swap amounts are the swapper's deltas: a zero-for-one swap pays in token0.
     db
       .select({ swapCount: count() })
       .from(marketSwap)
       .where(and(where, lt(marketSwap.amount0, 0n))),
+    db
+      .select({ swapCount: count() })
+      .from(marketSwap)
+      .where(and(where, gt(marketSwap.amount0, 0n))),
   ]);
   const aggregate = aggregateRows[0];
   const first = firstRows[0];
