@@ -870,7 +870,11 @@ html:has(.landing-page) {
     grid-template-columns: 1fr 1fr;
   }
   .landing-page .site-footer nav:first-of-type {
-    display: none;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
   }
 }
 
