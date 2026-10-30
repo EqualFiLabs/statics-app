@@ -3,8 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { DOCS_URL, projectLinks } from "@/lib/site-config";
-import { PlaceholderLink } from "./PlaceholderLink";
+import { DOCS_URL, MCG_SIGNAL_URL, projectLinks } from "@/lib/site-config";
 import { SiteHeader } from "./SiteHeader";
 import { UtcClock } from "./UtcClock";
 
@@ -221,6 +220,14 @@ export async function LandingPage() {
               />
               <p id="launch-title">{t("tagline")}</p>
             </div>
+            <a className="mcg-signal-link" href={MCG_SIGNAL_URL}>
+              <Image
+                src="/assets/mcg-signal-wordmark.png"
+                alt={t("mcgSignal")}
+                width={200}
+                height={40}
+              />
+            </a>
           </section>
         </main>
 
@@ -231,11 +238,6 @@ export async function LandingPage() {
               <a key={link.messageKey} href={link.href}>
                 {t(link.messageKey)}
               </a>
-            ))}
-          </nav>
-          <nav aria-label={t("legalLinks")}>
-            {(["terms", "privacy", "security"] as const).map((key) => (
-              <PlaceholderLink key={key} label={t(key)} />
             ))}
           </nav>
         </footer>

@@ -52,6 +52,7 @@ export function readPublicEnvironment(
 }
 
 export const DOCS_URL = "https://docs.staticsprotocol.com";
+export const MCG_SIGNAL_URL = "https://mcgsignal.com/0x2d8d6f4a93acd7a916a5a654ec8b690ba3b3eadd";
 const GITHUB_URL = "https://github.com/EqualFiLabs/statics";
 
 export const primaryNavigation: readonly SiteNavigationItem[] = [
@@ -69,10 +70,6 @@ export const projectLinks = [
   { messageKey: "github", href: GITHUB_URL },
   { messageKey: "telegram", href: "https://t.me/EqualFi" },
   { messageKey: "twitter", href: "https://x.com/staticsprotocol" },
-  {
-    messageKey: "mcgSignal",
-    href: "https://mcgsignal.com/0x2d8d6f4a93acd7a916a5a654ec8b690ba3b3eadd",
-  },
 ] as const;
 
 export const protocolStatus = {
