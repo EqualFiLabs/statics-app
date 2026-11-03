@@ -1558,6 +1558,11 @@
   line-height: var(--leading-normal);
 }
 
+/* Privy's transaction error headline can contain an unbroken RPC address. */
+#privy-dialog {
+  overflow-wrap: anywhere;
+}
+
 /* ===================================================================
  * PAGE STYLES — per-route rules, swept onto the tokens above.
  *
