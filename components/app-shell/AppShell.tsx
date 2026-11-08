@@ -347,6 +347,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         {options.length < 2 ? <NetworkIndicator /> : null}
         <div className="dapp-header-actions">
+          {process.env.NEXT_PUBLIC_AGENT_ENABLED === "true" &&
+            active.descriptor.capabilities.includes("position-staking") && (
+              <Link className="dapp-return" href="/app/agent">
+                {tRoutes("agent.label")}
+              </Link>
+            )}
           <NetworkSelector className="dapp-network-selector--header" />
           <LocaleSwitcher className="locale-switcher locale-switcher--dapp" />
           {active.descriptor.stage === "launch" && (

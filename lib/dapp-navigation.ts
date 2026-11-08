@@ -186,11 +186,18 @@ const routePresentations = {
     title: "Approval tools",
     description: "Review and revoke the permissions this wallet has granted to Statics.",
   },
+  agent: {
+    label: "Agent",
+    status: "Agent",
+    title: "Your agent",
+    description: "Prepare staking actions, manage delegation, and recover activity.",
+  },
 } as const satisfies Record<string, DappRoutePresentation>;
 
 export type DappRouteId = keyof typeof routePresentations;
 
 export function getDappRouteId(pathname: string): DappRouteId {
+  if (pathname.startsWith("/app/agent")) return "agent";
   if (pathname.startsWith("/app/markets")) return "markets";
   if (pathname.startsWith("/app/swap")) return "swap";
   if (pathname.startsWith("/app/wallet")) return "wallet";

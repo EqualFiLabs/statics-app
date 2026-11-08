@@ -39,6 +39,7 @@ import {
 } from "@/lib/wallet/local-fork";
 import { recoverPrivyWallet } from "@/lib/wallet/reconnection";
 import { ProtocolQueryReconciler } from "./ProtocolQueryReconciler";
+import { AgentRuntimeProvider, agentEnabled } from "./agent-context";
 import { WalletContext, defaultWalletState, type WalletState } from "./wallet-context";
 import { DeploymentProvider, useDeployment } from "./deployment-context";
 import {
@@ -445,7 +446,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
 
   return (
     <WalletContext.Provider value={value}>
-      <SolanaWalletContext.Provider value={solanaValue}>{children}</SolanaWalletContext.Provider>
+      <SolanaWalletContext.Provider value={solanaValue}>
+        {agentEnabled ? <AgentRuntimeProvider>{children}</AgentRuntimeProvider> : children}
+      </SolanaWalletContext.Provider>
     </WalletContext.Provider>
   );
 }

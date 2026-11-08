@@ -33,6 +33,7 @@ import { ReviewDrawer } from "./ReviewDrawer";
 import { RewardAssetModal } from "./RewardAssetModal";
 import { stakingRewardAssetOptions } from "@/lib/rewards/staking-assets";
 import styles from "./earn.module.css";
+import { agentEnabled } from "@/providers/agent-context";
 
 const PICKER_PAGE = 5;
 
@@ -759,17 +760,26 @@ export function EarnStakeForm({
             {action.busy && <p role="status">{progress ?? t("preparing")}</p>}
           </ReviewDrawer>
         ) : null}
-        <button
-          type="button"
-          className="ui-button ui-button--primary ui-button--block"
-          disabled={!canReview}
-          onClick={() => {
-            setSuccess(null);
-            void review();
-          }}
-        >
-          {action.busy && !action.review ? t("preparing") : t(`review.${mode}`)}
-        </button>
+        {agentEnabled && preview?.kind === "stake" && canReview ? (
+          <Link
+            className="ui-button ui-button--primary ui-button--block"
+            href={`/app/agent?positionId=${preview.positionId}&amount=${amount}`}
+          >
+            {t("agentReview")}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="ui-button ui-button--primary ui-button--block"
+            disabled={!canReview}
+            onClick={() => {
+              setSuccess(null);
+              void review();
+            }}
+          >
+            {action.busy && !action.review ? t("preparing") : t(`review.${mode}`)}
+          </button>
+        )}
         {success && (
           <p role="status" className="earn-success">
             {t("confirmed", { label: success })}
