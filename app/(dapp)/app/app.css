@@ -18,7 +18,7 @@
 
 .dapp-shell {
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--app-bg);
   color: var(--app-text);
   font-family: var(--font-sans);
@@ -1401,9 +1401,14 @@
 }
 
 .dapp-sidebar {
+  position: sticky;
+  top: 72px;
   display: flex;
+  align-self: start;
   min-width: 0;
+  height: calc(100vh - 72px);
   flex-direction: column;
+  overflow-y: auto;
   padding: 1.5rem 0.75rem;
   border-right: 1px solid var(--app-border);
 }
@@ -6210,7 +6215,10 @@
   .dapp-sidebar {
     position: relative;
     z-index: 40;
+    top: auto;
+    align-self: stretch;
     min-width: 0;
+    height: auto;
     overflow: visible;
     padding: 0;
     border-right: 0;
