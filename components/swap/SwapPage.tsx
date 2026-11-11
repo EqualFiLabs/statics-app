@@ -15,11 +15,19 @@ export function SwapPage() {
   const t = useTranslations("trade");
   const { active } = useDeployment();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<SwapMode>(() => {
-    const requested = searchParams?.get("mode");
-    if (requested === "nft" || requested === "token") return requested;
-    return "token";
-  });
+  const requestedMode = searchParams?.get("mode");
+  const requestedAction = searchParams?.get("action");
+  const requestedOperatorId = searchParams?.get("operatorId");
+  const routeKey = searchParams?.toString() ?? "";
+  const [modeOverride, setModeOverride] = useState<{ routeKey: string; mode: SwapMode } | null>(
+    null
+  );
+  const mode: SwapMode =
+    modeOverride?.routeKey === routeKey
+      ? modeOverride.mode
+      : requestedMode === "nft"
+        ? "nft"
+        : "token";
   if (!active.launch && !active.phaseOne) {
     return (
       <EmptyState
@@ -41,7 +49,7 @@ export function SwapPage() {
             type="button"
             role="tab"
             aria-selected={mode === item}
-            onClick={() => setMode(item)}
+            onClick={() => setModeOverride({ routeKey, mode: item })}
           >
             {item === "token" ? t("token") : t("operatorNft")}
           </button>
@@ -54,7 +62,12 @@ export function SwapPage() {
           initialOut={searchParams?.get("out") ?? undefined}
         />
       ) : active.launch ? (
-        <GenesisVaultSwapPanel deployment={active.launch} />
+        <GenesisVaultSwapPanel
+          key={`${active.launch.descriptor.deploymentId}-${requestedAction}-${requestedOperatorId}`}
+          deployment={active.launch}
+          initialDirection={requestedAction === "redeem" ? "redeem" : "acquire"}
+          initialOperatorId={requestedOperatorId ?? undefined}
+        />
       ) : null}
     </div>
   );

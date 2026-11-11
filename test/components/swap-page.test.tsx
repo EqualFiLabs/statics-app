@@ -21,7 +21,19 @@ vi.mock("@/components/portal/EvmSwapPanel", () => ({
   ),
 }));
 vi.mock("@/components/genesis/GenesisVaultSwapPanel", () => ({
-  GenesisVaultSwapPanel: () => <div>Next available Operator NFT</div>,
+  GenesisVaultSwapPanel: ({
+    initialDirection,
+    initialOperatorId,
+  }: {
+    initialDirection?: string;
+    initialOperatorId?: string;
+  }) => (
+    <div>
+      Next available Operator NFT
+      <span>Direction: {initialDirection}</span>
+      <span>Operator: {initialOperatorId}</span>
+    </div>
+  ),
 }));
 vi.mock("@/components/phase-one/PhaseOneSwapPanel", () => ({
   PhaseOneSwapPanel: () => <div>Phase 1 direct public swap</div>,
@@ -121,6 +133,56 @@ describe("Swap page", () => {
     expect(screen.getByText("Next available Operator NFT")).toBeInTheDocument();
     expect(screen.queryByText("Token swap statics")).not.toBeInTheDocument();
     searchParams.delete("mode");
+  });
+
+  it("opens the Redeem direction with the requested Operator", () => {
+    searchParams.set("mode", "nft");
+    searchParams.set("action", "redeem");
+    searchParams.set("operatorId", "1204");
+    render(
+      <DeploymentContext.Provider
+        value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+      >
+        <SwapPage />
+      </DeploymentContext.Provider>
+    );
+
+    expect(screen.getByRole("tab", { name: "Operator NFT" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(screen.getByText("Direction: redeem")).toBeInTheDocument();
+    expect(screen.getByText("Operator: 1204")).toBeInTheDocument();
+    searchParams.delete("mode");
+    searchParams.delete("action");
+    searchParams.delete("operatorId");
+  });
+
+  it("follows a new redemption link after a manual tab change", () => {
+    const page = () => (
+      <DeploymentContext.Provider
+        value={{ active: option, options: [option], selectNetwork: vi.fn() }}
+      >
+        <SwapPage />
+      </DeploymentContext.Provider>
+    );
+    const view = render(page());
+    fireEvent.click(screen.getByRole("tab", { name: "Operator NFT" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Token" }));
+
+    searchParams.set("mode", "nft");
+    searchParams.set("action", "redeem");
+    searchParams.set("operatorId", "1204");
+    view.rerender(page());
+
+    expect(screen.getByRole("tab", { name: "Operator NFT" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(screen.getByText("Direction: redeem")).toBeInTheDocument();
+    searchParams.delete("mode");
+    searchParams.delete("action");
+    searchParams.delete("operatorId");
   });
 
   it("renders the Genesis trade controls in Spanish", () => {
