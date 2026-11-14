@@ -625,6 +625,239 @@ describe("protocol overview", () => {
     ]);
   });
 
+  it("keeps top pool order and yields stable across quote changes, including a one-day yield", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      const [first, second] = sample.pools.items;
+      const rows = quote === "usdg" ? [first!, second!] : [second!, first!];
+      return {
+        ...sample.pools,
+        items: rows.map((pool) => ({
+          ...pool,
+          estimatedYieldBps:
+            pool.poolId === first!.poolId
+              ? quote === "weth"
+                ? null
+                : 1200
+              : quote === "weth"
+                ? 1400
+                : null,
+          yieldComponents: {
+            ...pool.yieldComponents,
+            complete: false,
+            windowSeconds: "86400",
+          },
+        })),
+      };
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(3));
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("STATICS / WETH");
+    expect(rows[0]).toHaveTextContent("12.0%");
+    expect(rows[1]).toHaveTextContent("STATICS / TOKEN");
+    expect(rows[1]).toHaveTextContent("14.0%");
+    expect(within(rows[1]!).getByTitle("Estimated using WETH prices")).toHaveTextContent("14.0%");
+    expect(rows[0]).toHaveTextContent("≈ $");
+
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => {
+      const wethRows = within(table).getAllByRole("row").slice(1);
+      expect(wethRows[0]).toHaveTextContent(" WETH");
+      expect(wethRows[0]).toHaveTextContent("12.0%");
+      expect(wethRows[1]).toHaveTextContent("14.0%");
+      expect(wethRows[0]).toHaveTextContent("STATICS / WETH");
+      expect(wethRows[1]).toHaveTextContent("STATICS / TOKEN");
+    });
+  });
+
+  it("formats a positive WETH pool metric after switching from ten USDG", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) =>
+          index === 0
+            ? {
+                ...pool,
+                valueLocked: quote === "usdg" ? "10000000" : "4000000000000000",
+                volume24h: quote === "usdg" ? "10000000" : "4000000000000000",
+              }
+            : pool
+        ),
+      };
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    const row = (await within(table).findByText("STATICS / WETH")).closest("tr")!;
+    expect(within(row).getAllByText("≈ $10")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => {
+      const wethRow = within(table).getByText("STATICS / WETH").closest("tr")!;
+      expect(within(wethRow).getAllByText("0.004 WETH")).toHaveLength(2);
+    });
+  });
+
+  it("keeps a ranked pool visible when it is outside the other quote's page", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools" || quote === "usdg") return sample[endpoint as keyof typeof sample];
+      return { ...sample.pools, items: sample.pools.items.slice(1) };
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => {
+      const first = within(table).getAllByRole("row")[1]!;
+      expect(first).toHaveTextContent("STATICS / WETH");
+      expect(within(first).getAllByRole("cell")[0]).toHaveTextContent("—");
+      expect(within(first).getAllByRole("cell")[1]).toHaveTextContent("—");
+    });
+  });
+
+  it("shows unavailable when a conflicting WETH zero has no bridge price", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) =>
+          index === 0
+            ? {
+                ...pool,
+                valueLocked: quote === "usdg" ? "10000000" : "0",
+                volume24h: quote === "usdg" ? "10000000" : "0",
+              }
+            : pool
+        ),
+      };
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    const row = (await within(table).findByText("STATICS / WETH")).closest("tr")!;
+    expect(within(row).getAllByText("≈ $10")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => {
+      const wethRow = within(table).getByText("STATICS / WETH").closest("tr")!;
+      expect(within(wethRow).getAllByText("—")).toHaveLength(2);
+      expect(wethRow).not.toHaveTextContent("0 WETH");
+    });
+  });
+
+  it("converts a conflicting WETH zero from ten USDG using the same-block bridge price", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      const sample = dexFixture(phaseOne, quote);
+      if (endpoint === "tokens" && quote === "weth")
+        return {
+          ...sample.tokens,
+          items: [
+            ...sample.tokens.items,
+            {
+              token: {
+                address: dexFixture(phaseOne, "usdg").summary.quote.address,
+                symbol: "USDG",
+                name: "Global Dollar",
+                decimals: 6,
+              },
+              price: "400000000000000",
+              priceNumerator: "400000000000000",
+              priceDenominator: "1",
+              change24hBps: null,
+              volume24h: "0",
+              priceFallback: false,
+              route: [],
+            },
+          ],
+        };
+      if (endpoint !== "pools") return sample[endpoint as keyof typeof sample];
+      return {
+        ...sample.pools,
+        items: sample.pools.items.map((pool, index) =>
+          index === 0
+            ? {
+                ...pool,
+                valueLocked: quote === "usdg" ? "10000000" : "0",
+                volume24h: quote === "usdg" ? "10000000" : "0",
+              }
+            : pool
+        ),
+      };
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    expect(await within(table).findByText("STATICS / WETH")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() => {
+      const row = within(table).getByText("STATICS / WETH").closest("tr")!;
+      expect(within(row).getAllByText("≈ 0.004 WETH")).toHaveLength(2);
+      expect(
+        within(row).getAllByTitle("Converted from USDG using the indexed WETH price")
+      ).toHaveLength(2);
+    });
+  });
+
+  it("keeps the selected pool rows visible if the comparison quote fails", async () => {
+    mocks.dex.mockImplementation(async (endpoint: string, quote: "usdg" | "weth") => {
+      if (endpoint === "pools" && quote === "usdg") throw new Error("USDG pools unavailable");
+      return dexFixture(phaseOne, quote)[endpoint as keyof ReturnType<typeof dexFixture>];
+    });
+    withPhaseOne(<ProtocolOverview deployment={phaseOne} launch={null} />);
+    const table = screen.getByRole("region", { name: "Top pools" });
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    expect(await within(table).findByText("STATICS / WETH")).toBeInTheDocument();
+    expect(within(table).getByText("by 24h WETH volume")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("could not be refreshed");
+  });
+
+  it("keeps USD mode ranked by USDG on Mainnet", async () => {
+    const mainnet = {
+      ...phaseOne,
+      descriptor: { ...phaseOne.descriptor, deploymentId: "robinhood-phase-one", chainId: 4663 },
+    } as PhaseOneDeployment;
+    mocks.dex.mockImplementation(async (endpoint: string, quote: DexQuote) => {
+      const sample = dexFixture(mainnet, quote);
+      const data = sample[endpoint as keyof typeof sample];
+      return {
+        ...data,
+        ...(endpoint === "pools" && quote === "usd"
+          ? { items: [...sample.pools.items].reverse() }
+          : {}),
+        observation: {
+          referenceAsOf: Date.now(),
+          referencePrices: [
+            {
+              source: "robinhood",
+              asset: tokens[0].address,
+              observedAt: Date.now(),
+              fetchedAt: Date.now(),
+              expiresAt: Date.now() + 800000,
+              stale: false,
+              halted: false,
+            },
+          ],
+        },
+      };
+    });
+    withPhaseOne(<ProtocolOverview deployment={mainnet} launch={null} />, mainnet);
+    expect(screen.getByRole("button", { name: "USD" })).toHaveAttribute("aria-pressed", "true");
+    const table = screen.getByRole("region", { name: "Top pools" });
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(3));
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("STATICS / WETH");
+    expect(within(table).getByText("by 24h USDG volume")).toBeInTheDocument();
+    expect(mocks.dex).toHaveBeenCalledWith("pools", "usdg");
+
+    fireEvent.click(screen.getByRole("button", { name: "WETH" }));
+    await waitFor(() =>
+      expect(within(table).getAllByRole("row")[1]).toHaveTextContent("STATICS / WETH")
+    );
+  });
+
   it("opens Phase 1 on every live module rather than the DEX alone", async () => {
     withPhaseOne(<DeploymentOverview />);
     expect(await screen.findByRole("heading", { name: "Overview", level: 1 })).toBeInTheDocument();
