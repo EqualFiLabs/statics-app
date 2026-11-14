@@ -228,6 +228,20 @@
 .poolsTable td.pairPrice {
   min-width: 96px;
 }
+.pairPriceButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.pairPriceButton:hover {
+  color: var(--accent);
+}
 .table th,
 .table td {
   padding: 12px 10px;
