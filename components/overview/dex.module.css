@@ -197,6 +197,22 @@
   color: var(--app-text);
   font: var(--text-sm) var(--font-sans);
 }
+.mobileSort {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-text-muted);
+  font-size: var(--text-sm);
+}
+.mobileSort select {
+  min-height: var(--control-height-sm);
+  padding: 0 8px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--app-sunken);
+  color: var(--app-text);
+  font: inherit;
+}
 .srOnly {
   position: absolute;
   width: 1px;
@@ -227,6 +243,25 @@
 }
 .poolsTable td.pairPrice {
   min-width: 96px;
+}
+.sortHeaderButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.sortHeaderButton:hover {
+  color: var(--accent);
+}
+.poolsTable th[aria-sort="descending"] .sortHeaderButton::after {
+  content: " ↓";
 }
 .table th,
 .table td {
@@ -423,6 +458,9 @@
 /* Whenever the pools section is too narrow for every column (a phone, or a laptop with the
    sidebar open), each pool becomes a card with labelled figures instead of scrolling. */
 @container pools (width < 1040px) {
+  .mobileSort {
+    display: flex;
+  }
   .tableFrame {
     overflow: visible;
     border: 0;
