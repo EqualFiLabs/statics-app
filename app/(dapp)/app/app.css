@@ -2687,6 +2687,10 @@
   white-space: nowrap;
 }
 
+.portal-asset-field select:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
 .portal-asset-field select:hover {
   background: var(--app-overlay);
 }
