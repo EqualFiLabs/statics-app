@@ -311,6 +311,7 @@ export function isNavigationItemAvailable(
   capabilities: readonly DeploymentCapability[]
 ): boolean {
   if (capabilities.includes(item.capability)) return true;
+  if (item.href === "/app/baskets") return capabilities.includes("basket-conversion");
   if (item.capability === "canonical-statics-market") {
     return capabilities.includes("public-direct-swaps");
   }

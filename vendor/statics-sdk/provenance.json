@@ -57,7 +57,9 @@
     "dist/phase-one/genesis-credit.d.ts": "ffef22c37b79e975da48093ce8e572db6bcdd5d8f0b34617f4fbc6cfbd60a779",
     "dist/phase-one/genesis-credit.js": "9b9be92463d34e6f18354c96064ad2f43365078945a13e9df0df7c8dd852e42d",
     "dist/phase-one/position-market.d.ts": "ab065ee9363338f6c41a6bb13b703dc963e216e63d899e42f93bc5addecb1008",
-    "dist/phase-one/position-market.js": "617404121aeb2abd7ebda24436dc033788dc9643819376d5060fd3ed5d40f706"
+    "dist/phase-one/position-market.js": "617404121aeb2abd7ebda24436dc033788dc9643819376d5060fd3ed5d40f706",
+    "dist/basket-conversion.js": "89d12effcf28106508c0a38a4143f971771ba119c4e446048bfcbb1553e11f42",
+    "dist/basket-conversion.d.ts": "6763a929db544baf5fa2419062aa556ba6181920ac214a3396ec11beb79cf58b"
   },
   "batchRewardsSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
@@ -89,5 +91,13 @@
     "package.json": "98fa4239fadcf6659053e995f0d80c0e76588c9734297e85cea6cf634dee56e6"
   },
   "positionStatementLegacyArtifactsCommit": "96b52bc0076119b54522e071be217c4614fea506",
-  "positionStatementProtocolCommit": "df750c3f9517878b0c60d6dce0146a039bf25844"
+  "positionStatementProtocolCommit": "df750c3f9517878b0c60d6dce0146a039bf25844",
+  "basketConversionSource": {
+    "repository": "https://github.com/EqualFiLabs/statics-sdk",
+    "path": ".",
+    "commit": "3843985ca7826c77ade603f9854da3cb94406685"
+  },
+  "basketConversionSourceChecksums": {
+    "src/basket-conversion.ts": "46c13b93c062c379bfe6b2be74998d4838cefdf80d8bcc955aa7d9cdac7992a5"
+  }
 }

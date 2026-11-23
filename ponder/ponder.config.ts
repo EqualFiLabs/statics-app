@@ -57,6 +57,10 @@ const poolManagerEventsAbi = parseAbi([
   "event ModifyLiquidity(bytes32 indexed id,address indexed sender,int24 tickLower,int24 tickUpper,int256 liquidityDelta,bytes32 salt)",
   "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
 ]);
+const basketConversionEventsAbi = parseAbi([
+  "event BasketConversionMarketCreated(bytes32 indexed poolId,uint256 indexed basketId,address indexed quote)",
+  "event BasketConversionMarketDecommissioned(bytes32 indexed poolId)",
+]);
 const phaseOnePolicyEventsAbi = parseAbi([
   "event ProtocolPoolQuarantineSet(bytes32 indexed poolId,address indexed caller,bool quarantined)",
   "event RewardRestrictionAdded(address indexed asset,address indexed caller)",
@@ -105,7 +109,7 @@ export default createConfig({
   contracts: activeContracts({
     Statics: {
       chain: "active",
-      abi: legacyStaticsAbi,
+      abi: uniqueAbi([...legacyStaticsAbi, ...basketConversionEventsAbi]),
       address: staticsAddress ?? zeroAddress,
       startBlock: optionalStartBlock("PONDER_STATICS_START_BLOCK", deploymentStartBlock),
     },

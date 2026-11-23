@@ -27,6 +27,7 @@ export function isDappRouteAllowed(pathname: string, descriptor: DeploymentDescr
   const capability = getDappRouteCapability(pathname);
   if (capability === null) return true;
   if (descriptor.capabilities.includes(capability)) return true;
+  if (pathname === "/app/baskets") return descriptor.capabilities.includes("basket-conversion");
   if (pathname === "/app/swap") {
     return descriptor.capabilities.includes("public-direct-swaps");
   }

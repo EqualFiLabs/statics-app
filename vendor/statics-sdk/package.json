@@ -17,6 +17,10 @@
     "./phase-one": {
       "types": "./dist/phase-one/index.d.ts",
       "import": "./dist/phase-one/index.js"
+    },
+    "./basket-conversion": {
+      "types": "./dist/basket-conversion.d.ts",
+      "import": "./dist/basket-conversion.js"
     }
   },
   "peerDependencies": {

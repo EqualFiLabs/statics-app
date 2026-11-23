@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
-import { BasketListPage } from "@/components/baskets/BasketListPage";
+import { PhaseTwoConversion } from "@/components/baskets/PhaseTwoConversion";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("pageMetadata.baskets");
@@ -9,5 +9,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function BasketsRoute() {
-  return <BasketListPage />;
+  return <PhaseTwoConversion />;
 }

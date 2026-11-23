@@ -591,3 +591,22 @@ export const dexState = onchainTable("dex_state", (t) => ({
   blockNumber: t.bigint().notNull(),
   timestamp: t.bigint().notNull(),
 }));
+
+export const activatedBasket = onchainTable("activated_basket", (table) => ({
+  key: table.text().primaryKey(),
+  deploymentId: table.text().notNull(),
+  basketId: table.bigint().notNull(),
+  token: table.hex().notNull(),
+  creator: table.hex().notNull(),
+  block: table.bigint().notNull(),
+}));
+
+export const basketConversionMarket = onchainTable("basket_conversion_market", (table) => ({
+  key: table.text().primaryKey(),
+  deploymentId: table.text().notNull(),
+  poolId: table.hex().notNull(),
+  basketId: table.bigint().notNull(),
+  quote: table.hex().notNull(),
+  createdAtBlock: table.bigint().notNull(),
+  retiredAtBlock: table.bigint(),
+}));

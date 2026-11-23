@@ -1,3 +1,5 @@
+import { phaseTwoManifests } from "@/deployments/phase-two-manifests";
+import type { PhaseTwoManifest } from "@/lib/baskets/phase-two";
 import type { PublicDeploymentSnapshot } from "./public-manifests";
 import { launchDeploymentManifests } from "@/deployments/launch-manifests";
 import { deploymentManifests } from "@/deployments/manifests";
@@ -56,7 +58,8 @@ function target(
   chainId: number,
   launch: LaunchDeployment | null,
   phaseOne: PhaseOneDeployment | null,
-  protocol: ProtocolDeployment | null
+  protocol: ProtocolDeployment | null,
+  phaseTwo: PhaseTwoManifest | null = null
 ): DeploymentOption {
   const deploymentId =
     networkId === "anvil"
@@ -70,22 +73,23 @@ function target(
       ...(launch?.descriptor.capabilities ?? []),
       ...(phaseOne?.descriptor.capabilities ?? []),
       ...(protocol?.descriptor.capabilities ?? []),
+      ...(phaseTwo?.markets.length ? (["basket-conversion"] as const) : []),
     ])
   );
   const descriptor: DeploymentDescriptor = {
     deploymentId,
-    label: phaseOne || protocol ? "Statics Protocol" : "Statics Operators launch",
+    label: phaseOne || phaseTwo || protocol ? "Statics Protocol" : "Statics Operators launch",
     network,
     chainId,
-    stage: protocol ? "full-protocol" : phaseOne ? "phase-one" : "launch",
+    stage: protocol ? "full-protocol" : phaseTwo ? "phase-two" : phaseOne ? "phase-one" : "launch",
     capabilities,
-    available: Boolean(launch || phaseOne || protocol),
+    available: Boolean(launch || phaseOne || phaseTwo || protocol),
     unavailableReason:
-      launch || phaseOne || protocol
+      launch || phaseOne || phaseTwo || protocol
         ? undefined
         : `The reviewed ${network} deployment manifest has not been published yet.`,
   };
-  return { networkId, descriptor, launch, phaseOne, protocol };
+  return { networkId, descriptor, launch, phaseOne, ...(phaseTwo ? { phaseTwo } : {}), protocol };
 }
 
 function localLaunch(environment: Record<string, string | undefined>): LaunchDeployment | null {
@@ -193,6 +197,20 @@ function protocolDeployment(
   };
 }
 
+function localPhaseTwo(environment: Record<string, string | undefined>): PhaseTwoManifest | null {
+  const raw = environment.NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST?.trim();
+  if (!raw) return null;
+  const manifest = JSON.parse(raw) as PhaseTwoManifest;
+  if (
+    manifest.version !== 1 ||
+    manifest.chainId !== localChainId(environment) ||
+    !Array.isArray(manifest.markets)
+  ) {
+    throw new Error("The local Phase 2 manifest does not match the Anvil network.");
+  }
+  return manifest;
+}
+
 function publicEnvironment(): Record<string, string | undefined> {
   return {
     ...clientDollarEnvironment(),
@@ -201,6 +219,8 @@ function publicEnvironment(): Record<string, string | undefined> {
     NEXT_PUBLIC_ANVIL_CHAIN_ID: process.env.NEXT_PUBLIC_ANVIL_CHAIN_ID,
     NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST:
       process.env.NEXT_PUBLIC_STATICS_LOCAL_LAUNCH_MANIFEST,
+    NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST:
+      process.env.NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST,
     NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST:
       process.env.NEXT_PUBLIC_STATICS_LOCAL_PHASE_ONE_MANIFEST,
   };
@@ -221,6 +241,12 @@ export function deploymentRegistry(
   ) {
     throw new Error("A local Phase 1 manifest is only allowed in development.");
   }
+  if (
+    appEnvironment !== "development" &&
+    environment.NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST
+  ) {
+    throw new Error("A local Phase 2 manifest is only allowed in development.");
+  }
   if (appEnvironment === "development") {
     const chainId = localChainId(environment);
     options.push(
@@ -230,7 +256,8 @@ export function deploymentRegistry(
         chainId,
         localLaunch(environment),
         localPhaseOne(environment),
-        chainId === 31_337 ? protocolDeployment(31_337, environment) : null
+        chainId === 31_337 ? protocolDeployment(31_337, environment) : null,
+        localPhaseTwo(environment)
       )
     );
   }
@@ -241,7 +268,8 @@ export function deploymentRegistry(
       4_663,
       publicLaunch(ROBINHOOD_GENESIS_DEPLOYMENT_ID, snapshot),
       publicPhaseOne(ROBINHOOD_PHASE_ONE_DEPLOYMENT_ID, snapshot),
-      protocolDeployment(4_663, environment, snapshot)
+      protocolDeployment(4_663, environment, snapshot),
+      phaseTwoManifests.find((manifest) => manifest.chainId === 4_663) ?? null
     ),
     target(
       "robinhood-testnet",
@@ -249,7 +277,8 @@ export function deploymentRegistry(
       46_630,
       publicLaunch(ROBINHOOD_TESTNET_GENESIS_DEPLOYMENT_ID, snapshot),
       publicPhaseOne(ROBINHOOD_TESTNET_PHASE_ONE_DEPLOYMENT_ID, snapshot),
-      protocolDeployment(46_630, environment, snapshot)
+      protocolDeployment(46_630, environment, snapshot),
+      phaseTwoManifests.find((manifest) => manifest.chainId === 46_630) ?? null
     )
   );
   // A chain ID can target only one RPC in a wallet session. Keep the local
