@@ -1009,7 +1009,7 @@ export function EvmSwapPanel({
             balance === null || balance === 0n || !source || source.kind === "native"
               ? undefined
               : () => {
-                  setAmount(displayAmount(balance.toString(), source));
+                  setAmount(formatUnits(balance, source.decimals));
                   setQuote(null);
                   setReviewing(false);
                   setError(null);
