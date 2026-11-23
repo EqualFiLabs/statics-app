@@ -8,6 +8,7 @@ import {
   encodeFunctionResult,
   getAddress,
   maxUint256,
+  parseUnits,
   zeroAddress,
   type Address,
 } from "viem";
@@ -122,7 +123,8 @@ const option = {
 function renderCanonicalTrade(
   chainId: number,
   connected = false,
-  active: DeploymentOption = option
+  active: DeploymentOption = option,
+  initialIn?: Address
 ) {
   const switchNetwork = vi.fn().mockResolvedValue(undefined);
   const selectFundingNetwork = vi.fn().mockResolvedValue(undefined);
@@ -148,7 +150,7 @@ function renderCanonicalTrade(
         }}
       >
         <QueryClientProvider client={client}>
-          <EvmSwapPanel staticsNetwork />
+          <EvmSwapPanel staticsNetwork initialIn={initialIn} />
         </QueryClientProvider>
       </WalletContext.Provider>
     </DeploymentContext.Provider>
@@ -177,6 +179,20 @@ beforeEach(() => {
   mocks.execute.mockResolvedValue(`0x${"a".repeat(64)}`);
 });
 afterEach(() => vi.restoreAllMocks());
+
+it.each([
+  ["1.23456789", 1_234_567_890_000_000_000n],
+  ["0.000000000000000001", 1n],
+])("Max fills the exact WETH balance %s", async (expected, balance) => {
+  mocks.readContract.mockImplementation(
+    () => new Promise((resolve) => setTimeout(() => resolve(balance), 20))
+  );
+  renderCanonicalTrade(descriptor.chainId, true, option, deployment.contracts.weth);
+  fireEvent.click(await screen.findByRole("button", { name: "MAX" }));
+  const amount = screen.getByRole<HTMLInputElement>("textbox", { name: "You pay amount" });
+  expect(amount).toHaveValue(expected);
+  expect(parseUnits(amount.value, 18)).toBe(balance);
+});
 
 it.each([
   {
