@@ -27,25 +27,43 @@ export async function recoverProtocolActivity(
   try {
     const chain = protocolChain(activity.chainId);
     if (!chain && !getReceipt) return activity;
+    const hash = activity.replacementHash ?? activity.hash;
     const receipt = getReceipt
-      ? await getReceipt(activity.hash)
+      ? await getReceipt(hash)
       : await createPublicClient({
           chain: chain!,
           transport: http(chain!.rpcUrls.default.http[0]),
-        }).getTransactionReceipt({ hash: activity.hash });
+        }).getTransactionReceipt({ hash });
     const update =
-      receipt.status === "success"
+      receipt.status === "success" &&
+      (activity.replacementReason === "cancelled" || activity.replacementReason === "replaced")
         ? {
-            status: "confirmed-unverified" as const,
+            status: "replaced" as const,
             confirmedHash: receipt.transactionHash,
-            error: "Receipt confirmed after reload. Refresh protocol state before another action.",
+            error:
+              activity.replacementReason === "cancelled"
+                ? "The submitted transaction was cancelled in the wallet."
+                : "The submitted transaction was replaced by a different wallet transaction.",
           }
-        : {
-            status: "reverted" as const,
-            confirmedHash: receipt.transactionHash,
-            error: "The transaction reverted onchain.",
-          };
-    updateProtocolActivity(activity.wallet, activity.chainId, activity.id, update);
+        : receipt.status === "success"
+          ? {
+              status: "confirmed-unverified" as const,
+              confirmedHash: receipt.transactionHash,
+              error:
+                "Receipt confirmed after reload. Refresh protocol state before another action.",
+            }
+          : {
+              status: "reverted" as const,
+              confirmedHash: receipt.transactionHash,
+              error: "The transaction reverted onchain.",
+            };
+    updateProtocolActivity(
+      activity.wallet,
+      activity.chainId,
+      activity.id,
+      update,
+      activity.deploymentId
+    );
     return { ...activity, ...update };
   } catch {
     return activity;

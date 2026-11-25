@@ -58,7 +58,8 @@ type UnifiedActivity = Readonly<{
 function protocolStatus(activity: ProtocolActivity): string {
   if (activity.status === "simulating") return "Simulating";
   if (activity.status === "signing") return "Awaiting signature";
-  if (activity.status === "submitted") return "Confirming";
+  if (activity.status === "submitted")
+    return activity.error ? "Confirmation unknown" : "Confirming";
   if (activity.status === "confirmed") {
     return activity.replacementReason === "repriced" ? "Confirmed · repriced" : "Confirmed";
   }

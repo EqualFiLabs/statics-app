@@ -49,11 +49,19 @@ describe("protocol activity recovery", () => {
   it("marks a recovered reverted receipt as reverted", async () => {
     const entry = activity();
     writeProtocolActivity(entry);
-    const getReceipt = vi.fn().mockResolvedValue({
-      status: "reverted",
-      transactionHash: hash,
-    } as TransactionReceipt);
+    const getReceipt = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("RPC temporarily unavailable"))
+      .mockResolvedValue({
+        status: "reverted",
+        transactionHash: hash,
+      } as TransactionReceipt);
 
+    await recoverProtocolActivity(entry, getReceipt);
+    expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
+      status: "submitted",
+      hash,
+    });
     await recoverProtocolActivity(entry, getReceipt);
 
     expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({

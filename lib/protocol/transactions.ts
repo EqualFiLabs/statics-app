@@ -17,7 +17,7 @@ import {
   type ProtocolActivityStatus,
   type ProtocolReplacementReason,
 } from "@/lib/dollar/activity";
-import { isOnchainRevert, isWalletRejection } from "@/lib/dollar/transactions";
+import { isWalletRejection } from "@/lib/dollar/transactions";
 import { MAX_ERC20_ALLOWANCE } from "@/lib/protocol/approvals";
 import {
   announceProtocolTransactionConfirmed,
@@ -213,6 +213,7 @@ export async function executeProtocolTransaction(
   const deploymentId = request.deploymentId ?? activeActivityDeploymentId();
   let stage: "simulating" | "signing" | "submitted" | "finished" = "simulating";
   let replacementReason: ProtocolReplacementReason | undefined;
+  let receipt: TransactionReceipt | undefined;
 
   writeProtocolActivity({
     id,
@@ -281,7 +282,7 @@ export async function executeProtocolTransaction(
       // persistence is unavailable.
     }
 
-    const receipt = await request.publicClient.waitForTransactionReceipt({
+    const transactionReceipt = await request.publicClient.waitForTransactionReceipt({
       hash,
       confirmations: 1,
       onReplaced: (replacement) => {
@@ -299,7 +300,9 @@ export async function executeProtocolTransaction(
         );
       },
     });
-    if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
+    receipt = transactionReceipt;
+    if (transactionReceipt.status !== "success")
+      throw new Error("The transaction reverted onchain.");
     if (replacementReason === "cancelled" || replacementReason === "replaced") {
       const message =
         replacementReason === "cancelled"
@@ -312,7 +315,7 @@ export async function executeProtocolTransaction(
         id,
         {
           status: "replaced",
-          confirmedHash: receipt.transactionHash,
+          confirmedHash: transactionReceipt.transactionHash,
           error: message,
         },
         deploymentId
@@ -320,13 +323,13 @@ export async function executeProtocolTransaction(
       throw new Error(message);
     }
 
-    if (typeof receipt.blockNumber === "bigint") {
-      await waitForRpcBlock(request.publicClient, receipt.blockNumber);
+    if (typeof transactionReceipt.blockNumber === "bigint") {
+      await waitForRpcBlock(request.publicClient, transactionReceipt.blockNumber);
       announceProtocolTransactionConfirmed({
         wallet: request.wallet,
         chainId: request.chainId,
         deploymentId,
-        blockNumber: receipt.blockNumber,
+        blockNumber: transactionReceipt.blockNumber,
         kind: request.kind,
         scopes: protocolQueryScopes(request.kind),
       });
@@ -334,7 +337,7 @@ export async function executeProtocolTransaction(
 
     if (request.verifyConfirmation) {
       try {
-        await retryConfirmationVerification(() => request.verifyConfirmation!(receipt));
+        await retryConfirmationVerification(() => request.verifyConfirmation!(transactionReceipt));
       } catch (error) {
         const verificationError = new ConfirmationVerificationError(
           "The transaction confirmed, but refreshed protocol state could not be verified. Refresh before another action.",
@@ -347,7 +350,7 @@ export async function executeProtocolTransaction(
           id,
           {
             status: "confirmed-unverified",
-            confirmedHash: receipt.transactionHash,
+            confirmedHash: transactionReceipt.transactionHash,
             error: verificationError.message,
           },
           deploymentId
@@ -363,26 +366,41 @@ export async function executeProtocolTransaction(
       id,
       {
         status: "confirmed",
-        confirmedHash: receipt.transactionHash,
+        confirmedHash: transactionReceipt.transactionHash,
       },
       deploymentId
     );
-    return receipt.transactionHash;
+    return transactionReceipt.transactionHash;
   } catch (error) {
     if (stage === "finished") throw error;
-    let status: ProtocolActivityStatus = "failed";
-    if (isWalletRejection(error)) status = "rejected";
-    else if (stage === "submitted" && isOnchainRevert(error)) status = "reverted";
+    let status: ProtocolActivityStatus = isWalletRejection(error) ? "rejected" : "failed";
+    let message = request.describeError(error);
+    if (stage === "submitted") {
+      if (!receipt) {
+        status = "submitted";
+        message =
+          "Transaction submitted, but its outcome could not be checked. Check the transaction in Activity before retrying.";
+      } else if (receipt.status === "reverted") {
+        status = "reverted";
+        message = "The transaction reverted onchain.";
+      } else {
+        status = "confirmed-unverified";
+        message =
+          "The transaction confirmed, but refreshed protocol state could not be verified. Refresh before another action.";
+      }
+    }
     updateProtocolActivity(
       request.wallet,
       request.chainId,
       id,
       {
         status,
-        error: request.describeError(error),
+        confirmedHash: receipt?.transactionHash,
+        error: message,
       },
       deploymentId
     );
+    if (stage === "submitted" && !receipt) throw new Error(message, { cause: error });
     throw error;
   }
 }
