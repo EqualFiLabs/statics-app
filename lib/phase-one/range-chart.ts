@@ -189,10 +189,15 @@ export function depthBuckets(
 }
 
 export type PricePoint = Readonly<{ time: number; price: number }>;
+export type PriceSeries = Readonly<{
+  from: number;
+  to: number;
+  points: readonly PricePoint[];
+}>;
 
 /**
- * A step series of display prices from `from` to `to`. Prices only move on swaps, so before the
- * first candle the price is that candle's open, and after the last it is the current price.
+ * Display prices with their requested time window. History starts at the first candle; the chart
+ * leaves the earlier interval blank rather than stretching the available prices across it.
  */
 export function priceSeries(
   candles: readonly Readonly<{ timestamp: bigint; open: number; close: number }>[],
@@ -200,7 +205,7 @@ export function priceSeries(
   from: number,
   to: number,
   inverted: boolean
-): PricePoint[] {
+): PriceSeries {
   const display = (price: number) => (inverted ? 1 / price : price);
   const inside = candles.filter((c) => Number(c.timestamp) >= from && Number(c.timestamp) <= to);
   const points: PricePoint[] = [
@@ -212,5 +217,5 @@ export function priceSeries(
   for (const candle of inside)
     points.push({ time: Number(candle.timestamp), price: display(candle.close) });
   points.push({ time: to, price: display(current) });
-  return points;
+  return { from, to, points };
 }
