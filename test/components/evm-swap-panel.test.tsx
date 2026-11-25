@@ -297,8 +297,12 @@ describe("integrated swap execution", () => {
       aggregatedOutputs: [{ amount: output, minAmount: minimum, token: usd }],
     },
   });
-  const unsupported = async (inputToken: Address = zeroAddress, amount = "1") => {
-    mocks.tokens = [{ address: usd, decimals: 6, name: "Dollar", symbol: "USD" }];
+  const unsupported = async (
+    inputToken: Address = zeroAddress,
+    amount = "1",
+    outputDecimals = 6
+  ) => {
+    mocks.tokens = [{ address: usd, decimals: outputDecimals, name: "Dollar", symbol: "USD" }];
     const view = renderCanonicalTrade(descriptor.chainId, true);
     fireEvent.change(await screen.findByRole("combobox", { name: "You receive asset" }), {
       target: { value: usd },
@@ -312,6 +316,39 @@ describe("integrated swap execution", () => {
     });
     return view;
   };
+  it.each(["890000000000", "1"])(
+    "shows a positive sub-micro output instead of zero (%s base units)",
+    async (output) => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+        Response.json(
+          String(url) === "/api/uniswap/swap"
+            ? {
+                swap: {
+                  to: usd,
+                  from: walletAddress,
+                  chainId: descriptor.chainId,
+                  data: "0x1234",
+                },
+              }
+            : apiQuote(output, output)
+        )
+      );
+      await unsupported(zeroAddress, "1", 18);
+      await waitFor(() =>
+        expect(screen.getByRole("textbox", { name: "You receive amount" })).toHaveValue("<0.000001")
+      );
+      expect(screen.getByText("<0.000001 USD")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Review swap" }));
+      expect(screen.getAllByText("<0.000001 USD")).toHaveLength(2);
+      fireEvent.click(screen.getByRole("button", { name: "Confirm swap" }));
+      await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
+      const swap = fetchSpy.mock.calls.find(([url]) => url === "/api/uniswap/swap");
+      expect(JSON.parse(swap![1]!.body as string).quote.output.amount).toBe(output);
+      expect(JSON.parse(swap![1]!.body as string).quote.aggregatedOutputs[0].minAmount).toBe(
+        output
+      );
+    }
+  );
   it("executes unsupported-pair API fixtures on the selected chain and preserves the reviewed floor", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
       Response.json(
