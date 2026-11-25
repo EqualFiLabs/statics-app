@@ -108,9 +108,9 @@ function displayAmount(raw: string | undefined, token: EvmSwapToken | undefined)
   if (!raw || !token) return "";
   const value = formatUnits(BigInt(raw), token.decimals);
   const [whole, fraction = ""] = value.split(".");
-  return fraction
-    ? `${whole}.${fraction.slice(0, 6).replace(/0+$/, "")}`.replace(/\.$/, "")
-    : whole;
+  const visibleFraction = fraction.slice(0, 6).replace(/0+$/, "");
+  if (BigInt(raw) > 0n && whole === "0" && !visibleFraction) return "<0.000001";
+  return visibleFraction ? `${whole}.${visibleFraction}` : whole;
 }
 
 export function EvmSwapPanel({
