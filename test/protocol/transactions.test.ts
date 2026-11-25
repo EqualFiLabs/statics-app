@@ -1,7 +1,8 @@
-import type { Address, Hex, PublicClient } from "viem";
+import type { Address, Hex, PublicClient, TransactionReceipt } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readProtocolActivity } from "@/lib/dollar/activity";
+import { recoverProtocolActivity } from "@/lib/portal/activity-recovery";
 import {
   bufferedGasLimit,
   defaultProtocolPresentation,
@@ -77,6 +78,79 @@ describe("protocol transaction execution", () => {
     expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
       kind: "create-position",
       status: "confirmed",
+      confirmedHash: hash,
+    });
+  });
+
+  it("keeps a submitted transaction recoverable after receipt lookup fails", async () => {
+    const deploymentId = "phase-one-test";
+    const receiptError = new Error("Receipt lookup timed out");
+    await expect(
+      executeProtocolTransaction({
+        publicClient: {
+          call: vi.fn().mockResolvedValue({ data: "0x" }),
+          estimateGas: vi.fn().mockResolvedValue(100_000n),
+          waitForTransactionReceipt: vi.fn().mockRejectedValue(receiptError),
+        } as unknown as PublicClient,
+        wallet,
+        chainId: 31_337,
+        deploymentId,
+        kind: "send",
+        label: "Send ETH",
+        amount: "1 ETH",
+        to: target,
+        data: "0x",
+        sendTransaction: vi.fn().mockResolvedValue(hash),
+        describeError: (error) => (error instanceof Error ? error.message : "Unknown error"),
+      })
+    ).rejects.toThrow("outcome could not be checked");
+
+    const entry = readProtocolActivity(wallet, 31_337, deploymentId)[0];
+    expect(entry).toMatchObject({
+      status: "submitted",
+      hash,
+      error: expect.stringContaining("Check the transaction in Activity"),
+    });
+
+    await recoverProtocolActivity(
+      entry,
+      vi.fn().mockResolvedValue({
+        status: "success",
+        transactionHash: hash,
+      } as TransactionReceipt)
+    );
+    expect(readProtocolActivity(wallet, 31_337, deploymentId)[0]).toMatchObject({
+      status: "confirmed-unverified",
+      hash,
+      confirmedHash: hash,
+    });
+  });
+
+  it("marks a known reverted receipt as reverted", async () => {
+    await expect(
+      executeProtocolTransaction({
+        publicClient: {
+          call: vi.fn().mockResolvedValue({ data: "0x" }),
+          estimateGas: vi.fn().mockResolvedValue(100_000n),
+          waitForTransactionReceipt: vi.fn().mockResolvedValue({
+            status: "reverted",
+            transactionHash: hash,
+          }),
+        } as unknown as PublicClient,
+        wallet,
+        chainId: 31_337,
+        kind: "send",
+        label: "Send ETH",
+        amount: "1 ETH",
+        to: target,
+        data: "0x",
+        sendTransaction: vi.fn().mockResolvedValue(hash),
+        describeError: (error) => (error instanceof Error ? error.message : "Unknown error"),
+      })
+    ).rejects.toThrow("reverted onchain");
+    expect(readProtocolActivity(wallet, 31_337)[0]).toMatchObject({
+      status: "reverted",
+      hash,
       confirmedHash: hash,
     });
   });

@@ -104,6 +104,28 @@ describe("activity page", () => {
     expect(screen.getByText("Reverted")).toBeInTheDocument();
   });
 
+  it("shows the hash and unknown outcome when receipt checking times out", () => {
+    writeDollarActivity({
+      id: "unknown",
+      wallet,
+      chainId: 31_337,
+      kind: "send",
+      label: "Send ETH",
+      amount: "1 ETH",
+      status: "submitted",
+      hash: originalHash,
+      error: "Transaction submitted, but its outcome could not be checked.",
+      createdAt: 1,
+    });
+
+    renderActivity(31_337);
+    expect(screen.getByText("Confirmation unknown")).toBeInTheDocument();
+    expect(screen.getByText(/outcome could not be checked/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: `Copy transaction ${originalHash}` })
+    ).toBeInTheDocument();
+  });
+
   it("shows repriced confirmation metadata and a verified-chain explorer link", () => {
     writeDollarActivity({
       id: "repriced",
