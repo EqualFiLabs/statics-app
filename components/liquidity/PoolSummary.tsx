@@ -4,7 +4,7 @@ import { ReferenceStatus } from "@/components/overview/ReferenceStatus";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/i18n/client";
 import type { DexPool, DexPoolPage } from "@/lib/indexer/dex-market";
-import type { PricePoint } from "@/lib/phase-one/range-chart";
+import type { PriceSeries } from "@/lib/phase-one/range-chart";
 import styles from "./range-chart.module.css";
 
 /** Pool facts beside the range editor: price, a sparkline and indexed market stats. */
@@ -22,7 +22,7 @@ export function PoolSummary({
   fee: React.ReactNode;
   current: number | null;
   unit: string;
-  series: readonly PricePoint[] | null;
+  series: PriceSeries | null;
   stats: DexPool | null;
   quote: DexPoolPage["quote"] | null;
   children?: React.ReactNode;
@@ -44,16 +44,15 @@ export function PoolSummary({
               : {}),
           }).format(Number(value) / 10 ** quote.decimals)}`;
   const spark = (() => {
-    if (!series || series.length < 2) return null;
-    const prices = series.map((point) => point.price);
+    if (!series || series.points.length < 2) return null;
+    const prices = series.points.map((point) => point.price);
     const low = Math.min(...prices),
       high = Math.max(...prices),
-      from = series[0]!.time,
-      span = series.at(-1)!.time - from || 1;
+      span = series.to - series.from || 1;
     const y = (price: number) => (high === low ? 15 : 28 - ((price - low) / (high - low)) * 26);
-    return series
+    return series.points
       .map((point, index) => {
-        const x = (((point.time - from) / span) * 100).toFixed(2);
+        const x = (((point.time - series.from) / span) * 100).toFixed(2);
         return index === 0
           ? `M${x} ${y(point.price).toFixed(2)}`
           : `H${x} V${y(point.price).toFixed(2)}`;

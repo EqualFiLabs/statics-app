@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@/test/render";
 import { usePoolMarket } from "@/hooks/usePoolMarket";
 import { PoolSummary } from "@/components/liquidity/PoolSummary";
+import { RangeChart } from "@/components/liquidity/RangeChart";
+import { priceSeries } from "@/lib/phase-one/range-chart";
 
 const mocks = vi.hoisted(() => ({
   pools: vi.fn(),
@@ -24,6 +26,56 @@ function Market() {
   return <span data-testid="quote">{String(market.usd(token, 10n ** 18n, 18))}</span>;
 }
 describe("liquidity market context", () => {
+  it.each([
+    ["1D", 86_400],
+    ["1W", 7 * 86_400],
+    ["1M", 30 * 86_400],
+  ] as const)(
+    "leaves the start of a sparse %s price window blank in both charts",
+    (period, span) => {
+      const from = 1_000_000;
+      const firstCandle = BigInt(from + (span * 9) / 10);
+      const series = priceSeries(
+        [{ timestamp: firstCandle, open: 2, close: 3 }],
+        3,
+        from,
+        from + span,
+        false
+      );
+      const summary = render(
+        <PoolSummary
+          pair="A / B"
+          fee="0.3%"
+          current={3}
+          unit="A/B"
+          series={series}
+          stats={null}
+          quote={null}
+        />
+      );
+      expect(summary.container.querySelector("svg path")?.getAttribute("d")).toMatch(/^M90\.00 /);
+      summary.unmount();
+
+      const chart = render(
+        <RangeChart
+          current={3}
+          bounds={null}
+          unit="A/B"
+          series={series}
+          depth={null}
+          decimals={[18, 18]}
+          inverted={false}
+          period={period}
+          onPeriod={vi.fn()}
+          editable={false}
+          onMove={vi.fn()}
+          onStep={vi.fn()}
+        />
+      );
+      expect(chart.container.querySelector("svg path")?.getAttribute("d")).toMatch(/^M90\.000 /);
+    }
+  );
+
   it("uses the indexed clock for candle windows and never labels WETH valuation as dollars", async () => {
     mocks.pools.mockResolvedValue({ items: [], quote, indexedAtTimestamp: 1000000n });
     mocks.tokens.mockResolvedValue({

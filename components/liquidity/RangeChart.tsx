@@ -3,7 +3,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/i18n/client";
-import { depthBuckets, type Bound, type PricePoint } from "@/lib/phase-one/range-chart";
+import { depthBuckets, type Bound, type PriceSeries } from "@/lib/phase-one/range-chart";
 import type { ChartPeriod } from "@/hooks/usePoolMarket";
 import styles from "./range-chart.module.css";
 
@@ -32,7 +32,7 @@ export function RangeChart({
   /** Display [min, max]; [0, ∞] is full range; null while no range is set. */
   bounds: readonly [number, number] | null;
   unit: string;
-  series: readonly PricePoint[] | null;
+  series: PriceSeries | null;
   depth: readonly Readonly<{ tick: number; liquidityNet: bigint }>[] | null;
   decimals: readonly [number, number];
   inverted: boolean;
@@ -66,12 +66,11 @@ export function RangeChart({
     new Intl.NumberFormat(locale, { maximumSignificantDigits: 5 }).format(value);
 
   const path = (() => {
-    if (!series || series.length < 2) return null;
-    const from = series[0]!.time,
-      span = series.at(-1)!.time - from || 1;
-    return series
+    if (!series || series.points.length < 2) return null;
+    const span = series.to - series.from || 1;
+    return series.points
       .map((point, index) => {
-        const x = (((point.time - from) / span) * 100).toFixed(3);
+        const x = (((point.time - series.from) / span) * 100).toFixed(3);
         const height = y(point.price).toFixed(3);
         return index === 0 ? `M${x} ${height}` : `H${x} V${height}`;
       })

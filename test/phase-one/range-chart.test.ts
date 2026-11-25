@@ -123,15 +123,23 @@ describe("range chart geometry", () => {
       100,
       false
     );
-    expect(series).toEqual([
-      { time: 50, price: 9 },
-      { time: 50, price: 11 },
-      { time: 70, price: 12 },
-      { time: 100, price: 13 },
-    ]);
-    expect(priceSeries([], 4, 0, 10, true)).toEqual([
-      { time: 10, price: 0.25 },
-      { time: 10, price: 0.25 },
-    ]);
+    expect(series).toEqual({
+      from: 0,
+      to: 100,
+      points: [
+        { time: 50, price: 9 },
+        { time: 50, price: 11 },
+        { time: 70, price: 12 },
+        { time: 100, price: 13 },
+      ],
+    });
+    expect(priceSeries([], 4, 0, 10, true)).toEqual({
+      from: 0,
+      to: 10,
+      points: [
+        { time: 10, price: 0.25 },
+        { time: 10, price: 0.25 },
+      ],
+    });
   });
 });
