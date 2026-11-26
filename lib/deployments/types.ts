@@ -1,5 +1,6 @@
 import type { Address, Hex } from "viem";
 
+import type { PhaseTwoManifest } from "@/lib/baskets/phase-two";
 import type { DollarDeployment } from "@/lib/dollar/deployment";
 
 export type LegacyDeploymentCapability =
@@ -11,6 +12,7 @@ export type LegacyDeploymentCapability =
   | "genesis-position-linking"
   | "dollar"
   | "baskets"
+  | "basket-conversion"
   | "positions"
   | "loans"
   | "protocol-liquidity"
@@ -35,7 +37,7 @@ export type PhaseOneCapability =
 
 export type DeploymentCapability = LegacyDeploymentCapability | PhaseOneCapability;
 
-export type DeploymentStage = "launch" | "phase-one" | "full-protocol";
+export type DeploymentStage = "launch" | "phase-one" | "phase-two" | "full-protocol";
 
 export type DeploymentDescriptor = Readonly<{
   deploymentId: string;
@@ -161,5 +163,6 @@ export type DeploymentOption = Readonly<{
   descriptor: DeploymentDescriptor;
   launch: LaunchDeployment | null;
   phaseOne?: PhaseOneDeployment | null;
+  phaseTwo?: PhaseTwoManifest | null;
   protocol: ProtocolDeployment | null;
 }>;

@@ -22,6 +22,8 @@ vi.mock("ponder:schema", () =>
       "allocationDirectoryState",
       "activeGenesisCredit",
       "activeLoan",
+      "activatedBasket",
+      "basketConversionMarket",
       "genesisNft",
       "genesisRewardClaim",
       "harvestedFee",
@@ -668,4 +670,32 @@ it("updates default hook rates without overwriting overrides or another deployme
     outputFeePips: 0,
     updatedAtBlock: 101n,
   });
+});
+
+it("indexes conversion registration and retirement without creating an AMM pool", async () => {
+  const basketId = 7n;
+  const token = `0x${"2".repeat(40)}`;
+  const creator = `0x${"3".repeat(40)}`;
+  const quote = `0x${"4".repeat(40)}`;
+  const context = { db };
+  await handlers.get("Statics:BasketLaunched")!({
+    context,
+    event: { ...base, args: { basketId, token, creator } },
+  });
+  await handlers.get("Statics:BasketConversionMarketCreated")!({
+    context,
+    event: { ...base, args: { poolId, basketId, quote } },
+  });
+  await handlers.get("Statics:BasketConversionMarketDecommissioned")!({
+    context,
+    event: { ...base, block: { ...base.block, number: 110n }, args: { poolId } },
+  });
+  expect(rows.get("activatedBasket:genesis:7")).toMatchObject({ token, creator, block: 100n });
+  expect(rows.get(`basketConversionMarket:genesis:${poolId}`)).toMatchObject({
+    basketId,
+    quote,
+    createdAtBlock: 100n,
+    retiredAtBlock: 110n,
+  });
+  expect([...rows.keys()].some((key) => key.startsWith("publicPool:"))).toBe(false);
 });

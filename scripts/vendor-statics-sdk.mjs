@@ -71,6 +71,13 @@ if (
   );
 }
 
+if (
+  priorProvenance?.basketConversionSource &&
+  !process.env.STATICS_CONVERSION_SDK_REPOSITORY?.trim()
+) {
+  throw new Error("Set STATICS_CONVERSION_SDK_REPOSITORY to retain basket conversion during sync.");
+}
+
 const protocolCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: protocolRoot,
   encoding: "utf8",
@@ -289,4 +296,8 @@ if (process.env.STATICS_REWARD_SELECTION_TIMING_SDK_REPOSITORY?.trim()) {
 
 if (process.env.STATICS_POSITION_STATEMENT_SDK_REPOSITORY?.trim()) {
   await import("./vendor-position-statements-sdk.mjs");
+}
+
+if (process.env.STATICS_CONVERSION_SDK_REPOSITORY?.trim()) {
+  await import("./vendor-basket-conversion-sdk.mjs");
 }

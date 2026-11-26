@@ -26,6 +26,8 @@ import { dexIndexer, type DexEvent } from "./dex-indexer";
 import {
   activeGenesisCredit,
   activeLoan,
+  activatedBasket,
+  basketConversionMarket,
   genesisNft,
   genesisRewardClaim,
   harvestedFee,
@@ -74,6 +76,37 @@ function sourceHandler(enabled: boolean): typeof ponder.on {
 }
 
 const onStatics = sourceHandler(Boolean(configuredAddress("PONDER_STATICS_DIAMOND_ADDRESS")));
+onStatics("Statics:BasketLaunched", async ({ event, context }) => {
+  const { basketId, token, creator } = event.args;
+  await context.db.insert(activatedBasket).values({
+    key: entityKey(basketId),
+    deploymentId,
+    basketId,
+    token,
+    creator,
+    block: event.block.number,
+  });
+});
+
+onStatics("Statics:BasketConversionMarketCreated", async ({ event, context }) => {
+  const { poolId, basketId, quote } = event.args;
+  await context.db.insert(basketConversionMarket).values({
+    key: `${deploymentId}:${poolId.toLowerCase()}`,
+    deploymentId,
+    poolId,
+    basketId,
+    quote,
+    createdAtBlock: event.block.number,
+  });
+});
+
+onStatics("Statics:BasketConversionMarketDecommissioned", async ({ event, context }) => {
+  const key = `${deploymentId}:${event.args.poolId.toLowerCase()}`;
+  await context.db
+    .update(basketConversionMarket, { key })
+    .set({ retiredAtBlock: event.block.number });
+});
+
 const onPositionManager = sourceHandler(
   Boolean(configuredAddress("PONDER_POSITION_MANAGER_ADDRESS"))
 );

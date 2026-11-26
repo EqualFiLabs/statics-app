@@ -100,3 +100,17 @@ rebuild; the existing manifest checks still apply. See
 [Runtime deployment manifests](../docs/runtime-deployment-manifests.md) for staging, generation,
 atomic publication, failure behavior and rollback. Private deployment configuration is never
 part of the public bundle.
+
+## Phase 2 conversion
+
+Add a market to the Phase 2 catalog after governance finalizes its verified
+unseeded basket, registers the USDG market, approves the zap for that basket and
+checks a buy and sell. The catalog binds the protocol commit, deployment block,
+contract addresses and runtime hashes. Each market specifies the basket ID,
+conversion PoolId and a direct reviewed v4 PoolKey for each constituent in
+onchain order. Use `null` for the USDG constituent itself.
+
+For local fork testing, provide the same manifest shape in
+`NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST` with the app set to development
+and the network set to Anvil. The browser checks the deployed configuration and
+selector routes before quoting or submitting transactions.

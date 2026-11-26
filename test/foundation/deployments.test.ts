@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { v4PoolId } from "@statics-protocol/sdk";
 
+import { isDappRouteAllowed } from "@/lib/dapp-navigation";
 import { parseLaunchDeploymentManifest } from "@/lib/deployments/launch-manifest";
 import {
   LOCAL_ROBINHOOD_GENESIS_DEPLOYMENT_ID,
@@ -86,6 +87,49 @@ describe("deployment registry", () => {
     expect(() => deploymentRegistry({ ...environment, NEXT_PUBLIC_APP_ENV: "production" })).toThrow(
       "only allowed in development"
     );
+  });
+
+  it("opens the basket conversion route independently of Dollar", () => {
+    const identity = { address: address("1"), runtimeCodeHash: hash("1") };
+    const phaseTwo = {
+      version: 1,
+      chainId: 4663,
+      protocolCommit: "a".repeat(40),
+      deploymentBlock: "100",
+      diamond: identity,
+      conversionFacet: identity,
+      redemptionFacet: identity,
+      basketViewFacet: identity,
+      hook: identity,
+      zap: identity,
+      router: identity,
+      poolManager: identity,
+      quoter: identity,
+      quote: identity,
+      markets: [
+        {
+          basketId: "0",
+          poolId: hash("a"),
+          name: "Basket",
+          symbol: "BASKET",
+          quote: address("1"),
+          assets: [address("1")],
+          pools: [null],
+        },
+      ],
+    };
+    const [local] = deploymentRegistry({
+      NEXT_PUBLIC_APP_ENV: "development",
+      NEXT_PUBLIC_APP_NETWORK: "anvil",
+      NEXT_PUBLIC_ANVIL_CHAIN_ID: "4663",
+      NEXT_PUBLIC_STATICS_LOCAL_PHASE_TWO_MANIFEST: JSON.stringify(phaseTwo),
+    });
+    expect(local.phaseTwo).toEqual(phaseTwo);
+    expect(local.protocol).toBeNull();
+    expect(local.descriptor.stage).toBe("phase-two");
+    expect(isDappRouteAllowed("/app/baskets", local.descriptor)).toBe(true);
+    expect(isDappRouteAllowed("/app/create", local.descriptor)).toBe(false);
+    expect(isDappRouteAllowed("/app/dollar", local.descriptor)).toBe(false);
   });
 
   it("rejects incomplete local runtime identity", () => {
