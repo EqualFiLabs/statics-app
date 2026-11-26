@@ -58,8 +58,8 @@
     "dist/phase-one/genesis-credit.js": "9b9be92463d34e6f18354c96064ad2f43365078945a13e9df0df7c8dd852e42d",
     "dist/phase-one/position-market.d.ts": "ab065ee9363338f6c41a6bb13b703dc963e216e63d899e42f93bc5addecb1008",
     "dist/phase-one/position-market.js": "617404121aeb2abd7ebda24436dc033788dc9643819376d5060fd3ed5d40f706",
-    "dist/basket-conversion.js": "89d12effcf28106508c0a38a4143f971771ba119c4e446048bfcbb1553e11f42",
-    "dist/basket-conversion.d.ts": "6763a929db544baf5fa2419062aa556ba6181920ac214a3396ec11beb79cf58b"
+    "dist/basket-conversion.js": "78ea0fd628ccc040f2e6f1e27368bb8c3f867c0e331761b610bcd523abc88b44",
+    "dist/basket-conversion.d.ts": "433a3b0680266f4554787cb49b2d986fb556aa95aeda77d410ca02e3c054f114"
   },
   "batchRewardsSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
@@ -95,9 +95,9 @@
   "basketConversionSource": {
     "repository": "https://github.com/EqualFiLabs/statics-sdk",
     "path": ".",
-    "commit": "3843985ca7826c77ade603f9854da3cb94406685"
+    "commit": "e06e0e9f75d6f71c4911b252cc92a37639473be1"
   },
   "basketConversionSourceChecksums": {
-    "src/basket-conversion.ts": "46c13b93c062c379bfe6b2be74998d4838cefdf80d8bcc955aa7d9cdac7992a5"
+    "src/basket-conversion.ts": "9ff5690fa75f3da3f6e949c6baebed5200f5c357f7d27586b16a0e5f20e157ce"
   }
 }

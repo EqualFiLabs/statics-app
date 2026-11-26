@@ -657,6 +657,7 @@ export declare const staticsBasketDistributorAbi: readonly [{
         readonly name: "allowed";
     }];
 }];
+export declare function buildSetBasketDistributorCall(basketId: bigint, account: Address, allowed: boolean): Hex;
 export type ReviewedBasketConversionMarket = Readonly<{
     chainId: number;
     basketId: bigint;

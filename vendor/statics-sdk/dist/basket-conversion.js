@@ -104,6 +104,13 @@ export const staticsBasketDistributorAbi = parseAbi([
     "function isBasketDistributor(uint256 basketId,address account) view returns (bool)",
     "event BasketDistributorSet(uint256 indexed basketId,address indexed account,bool allowed)",
 ]);
+export function buildSetBasketDistributorCall(basketId, account, allowed) {
+    return encodeFunctionData({
+        abi: staticsBasketDistributorAbi,
+        functionName: "setBasketDistributor",
+        args: [basketId, account, allowed],
+    });
+}
 const basketQuoteAbi = parseAbi([
     "function basket(uint256 basketId) view returns ((address token,address creator,uint8 status,address[] assets,uint256[] bundleAmounts,(uint256 minActionShares,uint256 feeShares)[] mintFeeTiers,(uint256 minActionShares,uint256 feeShares)[] redemptionFeeTiers,uint16 flashFeeBps,uint16 originationFeeBps,uint16 extensionFeeBps,uint16 ltvBps,uint16 recoveryPenaltyBps,uint40 loanDuration) result)",
     "function quoteMint(uint256 basketId,uint256 shares) view returns (uint256[])",
